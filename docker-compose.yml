@@ -1,0 +1,90 @@
+version: '3.8'
+services:
+  postgres-primary:
+    image: citusdata/citus:12.1
+    environment:
+      POSTGRES_DB: takelow_db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d takelow_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-replica:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: takelow_db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: secret
+      POSTGRES_PRIMARY_URL: postgresql://admin:secret@postgres-primary:5432/takelow_db
+    ports:
+      - "5433:5432"
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+    volumes:
+      - replica_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  identity-service:
+    build: ./identity-service
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://admin:secret@postgres-primary:5432/takelow_db
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "3001:3000"
+
+  auction-engine:
+    build: ./auction-engine
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://admin:secret@postgres-primary:5432/takelow_db
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "3002:3000"
+
+  query-service:
+    build: ./query-service
+    depends_on:
+      postgres-replica:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgresql://admin:secret@postgres-primary:5432/takelow_db
+      READ_REPLICA_URL: postgresql://admin:secret@postgres-replica:5432/takelow_db
+    ports:
+      - "3003:3000"
+
+  web:
+    build: ./takelow-web
+    depends_on: [identity-service, auction-engine, query-service]
+    ports:
+      - "80:80"
+
+volumes:
+  postgres_data:
+  replica_data:

@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: takelow-config
+  labels:
+    app: takelow
+data:
+  NODE_ENV: production
+  DB_HOST: takelow-citus-primary
+  DB_PORT: "5432"
+  DB_DATABASE: takelow_db
+  DB_USER: admin
+  REDIS_HOST: takelow-redis
+  REDIS_PORT: "6379"
+  IDENTITY_SERVICE_URL: http://identity-service:3001
+  AUCTION_ENGINE_URL: http://auction-engine:3002
+  QUERY_SERVICE_URL: http://query-service:3003
+  CORS_ORIGINS: https://takelow.com,https://www.takelow.com
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: takelow-secrets
+  labels:
+    app: takelow
+type: Opaque
+stringData:
+  JWT_SECRET: "${JWT_SECRET}"
+  JWT_REFRESH_SECRET: "${JWT_REFRESH_SECRET}"
+  DB_PASSWORD: "${DB_PASSWORD}"
+  FINTECH_WEBHOOK_SECRET: "${FINTECH_WEBHOOK_SECRET}"
+  ENCRYPTION_KEY: "${ENCRYPTION_KEY}"

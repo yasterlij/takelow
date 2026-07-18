@@ -1,0 +1,73 @@
+export const colors = {
+  navy: '#0F2154',
+  navyLight: '#1B3573',
+  navyDark: '#0A1838',
+  navyForeground: '#FFFFFF',
+  orange: '#F27A18',
+  orangeLight: '#F79A4E',
+  orangeDark: '#D96A10',
+  mint: '#27AE60',
+  mintLight: '#4CC97E',
+  mintDark: '#1E8B4C',
+  background: '#F5F6F8',
+  foreground: '#0F2154',
+  card: '#FFFFFF',
+  cardForeground: '#0F2154',
+  muted: '#F5F6F8',
+  mutedForeground: '#7C829F',
+  border: '#E5E7EB',
+  input: '#E5E7EB',
+  ring: '#F27A18',
+  primary: '#F27A18',
+  primaryForeground: '#FFFFFF',
+  secondary: '#EEF0F7',
+  secondaryForeground: '#0F2154',
+  accent: '#FFF0E0',
+  accentForeground: '#D96A10',
+  destructive: '#EF4444',
+  emerald50: '#ECFDF5',
+  emerald100: '#D1FAE5',
+  emerald400: '#34D399',
+  emerald500: '#10B981',
+  emerald600: '#059669',
+  emerald700: '#047857',
+  white: '#FFFFFF',
+  warning: '#F59E0B',
+  black: '#000000',
+  navyBg: '#141d47',
+  navyBgFrom: '#141d47',
+  navyBgTo: '#0d1533',
+}
+
+export const spacing = {
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  xxl: 24,
+  xxxl: 32,
+}
+
+export const borderRadius = {
+  sm: 6,
+  md: 10,
+  lg: 14,
+  xl: 18,
+  xxl: 24,
+  full: 999,
+}
+
+export const fontSize = {
+  xs: 11,
+  sm: 13,
+  md: 15,
+  base: 16,
+  lg: 18,
+  xl: 20,
+  xxl: 24,
+  xxxl: 30,
+  display: 36,
+}
+
+export const CURRENCY = 'ETB'

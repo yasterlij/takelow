@@ -1,0 +1,30 @@
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+} from 'typeorm';
+
+@Entity('products')
+export class Product {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column({ type: 'varchar' })
+  name: string;
+
+  @Column({ type: 'text', nullable: true })
+  description: string;
+
+  @Column({ type: 'jsonb', nullable: true })
+  image_urls: string[];
+
+  @Column({ type: 'decimal', precision: 12, scale: 2 })
+  current_market_price: number;
+
+  @Column({ type: 'varchar', nullable: true })
+  brand: string;
+
+  @CreateDateColumn()
+  created_at: Date;
+}
