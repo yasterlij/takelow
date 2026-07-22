@@ -1,59 +1,127 @@
-import React, { useState } from 'react'
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native'
-import { Eye, EyeOff, Smartphone, Lock, User } from 'lucide-react-native'
+import React, { useState, useRef } from 'react'
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
+import { Eye, EyeOff, Smartphone, Lock, User, AlertCircle } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { AwashLogo } from '../components/AuctionUI'
 import { colors } from '../theme'
 
 export function RegisterScreen() {
-  const { register, go } = useApp()
+  const { register, go, authError } = useApp()
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
-  const [pin, setPin] = useState('')
-  const [showPin, setShowPin] = useState(false)
-  const [error, setError] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPw, setShowPw] = useState(false)
+  const [localError, setLocalError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const nameRef = useRef<TextInput>(null)
+  const phoneRef = useRef<TextInput>(null)
+  const pwRef = useRef<TextInput>(null)
 
-  const handleRegister = () => {
-    if (!name.trim() || !phone.trim() || !pin.trim()) { setError('All fields are required'); return }
-    if (pin.length < 4) { setError('PIN must be 4 digits'); return }
-    register(name.trim(), phone.trim(), pin.trim())
+  const validate = (): boolean => {
+    if (!name.trim()) { setLocalError('Please enter your full name'); nameRef.current?.focus(); return false }
+    if (!phone.trim()) { setLocalError('Please enter your phone number'); phoneRef.current?.focus(); return false }
+    if (phone.trim().length < 9) { setLocalError('Phone number must be at least 9 digits'); phoneRef.current?.focus(); return false }
+    if (!password.trim()) { setLocalError('Please enter a password'); pwRef.current?.focus(); return false }
+    if (password.length < 6) { setLocalError('Password must be at least 6 characters'); pwRef.current?.focus(); return false }
+    return true
   }
+
+  const handleRegister = async () => {
+    setLocalError('')
+    if (!validate()) return
+    setLoading(true)
+    const ok = await register(name.trim(), phone.trim(), password.trim())
+    setLoading(false)
+    if (!ok) setLocalError(authError || 'Registration failed')
+  }
+
+  const displayError = localError || authError
 
   return (
     <View style={s.container}>
       <View style={s.body}>
         <AwashLogo variant="light" size={48} />
         <Text style={s.title}>Create Account</Text>
-        <Text style={s.subtitle}>Join Awash Mobile Money</Text>
+        <Text style={s.subtitle}>Join TakeLow auctions</Text>
 
-        {error ? <View style={s.errorBox}><Text style={s.errorText}>{error}</Text></View> : null}
+        {displayError ? (
+          <View style={s.errorBox}>
+            <AlertCircle size={16} color={colors.destructive} />
+            <Text style={s.errorText}>{displayError}</Text>
+          </View>
+        ) : null}
 
         <View style={s.form}>
           <Text style={s.label}>Full Name</Text>
-          <View style={s.inputRow}>
+          <View style={[s.inputRow, name.trim().length >= 2 && { borderColor: colors.emerald500 + '66' }]}>
             <User size={18} color={colors.white + '99'} />
-            <TextInput value={name} onChangeText={setName} placeholder="Selam Tesfaye" placeholderTextColor={colors.white + '40'} style={s.input} />
+            <TextInput
+              ref={nameRef}
+              value={name}
+              onChangeText={(t) => { setName(t); setLocalError('') }}
+              placeholder="Selam Tesfaye"
+              placeholderTextColor={colors.white + '40'}
+              style={s.input}
+              returnKeyType="next"
+              onSubmitEditing={() => phoneRef.current?.focus()}
+              blurOnSubmit={false}
+            />
           </View>
           <Text style={[s.label, { marginTop: 16 }]}>Phone Number</Text>
-          <View style={s.inputRow}>
+          <View style={[s.inputRow, phone.trim().length >= 9 && { borderColor: colors.emerald500 + '66' }]}>
             <Smartphone size={18} color={colors.white + '99'} />
-            <TextInput value={phone} onChangeText={setPhone} placeholder="091 XXX XXXX" placeholderTextColor={colors.white + '40'} style={s.input} keyboardType="phone-pad" />
+            <TextInput
+              ref={phoneRef}
+              value={phone}
+              onChangeText={(t) => { setPhone(t.replace(/\D/g, '')); setLocalError('') }}
+              placeholder="091 XXX XXXX"
+              placeholderTextColor={colors.white + '40'}
+              style={s.input}
+              keyboardType="phone-pad"
+              maxLength={10}
+              returnKeyType="next"
+              onSubmitEditing={() => pwRef.current?.focus()}
+              blurOnSubmit={false}
+            />
           </View>
-          <Text style={[s.label, { marginTop: 16 }]}>PIN (4 digits)</Text>
-          <View style={s.inputRow}>
+          <Text style={[s.label, { marginTop: 16 }]}>Password</Text>
+          <View style={[s.inputRow, password.length >= 6 && { borderColor: colors.emerald500 + '66' }]}>
             <Lock size={18} color={colors.white + '99'} />
-            <TextInput value={pin} onChangeText={(t) => setPin(t.replace(/\D/g, '').slice(0, 4))} secureTextEntry={!showPin} maxLength={4} placeholder="****" placeholderTextColor={colors.white + '40'} style={s.input} keyboardType="number-pad" />
-            <TouchableOpacity onPress={() => setShowPin((s) => !s)}><Text style={s.eye}>{showPin ? <EyeOff size={16} color={colors.white + '99'} /> : <Eye size={16} color={colors.white + '99'} />}</Text></TouchableOpacity>
+            <TextInput
+              ref={pwRef}
+              value={password}
+              onChangeText={(t) => { setPassword(t); setLocalError('') }}
+              secureTextEntry={!showPw}
+              placeholder="min 6 characters"
+              placeholderTextColor={colors.white + '40'}
+              style={s.input}
+              returnKeyType="go"
+              onSubmitEditing={handleRegister}
+            />
+            <TouchableOpacity onPress={() => setShowPw((s) => !s)} style={{ padding: 4 }}>
+              {showPw ? <EyeOff size={16} color={colors.white + '99'} /> : <Eye size={16} color={colors.white + '99'} />}
+            </TouchableOpacity>
           </View>
         </View>
 
-        <TouchableOpacity style={s.registerBtn} onPress={handleRegister}>
-          <Text style={s.registerBtnText}>Create Account</Text>
+        <TouchableOpacity
+          style={[s.registerBtn, loading && { opacity: 0.7 }]}
+          onPress={handleRegister}
+          disabled={loading}
+          activeOpacity={0.85}
+        >
+          {loading ? (
+            <ActivityIndicator size={18} color={colors.primaryForeground} />
+          ) : (
+            <Text style={s.registerBtnText}>Create Account</Text>
+          )}
         </TouchableOpacity>
 
         <Text style={s.footer}>
           Already have an account?{' '}
-          <Text onPress={() => go('login')} style={s.footerLink}>Sign In</Text>
+          <TouchableOpacity onPress={() => go('login')}>
+            <Text style={s.footerLink}>Sign In</Text>
+          </TouchableOpacity>
         </Text>
       </View>
     </View>
@@ -65,13 +133,12 @@ const s = StyleSheet.create({
   body: { alignItems: 'center' },
   title: { fontSize: 24, fontWeight: '800', color: colors.navyForeground, marginTop: 32 },
   subtitle: { fontSize: 14, fontWeight: '500', color: colors.navyForeground + '99', marginTop: 4 },
-  errorBox: { marginTop: 24, borderRadius: 12, backgroundColor: colors.destructive + '26', padding: 12, width: '100%', maxWidth: 320 },
-  errorText: { fontSize: 12, fontWeight: '600', color: colors.destructive, textAlign: 'center' },
+  errorBox: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 24, borderRadius: 12, backgroundColor: colors.destructive + '26', padding: 12, width: '100%', maxWidth: 320 },
+  errorText: { fontSize: 12, fontWeight: '600', color: colors.destructive, textAlign: 'center', flex: 1 },
   form: { marginTop: 32, width: '100%', maxWidth: 320 },
   label: { fontSize: 12, fontWeight: '600', color: colors.navyForeground + 'B3', marginBottom: 6 },
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.navyForeground + '4D', backgroundColor: colors.white + '1A', paddingHorizontal: 16, paddingVertical: 12 },
   input: { flex: 1, fontSize: 14, fontWeight: '500', color: colors.navyForeground },
-  eye: { padding: 4 },
   registerBtn: { marginTop: 32, width: '100%', maxWidth: 320, borderRadius: 12, backgroundColor: colors.primary, paddingVertical: 14, alignItems: 'center', shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
   registerBtnText: { fontSize: 14, fontWeight: '700', color: colors.primaryForeground },
   footer: { marginTop: 24, fontSize: 12, fontWeight: '500', color: colors.navyForeground + '80' },

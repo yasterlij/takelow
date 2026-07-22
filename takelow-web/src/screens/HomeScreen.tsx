@@ -1,9 +1,12 @@
-import { useState } from "react"
-import { Gavel, Send, Download, Smartphone, Zap, Receipt, CreditCard, Wallet, PiggyBank, Users, Bell, ArrowRight, Eye, EyeOff } from "lucide-react"
+import { useState, useRef } from "react"
+import { Gavel, Send, Download, Smartphone, Zap, Receipt, CreditCard, Wallet, PiggyBank, Users, ArrowRight, Eye, EyeOff, LogOut, Shield, User, Signal, Wifi, BatteryFull } from "lucide-react"
 import { useApp } from "../AppContext"
-import { AwashMark } from "../components/AuctionUI"
-import { PhoneStatusBar, Badge } from "../components/AuctionUI"
+import { AwashMark, Badge } from "../components/AuctionUI"
 import { CURRENCY, formatETB } from "../mockDataV0"
+
+function getInitials(name: string) {
+  return name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
+}
 
 const quickActions = [
   { icon: Send, label: "Send" },
@@ -17,32 +20,40 @@ const quickActions = [
 ]
 
 export function HomeScreen() {
-  const { go, walletBalance, user } = useApp()
+  const { go, walletBalance, user, logout, auctions, auctionsLoading } = useApp()
   const [showBalance, setShowBalance] = useState(true)
+  const activeAuctions = auctions.filter((a) => a.status !== "closed").length
 
   return (
     <div className="flex flex-1 flex-col">
       <div className="bg-navy text-navy-foreground">
-        <PhoneStatusBar dark />
-        <div className="flex items-center justify-between px-5 pb-2 pt-1">
-          <div className="flex items-center gap-2">
-            <div className="flex size-9 items-center justify-center rounded-full bg-white">
-              <AwashMark className="size-7" />
-            </div>
-            <div>
-              <p className="text-[11px] text-white/60">Welcome back</p>
-              <p className="text-sm font-bold">{user?.name || "Selam Tesfaye"}</p>
-            </div>
+        <div className="flex items-center justify-between px-5 pb-2 pt-3">
+          <div className="flex size-8 items-center justify-center rounded-full bg-white">
+            <AwashMark className="size-6" />
           </div>
+
+          <div className="hidden sm:block ml-4">
+            <p className="text-[11px] text-white/60">Welcome back</p>
+            <p className="text-sm font-bold">{user?.name || "Selam Tesfaye"}</p>
+          </div>
+
           <button
-            aria-label="Notifications"
-            className="relative flex size-9 items-center justify-center rounded-full bg-white/10"
+            onClick={() => { logout() }}
+            className="ml-3 flex size-9 items-center justify-center rounded-full bg-destructive/20 text-destructive text-[12px] font-semibold shadow transition-colors hover:bg-destructive/30"
+            aria-label="Sign out"
           >
-            <Bell className="size-[18px]" />
-            <span className="absolute right-2 top-2 size-2 rounded-full bg-primary" />
+            <LogOut className="size-4" />
           </button>
+
+          <div className="flex items-center gap-1 text-navy-foreground/70">
+            <Signal className="size-3" />
+            <Wifi className="size-3" />
+            <BatteryFull className="size-3.5" />
+            <span className="ml-1 text-[11px] font-semibold tabular-nums">9:41</span>
+          </div>
         </div>
-        <div className="px-5 pb-6 pt-2">
+
+        <div className="px-5 pb-6 pt-1">
           <div className="rounded-2xl bg-gradient-to-br from-primary to-[#d9641a] p-4 text-primary-foreground shadow-lg shadow-black/20">
             <div className="flex items-center justify-between">
               <span className="flex items-center gap-1.5 text-xs font-medium text-white/80">
@@ -76,7 +87,9 @@ export function HomeScreen() {
               <span className="font-display text-base font-bold text-navy">Reverse Auction</span>
               <Badge tone="orange">NEW</Badge>
             </div>
-            <p className="text-xs font-medium text-navy/60">Bid Low. Be Unique. Win Big!</p>
+            <p className="text-xs font-medium text-navy/60">
+              {auctionsLoading ? "Loading auctions..." : `${activeAuctions} live auctions — Bid Low. Be Unique. Win Big!`}
+            </p>
           </div>
           <ArrowRight className="size-5 text-primary transition-transform group-hover:translate-x-1" />
         </button>
@@ -87,7 +100,7 @@ export function HomeScreen() {
             </span>
             <div className="flex-1 text-left">
               <p className="text-sm font-bold text-navy">Admin Panel</p>
-              <p className="text-xs font-medium text-muted-foreground">Manage auctions, users &amp; bids</p>
+              <p className="text-xs font-medium text-muted-foreground">Manage auctions, users & bids</p>
             </div>
             <ArrowRight className="size-4 text-primary" />
           </button>
@@ -109,7 +122,9 @@ export function HomeScreen() {
         <div className="mt-7 overflow-hidden rounded-2xl bg-navy p-4 text-navy-foreground">
           <p className="font-display text-sm font-bold text-primary">Live Auctions Now</p>
           <p className="mt-1 text-xs text-white/70">
-            Premium phones, TVs and laptops waiting for their lowest unique bid.
+            {auctionsLoading
+              ? "Loading latest auctions..."
+              : `Premium phones, TVs and laptops waiting for their lowest unique bid. — ${activeAuctions} live now`}
           </p>
           <button
             onClick={() => go("auctions")}

@@ -15,9 +15,9 @@ export class CacheInterceptor implements NestInterceptor {
 
     return next.handle().pipe(
       tap(() => {
-        response.setHeader('Cache-Control', 'public, max-age=60, s-maxage=60');
-        response.setHeader('CDN-Cache-Control', 'public, max-age=60');
-        response.setHeader('Surrogate-Control', 'public, max-age=60');
+        response.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        response.setHeader('Pragma', 'no-cache');
+        response.setHeader('Expires', '0');
       }),
     );
   }

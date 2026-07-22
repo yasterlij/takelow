@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { View, Text, Image, StyleSheet, Animated } from 'react-native'
-import { Bell, Users, Radio, Eye } from 'lucide-react-native'
+import { Bell, Users, Radio, Eye, ImageIcon, Trophy, TrendingDown } from 'lucide-react-native'
 import { useApp } from '../AppContext'
-import { AppBar, CTAButton, Card } from '../components/AuctionUI'
+import { AppBar, CTAButton, Card, Badge } from '../components/AuctionUI'
 import { Countdown } from '../components/Countdown'
 import { CURRENCY, formatETB } from '../mockDataV0'
 import { colors } from '../theme'
@@ -13,8 +13,11 @@ export function MonitorScreen() {
   const pulseAnim = useRef(new Animated.Value(1)).current
   const bellAnim = useRef(new Animated.Value(1)).current
 
-  const [seconds, setSeconds] = useState(130)
-  const [bidders, setBidders] = useState(auction?.bidders ?? 0)
+  const [seconds, setSeconds] = useState(auction?.timeLeft ?? 0)
+
+  useEffect(() => {
+    setSeconds(auction?.timeLeft ?? 0)
+  }, [auction?.timeLeft])
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -28,23 +31,12 @@ export function MonitorScreen() {
   }, [])
 
   useEffect(() => {
-    const t = setInterval(() => setSeconds((s) => (s <= 0 ? 0 : s - 1)), 1000)
+    const t = setInterval(() => setSeconds((s) => Math.max(0, s - 1)), 1000)
     return () => clearInterval(t)
   }, [])
 
   useEffect(() => {
-    setBidders(auction?.bidders ?? 0)
-  }, [auction])
-
-  useEffect(() => {
-    const t = setInterval(() => {
-      setBidders((b) => b + (Math.random() > 0.5 ? 1 : 0))
-    }, 2500)
-    return () => clearInterval(t)
-  }, [])
-
-  useEffect(() => {
-    if (seconds === 0) {
+    if (seconds <= 0) {
       const t = setTimeout(() => go('closed'), 1200)
       return () => clearTimeout(t)
     }
@@ -68,6 +60,7 @@ export function MonitorScreen() {
   if (!auction) return null
 
   const endingSoon = seconds <= 60
+  const bidProgress = auction.maxBid ? Math.min((auction.totalBids || auction.bidders) / auction.maxBid, 1) : 0
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -85,25 +78,47 @@ export function MonitorScreen() {
 
         <Card style={{ alignItems: 'center', padding: 20, marginTop: 16 }}>
           <View style={s.productImage}>
-            <Image source={{ uri: auction.image }} style={{ width: 80, height: 80 }} resizeMode="contain" />
+            {auction.images?.[0] ? <Image source={{ uri: auction.images[0] }} style={{ width: 80, height: 80 }} resizeMode="contain" /> : <ImageIcon size={32} color="#94a3b8" />}
           </View>
           <Text style={s.productName}>{auction.name}</Text>
           <Text style={{ fontSize: 12, fontWeight: '500', color: colors.mutedForeground }}>Time Left</Text>
           <View style={{ marginTop: 8 }}>
             <Countdown seconds={seconds} size="lg" />
           </View>
+          {auction.numWinners && auction.numWinners > 1 && (
+            <Badge tone="navy" style={{ marginTop: 8 }}>
+              <Trophy size={12} /> {auction.numWinners} winner{auction.numWinners > 1 ? 's' : ''}
+            </Badge>
+          )}
         </Card>
+
+        {auction.maxBid && (
+          <View style={{ marginTop: 12, paddingHorizontal: 4 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+              <Text style={{ fontSize: 10, fontWeight: '600', color: colors.mutedForeground }}>Total bids: {auction.totalBids || auction.bidders}</Text>
+              <Text style={{ fontSize: 10, fontWeight: '600', color: colors.mutedForeground }}>Capacity: {auction.maxBid}</Text>
+            </View>
+            <View style={{ height: 5, borderRadius: 3, backgroundColor: colors.border, overflow: 'hidden' }}>
+              <View style={{ width: `${bidProgress * 100}%`, height: '100%', borderRadius: 3, backgroundColor: bidProgress > 0.8 ? colors.primary : colors.emerald500 }} />
+            </View>
+          </View>
+        )}
 
         <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
           <Card style={{ flex: 1, alignItems: 'center', padding: 16 }}>
             <Users size={20} color={colors.navy} />
-            <Text style={s.statNumber}>{bidders}</Text>
+            <Text style={s.statNumber}>{auction.totalBids || auction.bidders || 0}</Text>
+            <Text style={s.statLabel}>Total Bids</Text>
+          </Card>
+          <Card style={{ flex: 1, alignItems: 'center', padding: 16 }}>
+            <Users size={20} color={colors.primary} />
+            <Text style={[s.statNumber, { color: colors.primary }]}>{auction.uniqueBidders || 0}</Text>
             <Text style={s.statLabel}>Bidders</Text>
           </Card>
           <Card style={{ flex: 1, alignItems: 'center', padding: 16 }}>
-            <Text style={s.statLabel}>Your Bid</Text>
+            <TrendingDown size={20} color={colors.emerald600} />
             <Text style={s.bidStat}>{formatETB(userBid ?? 0)}</Text>
-            <Text style={s.statLabel}>{CURRENCY}</Text>
+            <Text style={s.statLabel}>Your Bid</Text>
           </Card>
         </View>
 
@@ -116,6 +131,15 @@ export function MonitorScreen() {
               <Text style={{ fontSize: 14, fontWeight: '700', color: colors.primary }}>Auction Ending Soon!</Text>
               <Text style={{ fontSize: 12, fontWeight: '500', color: colors.navy + 'B3' }}>{auction.name} is about to close. Stay tuned!</Text>
             </View>
+          </Card>
+        )}
+
+        {auction.minBid && (auction.totalBids || auction.bidders) < auction.minBid && (
+          <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 8, borderColor: colors.orange + '44', backgroundColor: colors.orange + '11', padding: 12, marginTop: 12 }}>
+            <Bell size={16} color={colors.orange} />
+            <Text style={{ fontSize: 11, fontWeight: '600', color: colors.orange, flex: 1 }}>
+              Only {(auction.totalBids || auction.bidders)}/{auction.minBid} bids — may extend if under minimum
+            </Text>
           </Card>
         )}
 
@@ -148,7 +172,7 @@ const s = StyleSheet.create({
   productName: { fontSize: 18, fontWeight: '800', color: colors.navy, marginTop: 12 },
   statNumber: { fontSize: 24, fontWeight: '800', color: colors.navy, fontVariant: ['tabular-nums'], marginTop: 4 },
   statLabel: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1, color: colors.mutedForeground, marginTop: 4 },
-  bidStat: { fontSize: 24, fontWeight: '800', color: colors.primary, fontVariant: ['tabular-nums'] },
+  bidStat: { fontSize: 24, fontWeight: '800', color: colors.emerald600, fontVariant: ['tabular-nums'] },
   alertIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' },
   bottomCta: { position: 'absolute', bottom: 0, left: 0, right: 0, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.card + 'F2', padding: 16 },
 })

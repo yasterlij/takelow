@@ -19,7 +19,7 @@ export class Bid {
   @Column({ type: 'uuid' })
   auction_id: string;
 
-  @Column({ type: 'integer' })
+  @Column({ type: 'decimal', precision: 12, scale: 2 })
   amount: number;
 
   @CreateDateColumn()

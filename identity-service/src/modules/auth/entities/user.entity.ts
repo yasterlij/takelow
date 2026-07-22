@@ -64,6 +64,15 @@ export class User {
   @Column({ type: 'boolean', default: false })
   is_banned: boolean;
 
+  @Column({ type: 'varchar', length: 60, nullable: true })
+  wallet_pin_hash: string;
+
+  @Column({ type: 'int', default: 0 })
+  pin_attempts: number;
+
+  @Column({ type: 'timestamp', nullable: true })
+  pin_locked_until: Date;
+
   @Column({ type: 'varchar', nullable: true })
   fcm_token: string;
 

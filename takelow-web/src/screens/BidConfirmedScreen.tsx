@@ -1,12 +1,17 @@
-import { Check, Eye } from "lucide-react"
+import { Check, Eye, Home, MessageSquareText } from "lucide-react"
 import { useApp } from "../AppContext"
 import { PhoneStatusBar, CTAButton, Card } from "../components/AuctionUI"
 import { CURRENCY, formatETB } from "../mockDataV0"
 
 export function BidConfirmedScreen() {
-  const { go, selectedId, userBid, getAuction } = useApp()
+  const { go, selectedId, userBid, bidTicketNumber, getAuction, user } = useApp()
+  const isAdmin = user?.role === "admin"
   const auction = getAuction(selectedId)
   if (!auction) return null
+
+  const smsMessage = bidTicketNumber
+    ? `Your bid of ${formatETB(userBid ?? 0)} ETB on '${auction.name}' has been placed successfully. Your BID ticket number is: ${bidTicketNumber}`
+    : null
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto">
@@ -23,10 +28,15 @@ export function BidConfirmedScreen() {
         <h1 className="mt-6 font-display text-2xl font-extrabold text-navy">
           Bid Submitted Successfully!
         </h1>
-        <p className="mt-2 max-w-xs text-sm font-medium text-muted-foreground">
-          Your bid has been recorded for {auction.name}.
-        </p>
-        <Card className="mt-6 w-full max-w-xs p-5">
+        {smsMessage && (
+          <div className="mt-4 flex w-full max-w-xs items-start gap-2.5 rounded-xl bg-blue-50 p-3 text-left">
+            <MessageSquareText className="mt-0.5 size-4 flex-shrink-0 text-blue-600" />
+            <p className="text-xs font-medium leading-relaxed text-blue-800">
+              {smsMessage}
+            </p>
+          </div>
+        )}
+        <Card className="mt-4 w-full max-w-xs p-5">
           <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Your Bid
           </span>
@@ -42,6 +52,12 @@ export function BidConfirmedScreen() {
               <span className="text-muted-foreground">Status</span>
               <span className="font-semibold text-emerald-600">Recorded</span>
             </div>
+            {bidTicketNumber && (
+              <div className="mt-1.5 flex justify-between text-xs">
+                <span className="text-muted-foreground">Ticket</span>
+                <span className="font-mono text-[11px] font-bold text-navy">{bidTicketNumber}</span>
+              </div>
+            )}
           </div>
         </Card>
         <p className="mt-5 max-w-xs text-xs font-medium text-navy/70">
@@ -49,9 +65,15 @@ export function BidConfirmedScreen() {
         </p>
       </div>
       <div className="border-t border-border bg-card p-4">
-        <CTAButton variant="navy" onClick={() => go("monitor")}>
-          <Eye className="size-[18px]" /> Monitor Auction
-        </CTAButton>
+        {isAdmin ? (
+          <CTAButton variant="navy" onClick={() => go("monitor")}>
+            <Eye className="size-[18px]" /> Monitor Auction
+          </CTAButton>
+        ) : (
+          <CTAButton variant="outline" onClick={() => go("auctions")}>
+            <Home className="size-[18px]" /> Back to Auctions
+          </CTAButton>
+        )}
       </div>
     </div>
   )

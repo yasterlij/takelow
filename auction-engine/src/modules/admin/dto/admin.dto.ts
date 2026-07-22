@@ -56,6 +56,18 @@ export class CreateAuctionDto {
 
   @IsDateString()
   end_time: string;
+
+  @IsOptional()
+  @IsNumber()
+  min_bid?: number;
+
+  @IsOptional()
+  @IsNumber()
+  max_bid?: number;
+
+  @IsOptional()
+  @IsNumber()
+  num_winners?: number;
 }
 
 export class UpdateAuctionDto {
@@ -70,6 +82,18 @@ export class UpdateAuctionDto {
   @IsOptional()
   @IsDateString()
   end_time?: string;
+
+  @IsOptional()
+  @IsNumber()
+  min_bid?: number;
+
+  @IsOptional()
+  @IsNumber()
+  max_bid?: number;
+
+  @IsOptional()
+  @IsNumber()
+  num_winners?: number;
 
   @IsOptional()
   @IsEnum(AuctionStatus)

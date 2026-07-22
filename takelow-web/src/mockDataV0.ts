@@ -4,7 +4,7 @@ export type Auction = {
   id: string
   name: string
   category: string
-  image: string
+  images: string[]
   marketPrice: number
   bidFee: number
   bidders: number
@@ -12,6 +12,12 @@ export type Auction = {
   status: AuctionStatus
   description: string
   highlights: string[]
+  uniqueBidders?: number
+  totalBids?: number
+  minBid?: number
+  maxBid?: number
+  numWinners?: number
+  endTime?: string
 }
 
 export const CURRENCY = "ETB"
@@ -21,10 +27,15 @@ export const auctions: Auction[] = [
     id: "iphone-15-pro-max",
     name: "iPhone 15 Pro Max",
     category: "Smartphones",
-    image: "/products/iphone-15-pro-max.png",
+    images: ["/products/iphone-15-pro-max.png"],
     marketPrice: 85000,
     bidFee: 10,
     bidders: 32,
+    totalBids: 32,
+    uniqueBidders: 28,
+    minBid: 5,
+    maxBid: 100,
+    numWinners: 2,
     timeLeft: 2 * 3600 + 15 * 60 + 30,
     status: "live",
     description:
@@ -35,10 +46,12 @@ export const auctions: Auction[] = [
     id: "samsung-55-tv",
     name: 'Samsung 55" Smart TV',
     category: "Electronics",
-    image: "/products/samsung-tv.png",
+    images: ["/products/samsung-tv.png"],
     marketPrice: 65000,
     bidFee: 10,
     bidders: 18,
+    totalBids: 18,
+    uniqueBidders: 15,
     timeLeft: 1 * 3600 + 45 * 60 + 10,
     status: "live",
     description:
@@ -49,10 +62,12 @@ export const auctions: Auction[] = [
     id: "dell-laptop",
     name: "Dell XPS Laptop",
     category: "Computers",
-    image: "/products/dell-laptop.png",
+    images: ["/products/dell-laptop.png"],
     marketPrice: 50000,
     bidFee: 10,
     bidders: 24,
+    totalBids: 24,
+    uniqueBidders: 20,
     timeLeft: 3 * 3600 + 30 * 60 + 45,
     status: "live",
     description:
@@ -63,10 +78,12 @@ export const auctions: Auction[] = [
     id: "headphones",
     name: "Wireless Headphones Pro",
     category: "Audio",
-    image: "/products/headphones.png",
+    images: ["/products/headphones.png"],
     marketPrice: 18000,
     bidFee: 10,
     bidders: 41,
+    totalBids: 41,
+    uniqueBidders: 35,
     timeLeft: 40 * 60 + 12,
     status: "ending-soon",
     description:
@@ -77,10 +94,13 @@ export const auctions: Auction[] = [
     id: "game-console",
     name: "Next-Gen Game Console",
     category: "Gaming",
-    image: "/products/game-console.png",
+    images: ["/products/game-console.png"],
     marketPrice: 42000,
     bidFee: 10,
     bidders: 37,
+    totalBids: 37,
+    uniqueBidders: 32,
+    numWinners: 3,
     timeLeft: 5 * 3600 + 5 * 60,
     status: "live",
     description:

@@ -1,40 +1,159 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { Redis } from 'ioredis';
 import { InjectRedis } from '../common/redis.decorator';
+import { Bid } from '../bidding/entities/bid.entity';
+import { Auction } from '../winner/entities/auction.entity';
 
 @Injectable()
 export class WinnerService {
   private readonly logger = new Logger(WinnerService.name);
 
-  constructor(@InjectRedis() private readonly redis: Redis) {}
+  constructor(
+    @InjectRedis() private readonly redis: Redis,
+    @InjectRepository(Bid) private bidRepository: Repository<Bid>,
+    @InjectRepository(Auction) private auctionRepository: Repository<Auction>,
+  ) {}
 
-  async calculateWinner(auctionId: string): Promise<{
-    winningAmount: number | null;
+  async calculateWinners(auctionId: string): Promise<{
+    winningAmounts: number[];
     totalBids: number;
+    winners: { amount: number; userId: string }[];
   }> {
-    const freqKey = `takelow:auction:${auctionId}:frequencies`;
-    const uniqueKey = `takelow:auction:${auctionId}:unique_bids`;
+    const auction = await this.auctionRepository.findOne({
+      where: { id: auctionId },
+      select: ['num_winners'],
+    });
+    const numWinners = auction?.num_winners ?? 1;
 
+    const result = await this.calculateWinnersFromRedis(auctionId, numWinners);
+    if (result.found) {
+      return result;
+    }
+
+    return this.calculateWinnersFromDb(auctionId, numWinners);
+  }
+
+  private async calculateWinnersFromRedis(
+    auctionId: string,
+    numWinners: number,
+  ): Promise<{
+    found: boolean;
+    winningAmounts: number[];
+    totalBids: number;
+    winners: { amount: number; userId: string }[];
+  }> {
     const totalBidsStr = await this.redis.get(`takelow:auction:${auctionId}:total_bids`);
-    const totalBids = totalBidsStr ? parseInt(totalBidsStr, 10) : 0;
+    if (totalBidsStr === null) {
+      return { found: false, winningAmounts: [], totalBids: 0, winners: [] };
+    }
 
+    const totalBids = parseInt(totalBidsStr, 10);
     if (totalBids === 0) {
-      this.logger.log(`Auction ${auctionId}: No bids placed, no winner`);
-      return { winningAmount: null, totalBids: 0 };
+      return { found: true, winningAmounts: [], totalBids: 0, winners: [] };
     }
 
-    const result = await this.redis.zrangebyscore(uniqueKey, 0, 0, 'WITHSCORES', 'LIMIT', 0, 1);
-
-    if (result.length === 0) {
-      this.logger.log(`Auction ${auctionId}: No unique bids found, expired`);
-      return { winningAmount: null, totalBids };
+    const uniqueKey = `takelow:auction:${auctionId}:unique_bids`;
+    const amounts = await this.redis.zrange(uniqueKey, 0, numWinners - 1);
+    if (amounts.length === 0) {
+      return { found: true, winningAmounts: [], totalBids, winners: [] };
     }
 
-    const winningAmount = parseInt(result[0], 10);
+    const winningAmounts = amounts.map((a) => parseFloat(a));
+    const winners: { amount: number; userId: string }[] = [];
 
-    this.logger.log(`Auction ${auctionId}: Winner found with amount ${winningAmount}`);
+    for (const amount of winningAmounts) {
+      const freqKey = `takelow:auction:${auctionId}:frequencies`;
+      const freq = await this.redis.zscore(freqKey, String(amount));
+      if (freq && Number(freq) === 1) {
+        const userId = await this.findEarliestBidder(auctionId, amount);
+        if (userId) {
+          winners.push({ amount, userId });
+        }
+      }
+    }
 
-    return { winningAmount, totalBids };
+    return { found: true, winningAmounts, totalBids, winners };
+  }
+
+  private async calculateWinnersFromDb(
+    auctionId: string,
+    numWinners: number,
+  ): Promise<{
+    winningAmounts: number[];
+    totalBids: number;
+    winners: { amount: number; userId: string }[];
+  }> {
+    const bids = await this.bidRepository.find({
+      where: { auction_id: auctionId },
+      order: { bid_time: 'ASC' },
+    });
+
+    const totalBids = bids.length;
+    if (totalBids === 0) {
+      return { winningAmounts: [], totalBids: 0, winners: [] };
+    }
+
+    const frequency = new Map<number, number>();
+    const earliestPerAmount = new Map<number, string>();
+    for (const bid of bids) {
+      frequency.set(bid.amount, (frequency.get(bid.amount) || 0) + 1);
+      if (!earliestPerAmount.has(bid.amount)) {
+        earliestPerAmount.set(bid.amount, bid.user_id);
+      }
+    }
+
+    const uniqueAmounts = Array.from(frequency.entries())
+      .filter(([, count]) => count === 1)
+      .map(([amount]) => amount)
+      .sort((a, b) => a - b);
+
+    const selected = uniqueAmounts.slice(0, numWinners);
+    const winners = selected.map((amount) => ({
+      amount,
+      userId: earliestPerAmount.get(amount) || '',
+    }));
+
+    return { winningAmounts: selected, totalBids, winners };
+  }
+
+  private async findEarliestBidder(
+    auctionId: string,
+    amount: number,
+  ): Promise<string | null> {
+    const bid = await this.bidRepository.findOne({
+      where: { auction_id: auctionId, amount },
+      order: { bid_time: 'ASC' },
+    });
+    return bid?.user_id || null;
+  }
+
+  async getUniqueBiddersCount(auctionId: string): Promise<number> {
+    const key = `takelow:auction:${auctionId}:bidders`;
+    const count = await this.redis.scard(key);
+    if (count > 0) return count;
+
+    const dbCount = await this.bidRepository
+      .createQueryBuilder('bid')
+      .where('bid.auction_id = :auctionId', { auctionId })
+      .select('COUNT(DISTINCT bid.user_id)', 'count')
+      .getRawOne();
+    return parseInt(dbCount?.count || '0', 10);
+  }
+
+  async getAuctionStats(auctionId: string): Promise<{
+    totalBids: number;
+    uniqueBidders: number;
+    lowestUniqueBid: number | null;
+  }> {
+    const { winningAmounts, totalBids } = await this.calculateWinners(auctionId);
+    const uniqueBidders = await this.getUniqueBiddersCount(auctionId);
+    return {
+      totalBids,
+      uniqueBidders,
+      lowestUniqueBid: winningAmounts.length > 0 ? winningAmounts[0] : null,
+    };
   }
 
   async cleanupAuctionKeys(auctionId: string): Promise<void> {
@@ -42,6 +161,7 @@ export class WinnerService {
       `takelow:auction:${auctionId}:frequencies`,
       `takelow:auction:${auctionId}:unique_bids`,
       `takelow:auction:${auctionId}:total_bids`,
+      `takelow:auction:${auctionId}:bidders`,
       `takelow:auction:${auctionId}:lock`,
     ];
 

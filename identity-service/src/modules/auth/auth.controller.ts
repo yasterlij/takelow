@@ -7,6 +7,7 @@ import {
   Req,
   Param,
   Query,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
@@ -30,6 +31,16 @@ export class AuthController {
   @Post('login/email')
   async loginWithEmail(@Req() req: any) {
     return this.authService.login(req.user);
+  }
+
+  @Post('login/phone')
+  async loginWithPhone(@Body() dto: LoginDto) {
+    if (!dto.phone_number || !dto.password) {
+      throw new UnauthorizedException('Phone number and password required');
+    }
+    const user = await this.authService.validateLocalUserByPhone(dto.phone_number, dto.password);
+    if (!user) throw new UnauthorizedException('Invalid phone number or password');
+    return this.authService.login(user);
   }
 
   @UseGuards(AuthGuard('telebirr'))

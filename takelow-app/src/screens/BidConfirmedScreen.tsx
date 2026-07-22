@@ -1,13 +1,14 @@
 import React, { useEffect, useRef } from 'react'
 import { View, Text, StyleSheet, Animated } from 'react-native'
-import { Check, Eye } from 'lucide-react-native'
+import { Check, Eye, Home, MessageSquareText } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { CTAButton, Card } from '../components/AuctionUI'
 import { CURRENCY, formatETB } from '../mockDataV0'
 import { colors } from '../theme'
 
 export function BidConfirmedScreen() {
-  const { go, selectedId, userBid, getAuction } = useApp()
+  const { go, selectedId, userBid, bidTicketNumber, getAuction, user } = useApp()
+  const isAdmin = user?.role === 'admin'
   const auction = getAuction(selectedId)
   const pingAnim = useRef(new Animated.Value(1)).current
 
@@ -23,6 +24,10 @@ export function BidConfirmedScreen() {
   }, [])
 
   if (!auction) return null
+
+  const smsMessage = bidTicketNumber
+    ? `Your bid of ${formatETB(userBid ?? 0)} ETB on '${auction.name}' has been placed successfully. Your BID ticket number is: ${bidTicketNumber}`
+    : null
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -40,9 +45,15 @@ export function BidConfirmedScreen() {
           </View>
         </View>
         <Text style={s.title}>Bid Submitted Successfully!</Text>
-        <Text style={s.subtitle}>Your bid has been recorded for {auction.name}.</Text>
 
-        <Card style={{ width: '100%', maxWidth: 280, padding: 20, marginTop: 24 }}>
+        {smsMessage && (
+          <View style={s.smsBanner}>
+            <MessageSquareText size={16} color={'#2563EB'} style={{ marginTop: 2 }} />
+            <Text style={s.smsText}>{smsMessage}</Text>
+          </View>
+        )}
+
+        <Card style={{ width: '100%', maxWidth: 280, padding: 20, marginTop: smsMessage ? 12 : 24 }}>
           <Text style={s.sectionLabel}>Your Bid</Text>
           <Text style={s.bidAmount}>{formatETB(userBid ?? 0)} {CURRENCY}</Text>
           <View style={s.divider} />
@@ -54,14 +65,26 @@ export function BidConfirmedScreen() {
             <Text style={s.infoLabel}>Status</Text>
             <Text style={[s.infoValue, { color: colors.emerald600 }]}>Recorded</Text>
           </View>
+          {bidTicketNumber && (
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+              <Text style={s.infoLabel}>Ticket</Text>
+              <Text style={[s.infoValue, { fontFamily: 'monospace', fontSize: 11 }]}>{bidTicketNumber}</Text>
+            </View>
+          )}
         </Card>
 
         <Text style={s.keepWatching}>Keep watching — you might be the lowest unique bidder!</Text>
       </View>
       <View style={s.bottomCta}>
-        <CTAButton variant="navy" onPress={() => go('monitor')}>
-          <Eye size={18} /> Monitor Auction
-        </CTAButton>
+        {isAdmin ? (
+          <CTAButton variant="navy" onPress={() => go('monitor')}>
+            <Eye size={18} /> Monitor Auction
+          </CTAButton>
+        ) : (
+          <CTAButton variant="outline" onPress={() => go('auctions')}>
+            <Home size={18} /> Back to Auctions
+          </CTAButton>
+        )}
       </View>
     </View>
   )
@@ -97,4 +120,10 @@ const s = StyleSheet.create({
   infoValue: { fontSize: 12, fontWeight: '600', color: colors.navy },
   keepWatching: { fontSize: 12, fontWeight: '500', color: colors.navy + 'B3', textAlign: 'center', maxWidth: 280, marginTop: 20 },
   bottomCta: { borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.card, padding: 16 },
+  smsBanner: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 10,
+    backgroundColor: '#EFF6FF', borderRadius: 12, padding: 12,
+    width: '100%', maxWidth: 280, marginTop: 16,
+  },
+  smsText: { fontSize: 12, fontWeight: '500', lineHeight: 18, color: '#1E40AF', flex: 1 },
 })

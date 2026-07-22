@@ -11,7 +11,8 @@
     "test:watch": "jest --watch",
     "migration:run": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:run -d src/config/typeorm-cli.config.ts",
     "migration:generate": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:generate -d src/config/typeorm-cli.config.ts src/migrations/Initial",
-    "migration:revert": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:revert -d src/config/typeorm-cli.config.ts"
+    "migration:revert": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:revert -d src/config/typeorm-cli.config.ts",
+    "seed": "ts-node -r tsconfig-paths/register src/seed/seed.ts"
   },
   "dependencies": {
     "@nestjs/bullmq": "^10.0.0",

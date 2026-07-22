@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { BullModule } from '@nestjs/bullmq';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BiddingController } from './bidding.controller';
 import { BiddingService } from './bidding.service';
@@ -8,9 +9,15 @@ import { AuctionGateway } from './gateway/auction.gateway';
 import { BiddingWindowInterceptor } from '../common/bidding-window.interceptor';
 import { ThrottleGuard } from '../common/throttle.guard';
 import { NonceGuard } from '../common/nonce.guard';
+import { WinnerModule } from '../winner/winner.module';
+import { PaymentTransaction } from '../payment/entities/payment-transaction.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Bid, Auction])],
+  imports: [
+TypeOrmModule.forFeature([Bid, Auction, PaymentTransaction]),
+    BullModule.registerQueue({ name: 'incoming-bids' }),
+    WinnerModule,
+  ],
   controllers: [BiddingController],
   providers: [
     BiddingService,

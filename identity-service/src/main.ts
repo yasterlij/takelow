@@ -11,6 +11,11 @@ async function bootstrap() {
     logger: new StructuredLogger(),
   });
 
+  app.enableCors({
+    origin: ['http://localhost:5173', 'http://localhost:3000', 'http://localhost'],
+    credentials: true,
+  });
+
   const configService = app.get(ConfigService);
   const port = configService.get('app.port', 3000);
 

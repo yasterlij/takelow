@@ -11,5 +11,6 @@ import { BullMqWorker } from './bullmq.worker';
     TypeOrmModule.forFeature([]),
   ],
   providers: [BullMqWorker],
+  exports: [BullMqWorker],
 })
 export class WorkerModule {}

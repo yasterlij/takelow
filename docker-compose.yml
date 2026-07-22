@@ -65,6 +65,13 @@ services:
     environment:
       DATABASE_URL: postgresql://admin:secret@postgres-primary:5432/takelow_db
       REDIS_URL: redis://redis:6379
+      SIKINA_SECRET_KEY: ${SIKINA_SECRET_KEY:-}
+      SIKINA_WEBHOOK_SECRET: ${SIKINA_WEBHOOK_SECRET:-}
+      SIKINA_BASE_URL: ${SIKINA_BASE_URL:-https://sandbox.sikinapay.com}
+      SIKINA_SUCCESS_REDIRECT_URL: ${SIKINA_SUCCESS_REDIRECT_URL:-}
+      SIKINA_FAILED_REDIRECT_URL: ${SIKINA_FAILED_REDIRECT_URL:-}
+      SIKINA_WEBHOOK_URL: ${SIKINA_WEBHOOK_URL:-}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:5173}
     ports:
       - "3002:3000"
 

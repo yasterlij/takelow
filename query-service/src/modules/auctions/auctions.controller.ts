@@ -8,11 +8,13 @@ import { CacheInterceptor } from '../common/cache.interceptor';
 export class AuctionsController {
   constructor(private auctionsService: AuctionsService) {}
 
+  @UseGuards(AuthGuard('jwt'))
   @Get('active')
   async getActiveAuctions() {
     return this.auctionsService.getActiveAuctions();
   }
 
+  @UseGuards(AuthGuard('jwt'))
   @Get('closed')
   async getClosedAuctions() {
     return this.auctionsService.getClosedAuctions();
@@ -30,11 +32,13 @@ export class AuctionsController {
     return this.auctionsService.getUserWonAuctions(req.user.id);
   }
 
+  @UseGuards(AuthGuard('jwt'))
   @Get(':id')
   async getActiveAuction(@Param('id') id: string) {
     return this.auctionsService.getActiveAuction(id);
   }
 
+  @UseGuards(AuthGuard('jwt'))
   @Get(':id/bids')
   async getBidHistory(@Param('id') id: string) {
     return this.auctionsService.getBidHistory(id);

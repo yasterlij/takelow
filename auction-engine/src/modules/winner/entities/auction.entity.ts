@@ -15,6 +15,12 @@ export enum AuctionStatus {
   EXPIRED = 'EXPIRED',
 }
 
+export enum PaymentStatus {
+  PENDING = 'PENDING',
+  PAID = 'PAID',
+  EXPIRED = 'EXPIRED',
+}
+
 @Entity('auctions')
 export class Auction {
   @PrimaryGeneratedColumn('uuid')
@@ -34,6 +40,15 @@ export class Auction {
   @Column({ type: 'timestamp' })
   end_time: Date;
 
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  min_bid: number;
+
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  max_bid: number;
+
+  @Column({ type: 'int', default: 1 })
+  num_winners: number;
+
   @Column({
     type: 'enum',
     enum: AuctionStatus,
@@ -44,8 +59,18 @@ export class Auction {
   @Column({ type: 'uuid', nullable: true })
   winner_user_id: string;
 
-  @Column({ type: 'integer', nullable: true })
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
   winning_bid_amount: number;
+
+  @Column({
+    type: 'enum',
+    enum: PaymentStatus,
+    nullable: true,
+  })
+  payment_status: PaymentStatus;
+
+  @Column({ type: 'timestamp', nullable: true })
+  payment_deadline: Date;
 
   @CreateDateColumn()
   created_at: Date;

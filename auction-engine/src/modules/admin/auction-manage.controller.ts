@@ -7,17 +7,17 @@ import {
   Param,
   Body,
   Query,
-  UseGuards,
   UsePipes,
   ValidationPipe,
+  UseGuards,
   Res,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { RolesGuard } from '../common/roles.guard';
-import { Roles } from '../common/roles.decorator';
 import { AuctionManageService } from './auction-manage.service';
 import { CreateProductDto, UpdateProductDto, CreateAuctionDto, UpdateAuctionDto } from './dto/admin.dto';
 import { AuctionStatus } from '../winner/entities/auction.entity';
+import { RolesGuard } from '../common/roles.guard';
+import { Roles } from '../common/roles.decorator';
 import { Response } from 'express';
 
 @Controller('admin')
@@ -107,5 +107,15 @@ export class AuctionManageController {
   @Post('auctions/:id/close')
   async closeAuction(@Param('id') id: string) {
     return this.service.closeAuctionEarly(id);
+  }
+
+  @Get('auctions/:id/winner')
+  async drawWinner(@Param('id') id: string) {
+    return this.service.drawWinner(id);
+  }
+
+  @Get('auctions/:id/bids')
+  async getAuctionBids(@Param('id') id: string) {
+    return this.service.getAuctionBids(id);
   }
 }

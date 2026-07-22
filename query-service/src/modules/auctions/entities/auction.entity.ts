@@ -44,7 +44,7 @@ export class Auction {
   @Column({ type: 'uuid', nullable: true })
   winner_user_id: string;
 
-  @Column({ type: 'integer', nullable: true })
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
   winning_bid_amount: number;
 
   @CreateDateColumn()

@@ -100,9 +100,11 @@ export function AppBar({
 export function Badge({
   children,
   tone = 'orange',
+  style,
 }: {
   children: React.ReactNode
   tone?: 'orange' | 'navy' | 'green' | 'muted'
+  style?: ViewStyle
 }) {
   const bgMap = {
     orange: colors.accent,
@@ -117,7 +119,7 @@ export function Badge({
     muted: colors.mutedForeground,
   }
   return (
-    <View style={[s.badge, { backgroundColor: bgMap[tone] }]}>
+    <View style={[s.badge, { backgroundColor: bgMap[tone] }, style]}>
       <Text style={[s.badgeText, { color: txtMap[tone] }]}>{children}</Text>
     </View>
   )

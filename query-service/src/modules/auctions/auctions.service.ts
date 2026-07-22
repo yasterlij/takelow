@@ -16,6 +16,7 @@ export class AuctionsService {
   async getActiveAuctions(): Promise<any[]> {
     const auctions = await this.auctionRepository.find({
       where: { status: AuctionStatus.ACTIVE },
+      relations: ['product'],
       order: { created_at: 'DESC' },
       take: 50,
     });
@@ -25,11 +26,22 @@ export class AuctionsService {
         const totalBids = await this.bidRepository.count({
           where: { auction_id: auction.id },
         });
+        const uniqueBidders = await this.bidRepository
+          .createQueryBuilder('bid')
+          .where('bid.auction_id = :auctionId', { auctionId: auction.id })
+          .select('COUNT(DISTINCT bid.user_id)', 'count')
+          .getRawOne();
         return {
           id: auction.id,
-          product: (auction as any).product || null,
+          product_id: auction.product_id,
+          product: auction.product || null,
+          start_time: auction.start_time,
+          end_time: auction.end_time,
           time_remaining: this.computeTimeRemaining(auction.end_time),
-          stats: { total_bids: totalBids },
+          stats: {
+            total_bids: totalBids,
+            unique_bidders: parseInt(uniqueBidders?.count || '0', 10),
+          },
           status: auction.status,
         };
       }),
@@ -80,15 +92,36 @@ export class AuctionsService {
     };
   }
 
-  async getClosedAuctions(): Promise<Auction[]> {
-    return this.auctionRepository.find({
+  async getClosedAuctions(): Promise<any[]> {
+    const auctions = await this.auctionRepository.find({
       where: [
         { status: AuctionStatus.CLOSED },
         { status: AuctionStatus.EXPIRED },
       ],
+      relations: ['product'],
       order: { created_at: 'DESC' },
       take: 50,
     });
+
+    return Promise.all(
+      auctions.map(async (auction) => {
+        const totalBids = await this.bidRepository.count({
+          where: { auction_id: auction.id },
+        });
+        return {
+          id: auction.id,
+          product_id: auction.product_id,
+          product: auction.product || null,
+          start_time: auction.start_time,
+          end_time: auction.end_time,
+          status: auction.status,
+          winner_user_id: auction.winner_user_id,
+          winning_bid_amount: auction.winning_bid_amount,
+          stats: { total_bids: totalBids },
+          created_at: auction.created_at,
+        };
+      }),
+    );
   }
 
   async getBidHistory(auctionId: string): Promise<Bid[]> {
@@ -107,12 +140,13 @@ export class AuctionsService {
     });
   }
 
-  async getUserWonAuctions(userId: string): Promise<Auction[]> {
+  async getUserWonAuctions(userId: string): Promise<any[]> {
     return this.auctionRepository.find({
       where: {
         winner_user_id: userId,
         status: AuctionStatus.CLOSED,
       },
+      relations: ['product'],
       order: { created_at: 'DESC' },
       take: 50,
     });

@@ -1,12 +1,13 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import { Injectable, Logger } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { Redis } from 'ioredis';
 import { InjectRedis } from '../common/redis.decorator';
 
-const BATCH_SIZE = 100;
+const BATCH_SIZE = 50;
 
 @Injectable()
 @Processor('incoming-bids')
@@ -30,7 +31,7 @@ export class BullMqWorker extends WorkerHost {
     }
 
     const batch = this.batchBuffer.get(bufferKey)!;
-    batch.push({ auction_id, amount: parseInt(amount, 10), user_id, bid_time });
+    batch.push({ auction_id, amount: parseFloat(amount), user_id, bid_time });
 
     if (batch.length >= BATCH_SIZE) {
       await this.flushBatch(bufferKey);
@@ -51,15 +52,24 @@ export class BullMqWorker extends WorkerHost {
     await queryRunner.startTransaction();
 
     try {
-      const placeholders = batch
-        .map(
-          (_, i) =>
-            `($${i * 4 + 1}, $${i * 4 + 2}, $${i * 4 + 3}, $${i * 4 + 4})`,
-        )
+      const existing = await queryRunner.manager.query(
+        `SELECT amount, user_id FROM bids WHERE auction_id = $1 AND (amount, user_id, bid_time) IN (${batch.map((_, i) => `($${i * 3 + 2}, $${i * 3 + 3}, $${i * 3 + 4})`).join(', ')})`,
+        [auctionId, ...batch.flatMap((b) => [b.amount, b.user_id, b.bid_time])],
+      );
+      const existingSet = new Set(existing.map((r: any) => `${r.amount}:${r.user_id}`));
+
+      const newBids = batch.filter((b) => !existingSet.has(`${b.amount}:${b.user_id}`));
+      if (newBids.length === 0) {
+        this.batchBuffer.delete(bufferKey);
+        return;
+      }
+
+      const placeholders = newBids
+        .map((_, i) => `($${i * 4 + 1}, $${i * 4 + 2}, $${i * 4 + 3}, $${i * 4 + 4})`)
         .join(', ');
 
       const values: any[] = [];
-      batch.forEach((b) => {
+      newBids.forEach((b) => {
         values.push(b.auction_id);
         values.push(b.amount);
         values.push(b.user_id);
@@ -67,7 +77,7 @@ export class BullMqWorker extends WorkerHost {
       });
 
       await queryRunner.manager.query(
-        `INSERT INTO bids (auction_id, amount, user_id, bid_time) VALUES ${placeholders}`,
+        `INSERT INTO bids (auction_id, amount, user_id, bid_time) VALUES ${placeholders} ON CONFLICT DO NOTHING`,
         values,
       );
 
@@ -78,9 +88,25 @@ export class BullMqWorker extends WorkerHost {
       throw error;
     } finally {
       await queryRunner.release();
+      this.batchBuffer.delete(bufferKey);
     }
+  }
 
-    this.batchBuffer.delete(bufferKey);
+  async flushAuction(auctionId: string): Promise<void> {
+    const bufferKey = `batch:${auctionId}`;
+    if (this.batchBuffer.has(bufferKey)) {
+      this.logger.log(`Flushing buffer for auction ${auctionId}`);
+      await this.flushBatch(bufferKey);
+    }
+  }
+
+  @Cron(CronExpression.EVERY_5_SECONDS)
+  async flushAllBatches(): Promise<void> {
+    if (this.batchBuffer.size === 0) return;
+    const keys = Array.from(this.batchBuffer.keys());
+    for (const key of keys) {
+      await this.flushBatch(key);
+    }
   }
 
   async onApplicationShutdown(): Promise<void> {

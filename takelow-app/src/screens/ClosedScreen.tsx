@@ -1,16 +1,18 @@
 import React, { useEffect, useState } from 'react'
-import { View, Text, StyleSheet } from 'react-native'
-import { Gavel, Trophy, Eye, Loader2 } from 'lucide-react-native'
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native'
+import { Gavel, Trophy, Eye, Shield, Home } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { CTAButton } from '../components/AuctionUI'
-
+import { api } from '../api'
 import { colors } from '../theme'
 
 export function ClosedScreen() {
-  const { go, selectedId, setWinner, getAuction } = useApp()
+  const { go, selectedId, getAuction, user } = useApp()
+  const isAdmin = user?.role === 'admin'
   const auction = getAuction(selectedId)
   const [progress, setProgress] = useState(0)
   const [done, setDone] = useState(false)
+  const [revealing, setRevealing] = useState(false)
 
   useEffect(() => {
     const t = setInterval(() => {
@@ -29,6 +31,18 @@ export function ClosedScreen() {
     }
   }, [progress])
 
+  const handleReveal = async () => {
+    setRevealing(true)
+    try {
+      await api.closeAuction(selectedId!)
+      go('winner')
+    } catch {
+      go('winner')
+    } finally {
+      setRevealing(false)
+    }
+  }
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBarCustom />
@@ -39,8 +53,8 @@ export function ClosedScreen() {
         <Text style={s.title}>Auction Closed</Text>
         <Text style={s.subtitle}>
           {done
-            ? `${auction?.name} — the lowest unique bid has been determined.`
-            : `Finding the lowest unique bid for ${auction?.name}...`}
+            ? `${auction?.name || 'Auction'} has ended.${isAdmin ? ' The lowest unique bid has been determined.' : ''}`
+            : `Finding the lowest unique bid for ${auction?.name || 'auction'}...`}
         </Text>
 
         <View style={s.progressBarOuter}>
@@ -50,19 +64,39 @@ export function ClosedScreen() {
           {done ? 'Result ready' : `Analyzing bids... ${progress}%`}
         </Text>
 
-        {done && (
-          <Text style={s.doneMessage}>The system automatically determined the winner based on the lowest unique bid.</Text>
+        {done && !isAdmin && (
+          <View style={s.infoBox}>
+            <Shield size={16} color={colors.warning} />
+            <Text style={s.infoText}>
+              Results are being reviewed by the admin. You will be notified once the winner is declared.
+            </Text>
+          </View>
+        )}
+        {done && isAdmin && (
+          <Text style={s.adminHint}>Close the auction to draw and reveal the winner.</Text>
         )}
       </View>
 
       <View style={s.bottomCta}>
-        <CTAButton disabled={!done} onPress={() => { setWinner(); go('winner') }}>
-          {done ? (
-            <><Eye size={18} /> Reveal Winner</>
-          ) : (
-            <><Loader2 size={18} /> Determining...</>
-          )}
-        </CTAButton>
+        {isAdmin ? (
+          <CTAButton disabled={!done || revealing} onPress={handleReveal}>
+            {revealing ? (
+              <ActivityIndicator size="small" color={colors.primaryForeground} />
+            ) : done ? (
+              <>
+                <Eye size={18} />
+                <Text> Reveal Winner</Text>
+              </>
+            ) : (
+              <Text>Determining...</Text>
+            )}
+          </CTAButton>
+        ) : (
+          <CTAButton variant="outline" onPress={() => go('home')}>
+            <Home size={18} />
+            <Text> Back to Home</Text>
+          </CTAButton>
+        )}
       </View>
     </View>
   )
@@ -84,6 +118,8 @@ const s = StyleSheet.create({
   progressBarOuter: { width: '100%', maxWidth: 300, height: 10, borderRadius: 5, backgroundColor: colors.secondary, marginTop: 32, overflow: 'hidden' },
   progressBarInner: { height: 10, borderRadius: 5, backgroundColor: colors.primary },
   progressLabel: { fontSize: 13, fontWeight: '700', color: colors.navy, fontVariant: ['tabular-nums'], marginTop: 12 },
-  doneMessage: { fontSize: 12, fontWeight: '500', color: colors.navy + 'B3', textAlign: 'center', maxWidth: 300, marginTop: 16, lineHeight: 18 },
   bottomCta: { borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.card, padding: 16 },
+  infoBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A', borderRadius: 12, padding: 12, maxWidth: 300, marginTop: 24 },
+  infoText: { flex: 1, fontSize: 12, fontWeight: '500', color: '#92400E', lineHeight: 18 },
+  adminHint: { fontSize: 14, fontWeight: '600', color: colors.navy, textAlign: 'center', maxWidth: 300, marginTop: 24 },
 })

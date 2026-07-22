@@ -1,8 +1,8 @@
 import React, { useEffect, useRef } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native'
-import { Check, Download, Truck, ArrowRight } from 'lucide-react-native'
+import { Check, Download, Truck, ArrowRight, Home } from 'lucide-react-native'
 import { useApp } from '../AppContext'
-import { CTAButton, Card } from '../components/AuctionUI'
+import { CTAButton, Card, AwashMark } from '../components/AuctionUI'
 import { CURRENCY, formatETB } from '../mockDataV0'
 import { colors } from '../theme'
 
@@ -24,7 +24,8 @@ export function PaymentConfirmedScreen() {
 
   if (!auction) return null
 
-  const ref = `AWB${Math.random().toString(36).slice(2, 8).toUpperCase()}`
+  const ref = `RCT${Date.now().toString(36).toUpperCase().slice(-6)}`
+  const paidAt = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -46,7 +47,10 @@ export function PaymentConfirmedScreen() {
 
         <Card style={{ width: '100%', maxWidth: 300, padding: 20, marginTop: 24 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <Text style={s.receiptTitle}>Digital Receipt</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <AwashMark size={20} />
+              <Text style={s.receiptTitle}>Receipt</Text>
+            </View>
             <View style={s.paidBadge}>
               <Text style={s.paidText}>PAID</Text>
             </View>
@@ -65,24 +69,41 @@ export function PaymentConfirmedScreen() {
             <Text style={s.receiptValue}>{formatETB(userBid ?? 0)} {CURRENCY}</Text>
           </View>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
-            <Text style={s.receiptLabel}>Paid via</Text>
+            <Text style={s.receiptLabel}>Payment</Text>
             <Text style={s.receiptValue}>Mobile Money</Text>
           </View>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+            <Text style={s.receiptLabel}>Date</Text>
+            <Text style={s.receiptValue}>{paidAt}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+            <Text style={s.receiptLabel}>Status</Text>
+            <Text style={[s.receiptValue, { color: colors.emerald600 }]}>Completed</Text>
+          </View>
           <View style={{ marginTop: 16 }}>
-            <TouchableOpacity style={s.downloadBtn}>
+            <TouchableOpacity style={s.downloadBtn} activeOpacity={0.7}>
               <Download size={16} color={colors.navy} />
               <Text style={s.downloadText}>Download Receipt</Text>
             </TouchableOpacity>
           </View>
         </Card>
 
-        <Text style={s.confirmText}>{formatETB(userBid ?? 0)} {CURRENCY} paid successfully.</Text>
+        <Text style={s.confirmText}>Thank you for your payment!</Text>
       </View>
 
       <View style={s.bottomCta}>
-        <CTAButton variant="navy" onPress={() => go('delivery')}>
-          <Truck size={18} /> Track Delivery
-        </CTAButton>
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          <View style={{ flex: 1 }}>
+            <CTAButton variant="navy" onPress={() => go('delivery')}>
+              <Truck size={18} /> Track Delivery
+            </CTAButton>
+          </View>
+          <View style={{ flex: 1 }}>
+            <CTAButton variant="outline" onPress={() => go('home')}>
+              <Home size={18} /> Home
+            </CTAButton>
+          </View>
+        </View>
       </View>
     </View>
   )

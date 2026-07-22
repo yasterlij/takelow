@@ -62,6 +62,12 @@ export class AuthService {
     return valid ? user : null;
   }
 
+  async validateLocalUserByPhone(phone: string, password: string): Promise<User | null> {
+    const user = await this.userRepository.findOne({ where: { phone_number: phone } });
+    if (!user || !user.password_hash) return null;
+    return (await bcrypt.compare(password, user.password_hash)) ? user : null;
+  }
+
   async validateTeleBirrUser(accessToken: string, phoneNumber: string): Promise<User> {
     let user = await this.userRepository.findOne({ where: { phone_number: phoneNumber } });
 
@@ -126,6 +132,8 @@ export class AuthService {
 
   async login(user: User): Promise<{ access_token: string; refresh_token: string; user: { id: string; role: string; phone_number: string } }> {
     const tokens = await this.generateTokens(user);
+    user.hashed_refresh_token = await bcrypt.hash(tokens.refresh_token, 12);
+    await this.userRepository.save(user);
     return {
       ...tokens,
       user: { id: user.id, role: user.role, phone_number: user.phone_number },
@@ -179,7 +187,7 @@ export class AuthService {
   private async generateTokens(
     user: User,
   ): Promise<{ access_token: string; refresh_token: string }> {
-    const payload = { sub: user.id, phone: user.phone_number, role: user.role };
+    const payload = { sub: user.id, phone: user.phone_number, role: user.role, wallet_balance: user.wallet_balance };
 
     const access_token = this.jwtService.sign(payload, {
       secret: process.env.JWT_SECRET || 'takelow-jwt-secret',

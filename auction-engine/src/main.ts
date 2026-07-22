@@ -9,6 +9,12 @@ import { StructuredLogger } from './modules/common/logger.service';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     logger: new StructuredLogger(),
+    rawBody: true,
+  });
+
+  app.enableCors({
+    origin: ['http://localhost:5173', 'http://localhost:3000', 'http://localhost'],
+    credentials: true,
   });
 
   const configService = app.get(ConfigService);

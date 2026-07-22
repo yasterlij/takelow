@@ -1,13 +1,157 @@
-import React, { useState } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, Image, TextInput, StyleSheet, Alert, Platform } from 'react-native'
+import React, { useState, useMemo } from 'react'
+import { View, Text, ScrollView, TouchableOpacity, Image, TextInput, StyleSheet, Alert, Platform, Modal, Dimensions, ActivityIndicator } from 'react-native'
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker'
-import { Plus, X, Pencil, XCircle, Trash2, Eye, Calendar } from 'lucide-react-native'
+import * as ImagePicker from 'expo-image-picker'
+import { Plus, X, Pencil, XCircle, Trash2, Eye, Calendar, ImageIcon, Search, Filter, Upload, BarChart3, TrendingDown, ArrowUpRight, Camera } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { AppBar, CTAButton, Badge, Card } from '../components/AuctionUI'
 import { CURRENCY, formatETB } from '../mockDataV0'
 import { colors } from '../theme'
 
-const CATEGORIES = ['Electronics', 'Smartphones', 'Computers', 'Audio', 'Gaming']
+const { width } = Dimensions.get('window')
+
+function AuctionThumb({ src }: { src?: string }) {
+  const [err, setErr] = useState(false)
+  if (err || !src) {
+    return (
+      <View style={s.thumbWrap}>
+        <ImageIcon size={20} color={colors.mutedForeground + '4D'} />
+      </View>
+    )
+  }
+  return (
+    <View style={[s.thumbWrap, { overflow: 'hidden' }]}>
+      <Image source={{ uri: src }} style={{ width: '100%', height: '100%' }} resizeMode="cover" onError={() => setErr(true)} />
+    </View>
+  )
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const map: Record<string, { tone: 'green' | 'orange' | 'muted'; label: string }> = {
+    live: { tone: 'green', label: 'Live' },
+    'ending-soon': { tone: 'orange', label: 'Ending Soon' },
+    closed: { tone: 'muted', label: 'Closed' },
+  }
+  const s = map[status] || { tone: 'muted' as const, label: status }
+  return <Badge tone={s.tone}>{s.label}</Badge>
+}
+
+function BidChart({ amounts }: { amounts: number[] }) {
+  const buckets = useMemo(() => {
+    if (amounts.length === 0) return []
+    const min = Math.min(...amounts)
+    const max = Math.max(...amounts)
+    const range = max - min || 1
+    const count = Math.min(8, amounts.length)
+    const bucketSize = range / count
+    return Array.from({ length: count }, (_, i) => {
+      const start = min + i * bucketSize
+      let cnt = 0
+      amounts.forEach((a) => {
+        const idx = Math.min(Math.floor((a - min) / bucketSize), count - 1)
+        if (idx === i) cnt++
+      })
+      return { label: `${CURRENCY}${formatETB(Math.round(start))}`, count: cnt }
+    })
+  }, [amounts])
+
+  const maxCount = Math.max(...buckets.map((b) => b.count), 1)
+
+  if (buckets.length === 0) return null
+
+  return (
+    <View style={{ marginTop: 12 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+        <BarChart3 size={12} color={colors.mutedForeground} />
+        <Text style={{ fontSize: 10, fontWeight: '600', color: colors.mutedForeground }}>Bid Distribution</Text>
+      </View>
+      <View style={{ height: 40, flexDirection: 'row', alignItems: 'flex-end', gap: 2 }}>
+        {buckets.map((b, i) => (
+          <View key={i} style={{ flex: 1, alignItems: 'center' }}>
+            <Text style={{ fontSize: 7, fontWeight: '700', color: colors.navy, marginBottom: 1, opacity: 0 }}>{b.count}</Text>
+            <View
+              style={{
+                width: '100%',
+                borderRadius: 2,
+                backgroundColor: colors.primary + '99',
+                height: Math.max((b.count / maxCount) * 36, b.count > 0 ? 4 : 0),
+              }}
+            />
+          </View>
+        ))}
+      </View>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 }}>
+        <Text style={{ fontSize: 7, color: colors.mutedForeground }}>{buckets[0]?.label || ''}</Text>
+        <Text style={{ fontSize: 7, color: colors.mutedForeground }}>{buckets[buckets.length - 1]?.label || ''}</Text>
+      </View>
+    </View>
+  )
+}
+
+function ImagePickerBox({ value, onChange, onPreview }: { value: string; onChange: (v: string) => void; onPreview: () => void }) {
+  const hasImg = !!value
+  const [picking, setPicking] = useState(false)
+  const [showUrl, setShowUrl] = useState(false)
+  const [urlText, setUrlText] = useState('')
+
+  const pick = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (!perm.granted) {
+      Alert.alert('Permission needed', 'Allow access to your photo library to upload images.')
+      return
+    }
+    setPicking(true)
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.8,
+        allowsEditing: true,
+        aspect: [4, 3],
+      })
+      if (!result.canceled && result.assets[0]?.uri) {
+        onChange(result.assets[0].uri)
+      }
+    } finally {
+      setPicking(false)
+    }
+  }
+
+  return (
+    <View style={{ alignItems: 'center', gap: 4 }}>
+      <TouchableOpacity onPress={value ? onPreview : pick} style={s.imgPreviewBtn} activeOpacity={0.7}>
+        {picking ? (
+          <ActivityIndicator size="small" color={colors.primary} />
+        ) : value ? (
+          <>
+            <Image source={{ uri: value }} style={{ width: '100%', height: '100%' }} resizeMode="cover" onError={() => onChange('')} />
+            {hasImg && (
+              <TouchableOpacity onPress={() => onChange('')} style={{ position: 'absolute', top: 2, right: 2, borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.5)', width: 20, height: 20, justifyContent: 'center', alignItems: 'center' }}>
+                <X size={12} color="#fff" />
+              </TouchableOpacity>
+            )}
+          </>
+        ) : (
+          <Camera size={20} color={colors.mutedForeground + '4D'} />
+        )}
+      </TouchableOpacity>
+      <TouchableOpacity onPress={pick} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, borderRadius: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.secondary, paddingHorizontal: 16, paddingVertical: 6, width: '100%' }}>
+        <Upload size={12} color={colors.navy} />
+        <Text style={{ fontSize: 10, fontWeight: '600', color: colors.navy }}>Browse & Upload</Text>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={() => setShowUrl(!showUrl)}>
+        <Text style={{ fontSize: 8, color: colors.mutedForeground }}>{showUrl ? 'Hide URL' : 'or paste URL'}</Text>
+      </TouchableOpacity>
+      {showUrl && (
+        <View style={{ flexDirection: 'row', gap: 4, alignItems: 'center' }}>
+          <TextInput value={urlText} onChangeText={setUrlText} placeholder="https://..." placeholderTextColor={colors.mutedForeground + '80'} style={{ flex: 1, borderRadius: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.secondary, paddingHorizontal: 8, paddingVertical: 4, fontSize: 10, color: colors.foreground }} />
+          <TouchableOpacity onPress={() => { if (urlText) onChange(urlText); setUrlText('') }} style={{ borderRadius: 6, backgroundColor: colors.primary, paddingHorizontal: 8, paddingVertical: 4 }}>
+            <Text style={{ fontSize: 9, fontWeight: '600', color: colors.primaryForeground }}>Set</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  )
+}
 
 function fmtDate(d: Date): string {
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) + ' ' +
@@ -15,16 +159,22 @@ function fmtDate(d: Date): string {
 }
 
 export function AdminAuctionsScreen() {
-  const { go, auctions, addAuction, updateAuction, deleteAuction, closeAuction, allBids, users } = useApp()
+  const { go, auctions, addAuction, updateAuction, deleteAuction, closeAuction, allBids } = useApp()
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [viewBidsId, setViewBidsId] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
   const [name, setName] = useState('')
   const [category, setCategory] = useState('Electronics')
   const [marketPrice, setMarketPrice] = useState('')
   const [bidFee, setBidFee] = useState('10')
+  const [minBid, setMinBid] = useState('')
+  const [maxBid, setMaxBid] = useState('')
+  const [numWinners, setNumWinners] = useState('1')
   const [description, setDescription] = useState('')
   const [highlights, setHighlights] = useState('')
+  const [imageUrl, setImageUrl] = useState('')
   const [startDate, setStartDate] = useState(new Date())
   const [endDate, setEndDate] = useState(new Date(Date.now() + 7 * 86400000))
   const [showStartPicker, setShowStartPicker] = useState(false)
@@ -32,10 +182,12 @@ export function AdminAuctionsScreen() {
   const [startPickerMode, setStartPickerMode] = useState<'date' | 'time'>('date')
   const [endPickerMode, setEndPickerMode] = useState<'date' | 'time'>('date')
   const [submitting, setSubmitting] = useState(false)
+  const [showLightbox, setShowLightbox] = useState(false)
 
   const resetForm = () => {
     setName(''); setCategory('Electronics'); setMarketPrice(''); setBidFee('10')
-    setDescription(''); setHighlights('')
+    setMinBid(''); setMaxBid(''); setNumWinners('1')
+    setDescription(''); setHighlights(''); setImageUrl('')
     setStartDate(new Date()); setEndDate(new Date(Date.now() + 7 * 86400000))
   }
 
@@ -46,9 +198,14 @@ export function AdminAuctionsScreen() {
   const openEdit = (a: any) => {
     setEditingId(a.id)
     setName(a.name); setCategory(a.category); setMarketPrice(String(a.marketPrice))
-    setBidFee('10'); setDescription(a.description)
+    setBidFee(String(a.bidFee || 10)); setDescription(a.description); setImageUrl(a.images?.[0] || '')
     setHighlights(Array.isArray(a.highlights) ? a.highlights.join(', ') : '')
-    setStartDate(new Date()); setEndDate(new Date(Date.now() + 7 * 86400000))
+    setMinBid(a.minBid != null ? String(a.minBid) : '')
+    setMaxBid(a.maxBid != null ? String(a.maxBid) : '')
+    setNumWinners(String(a.numWinners ?? 1))
+    const end = a.endTime ? new Date(a.endTime) : new Date(Date.now() + 7 * 86400000)
+    setStartDate(end)
+    setEndDate(end)
     setShowForm(true)
   }
 
@@ -86,15 +243,26 @@ export function AdminAuctionsScreen() {
     if (!name || !marketPrice) return
     setSubmitting(true)
     const hl = highlights ? highlights.split(',').map((h) => h.trim()).filter(Boolean) : []
+    const payload = {
+      name, category, marketPrice: Number(marketPrice), description, highlights: hl,
+      ...(imageUrl ? { images: [imageUrl] } : {}),
+    }
     if (editingId) {
       await updateAuction(editingId, {
-        name, category, marketPrice: Number(marketPrice), description, highlights: hl,
+        ...payload,
+        startTime: startDate.toISOString(),
+        endTime: endDate.toISOString(),
+        minBid: minBid ? Number(minBid) : undefined,
+        maxBid: maxBid ? Number(maxBid) : undefined,
+        numWinners: numWinners ? Number(numWinners) : 1,
       })
     } else {
       await addAuction({
-        name, category, marketPrice: Number(marketPrice), bidFee: Number(bidFee),
-        description, highlights: hl,
+        ...payload, bidFee: Number(bidFee),
         startTime: startDate.toISOString(), endTime: endDate.toISOString(),
+        minBid: minBid ? Number(minBid) : undefined,
+        maxBid: maxBid ? Number(maxBid) : undefined,
+        numWinners: numWinners ? Number(numWinners) : 1,
       })
     }
     setSubmitting(false)
@@ -117,27 +285,86 @@ export function AdminAuctionsScreen() {
     ])
   }
 
+  const filtered = auctions.filter((a) => {
+    if (statusFilter !== 'all' && a.status !== statusFilter) return false
+    if (search && !a.name.toLowerCase().includes(search.toLowerCase())) return false
+    return true
+  })
+
+  const activeCount = auctions.filter((a) => a.status === 'live' || a.status === 'ending-soon').length
+  const closedCount = auctions.filter((a) => a.status === 'closed').length
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={{ backgroundColor: colors.navy }}>
         <StatusBarCustom />
       </View>
-      <AppBar title="Manage Auctions" onBack={() => go('admin-dashboard')} right={
+      <AppBar title="Auction Management" onBack={() => go('admin-dashboard')} right={
         <TouchableOpacity style={{ width: 32, height: 32, justifyContent: 'center', alignItems: 'center' }} onPress={openCreate}>
           <Plus size={20} color={colors.navyForeground} />
         </TouchableOpacity>
       } />
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+          <View style={s.searchWrap}>
+            <Search size={14} color={colors.mutedForeground} />
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Search auctions..."
+              placeholderTextColor={colors.mutedForeground + '80'}
+              style={s.searchInput}
+            />
+          </View>
+        </View>
+
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+          {['all', 'live', 'ending-soon', 'closed'].map((st) => (
+            <TouchableOpacity
+              key={st}
+              onPress={() => setStatusFilter(st)}
+              style={[s.filterChip, { backgroundColor: statusFilter === st ? colors.navy : colors.card, borderColor: statusFilter === st ? colors.navy : colors.border }]}
+            >
+              <Text style={{ fontSize: 10, fontWeight: '600', color: statusFilter === st ? colors.navyForeground : colors.mutedForeground }}>
+                {st === 'all' ? 'All' : st === 'ending-soon' ? 'Ending' : st.charAt(0).toUpperCase() + st.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <Text style={{ fontSize: 11, fontWeight: '600', color: colors.mutedForeground }}>
+            {filtered.length} of {auctions.length} auctions
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 6 }}>
+            <Badge tone="green">{activeCount} active</Badge>
+            <Badge tone="muted">{closedCount} closed</Badge>
+          </View>
+        </View>
+
         {showForm && (
-          <Card style={{ padding: 16, marginBottom: 16 }}>
+          <Card style={{ padding: 16, marginBottom: 16, borderWidth: 1, borderColor: colors.primary + '33' }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <Text style={{ fontSize: 14, fontWeight: '700', color: colors.navy }}>{editingId ? 'Edit Auction' : 'New Auction'}</Text>
               <TouchableOpacity onPress={() => { setShowForm(false); setEditingId(null) }}><X size={16} color={colors.mutedForeground} /></TouchableOpacity>
             </View>
-            <TextInput value={name} onChangeText={setName} placeholder="Product name" placeholderTextColor={colors.mutedForeground} style={s.input} />
+
             <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
-              <TextInput value={marketPrice} onChangeText={(t) => setMarketPrice(t.replace(/\D/g, ''))} placeholder="Market price" placeholderTextColor={colors.mutedForeground} style={[s.input, { flex: 1 }]} keyboardType="numeric" />
-              <TextInput value={bidFee} onChangeText={(t) => setBidFee(t.replace(/\D/g, ''))} placeholder="Bid fee" placeholderTextColor={colors.mutedForeground} style={[s.input, { flex: 1 }]} keyboardType="numeric" />
+              <View style={{ flex: 1 }}>
+                <TextInput value={name} onChangeText={setName} placeholder="Product name" placeholderTextColor={colors.mutedForeground} style={s.input} />
+              </View>
+              <ImagePickerBox value={imageUrl} onChange={setImageUrl} onPreview={() => setShowLightbox(true)} />
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
+              <TextInput value={marketPrice} onChangeText={(t) => setMarketPrice(t.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1').replace(/(\.\d{2})\d+/g, '$1'))} placeholder="Market price" placeholderTextColor={colors.mutedForeground} style={[s.input, { flex: 1 }]} keyboardType="decimal-pad" />
+              <TextInput value={bidFee} onChangeText={(t) => setBidFee(t.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1').replace(/(\.\d{2})\d+/g, '$1'))} placeholder="Bid fee" placeholderTextColor={colors.mutedForeground} style={[s.input, { flex: 1 }]} keyboardType="decimal-pad" />
+            </View>
+            <Text style={{ fontSize: 10, fontWeight: '600', color: colors.mutedForeground, marginBottom: 4 }}>Bid Configuration (optional)</Text>
+            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
+              <TextInput value={minBid} onChangeText={(t) => setMinBid(t.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1').replace(/(\.\d{2})\d+/g, '$1'))} placeholder="Min total bids" placeholderTextColor={colors.mutedForeground} style={[s.input, { flex: 1 }]} keyboardType="decimal-pad" />
+              <TextInput value={maxBid} onChangeText={(t) => setMaxBid(t.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1').replace(/(\.\d{2})\d+/g, '$1'))} placeholder="Max total bids" placeholderTextColor={colors.mutedForeground} style={[s.input, { flex: 1 }]} keyboardType="decimal-pad" />
+              <TextInput value={numWinners} onChangeText={(t) => setNumWinners(t.replace(/\D/g, ''))} placeholder="Winners" placeholderTextColor={colors.mutedForeground} style={[s.input, { flex: 1 }]} keyboardType="numeric" />
             </View>
             <TextInput value={description} onChangeText={setDescription} placeholder="Description" placeholderTextColor={colors.mutedForeground} style={s.input} multiline numberOfLines={2} />
             <TextInput value={highlights} onChangeText={setHighlights} placeholder="Highlights (comma separated)" placeholderTextColor={colors.mutedForeground} style={s.input} />
@@ -163,58 +390,98 @@ export function AdminAuctionsScreen() {
           </Card>
         )}
 
-        {auctions.length === 0 && (
-          <Text style={{ textAlign: 'center', paddingVertical: 32, fontSize: 12, fontWeight: '500', color: colors.mutedForeground }}>
-            No auctions yet. Create one above.
-          </Text>
-        )}
-
-        {auctions.map((a) => (
-          <View key={a.id}>
-            <View style={s.row}>
-              <View style={s.imageWrap}>
-                {a.image ? (
-                  <Image source={{ uri: a.image }} style={{ width: 48, height: 48 }} resizeMode="contain" />
-                ) : (
-                  <Text style={{ fontSize: 10, color: colors.mutedForeground }}>No img</Text>
-                )}
-              </View>
-              <View style={{ flex: 1 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Text style={s.name} numberOfLines={1}>{a.name}</Text>
-                  <Badge tone={a.status === 'ending-soon' ? 'orange' : a.status === 'live' ? 'green' : 'muted'}>{a.status}</Badge>
-                </View>
-                <Text style={s.meta}>{a.bidders} bidders · {CURRENCY} {formatETB(a.marketPrice)}</Text>
-              </View>
-              <TouchableOpacity onPress={() => openEdit(a)} style={s.iconBtn}><Pencil size={12} color={colors.mutedForeground} /></TouchableOpacity>
-              <TouchableOpacity onPress={() => setViewBidsId(viewBidsId === a.id ? null : a.id)} style={s.iconBtn}><Eye size={12} color={colors.mutedForeground} /></TouchableOpacity>
-              {a.status !== 'closed' && (
-                <TouchableOpacity onPress={() => handleClose(a.id)} style={s.closeBtn}><XCircle size={12} color={colors.destructive} /></TouchableOpacity>
-              )}
-              <TouchableOpacity onPress={() => handleDelete(a.id)} style={[s.iconBtn, { borderColor: colors.destructive + '4D' }]}><Trash2 size={12} color={colors.destructive} /></TouchableOpacity>
-            </View>
-            {viewBidsId === a.id && (
-              <View style={s.bidsBox}>
-                <Text style={{ fontSize: 11, fontWeight: '700', color: colors.navy, marginBottom: 8 }}>
-                  Bids ({allBids.filter(b => b.auctionId === a.id).length})
-                </Text>
-                {allBids.filter(b => b.auctionId === a.id).length === 0 ? (
-                  <Text style={{ fontSize: 10, color: colors.mutedForeground }}>No bids yet</Text>
-                ) : (
-                  allBids.filter(b => b.auctionId === a.id).map((b, i) => (
-                    <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}>
-                      <Text style={{ fontSize: 10, fontWeight: '500', color: colors.mutedForeground }}>
-                        {b.userName || users.find(u => u.id === b.userId)?.name || 'Anonymous'}
-                      </Text>
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: colors.navy }}>{CURRENCY} {formatETB(b.amount)}</Text>
-                    </View>
-                  ))
-                )}
-              </View>
+        {filtered.length === 0 ? (
+          <View style={{ alignItems: 'center', paddingVertical: 48 }}>
+            <Filter size={32} color={colors.mutedForeground + '4D'} />
+            <Text style={{ fontSize: 13, fontWeight: '500', color: colors.mutedForeground, marginTop: 8 }}>No matching auctions</Text>
+            {search || statusFilter !== 'all' ? (
+              <TouchableOpacity onPress={() => { setSearch(''); setStatusFilter('all') }}>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: colors.primary, marginTop: 8 }}>Clear filters</Text>
+              </TouchableOpacity>
+            ) : (
+              <Text style={{ fontSize: 11, color: colors.mutedForeground, marginTop: 4 }}>Tap + to create one</Text>
             )}
           </View>
-        ))}
+        ) : (
+          filtered.map((a) => {
+            const bids = allBids.filter((b) => b.auctionId === a.id)
+            const bidAmounts = bids.map((b) => b.amount)
+            const avgBid = bidAmounts.length > 0 ? Math.round(bidAmounts.reduce((s, v) => s + v, 0) / bidAmounts.length) : 0
+            return (
+              <View key={a.id}>
+                <View style={s.row}>
+                  <AuctionThumb src={a.images?.[0]} />
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={s.name} numberOfLines={1}>{a.name}</Text>
+                      <StatusBadge status={a.status} />
+                    </View>
+                    <Text style={s.meta}>
+                      {a.uniqueBidders} bidders · {CURRENCY} {formatETB(a.marketPrice)}
+                      {bidAmounts.length > 0 ? ` · Avg ${CURRENCY}${formatETB(avgBid)}` : ''}
+                    </Text>
+                  </View>
+                  <TouchableOpacity onPress={() => openEdit(a)} style={s.iconBtn}><Pencil size={12} color={colors.mutedForeground} /></TouchableOpacity>
+                  <TouchableOpacity onPress={() => setViewBidsId(viewBidsId === a.id ? null : a.id)} style={s.iconBtn}><Eye size={12} color={colors.mutedForeground} /></TouchableOpacity>
+                  {a.status !== 'closed' && (
+                    <TouchableOpacity onPress={() => handleClose(a.id)} style={s.closeBtn}><XCircle size={12} color={colors.destructive} /></TouchableOpacity>
+                  )}
+                  <TouchableOpacity onPress={() => handleDelete(a.id)} style={[s.iconBtn, { borderColor: colors.destructive + '4D' }]}><Trash2 size={12} color={colors.destructive} /></TouchableOpacity>
+                </View>
+                {viewBidsId === a.id && (
+                  <View style={s.bidsBox}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Eye size={12} color={colors.navy} />
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: colors.navy }}>Bids ({bids.length})</Text>
+                      </View>
+                      {bidAmounts.length > 1 && (
+                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                          <Text style={{ fontSize: 9, color: colors.mutedForeground }}>
+                            <TrendingDown size={10} color={colors.mutedForeground} /> Min: {CURRENCY}{formatETB(Math.min(...bidAmounts))}
+                          </Text>
+                          <Text style={{ fontSize: 9, color: colors.mutedForeground }}>
+                            <ArrowUpRight size={10} color={colors.mutedForeground} /> Max: {CURRENCY}{formatETB(Math.max(...bidAmounts))}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+
+                    {bids.length > 1 && <BidChart amounts={bidAmounts} />}
+
+                    {bids.length === 0 ? (
+                      <Text style={{ textAlign: 'center', paddingVertical: 8, fontSize: 10, color: colors.mutedForeground }}>No bids placed yet</Text>
+                    ) : (
+                      bids.map((b, i) => (
+                        <View key={i} style={s.bidRow}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <View style={s.bidIdx}>
+                              <Text style={{ fontSize: 8, fontWeight: '700', color: colors.navy + '99' }}>{i + 1}</Text>
+                            </View>
+                            <Text style={{ fontSize: 10, fontWeight: '500', color: colors.mutedForeground }}>
+                              {b.userName || b.userId?.slice(0, 8) || 'Anonymous'}
+                            </Text>
+                          </View>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: colors.navy }}>{CURRENCY} {formatETB(b.amount)}</Text>
+                        </View>
+                      ))
+                    )}
+                  </View>
+                )}
+              </View>
+            )
+          })
+        )}
       </ScrollView>
+
+      <Modal visible={showLightbox} transparent animationType="fade" onRequestClose={() => setShowLightbox(false)}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' }} activeOpacity={1} onPress={() => setShowLightbox(false)}>
+          <Image source={{ uri: imageUrl }} style={{ width: width - 40, height: width - 40 }} resizeMode="contain" />
+          <TouchableOpacity style={{ position: 'absolute', top: 60, right: 20 }} onPress={() => setShowLightbox(false)}>
+            <X size={24} color="#fff" />
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </View>
   )
 }
@@ -228,14 +495,20 @@ function StatusBarCustom() {
 }
 
 const s = StyleSheet.create({
+  searchWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.secondary, paddingHorizontal: 10 },
+  searchInput: { flex: 1, fontSize: 13, fontWeight: '500', color: colors.foreground, paddingVertical: 8 },
+  filterChip: { borderRadius: 16, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 5, marginRight: 0 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, marginBottom: 12 },
-  imageWrap: { width: 56, height: 56, borderRadius: 12, backgroundColor: colors.secondary, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
+  thumbWrap: { width: 56, height: 56, borderRadius: 12, backgroundColor: colors.secondary, justifyContent: 'center', alignItems: 'center' },
   name: { fontSize: 14, fontWeight: '700', color: colors.navy },
   meta: { fontSize: 11, fontWeight: '500', color: colors.mutedForeground, marginTop: 2 },
   iconBtn: { borderRadius: 8, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 8, paddingVertical: 6 },
   closeBtn: { borderRadius: 8, borderWidth: 1, borderColor: colors.destructive + '4D', paddingHorizontal: 8, paddingVertical: 6 },
   bidsBox: { marginTop: -8, marginBottom: 12, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.secondary + '66', padding: 12 },
+  bidRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderRadius: 8, backgroundColor: colors.white + '99', paddingHorizontal: 10, paddingVertical: 5, marginBottom: 4 },
+  bidIdx: { width: 16, height: 16, borderRadius: 8, backgroundColor: colors.navy + '1A', justifyContent: 'center', alignItems: 'center' },
   input: { borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.secondary, paddingHorizontal: 12, paddingVertical: 8, fontSize: 13, fontWeight: '500', color: colors.foreground, marginBottom: 12 },
   dateBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.secondary, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 12 },
   dateText: { fontSize: 13, fontWeight: '500', color: colors.foreground },
+  imgPreviewBtn: { width: 64, height: 64, borderRadius: 12, backgroundColor: colors.secondary, justifyContent: 'center', alignItems: 'center', overflow: 'hidden', borderWidth: 1, borderColor: colors.border },
 })

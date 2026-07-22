@@ -1,6 +1,7 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
+import * as bcrypt from 'bcryptjs';
 import { User } from '../auth/entities/user.entity';
 import { Transaction, TransactionType } from './entities/transaction.entity';
 
@@ -138,6 +139,98 @@ export class WalletService {
       where: { user_id: userId },
       order: { created_at: 'DESC' },
     });
+  }
+
+  async resolveUser(id: string): Promise<User | null> {
+    return this.userRepository.findOne({
+      where: { id },
+      select: ['id', 'full_name', 'phone_number'],
+    });
+  }
+
+  async setPin(userId: string, pin: string): Promise<void> {
+    if (!pin || pin.length < 4 || pin.length > 6 || !/^\d+$/.test(pin)) {
+      throw new BadRequestException('PIN must be 4–6 digits');
+    }
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+    user.wallet_pin_hash = await bcrypt.hash(pin, 10);
+    await this.userRepository.save(user);
+  }
+
+  private readonly MAX_PIN_ATTEMPTS = 5;
+  private readonly PIN_LOCKOUT_MINUTES = 30;
+
+  async verifyPin(userId: string, pin: string): Promise<{ valid: boolean; attemptsRemaining: number; locked: boolean; lockedUntil: Date | null }> {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      select: ['id', 'wallet_pin_hash', 'pin_attempts', 'pin_locked_until'],
+    });
+    if (!user) throw new NotFoundException('User not found');
+    if (!user.wallet_pin_hash) {
+      throw new BadRequestException('Wallet PIN not set');
+    }
+
+    // Check if currently locked
+    if (user.pin_locked_until && user.pin_locked_until > new Date()) {
+      const remainingMs = user.pin_locked_until.getTime() - Date.now();
+      return { valid: false, attemptsRemaining: 0, locked: true, lockedUntil: user.pin_locked_until };
+    }
+
+    // If lock expired, reset
+    if (user.pin_locked_until && user.pin_locked_until <= new Date()) {
+      await this.userRepository.update(user.id, { pin_attempts: 0, pin_locked_until: null as any });
+    }
+
+    const valid = await bcrypt.compare(pin, user.wallet_pin_hash);
+
+    if (!valid) {
+      const newAttempts = (user.pin_attempts || 0) + 1;
+      const locked = newAttempts >= this.MAX_PIN_ATTEMPTS;
+      const lockedUntil = locked ? new Date(Date.now() + this.PIN_LOCKOUT_MINUTES * 60 * 1000) : null;
+
+      await this.userRepository.update(user.id, {
+        pin_attempts: newAttempts,
+        pin_locked_until: lockedUntil as any,
+      });
+
+      const attemptsRemaining = locked ? 0 : this.MAX_PIN_ATTEMPTS - newAttempts;
+      return { valid: false, attemptsRemaining, locked, lockedUntil };
+    }
+
+    // Success — reset attempts
+    if ((user.pin_attempts || 0) > 0 || user.pin_locked_until) {
+      await this.userRepository.update(user.id, { pin_attempts: 0, pin_locked_until: null as any });
+    }
+
+    return { valid: true, attemptsRemaining: this.MAX_PIN_ATTEMPTS, locked: false, lockedUntil: null };
+  }
+
+  async getPinStatus(userId: string): Promise<{ hasPin: boolean; attemptsRemaining: number; locked: boolean; lockedUntil: Date | null }> {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      select: ['id', 'wallet_pin_hash', 'pin_attempts', 'pin_locked_until'],
+    });
+    if (!user) throw new NotFoundException('User not found');
+
+    const locked = !!(user.pin_locked_until && user.pin_locked_until > new Date());
+    const attemptsRemaining = Math.max(0, this.MAX_PIN_ATTEMPTS - (user.pin_attempts || 0));
+
+    return {
+      hasPin: user.wallet_pin_hash !== null,
+      attemptsRemaining: locked ? 0 : attemptsRemaining,
+      locked,
+      lockedUntil: locked ? user.pin_locked_until : null,
+    };
+  }
+
+  async hasPin(userId: string): Promise<boolean> {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      select: ['id', 'wallet_pin_hash'],
+    });
+    if (!user) throw new NotFoundException('User not found');
+    return user.wallet_pin_hash !== null;
   }
 
   async handleFintechWebhook(payload: {

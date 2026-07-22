@@ -1,0 +1,70 @@
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
+
+export enum PaymentTransactionStatus {
+  PENDING = 'PENDING',
+  SUCCESSFUL = 'SUCCESSFUL',
+  FAILED = 'FAILED',
+  EXPIRED = 'EXPIRED',
+  CANCELLED = 'CANCELLED',
+  REVOKED = 'REVOKED',
+}
+
+export enum PaymentType {
+  BID_FEE = 'BID_FEE',
+  WINNING_BID = 'WINNING_BID',
+}
+
+@Entity('payment_transactions')
+export class PaymentTransaction {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Index()
+  @Column({ type: 'uuid' })
+  auction_id: string;
+
+  @Index()
+  @Column({ type: 'uuid' })
+  user_id: string;
+
+  @Column({ type: 'decimal', precision: 12, scale: 2 })
+  amount: number;
+
+  @Column({ type: 'varchar', length: 128, unique: true })
+  client_reference_id: string;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  sikina_payment_reference_id: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  sikina_payment_url: string;
+
+  @Column({
+    type: 'enum',
+    enum: PaymentTransactionStatus,
+    default: PaymentTransactionStatus.PENDING,
+  })
+  status: PaymentTransactionStatus;
+
+  @Column({ type: 'varchar', nullable: true })
+  currency: string;
+
+  @Column({ type: 'jsonb', nullable: true })
+  webhook_payload: Record<string, any>;
+
+  @Column({
+    type: 'enum',
+    enum: PaymentType,
+    default: PaymentType.WINNING_BID,
+  })
+  payment_type: PaymentType;
+
+  @Column({ type: 'int', default: 0 })
+  retry_count: number;
+
+  @CreateDateColumn()
+  created_at: Date;
+
+  @UpdateDateColumn()
+  updated_at: Date;
+}

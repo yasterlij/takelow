@@ -1,4 +1,4 @@
-import { Gavel, Clock, TicketCheck, Trophy, ChevronRight } from "lucide-react"
+import { Gavel, Clock, TicketCheck, Trophy, ChevronRight, Hash } from "lucide-react"
 import { useApp } from "../AppContext"
 import { AppBar, PhoneStatusBar, Badge, CTAButton } from "../components/AuctionUI"
 import { useCountdown } from "../components/Countdown"
@@ -57,13 +57,13 @@ export function MyBidsScreen() {
               if (!auction) return null
               return (
                 <button
-                  key={bid.auctionId}
+                  key={`${bid.auctionId}-${bid.placedAt}`}
                   onClick={() => selectAuction(bid.auctionId)}
                   className="flex w-full items-center gap-3 rounded-2xl border border-border bg-card p-3 text-left transition-all hover:border-primary/40 hover:shadow-md"
                 >
                   <div className="flex size-16 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl bg-secondary">
                     <img
-                      src={auction.image || "/placeholder.svg"}
+                      src={auction.images?.[0] || "/placeholder.svg"}
                       alt={auction.name}
                       className="h-full w-full object-contain p-1.5"
                     />
@@ -76,6 +76,14 @@ export function MyBidsScreen() {
                         {CURRENCY} {formatETB(bid.amount)}
                       </span>
                     </div>
+                    {bid.ticketNumber && (
+                      <div className="mt-0.5 flex items-center gap-1">
+                        <Hash className="size-2.5 text-muted-foreground" />
+                        <span className="font-mono text-[10px] font-semibold text-muted-foreground">
+                          {bid.ticketNumber}
+                        </span>
+                      </div>
+                    )}
                     <div className="mt-1 flex items-center gap-2">
                       <TimeLeft seconds={auction.timeLeft} />
                       <Badge tone="green">

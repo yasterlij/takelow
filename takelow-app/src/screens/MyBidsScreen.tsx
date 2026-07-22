@@ -1,11 +1,13 @@
-import React from 'react'
-import { View, Text, TouchableOpacity, ScrollView, Image, StyleSheet } from 'react-native'
-import { Gavel, Clock, TicketCheck, Trophy, ChevronRight } from 'lucide-react-native'
+import React, { useState, useCallback } from 'react'
+import { View, Text, TouchableOpacity, ScrollView, Image, StyleSheet, RefreshControl } from 'react-native'
+import { Gavel, Clock, Trophy, ChevronRight, ImageIcon, Hash } from 'lucide-react-native'
 import { useApp } from '../AppContext'
-import { AppBar, Badge, CTAButton } from '../components/AuctionUI'
+import { AppBar, Badge } from '../components/AuctionUI'
 import { useCountdown } from '../components/Countdown'
+import { EmptyState } from '../components/EmptyState'
+import { SkeletonRow } from '../components/SkeletonLoader'
 import { CURRENCY, formatETB, formatCountdown } from '../mockDataV0'
-import { colors, borderRadius, fontSize } from '../theme'
+import { colors } from '../theme'
 
 function TimeLeft({ seconds }: { seconds: number }) {
   const t = useCountdown(seconds)
@@ -19,47 +21,78 @@ function TimeLeft({ seconds }: { seconds: number }) {
 }
 
 export function MyBidsScreen() {
-  const { go, myBids, selectAuction, getAuction } = useApp()
+  const { go, myBids, selectAuction, getAuction, auctionsLoading } = useApp()
+  const [refreshing, setRefreshing] = useState(false)
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true)
+    await new Promise((r) => setTimeout(r, 1000))
+    setRefreshing(false)
+  }, [])
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={{ backgroundColor: colors.navy }}>
         <StatusBarCustom />
-        <AppBar title="My Bids" onBack={() => go('auctions')} />
+        <AppBar title="My Bids" onBack={() => go('home')} />
       </View>
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 32 }}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 32 }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}
+      >
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <View>
             <Text style={{ fontSize: 18, fontWeight: '800', color: colors.navy }}>Your Active Bids</Text>
             <Text style={{ fontSize: 12, fontWeight: '500', color: colors.mutedForeground, marginTop: 2 }}>Track every auction you&apos;ve entered.</Text>
           </View>
-          <Badge tone="navy"><TicketCheck size={12} /> {myBids.length} placed</Badge>
+          <Badge tone="navy">{myBids.length} placed</Badge>
         </View>
 
-        {myBids.length === 0 ? (
-          <View style={s.empty}>
-            <View style={s.emptyIcon}><Gavel size={28} color={colors.navy} /></View>
-            <Text style={s.emptyTitle}>No bids yet</Text>
-            <Text style={s.emptySub}>Browse the live auctions and place your first unique lowest bid.</Text>
-            <CTAButton onPress={() => go('auctions')} style={{ marginTop: 8, paddingHorizontal: 24 }}>Browse Auctions</CTAButton>
+        {auctionsLoading && myBids.length === 0 ? (
+          <View style={{ gap: 12 }}>
+            {[1, 2, 3].map((i) => <SkeletonRow key={i} />)}
           </View>
+        ) : myBids.length === 0 ? (
+          <EmptyState
+            icon="bag"
+            title="No bids yet"
+            message="Browse the live auctions and place your first unique lowest bid to get started."
+            actionLabel="Browse Auctions"
+            onAction={() => go('auctions')}
+          />
         ) : (
           <View style={{ gap: 12 }}>
             {myBids.map((bid) => {
               const auction = getAuction(bid.auctionId)
               if (!auction) return null
               return (
-                <TouchableOpacity key={bid.auctionId} onPress={() => selectAuction(bid.auctionId)} style={s.bidRow} activeOpacity={0.8}>
-                  <View style={s.bidImg}><Image source={{ uri: auction.image }} style={{ width: '100%', height: '100%' }} resizeMode="contain" /></View>
+                <TouchableOpacity key={`${bid.auctionId}-${bid.placedAt}`} onPress={() => selectAuction(bid.auctionId)} style={s.bidRow} activeOpacity={0.8}>
+                  <View style={s.bidImg}>{auction.images?.[0] ? <Image source={{ uri: auction.images[0] }} style={{ width: '100%', height: '100%' }} resizeMode="contain" /> : <ImageIcon size={24} color="#94a3b8" />}</View>
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: 14, fontWeight: '700', color: colors.navy }} numberOfLines={1}>{auction.name}</Text>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
                       <Text style={{ fontSize: 11, fontWeight: '500', color: colors.mutedForeground }}>Your bid</Text>
                       <Text style={{ fontSize: 14, fontWeight: '800', color: colors.primary, fontVariant: ['tabular-nums'] }}>{CURRENCY} {formatETB(bid.amount)}</Text>
                     </View>
+                    {bid.ticketNumber && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 }}>
+                        <Hash size={10} color={colors.mutedForeground} />
+                        <Text style={{ fontFamily: 'monospace', fontSize: 10, fontWeight: '600', color: colors.mutedForeground }}>
+                          {bid.ticketNumber}
+                        </Text>
+                      </View>
+                    )}
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
-                      <TimeLeft seconds={auction.timeLeft} />
-                      <Badge tone="green"><Trophy size={12} /> In the running</Badge>
+                      {auction.status === 'closed' ? (
+                        <Text style={{ fontSize: 11, fontWeight: '500', color: colors.mutedForeground }}>Auction ended</Text>
+                      ) : (
+                        <TimeLeft seconds={auction.timeLeft} />
+                      )}
+                      <Badge tone={auction.status === 'closed' ? 'muted' : 'green'}>
+                        {auction.status === 'closed' ? 'Ended' : <><Trophy size={12} /> Running</>}
+                      </Badge>
                     </View>
                   </View>
                   <ChevronRight size={16} color={colors.mutedForeground} />
@@ -82,10 +115,6 @@ function StatusBarCustom() {
 }
 
 const s = StyleSheet.create({
-  empty: { marginTop: 40, alignItems: 'center', gap: 12, borderRadius: 16, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.border, backgroundColor: colors.card, paddingHorizontal: 24, paddingVertical: 48 },
-  emptyIcon: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.secondary, justifyContent: 'center', alignItems: 'center' },
-  emptyTitle: { fontSize: 14, fontWeight: '700', color: colors.navy },
-  emptySub: { fontSize: 12, color: colors.mutedForeground, textAlign: 'center' },
-  bidRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12 },
+  bidRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 2 },
   bidImg: { width: 64, height: 64, borderRadius: 12, backgroundColor: colors.secondary, overflow: 'hidden', justifyContent: 'center', alignItems: 'center' },
 })

@@ -1,6 +1,6 @@
 import React from 'react'
 import { View, Text, Image, ScrollView, StyleSheet, TouchableOpacity } from 'react-native'
-import { Package, CheckCircle2, Circle, Bike, Home, MapPin, Phone } from 'lucide-react-native'
+import { Package, CheckCircle2, Circle, Bike, Home, MapPin, Phone, ImageIcon, FileText } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { AppBar, CTAButton, Card } from '../components/AuctionUI'
 import { CURRENCY, formatETB } from '../mockDataV0'
@@ -39,7 +39,7 @@ export function DeliveryScreen() {
 
         <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, marginTop: 12 }}>
           <View style={s.productImgWrap}>
-            <Image source={{ uri: auction.image }} style={{ width: 56, height: 56 }} resizeMode="contain" />
+            {auction.images?.[0] ? <Image source={{ uri: auction.images[0] }} style={{ width: 56, height: 56 }} resizeMode="contain" /> : <ImageIcon size={24} color="#94a3b8" />}
           </View>
           <View style={{ flex: 1 }}>
             <Text style={{ fontSize: 14, fontWeight: '700', color: colors.navy }}>{auction.name}</Text>
@@ -79,12 +79,21 @@ export function DeliveryScreen() {
               <Text style={{ fontSize: 13, fontWeight: '500', color: colors.mutedForeground, marginTop: 4 }}>
                 Bole Sub-city, Woreda 03, Addis Ababa
               </Text>
+              <Text style={{ fontSize: 11, fontWeight: '500', color: colors.mutedForeground + '99', marginTop: 4 }}>
+                Leave at gate if not home
+              </Text>
             </View>
           </View>
-          <TouchableOpacity style={s.phoneBtn}>
-            <Phone size={16} color={colors.primary} />
-            <Text style={s.phoneText}>Call Courier</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
+            <TouchableOpacity style={s.actionBtn}>
+              <Phone size={16} color={colors.primary} />
+              <Text style={s.actionText}>Call Courier</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.actionBtn}>
+              <FileText size={16} color={colors.navy} />
+              <Text style={[s.actionText, { color: colors.navy }]}>Receipt</Text>
+            </TouchableOpacity>
+          </View>
         </Card>
       </ScrollView>
 
@@ -117,7 +126,7 @@ const s = StyleSheet.create({
   stageLabel: { fontSize: 14, fontWeight: '600', color: colors.mutedForeground },
   stageLabelActive: { color: colors.navy },
   stageTime: { fontSize: 12, fontWeight: '500', color: colors.mutedForeground, marginTop: 2 },
-  phoneBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-end', marginTop: 12 },
-  phoneText: { fontSize: 13, fontWeight: '600', color: colors.primary },
+  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 14, paddingVertical: 8 },
+  actionText: { fontSize: 13, fontWeight: '600', color: colors.primary },
   bottomCta: { borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.card, padding: 16 },
 })

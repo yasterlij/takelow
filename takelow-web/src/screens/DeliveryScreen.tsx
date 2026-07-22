@@ -36,7 +36,7 @@ export function DeliveryScreen() {
         <Card className="mt-4 flex items-center gap-3 p-3">
           <div className="flex size-16 items-center justify-center rounded-xl bg-secondary">
             <img
-              src={auction.image || "/placeholder.svg"}
+              src={auction.images?.[0] || "/placeholder.svg"}
               alt={auction.name}
               className="h-12 w-auto object-contain"
             />

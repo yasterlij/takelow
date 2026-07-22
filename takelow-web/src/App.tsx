@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useApp, AppProvider } from "./AppContext"
 import { LoginScreen } from "./screens/LoginScreen"
 import { RegisterScreen } from "./screens/RegisterScreen"
@@ -14,6 +14,7 @@ import { ClosedScreen } from "./screens/ClosedScreen"
 import { WinnerScreen } from "./screens/WinnerScreen"
 import { PayWinningScreen } from "./screens/PayWinningScreen"
 import { PaymentConfirmedScreen } from "./screens/PaymentConfirmedScreen"
+import { PaymentResultScreen } from "./screens/PaymentResultScreen"
 import { DeliveryScreen } from "./screens/DeliveryScreen"
 import { AdminDashboardScreen } from "./screens/AdminDashboardScreen"
 import { AdminAuctionsScreen } from "./screens/AdminAuctionsScreen"
@@ -22,6 +23,7 @@ import { BrandPanel } from "./components/BrandPanel"
 import { AwashLogo } from "./components/AuctionUI"
 import { ErrorBoundary } from "./components/ErrorBoundary"
 import { ToastContainer } from "./components/Toast"
+import { ShimmerProvider } from "./components/SkeletonLoader"
 
 function ScreenRouter() {
   const { view, user } = useApp()
@@ -36,12 +38,14 @@ function ScreenRouter() {
     case "pay-fee": return <PayFeeScreen />
     case "place-bid": return <PlaceBidScreen />
     case "bid-confirmed": return <BidConfirmedScreen />
-    case "monitor": return <MonitorScreen />
+    case "monitor": return isAdmin ? <MonitorScreen /> : <HomeScreen />
     case "closed": return <ClosedScreen />
-    case "winner": return <WinnerScreen />
+    case "winner": return isAdmin ? <WinnerScreen /> : <HomeScreen />
     case "pay-winning": return <PayWinningScreen />
     case "payment-confirmed": return <PaymentConfirmedScreen />
     case "delivery": return <DeliveryScreen />
+    case "payment-success": return <PaymentResultScreen />
+    case "payment-failed": return <PaymentResultScreen />
     case "admin-dashboard": return isAdmin ? <AdminDashboardScreen /> : <HomeScreen />
     case "admin-auctions": return isAdmin ? <AdminAuctionsScreen /> : <HomeScreen />
     case "admin-users": return isAdmin ? <AdminUsersScreen /> : <HomeScreen />
@@ -58,20 +62,31 @@ function DeviceFrame() {
   )
 }
 
+function RedirectHandler() {
+  const { go, selectAuction } = useApp()
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const paymentStatus = params.get("payment")
+    const clientRef = params.get("clientReferenceId")
+    if (paymentStatus === "success") {
+      if (clientRef) selectAuction(clientRef)
+      go("payment-success")
+      window.history.replaceState({}, "", window.location.pathname)
+    } else if (paymentStatus === "failed") {
+      if (clientRef) selectAuction(clientRef)
+      go("payment-failed")
+      window.history.replaceState({}, "", window.location.pathname)
+    }
+  }, [go, selectAuction])
+  return null
+}
+
 function AppContent() {
-  const { user, logout } = useApp()
-  const isAdmin = user?.role === "admin"
   return (
     <div className="min-h-screen bg-muted lg:bg-gradient-to-br lg:from-[#141d47] lg:via-navy lg:to-[#0d1533]">
+      <RedirectHandler />
       <div className="flex items-center justify-between bg-navy px-4 py-2 lg:hidden">
         <AwashLogo variant="dark" />
-        {user && (
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-medium text-navy-foreground/60">{user.name}</span>
-            {isAdmin && <span className="rounded-full bg-primary/30 px-2 py-0.5 text-[9px] font-bold text-primary">Admin</span>}
-            <button onClick={logout} className="rounded-lg bg-white/10 px-2.5 py-1 text-[10px] font-semibold text-navy-foreground/70">Exit</button>
-          </div>
-        )}
       </div>
       <div className="mx-auto flex min-h-screen max-w-7xl flex-col lg:flex-row lg:items-center lg:gap-12 lg:px-10 lg:py-12">
         <BrandPanel className="hidden lg:flex" />
@@ -88,7 +103,9 @@ export default function App() {
   return (
     <ErrorBoundary>
       <AppProvider>
-        <AppContent />
+        <ShimmerProvider>
+          <AppContent />
+        </ShimmerProvider>
       </AppProvider>
     </ErrorBoundary>
   )

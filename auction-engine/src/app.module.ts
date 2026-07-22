@@ -11,6 +11,7 @@ import { BiddingModule } from './modules/bidding/bidding.module';
 import { WinnerModule } from './modules/winner/winner.module';
 import { WorkerModule } from './modules/worker/worker.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { PaymentModule } from './modules/payment/payment.module';
 import { JwtStrategy } from './modules/common/jwt.strategy';
 import { redisProvider } from './modules/common/redis.provider';
 import { HealthController } from './modules/common/health.controller';
@@ -45,6 +46,7 @@ import { HealthController } from './modules/common/health.controller';
     WinnerModule,
     WorkerModule,
     AdminModule,
+    PaymentModule,
   ],
   controllers: [HealthController],
   providers: [JwtStrategy, redisProvider],
