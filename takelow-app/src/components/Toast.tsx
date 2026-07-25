@@ -23,7 +23,7 @@ export function useToast() {
   return ctx
 }
 
-const DURATION = 4000
+const DURATION = 8000
 
 const typeStyles: Record<ToastType, { icon: React.ReactNode; bg: string; border: string; bar: string }> = {
   success: {

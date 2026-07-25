@@ -19,7 +19,7 @@ interface ToastState {
 
 let count = 0
 
-const DURATION = 4000
+const DURATION = 8000
 
 export const useToastStore = create<ToastState>((set) => ({
   toasts: [],
