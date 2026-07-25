@@ -248,7 +248,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       refreshWallet()
       setTimeout(() => refreshAuctions(), 3000)
       const name = auctions.find((a) => a.id === selectedId)?.name || 'Unknown'
-      const smsText = `Your bid of ETB ${amount} on '${name}' has been placed successfully. Your BID ticket number is: ${ticket || 'N/A'}`
+      const smsText = `Your bid of ETB ${amount} on '${name}' has been placed successfully. Your BID ticket: ${ticket || 'N/A'}`
       toast(`📱 SMS: ${smsText}`, "success")
     } catch (e) {
       const msg = getUserFriendlyMessage(e)
