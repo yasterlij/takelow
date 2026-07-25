@@ -1,10 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { ConfigService } from '@nestjs/config';
 import { User } from '../auth/entities/user.entity';
 import { NotificationLog, NotificationChannel } from './entities/notification-log.entity';
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
+const SMSETHIOPIA_URL = 'https://smsethiopia.com/api/sms/send';
 
 interface PushPayload {
   title: string;
@@ -40,6 +42,7 @@ export class NotificationService {
     private userRepository: Repository<User>,
     @InjectRepository(NotificationLog)
     private notificationLogRepository: Repository<NotificationLog>,
+    private configService: ConfigService,
   ) {}
 
   async sendPush(userId: string, payload: PushPayload): Promise<void> {
@@ -85,6 +88,30 @@ export class NotificationService {
       }
     } catch (error) {
       this.logger.error(`Push failed for user ${userId}: ${error.message}`);
+    }
+  }
+
+  async sendSms(phone: string, text: string): Promise<void> {
+    const apiKey = this.configService.get<string>('app.smsApiKey');
+    if (!apiKey) {
+      this.logger.warn('SMS_API_KEY not configured, skipping SMS');
+      return;
+    }
+    const msisdn = phone.startsWith('0') ? `251${phone.slice(1)}` : phone.startsWith('251') ? phone : `251${phone}`;
+    try {
+      const res = await fetch(SMSETHIOPIA_URL, {
+        method: 'POST',
+        headers: { KEY: apiKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ msisdn, text }),
+      });
+      if (res.ok) {
+        this.logger.log(`[SMS] Sent to ${msisdn}: "${text.slice(0, 50)}..."`);
+      } else {
+        const body = await res.text();
+        this.logger.warn(`[SMS] Failed (${res.status}): ${body}`);
+      }
+    } catch (error) {
+      this.logger.error(`[SMS] Error sending to ${msisdn}: ${error.message}`);
     }
   }
 

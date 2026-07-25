@@ -1,3 +1,4 @@
+import * as crypto from "crypto";
 import {
   Controller,
   Get,
@@ -60,10 +61,14 @@ export class BiddingController {
       auction.end_time,
     );
 
+    const ticketNumber = `BID-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
+
+    this.sendBidSms(user, auction, amount, ticketNumber).catch(() => {});
+
     return {
       message: "Bid placed successfully",
       new_total_bids: result.newTotalBids,
-
+      ticket_number: ticketNumber,
     };
   }
 
@@ -134,6 +139,24 @@ export class BiddingController {
       payment_deadline: auction.payment_deadline,
       created_at: auction.created_at,
     };
+  }
+
+  private async sendBidSms(user: any, auction: any, amount: number, ticketNumber: string): Promise<void> {
+    try {
+      const identityBase = process.env.IDENTITY_SERVICE_URL || "http://localhost:3001";
+      await fetch(`${identityBase}/api/v1/notify/bid-confirmation`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone: user.phone,
+          product_name: auction.product?.name || "Unknown",
+          bid_amount: amount,
+          ticket_number: ticketNumber,
+        }),
+      });
+    } catch (e) {
+      this.logger.warn(`Failed to send bid SMS: ${e.message}`);
+    }
   }
 
   private async resolveWinnerUserInfo(

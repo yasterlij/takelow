@@ -91,6 +91,22 @@ export class NotificationController {
     return { notified: winners.length };
   }
 
+  @Post('bid-confirmation')
+  @HttpCode(200)
+  async sendBidConfirmationSms(
+    @Body('phone') phone: string,
+    @Body('product_name') productName: string,
+    @Body('bid_amount') bidAmount: number,
+    @Body('ticket_number') ticketNumber: string,
+  ) {
+    if (!phone || !productName || !bidAmount) {
+      throw new BadRequestException('Missing required fields');
+    }
+    const text = `Your bid of ETB ${bidAmount} on '${productName}' has been placed successfully. Your BID ticket number is: ${ticketNumber || 'N/A'}`;
+    await this.notificationService.sendSms(phone, text);
+    return { notified: true };
+  }
+
   @Post('outbid')
   @HttpCode(200)
   async notifyOutbid(
