@@ -282,12 +282,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       )
       setView('bid-confirmed')
       setTimeout(() => refreshAuctions(), 3000)
+      const name = auctions.find((a) => a.id === selectedId)?.name || 'Unknown'
+      const smsText = `Your bid of ETB ${amount} on '${name}' has been placed successfully.${ticket ? ` Your BID ticket number is: ${ticket}` : ''}`
+      toast.show(`📱 SMS: ${smsText}`, 'success')
     } catch (e: any) {
       const msg = getUserFriendlyMessage(e)
       setAuthError(msg)
       toast.show(msg, 'error')
     }
-  }, [selectedId, user, refreshAuctions])
+  }, [selectedId, user, refreshAuctions, auctions])
 
   const setPaymentMethod = useCallback((method: 'SIKINAPAY' | 'AWASH') => {
     setPaymentMethodState(method)
