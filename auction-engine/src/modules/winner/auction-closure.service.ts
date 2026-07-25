@@ -1,14 +1,20 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan } from 'typeorm';
-import { Cron, CronExpression } from '@nestjs/schedule';
-import { Auction, AuctionStatus as AS, PaymentStatus } from './entities/auction.entity';
-import { WinnerService } from './winner.service';
-import { Bid } from '../bidding/entities/bid.entity';
-import { BullMqWorker } from '../worker/bullmq.worker';
+import { Injectable, Logger } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, LessThan } from "typeorm";
+import { Cron, CronExpression } from "@nestjs/schedule";
+import {
+  Auction,
+  AuctionStatus as AS,
+  PaymentStatus,
+} from "./entities/auction.entity";
+import { Winner, WinnerPaymentStatus } from "./entities/winner.entity";
+import { WinnerService } from "./winner.service";
+import { Bid } from "../bidding/entities/bid.entity";
+import { BullMqWorker } from "../worker/bullmq.worker";
 
 const MAX_RETRIES = 5;
 const RETRY_DELAY_MS = 300;
+const PAYMENT_DEADLINE_HOURS = 24;
 
 @Injectable()
 export class AuctionClosureService {
@@ -19,6 +25,8 @@ export class AuctionClosureService {
     private auctionRepository: Repository<Auction>,
     @InjectRepository(Bid)
     private bidRepository: Repository<Bid>,
+    @InjectRepository(Winner)
+    private winnerRepository: Repository<Winner>,
     private winnerService: WinnerService,
     private bullMqWorker: BullMqWorker,
   ) {}
@@ -39,25 +47,40 @@ export class AuctionClosureService {
       try {
         await this.closeAuction(auction);
       } catch (error) {
-        this.logger.error(`Failed to close auction ${auction.id}: ${error.message}`, error.stack);
+        this.logger.error(
+          `Failed to close auction ${auction.id}: ${error.message}`,
+          error.stack,
+        );
       }
     }
   }
 
   private async closeAuction(auction: Auction): Promise<void> {
     await this.bullMqWorker.flushAuction(auction.id);
-    const { winningAmounts, totalBids, winners } = await this.winnerService.calculateWinners(auction.id);
+    const { winningAmounts, totalBids, winners } =
+      await this.winnerService.calculateWinners(auction.id);
 
-    if (auction.min_bid != null && totalBids > 0 && totalBids < auction.min_bid) {
+    if (
+      auction.min_bid != null &&
+      totalBids > 0 &&
+      totalBids < auction.min_bid
+    ) {
       const extendMs = 24 * 60 * 60 * 1000;
       auction.end_time = new Date(Date.now() + extendMs);
       await this.auctionRepository.save(auction);
-      this.logger.log(`Auction ${auction.id}: Only ${totalBids}/${auction.min_bid} bids, extended 24h`);
-      this.sendExtensionNotification(auction.id, totalBids, auction.min_bid).catch(() => {});
+      this.logger.log(
+        `Auction ${auction.id}: Only ${totalBids}/${auction.min_bid} bids, extended 24h`,
+      );
+      this.sendExtensionNotification(
+        auction.id,
+        totalBids,
+        auction.min_bid,
+      ).catch(() => {});
       return;
     }
 
-    const queryRunner = this.auctionRepository.manager.connection.createQueryRunner();
+    const queryRunner =
+      this.auctionRepository.manager.connection.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
@@ -68,38 +91,70 @@ export class AuctionClosureService {
       } else if (winners.length > 0) {
         const winningBids: Bid[] = [];
         for (const w of winners) {
-          const bid = await this.findWinBidWithRetry(queryRunner, auction.id, w.amount, w.userId);
+          const bid = await this.findWinBidWithRetry(
+            queryRunner,
+            auction.id,
+            w.amount,
+            w.userId,
+          );
           if (bid) winningBids.push(bid);
         }
 
         if (winningBids.length === 0) {
           auction.status = AS.EXPIRED;
-          this.logger.warn(`Auction ${auction.id}: No winning bids found in DB, expired`);
+          this.logger.warn(
+            `Auction ${auction.id}: No winning bids found in DB, expired`,
+          );
         } else {
+          const paymentDeadline = new Date(
+            Date.now() + PAYMENT_DEADLINE_HOURS * 60 * 60 * 1000,
+          );
+
           auction.winner_user_id = winningBids[0].user_id;
           auction.winning_bid_amount = winningBids[0].amount;
           auction.status = AS.CLOSED;
           auction.payment_status = PaymentStatus.PENDING;
-          auction.payment_deadline = new Date(Date.now() + 24 * 60 * 60 * 1000);
-          this.logger.log(`Auction ${auction.id}: ${winningBids.length} winner(s). Primary: user=${winningBids[0].user_id} amount=${winningBids[0].amount}`);
+          auction.payment_deadline = paymentDeadline;
+
+          await queryRunner.manager.save(auction);
+
+          const winnerEntities = await this.winnerService.persistWinners(
+            auction.id,
+            winners,
+            paymentDeadline,
+          );
+
+          await queryRunner.commitTransaction();
+
+          this.logger.log(
+            `Auction ${auction.id}: CLOSED with ${winnerEntities.length} winner(s). ` +
+              `Amounts: [${winners.map((w) => w.amount).join(", ")}]`,
+          );
+
+          this.logClosureEvent(auction.id, "AUTO_CLOSE", winners).catch(
+            () => {},
+          );
+          this.sendWinnerNotifications(auction, winners).catch(() => {});
         }
       } else {
         auction.status = AS.EXPIRED;
-        this.logger.log(`Auction ${auction.id}: All bid amounts duplicated, expired`);
-      }
-
-      await queryRunner.manager.save(auction);
-      await queryRunner.commitTransaction();
-
-      if (auction.status === AS.CLOSED && auction.winner_user_id) {
-        this.sendWinnerNotifications(auction, winners).catch(() => {});
+        this.logger.log(
+          `Auction ${auction.id}: All bid amounts duplicated, expired`,
+        );
+        await queryRunner.manager.save(auction);
+        await queryRunner.commitTransaction();
       }
     } catch (error) {
       await queryRunner.rollbackTransaction();
+      this.logger.error(
+        `Transaction failed for auction ${auction.id}: ${error.message}`,
+      );
       throw error;
     } finally {
       await queryRunner.release();
     }
+
+    await this.winnerService.cleanupAuctionKeys(auction.id);
   }
 
   private async findWinBidWithRetry(
@@ -111,16 +166,20 @@ export class AuctionClosureService {
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       const bid = await queryRunner.manager.findOne(Bid, {
         where: { auction_id: auctionId, amount, user_id: userId },
-        order: { bid_time: 'ASC' },
+        order: { bid_time: "ASC" },
       });
       if (bid) return bid;
 
       if (attempt < MAX_RETRIES - 1) {
-        this.logger.debug(`Win bid not found (attempt ${attempt + 1}/${MAX_RETRIES}), retrying...`);
+        this.logger.debug(
+          `Win bid not found (attempt ${attempt + 1}/${MAX_RETRIES}), retrying...`,
+        );
         await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
       }
     }
-    this.logger.warn(`Win bid amount=${amount} user=${userId} not found in DB after ${MAX_RETRIES} attempts for auction ${auctionId}`);
+    this.logger.warn(
+      `Win bid amount=${amount} user=${userId} not found in DB after ${MAX_RETRIES} attempts for auction ${auctionId}`,
+    );
     return null;
   }
 
@@ -130,48 +189,132 @@ export class AuctionClosureService {
   ): Promise<void> {
     const auctionWithProduct = await this.auctionRepository.findOne({
       where: { id: auction.id },
-      relations: ['product'],
+      relations: ["product"],
     });
     const productName = auctionWithProduct?.product?.name || auction.id;
+    const productDescription =
+      auctionWithProduct?.product?.description || undefined;
+    const deadline =
+      auction.payment_deadline?.toISOString() ||
+      new Date(
+        Date.now() + PAYMENT_DEADLINE_HOURS * 60 * 60 * 1000,
+      ).toISOString();
 
-    for (const w of winners) {
-      try {
-        await fetch('http://identity-service:3000/api/v1/notify/winner', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            user_id: w.userId,
-            auction_id: auction.id,
-            product_name: productName,
-            winning_amount: w.amount,
-            payment_deadline: auction.payment_deadline?.toISOString(),
-          }),
-        });
-      } catch (e) {
-        this.logger.warn(`Failed to send winner notification to user ${w.userId}: ${e.message}`);
-      }
+    const winnerPayloads = winners.map((w) => ({
+      user_id: w.userId,
+      auction_id: auction.id,
+      product_name: productName,
+      product_description: productDescription,
+      winning_amount: w.amount,
+      payment_deadline: deadline,
+    }));
+
+    try {
+      await fetch("http://identity-service:3000/api/v1/notify/winner-bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ winners: winnerPayloads }),
+      });
+    } catch (e) {
+      this.logger.warn(
+        `Failed to send bulk winner notifications: ${e.message}`,
+      );
     }
   }
 
-  private async sendExtensionNotification(auctionId: string, current: number, min: number): Promise<void> {
+  private async sendExtensionNotification(
+    auctionId: string,
+    current: number,
+    min: number,
+  ): Promise<void> {
     try {
-      await fetch('http://identity-service:3000/api/v1/notify/auction-extended', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ auction_id: auctionId, current_bids: current, min_bids: min }),
-      });
+      await fetch(
+        "http://identity-service:3000/api/v1/notify/auction-extended",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            auction_id: auctionId,
+            current_bids: current,
+            min_bids: min,
+          }),
+        },
+      );
     } catch (e) {
       this.logger.warn(`Failed to send extension notification: ${e.message}`);
     }
   }
 
-  async closeSingleAuction(auctionId: string): Promise<Auction> {
+  private async logClosureEvent(
+    auctionId: string,
+    action: string,
+    winners: { amount: number; userId: string }[],
+  ): Promise<void> {
+    try {
+      await fetch("http://identity-service:3000/api/v1/admin/audit/log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actor_id: "system",
+          actor_phone: "system",
+          action,
+          entity_type: "auction",
+          entity_id: auctionId,
+          details: {
+            winners: winners.map((w) => ({
+              user_id: w.userId,
+              amount: w.amount,
+            })),
+            winner_count: winners.length,
+            timestamp: new Date().toISOString(),
+          },
+        }),
+      });
+    } catch (e) {
+      this.logger.warn(
+        `Failed to log closure event for auction ${auctionId}: ${e.message}`,
+      );
+    }
+  }
+
+  async closeSingleAuction(
+    auctionId: string,
+    actorId?: string,
+  ): Promise<Auction> {
     const auction = await this.auctionRepository.findOne({
       where: { id: auctionId },
     });
     if (!auction) throw new Error(`Auction ${auctionId} not found`);
-    if (auction.status !== AS.ACTIVE) throw new Error(`Auction ${auctionId} is not active (status: ${auction.status})`);
+    if (auction.status !== AS.ACTIVE)
+      throw new Error(
+        `Auction ${auctionId} is not active (status: ${auction.status})`,
+      );
+
+    auction.end_time = new Date();
+    await this.auctionRepository.save(auction);
+
     await this.closeAuction(auction);
-    return this.auctionRepository.findOne({ where: { id: auctionId }, relations: ['product'] }) as Promise<Auction>;
+
+    if (actorId) {
+      const closedAuction = await this.auctionRepository.findOne({
+        where: { id: auctionId },
+        relations: ["product"],
+      });
+      const winners = await this.winnerRepository.find({
+        where: { auction_id: auctionId },
+        order: { rank: "ASC" },
+      });
+      await this.logClosureEvent(
+        auctionId,
+        "ADMIN_CLOSE",
+        winners.map((w) => ({ amount: w.amount, userId: w.user_id })),
+      );
+      return closedAuction as Auction;
+    }
+
+    return this.auctionRepository.findOne({
+      where: { id: auctionId },
+      relations: ["product"],
+    }) as Promise<Auction>;
   }
 }

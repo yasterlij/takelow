@@ -1,6 +1,6 @@
 import { CheckCircle2, Package, Bike, MapPin, Home, Phone } from "lucide-react"
 import { useApp } from "../AppContext"
-import { AppBar, PhoneStatusBar, CTAButton, Card } from "../components/AuctionUI"
+import { AppBar, CTAButton, Card } from "../components/AuctionUI"
 
 
 const steps = [
@@ -17,11 +17,9 @@ export function DeliveryScreen() {
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto">
-      <div className="bg-navy rounded-t-[2rem] overflow-hidden">
-        <PhoneStatusBar dark />
-      </div>
-      <AppBar title="Track Delivery" onBack={() => go("payment-confirmed")} />
-      <div className="flex-1 px-5 pb-28 pt-5">
+      
+      <AppBar title="Track Delivery" onBack={() => go("winner")} />
+      <div className="flex-1 px-5 pb-6 pt-5">
         <Card className="flex items-center gap-4 border-primary/30 bg-accent p-4">
           <span className="flex size-14 flex-shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
             <Bike className="size-7" />
@@ -38,6 +36,8 @@ export function DeliveryScreen() {
             <img
               src={auction.images?.[0] || "/placeholder.svg"}
               alt={auction.name}
+              loading="lazy"
+              decoding="async"
               className="h-12 w-auto object-contain"
             />
           </div>

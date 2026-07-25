@@ -1,0 +1,349 @@
+import { useState, useEffect, useRef } from "react"
+import { Package, Plus, Search, X, Pencil, Trash2, Camera, Link, Upload, ImageIcon, Filter, DollarSign, ShoppingBag, Tag } from "lucide-react"
+import { useApp } from "../AppContext"
+import { api } from "../api"
+import { CTAButton, Badge, Card } from "../components/AuctionUI"
+import { CURRENCY, formatETB } from "../mockDataV0"
+
+function ProductThumb({ src, onClick }: { src?: string; onClick?: () => void }) {
+  const [err, setErr] = useState(false)
+  const hasSrc = src && (src.startsWith("data:") || src.startsWith("http") || src.startsWith("/"))
+  if (err || !hasSrc) {
+    return (
+      <div className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-neutral-100 to-neutral-50">
+        <ImageIcon className="size-5 text-neutral-300/30" />
+      </div>
+    )
+  }
+  return (
+    <button onClick={onClick} className="size-14 shrink-0 overflow-hidden rounded-xl bg-neutral-100">
+      <img src={src} alt="" loading="lazy" decoding="async" onError={() => setErr(true)} className="h-full w-full object-cover" />
+    </button>
+  )
+}
+
+function ImageUploadBox({ src, onFile, onClear }: { src: string; onFile: (dataUrl: string) => void; onClear: () => void }) {
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [showUrlInput, setShowUrlInput] = useState(false)
+  const [urlValue, setUrlValue] = useState("")
+  const [err, setErr] = useState(false)
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith("image/")) return
+    const reader = new FileReader()
+    reader.onload = () => onFile(reader.result as string)
+    reader.readAsDataURL(file)
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <div className="relative size-20 overflow-hidden rounded-xl border-2 border-dashed border-border bg-neutral-100 transition-colors hover:border-awash-gold/40">
+        {src && !err ? (
+          <img src={src} alt="Preview" loading="lazy" decoding="async" onError={() => setErr(true)} className="h-full w-full object-cover" />
+        ) : (
+          <div className="flex h-full w-full flex-col items-center justify-center gap-1">
+            <Camera className="size-5 text-neutral-400/40" />
+            <span className="text-[8px] font-medium text-neutral-400/40">Upload</span>
+          </div>
+        )}
+        <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} className="absolute inset-0 cursor-pointer opacity-0" />
+        {src && (
+          <button onClick={(e) => { e.stopPropagation(); onClear(); setErr(false); if (fileRef.current) fileRef.current.value = "" }} className="absolute -right-1.5 -top-1.5 flex size-4 items-center justify-center rounded-full bg-red-500 text-white shadow">
+            <X className="size-3" />
+          </button>
+        )}
+      </div>
+      <button onClick={() => fileRef.current?.click()} className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-neutral-100 px-3 py-1.5 text-[10px] font-semibold text-awash-blue transition-colors hover:border-awash-gold/40 hover:bg-awash-gold/5">
+        <Upload className="size-3.5" /> Browse & Upload
+      </button>
+      <button onClick={() => setShowUrlInput(!showUrlInput)} className="flex items-center gap-1 text-[9px] font-semibold text-neutral-400 hover:text-awash-gold">
+        <Link className="size-3" /> {showUrlInput ? "Hide URL" : "Paste URL"}
+      </button>
+      {showUrlInput && (
+        <div className="flex w-full gap-1">
+          <input value={urlValue} onChange={(e) => setUrlValue(e.target.value)} placeholder="https://..." className="min-w-0 flex-1 rounded-lg border border-border bg-neutral-100 px-2 py-1 text-[10px] outline-none focus:border-awash-gold" />
+          <button onClick={() => { if (urlValue) { onFile(urlValue); setUrlValue("") } }} className="rounded-lg bg-awash-gold px-2 py-1 text-[9px] font-semibold text-awash-blue">Set</button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ImageLightbox({ src, onClose }: { src: string; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-scale-in" onClick={onClose}>
+      <button onClick={onClose} className="absolute right-4 top-4 z-10 rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/20"><X className="size-6" /></button>
+      <img src={src} alt="" loading="lazy" decoding="async" className="max-h-[85vh] max-w-[90vw] rounded-lg object-contain shadow-2xl" onClick={(e) => e.stopPropagation()} />
+    </div>
+  )
+}
+
+const emptyForm = { name: "", brand: "", price: "", description: "", imageUrl: "" }
+
+export function AdminProductsScreen() {
+  const { go, auctions } = useApp()
+  const [products, setProducts] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [search, setSearch] = useState("")
+  const [brandFilter, setBrandFilter] = useState<string>("all")
+  const [showForm, setShowForm] = useState(false)
+  const [editing, setEditing] = useState<any>(null)
+  const [form, setForm] = useState(emptyForm)
+  const [submitting, setSubmitting] = useState(false)
+  const [lightboxImg, setLightboxImg] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+  const perPage = 20
+
+  const loadProducts = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await api.listProducts(page, perPage)
+      const list = (res as any).data || res || []
+      setProducts(list)
+    } catch (e: any) {
+      setError(e.message || "Failed to load products")
+      setProducts([])
+    }
+    setLoading(false)
+  }
+
+  useEffect(() => { loadProducts() }, [page])
+
+  const resetForm = () => {
+    setForm(emptyForm)
+    setEditing(null)
+    setShowForm(false)
+  }
+
+  const openCreate = () => {
+    setEditing(null)
+    setForm(emptyForm)
+    setShowForm(true)
+  }
+
+  const openEdit = (p: any) => {
+    setEditing(p)
+    setForm({
+      name: p.name || "",
+      brand: p.brand || "",
+      price: String(p.current_market_price || ""),
+      description: p.description || "",
+      imageUrl: (p.image_urls || [])[0] || "",
+    })
+    setShowForm(true)
+  }
+
+  const handleSave = async () => {
+    if (!form.name.trim() || !form.price.trim()) return
+    setSubmitting(true)
+    const data: any = {
+      name: form.name.trim(),
+      current_market_price: Number(form.price),
+      brand: form.brand.trim() || undefined,
+      description: form.description.trim() || undefined,
+      image_urls: form.imageUrl.trim() ? [form.imageUrl.trim()] : undefined,
+    }
+    try {
+      if (editing) {
+        await api.updateProduct(editing.id, data)
+      } else {
+        await api.createProduct(data)
+      }
+      resetForm()
+      loadProducts()
+    } catch (e: any) {
+      alert(e.message || "Failed to save product")
+    }
+    setSubmitting(false)
+  }
+
+  const confirmDelete = (id: string, name: string) => {
+    if (window.confirm(`Delete "${name}"?`)) {
+      api.deleteProduct(id).then(loadProducts).catch((e: any) => alert(e.message))
+    }
+  }
+
+  const brands = Array.from(new Set(products.map((p) => p.brand).filter(Boolean))) as string[]
+
+  const filtered = products.filter((p: any) => {
+    if (search && !p.name?.toLowerCase().includes(search.toLowerCase()) && !p.brand?.toLowerCase().includes(search.toLowerCase())) return false
+    if (brandFilter !== "all" && p.brand !== brandFilter) return false
+    return true
+  })
+
+  const totalValue = products.reduce((sum, p) => sum + Number(p.current_market_price || 0), 0)
+  const inUseCount = auctions.filter((a) => products.some((p) => p.id === a.id)).length
+
+  return (
+    <div className="flex flex-1 flex-col overflow-y-auto">
+      {lightboxImg && <ImageLightbox src={lightboxImg} onClose={() => setLightboxImg(null)} />}
+
+      <div className="sticky top-0 z-10 border-b border-border bg-white/80 backdrop-blur-md px-5 pb-3 pt-12">
+        <div className="flex items-center justify-between">
+          <div>
+             <button onClick={() => go("auctions")} className="mb-2 text-xs font-semibold text-awash-gold hover:text-awash-gold-dark">&larr; Auctions</button>
+            <h1 className="font-display text-xl font-extrabold text-awash-blue">Product Management</h1>
+          </div>
+          <button onClick={openCreate} className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-awash-gold to-awash-gold-light px-4 py-2.5 text-xs font-bold text-awash-blue shadow-lg shadow-primary/20 transition-all hover:shadow-primary/30">
+            <Plus className="size-3.5" /> New Product
+          </button>
+        </div>
+        <div className="mt-3 flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-neutral-400" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search products..."
+              className="w-full rounded-xl border border-border/60 bg-white py-2 pl-8 pr-3 text-xs font-medium outline-none placeholder:text-neutral-400/50 focus:border-awash-gold"
+            />
+          </div>
+          {brands.length > 0 && (
+            <select
+              value={brandFilter}
+              onChange={(e) => setBrandFilter(e.target.value)}
+              className="rounded-xl border border-border/60 bg-white px-3 py-2 text-xs font-semibold text-awash-blue outline-none focus:border-awash-gold"
+            >
+              <option value="all">All Brands</option>
+              {brands.map((b) => <option key={b}>{b}</option>)}
+            </select>
+          )}
+        </div>
+      </div>
+
+      <div className="flex-1 px-5 pb-8 pt-4">
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          <Card className="items-center p-3 text-center">
+            <ShoppingBag className="size-5 text-awash-gold" />
+            <p className="mt-1 font-display text-2xl font-extrabold text-awash-blue tabular-nums">{loading ? "..." : products.length}</p>
+            <p className="text-[10px] font-medium text-neutral-400">Products</p>
+          </Card>
+          <Card className="items-center p-3 text-center">
+            <DollarSign className="size-5 text-awash-gold" />
+            <p className="mt-1 font-display text-2xl font-extrabold text-awash-gold-dark tabular-nums">{CURRENCY} {formatETB(totalValue)}</p>
+            <p className="text-[10px] font-medium text-neutral-400">Total Value</p>
+          </Card>
+          <Card className="items-center p-3 text-center">
+            <Tag className="size-5 text-emerald-600" />
+            <p className="mt-1 font-display text-2xl font-extrabold text-emerald-600 tabular-nums">{brands.length}</p>
+            <p className="text-[10px] font-medium text-neutral-400">Brands</p>
+          </Card>
+        </div>
+
+        {showForm && (
+          <Card className="mb-4 space-y-3 border border-awash-gold/20 p-4 shadow-lg">
+            <div className="flex items-center justify-between">
+              <h2 className="font-display text-sm font-bold text-awash-blue">{editing ? "Edit Product" : "New Product"}</h2>
+              <button onClick={resetForm} className="rounded-lg p-1 hover:bg-neutral-100"><X className="size-4 text-neutral-400" /></button>
+            </div>
+
+            <div className="flex gap-3">
+              <div className="flex-1 space-y-3">
+                <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Product name" className="w-full rounded-xl border border-border/60 bg-white px-3 py-2.5 text-xs font-medium outline-none focus:border-awash-gold" />
+                <input value={form.brand} onChange={(e) => setForm((f) => ({ ...f, brand: e.target.value }))} placeholder="Brand" className="w-full rounded-xl border border-border/60 bg-white px-3 py-2.5 text-xs font-medium outline-none focus:border-awash-gold" />
+                <input value={form.price} onChange={(e) => setForm((f) => ({ ...f, price: e.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1").replace(/(\.\d{2})\d+/g, "$1") }))} type="text" inputMode="decimal" placeholder="Market price" className="w-full rounded-xl border border-border/60 bg-white px-3 py-2.5 text-xs font-medium outline-none focus:border-awash-gold" />
+              </div>
+              <div className="flex-shrink-0">
+                <ImageUploadBox
+                  src={form.imageUrl}
+                  onFile={(dataUrl) => setForm((f) => ({ ...f, imageUrl: dataUrl }))}
+                  onClear={() => setForm((f) => ({ ...f, imageUrl: "" }))}
+                />
+              </div>
+            </div>
+
+            <textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="Description" className="w-full rounded-xl border border-border/60 bg-white px-3 py-2.5 text-xs font-medium outline-none focus:border-awash-gold" rows={2} />
+
+            <div className="flex gap-2">
+              <CTAButton variant="outline" onClick={resetForm} className="flex-1">Cancel</CTAButton>
+              <CTAButton onClick={handleSave} disabled={submitting || !form.name || !form.price} className="flex-1">
+                {submitting ? "Saving..." : editing ? "Update Product" : "Create Product"}
+              </CTAButton>
+            </div>
+          </Card>
+        )}
+
+        <div className="mb-3 flex items-center justify-between">
+          <p className="text-xs font-semibold text-neutral-400">
+            {filtered.length} of {products.length} products
+          </p>
+          {inUseCount > 0 && (
+            <Badge tone="blue">{inUseCount} in auctions</Badge>
+          )}
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center py-16">
+            <div className="size-8 animate-spin rounded-full border-4 border-primary/30 border-t-primary" />
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center gap-3 py-16 text-neutral-400">
+            <Filter className="size-8 opacity-30 text-red-400" />
+            <p className="text-sm font-medium text-red-500">{error}</p>
+            <button onClick={loadProducts} className="text-xs font-semibold text-awash-gold hover:text-awash-gold-dark transition-colors">Retry</button>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center gap-3 py-16 text-neutral-400">
+            <Package className="size-8 opacity-30" />
+            <p className="text-sm font-medium">{search || brandFilter !== "all" ? "No matching products" : "No products yet"}</p>
+            {search || brandFilter !== "all" ? (
+              <button onClick={() => { setSearch(""); setBrandFilter("all") }} className="text-xs font-semibold text-awash-gold">Clear filters</button>
+            ) : (
+              <p className="text-xs">Click "New Product" to get started</p>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {filtered.map((p: any) => (
+              <div key={p.id} className="flex items-center gap-3 rounded-2xl border border-border/60 bg-white p-3 shadow-sm transition-all hover:border-awash-gold/20 hover:shadow-md">
+                <ProductThumb src={p.image_urls?.[0]} onClick={() => p.image_urls?.[0] && setLightboxImg(p.image_urls[0])} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="truncate text-sm font-bold text-awash-blue">{p.name}</p>
+                    {p.brand && <Badge tone="navy">{p.brand}</Badge>}
+                  </div>
+                  <p className="mt-0.5 text-xs font-medium text-neutral-400">
+                    {CURRENCY} {formatETB(p.current_market_price)}
+                    {p.description && <span className="ml-2">· {p.description.slice(0, 60)}</span>}
+                  </p>
+                </div>
+                <div className="flex gap-1">
+                  <button onClick={() => openEdit(p)} className="flex items-center gap-1 rounded-lg border border-border/60 px-2.5 py-1.5 text-[10px] font-semibold text-awash-blue hover:bg-neutral-50 transition-colors" title="Edit">
+                    <Pencil className="size-3" />
+                  </button>
+                  <button onClick={() => confirmDelete(p.id, p.name)} className="flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1.5 text-[10px] font-semibold text-red-600 hover:bg-red-50 transition-colors" title="Delete">
+                    <Trash2 className="size-3" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {products.length > 0 && (
+          <div className="mt-4 flex items-center justify-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="rounded-lg border border-border/60 px-3 py-1.5 text-xs font-semibold text-awash-blue hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Previous
+            </button>
+            <span className="text-xs font-medium text-neutral-400">Page {page}</span>
+            <button
+              onClick={() => setPage((p) => p + 1)}
+              disabled={products.length < perPage}
+              className="rounded-lg border border-border/60 px-3 py-1.5 text-xs font-semibold text-awash-blue hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Next
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

@@ -1,8 +1,16 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, MoreThan } from 'typeorm';
 import { Auction, AuctionStatus } from './entities/auction.entity';
 import { Bid } from './entities/bid.entity';
+
+interface WinnerRow {
+  user_id: string;
+  amount: number;
+  rank: number;
+  payment_status: string;
+  payment_deadline: Date;
+}
 
 @Injectable()
 export class AuctionsService {
@@ -15,7 +23,7 @@ export class AuctionsService {
 
   async getActiveAuctions(): Promise<any[]> {
     const auctions = await this.auctionRepository.find({
-      where: { status: AuctionStatus.ACTIVE },
+      where: { status: AuctionStatus.ACTIVE, end_time: MoreThan(new Date()) },
       relations: ['product'],
       order: { created_at: 'DESC' },
       take: 50,
@@ -54,8 +62,8 @@ export class AuctionsService {
       relations: ['product'],
     });
 
-    if (!auction) {
-      throw new NotFoundException('Auction not found');
+    if (!auction || auction.status !== AuctionStatus.ACTIVE || auction.end_time.getTime() <= Date.now()) {
+      throw new NotFoundException('Auction not found or has ended');
     }
 
     const now = Date.now();
@@ -83,12 +91,8 @@ export class AuctionsService {
       stats: {
         total_bids: totalBids,
         unique_bidders: parseInt(uniqueBidders?.count || '0', 10),
-        viewers: 0,
       },
-      min_bid_increment: 1,
-      service_fee: 50,
       status: auction.status,
-      user_is_favorite: false,
     };
   }
 
@@ -103,11 +107,41 @@ export class AuctionsService {
       take: 50,
     });
 
+    const auctionIds = auctions.map((a) => a.id);
+
+    let winnersByAuction: Map<string, WinnerRow[]> = new Map();
+    if (auctionIds.length > 0) {
+      try {
+        const winnerRows: any[] = await this.auctionRepository.query(
+          `SELECT w.auction_id, w.user_id, w.amount, w.rank, w.payment_status, w.payment_deadline
+           FROM winners w
+           WHERE w.auction_id = ANY($1)
+           ORDER BY w.rank ASC`,
+          [auctionIds],
+        );
+        for (const row of winnerRows) {
+          if (!winnersByAuction.has(row.auction_id)) {
+            winnersByAuction.set(row.auction_id, []);
+          }
+          winnersByAuction.get(row.auction_id)!.push({
+            user_id: row.user_id,
+            amount: parseFloat(row.amount),
+            rank: row.rank,
+            payment_status: row.payment_status,
+            payment_deadline: row.payment_deadline,
+          });
+        }
+      } catch {
+        // winners table may not exist in query service's read replica; ignore
+      }
+    }
+
     return Promise.all(
       auctions.map(async (auction) => {
         const totalBids = await this.bidRepository.count({
           where: { auction_id: auction.id },
         });
+        const auctionWinners = winnersByAuction.get(auction.id) || [];
         return {
           id: auction.id,
           product_id: auction.product_id,
@@ -117,6 +151,14 @@ export class AuctionsService {
           status: auction.status,
           winner_user_id: auction.winner_user_id,
           winning_bid_amount: auction.winning_bid_amount,
+          winners: auctionWinners.map((w) => ({
+            user_id: w.user_id,
+            amount: w.amount,
+            rank: w.rank,
+            payment_status: w.payment_status,
+            payment_deadline: w.payment_deadline,
+          })),
+          winners_count: auctionWinners.length,
           stats: { total_bids: totalBids },
           created_at: auction.created_at,
         };
@@ -141,7 +183,7 @@ export class AuctionsService {
   }
 
   async getUserWonAuctions(userId: string): Promise<any[]> {
-    return this.auctionRepository.find({
+    const auctions = await this.auctionRepository.find({
       where: {
         winner_user_id: userId,
         status: AuctionStatus.CLOSED,
@@ -149,6 +191,47 @@ export class AuctionsService {
       relations: ['product'],
       order: { created_at: 'DESC' },
       take: 50,
+    });
+
+    const auctionIds = auctions.map((a) => a.id);
+    let winnersByAuction: Map<string, WinnerRow[]> = new Map();
+    if (auctionIds.length > 0) {
+      try {
+        const winnerRows: any[] = await this.auctionRepository.query(
+          `SELECT w.auction_id, w.user_id, w.amount, w.rank, w.payment_status, w.payment_deadline
+           FROM winners w
+           WHERE w.auction_id = ANY($1) AND w.user_id = $2
+           ORDER BY w.rank ASC`,
+          [auctionIds, userId],
+        );
+        for (const row of winnerRows) {
+          if (!winnersByAuction.has(row.auction_id)) {
+            winnersByAuction.set(row.auction_id, []);
+          }
+          winnersByAuction.get(row.auction_id)!.push({
+            user_id: row.user_id,
+            amount: parseFloat(row.amount),
+            rank: row.rank,
+            payment_status: row.payment_status,
+            payment_deadline: row.payment_deadline,
+          });
+        }
+      } catch { /* ignore */ }
+    }
+
+    return auctions.map((auction) => {
+      const auctionWinners = winnersByAuction.get(auction.id) || [];
+      return {
+        id: auction.id,
+        product: auction.product,
+        start_time: auction.start_time,
+        end_time: auction.end_time,
+        status: auction.status,
+        winner_user_id: auction.winner_user_id,
+        winning_bid_amount: auction.winning_bid_amount,
+        winners: auctionWinners,
+        created_at: auction.created_at,
+      };
     });
   }
 

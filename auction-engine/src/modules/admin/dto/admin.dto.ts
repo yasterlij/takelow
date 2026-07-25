@@ -1,5 +1,13 @@
-import { IsString, IsOptional, IsNumber, IsArray, Min, IsDateString, IsEnum } from 'class-validator';
-import { AuctionStatus } from '../../winner/entities/auction.entity';
+import {
+  IsString,
+  IsOptional,
+  IsNumber,
+  IsArray,
+  Min,
+  IsDateString,
+  IsEnum,
+} from "class-validator";
+import { AuctionStatus } from "../../winner/entities/auction.entity";
 
 export class CreateProductDto {
   @IsString()
@@ -65,9 +73,6 @@ export class CreateAuctionDto {
   @IsNumber()
   max_bid?: number;
 
-  @IsOptional()
-  @IsNumber()
-  num_winners?: number;
 }
 
 export class UpdateAuctionDto {
@@ -90,10 +95,6 @@ export class UpdateAuctionDto {
   @IsOptional()
   @IsNumber()
   max_bid?: number;
-
-  @IsOptional()
-  @IsNumber()
-  num_winners?: number;
 
   @IsOptional()
   @IsEnum(AuctionStatus)

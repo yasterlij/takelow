@@ -1,20 +1,24 @@
-import * as crypto from 'crypto';
+import * as crypto from "crypto";
 import {
   Injectable,
   ForbiddenException,
   BadRequestException,
   Logger,
-} from '@nestjs/common';
-import { Redis } from 'ioredis';
-import { InjectRedis } from '../common/redis.decorator';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Auction } from '../winner/entities/auction.entity';
-import { AuctionClosureService } from '../winner/auction-closure.service';
-import { AuctionGateway } from './gateway/auction.gateway';
-import { InjectQueue } from '@nestjs/bullmq';
-import { Queue } from 'bullmq';
-import { PaymentTransaction, PaymentTransactionStatus, PaymentType } from '../payment/entities/payment-transaction.entity';
+} from "@nestjs/common";
+import { Redis } from "ioredis";
+import { InjectRedis } from "../common/redis.decorator";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { Auction } from "../winner/entities/auction.entity";
+import { AuctionClosureService } from "../winner/auction-closure.service";
+import { AuctionGateway } from "./gateway/auction.gateway";
+import { InjectQueue } from "@nestjs/bullmq";
+import { Queue } from "bullmq";
+import {
+  PaymentTransaction,
+  PaymentTransactionStatus,
+  PaymentType,
+} from "../payment/entities/payment-transaction.entity";
 
 const LOCK_TTL = 5000;
 
@@ -25,7 +29,7 @@ export class BiddingService {
   constructor(
     @InjectRedis() private readonly redis: Redis,
     private readonly auctionGateway: AuctionGateway,
-    @InjectQueue('incoming-bids') private readonly bidQueue: Queue,
+    @InjectQueue("incoming-bids") private readonly bidQueue: Queue,
     @InjectRepository(Auction)
     private readonly auctionRepository: Repository<Auction>,
     @InjectRepository(PaymentTransaction)
@@ -38,27 +42,41 @@ export class BiddingService {
     userId: string,
     amount: number,
     endTime: Date,
-  ): Promise<{ newTotalBids: number; ticketNumber: string; productName: string }> {
+  ): Promise<{
+    newTotalBids: number;
+
+    productName: string;
+  }> {
     const lockKey = `takelow:auction:${auctionId}:lock`;
-    const lockAcquired = await this.redis.set(lockKey, userId, 'PX', LOCK_TTL, 'NX');
+    const lockAcquired = await this.redis.set(
+      lockKey,
+      userId,
+      "PX",
+      LOCK_TTL,
+      "NX",
+    );
 
     if (!lockAcquired) {
-      throw new ForbiddenException('Auction is temporarily locked. Please retry.');
+      throw new ForbiddenException(
+        "Auction is temporarily locked. Please retry.",
+      );
     }
 
     try {
       const now = Date.now();
       if (now > endTime.getTime()) {
-        throw new ForbiddenException('Auction has closed');
+        throw new ForbiddenException("Auction has closed");
       }
 
       // Check if user has paid bid fee via SikinaPay
       const feePaid = await this.checkBidFeePaid(userId, auctionId);
       if (!feePaid) {
-        throw new BadRequestException('Bid fee not paid. Please pay the bid fee via SikinaPay before placing a bid.');
+        throw new BadRequestException(
+          "Bid fee not paid. Please pay the bid fee via SikinaPay before placing a bid.",
+        );
       }
 
-      await this.bidQueue.add('bid', {
+      await this.bidQueue.add("bid", {
         auction_id: auctionId,
         amount: String(amount),
         user_id: userId,
@@ -67,7 +85,9 @@ export class BiddingService {
 
       await this.trackBidInRedis(auctionId, userId, amount);
 
-      const totalBidsStr = await this.redis.get(`takelow:auction:${auctionId}:total_bids`);
+      const totalBidsStr = await this.redis.get(
+        `takelow:auction:${auctionId}:total_bids`,
+      );
       const totalBids = totalBidsStr ? parseInt(totalBidsStr, 10) : 1;
 
       this.auctionGateway.broadcastAuctionUpdate({
@@ -77,47 +97,67 @@ export class BiddingService {
         timestamp: new Date().toISOString(),
       });
 
-      this.logger.debug(`Bid placed: auction=${auctionId} user=${userId} amount=${amount} total_bids=${totalBids}`);
+      this.logger.debug(
+        `Bid placed: auction=${auctionId} user=${userId} amount=${amount} total_bids=${totalBids}`,
+      );
 
       const auction = await this.auctionRepository.findOne({
         where: { id: auctionId },
-        select: ['max_bid'],
+        select: ["max_bid"],
       });
       if (auction?.max_bid != null && totalBids >= auction.max_bid) {
-        this.logger.log(`Max bids (${auction.max_bid}) reached for auction ${auctionId}, closing early`);
-        this.notifyMaxBidReached(auctionId, totalBids, auction.max_bid).catch(() => {});
+        this.logger.log(
+          `Max bids (${auction.max_bid}) reached for auction ${auctionId}, closing early`,
+        );
+        this.notifyMaxBidReached(auctionId, totalBids, auction.max_bid).catch(
+          () => {},
+        );
         await this.closureService.closeSingleAuction(auctionId);
       }
 
       const auctionFull = await this.auctionRepository.findOne({
         where: { id: auctionId },
-        relations: ['product'],
+        relations: ["product"],
       });
-      const productName = auctionFull?.product?.name || 'Unknown Product';
-      const ticketNumber = `BID_${crypto.randomBytes(6).toString('hex').toUpperCase()}`;
+      const productName = auctionFull?.product?.name || "Unknown Product";
+
       this.logger.log(
-        `📱 [MOCK SMS] To user ${userId}: "Your bid of ${amount.toFixed(2)} ETB on '${productName}' has been placed successfully. Your BID ticket number is: ${ticketNumber}"`,
+        `Bid placed: user=${userId} auction=${auctionId} amount=${amount} total_bids=${totalBids}`,
       );
 
-      return { newTotalBids: totalBids, ticketNumber, productName };
+      return { newTotalBids: totalBids, productName };
     } finally {
       await this.redis.del(lockKey);
     }
   }
 
-  private async notifyMaxBidReached(auctionId: string, total: number, max: number): Promise<void> {
+  private async notifyMaxBidReached(
+    auctionId: string,
+    total: number,
+    max: number,
+  ): Promise<void> {
     try {
-      await fetch('http://identity-service:3000/api/v1/notify/max-bid-reached', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ auction_id: auctionId, total_bids: total, max_bids: max }),
-      });
+      await fetch(
+        "http://identity-service:3000/api/v1/notify/max-bid-reached",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            auction_id: auctionId,
+            total_bids: total,
+            max_bids: max,
+          }),
+        },
+      );
     } catch (e) {
       this.logger.warn(`Failed to send max-bid notification: ${e.message}`);
     }
   }
 
-  private async checkBidFeePaid(userId: string, auctionId: string): Promise<boolean> {
+  private async checkBidFeePaid(
+    userId: string,
+    auctionId: string,
+  ): Promise<boolean> {
     const transaction = await this.paymentTransactionRepository.findOne({
       where: {
         auction_id: auctionId,
@@ -138,7 +178,11 @@ export class BiddingService {
 
     multi.sadd(`takelow:auction:${auctionId}:bidders`, userId);
 
-    multi.zincrby(`takelow:auction:${auctionId}:frequencies`, 1, String(amount));
+    multi.zincrby(
+      `takelow:auction:${auctionId}:frequencies`,
+      1,
+      String(amount),
+    );
 
     const freqKey = `takelow:auction:${auctionId}:frequencies`;
     const uniqueKey = `takelow:auction:${auctionId}:unique_bids`;

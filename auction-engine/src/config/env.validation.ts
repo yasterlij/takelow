@@ -1,5 +1,5 @@
-import { plainToInstance } from 'class-transformer';
-import { IsString, IsOptional, IsNumber, validateSync } from 'class-validator';
+import { plainToInstance } from "class-transformer";
+import { IsString, IsOptional, IsNumber, validateSync } from "class-validator";
 
 class EnvironmentVariables {
   @IsNumber()
@@ -7,7 +7,7 @@ class EnvironmentVariables {
 
   @IsString()
   @IsOptional()
-  JWT_SECRET: string = 'takelow-jwt-secret';
+  JWT_SECRET: string = "takelow-jwt-secret";
 
   @IsString()
   DATABASE_URL: string;
@@ -21,31 +21,47 @@ class EnvironmentVariables {
 
   @IsString()
   @IsOptional()
-  SIKINA_SECRET_KEY: string = '';
+  SIKINA_SECRET_KEY: string = "";
 
   @IsString()
   @IsOptional()
-  SIKINA_WEBHOOK_SECRET: string = '';
+  SIKINA_WEBHOOK_SECRET: string = "";
 
   @IsString()
   @IsOptional()
-  SIKINA_BASE_URL: string = 'https://sandbox.sikinapay.com';
+  SIKINA_BASE_URL: string = "https://sandbox.sikinapay.com";
 
   @IsString()
   @IsOptional()
-  SIKINA_SUCCESS_REDIRECT_URL: string = '';
+  SIKINA_SUCCESS_REDIRECT_URL: string = "";
 
   @IsString()
   @IsOptional()
-  SIKINA_FAILED_REDIRECT_URL: string = '';
+  SIKINA_FAILED_REDIRECT_URL: string = "";
 
   @IsString()
   @IsOptional()
-  SIKINA_WEBHOOK_URL: string = '';
+  SIKINA_WEBHOOK_URL: string = "";
 
   @IsString()
   @IsOptional()
-  APP_BASE_URL: string = 'http://localhost:5173';
+  APP_BASE_URL: string = "http://localhost:5173";
+
+  @IsString()
+  @IsOptional()
+  AWASH_MERCHANT_ID: string = "";
+
+  @IsString()
+  @IsOptional()
+  AWASH_SECRET_KEY: string = "";
+
+  @IsString()
+  @IsOptional()
+  AWASH_WEBHOOK_SECRET: string = "";
+
+  @IsString()
+  @IsOptional()
+  AWASH_BASE_URL: string = "https://sandbox.awashbank.com";
 }
 
 export function validate(config: Record<string, unknown>) {

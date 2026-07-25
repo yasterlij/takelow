@@ -4,11 +4,11 @@ import {
   ExecutionContext,
   CallHandler,
   ForbiddenException,
-} from '@nestjs/common';
-import { Observable } from 'rxjs';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Auction, AuctionStatus } from '../winner/entities/auction.entity';
+} from "@nestjs/common";
+import { Observable } from "rxjs";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { Auction, AuctionStatus } from "../winner/entities/auction.entity";
 
 @Injectable()
 export class BiddingWindowInterceptor implements NestInterceptor {
@@ -29,12 +29,12 @@ export class BiddingWindowInterceptor implements NestInterceptor {
     });
 
     if (!auction) {
-      throw new ForbiddenException('Auction not found or not active');
+      throw new ForbiddenException("Auction not found or not active");
     }
 
     const now = Date.now();
     if (now > auction.end_time.getTime()) {
-      throw new ForbiddenException('Auction Closed');
+      throw new ForbiddenException("Auction Closed");
     }
 
     request.auction = auction;

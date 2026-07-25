@@ -1,5 +1,7 @@
-import { Inject } from '@nestjs/common';
+import { Injectable, Inject } from "@nestjs/common";
 
-export const REDIS_CLIENT = 'REDIS_CLIENT';
+export const REDIS_CLIENT = "REDIS_CLIENT";
 
-export const InjectRedis = () => Inject(REDIS_CLIENT);
+export function InjectRedis() {
+  return Inject(REDIS_CLIENT);
+}

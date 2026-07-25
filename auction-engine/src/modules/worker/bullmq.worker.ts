@@ -1,16 +1,16 @@
-import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { Job } from 'bullmq';
-import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
-import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
-import { Redis } from 'ioredis';
-import { InjectRedis } from '../common/redis.decorator';
+import { Processor, WorkerHost } from "@nestjs/bullmq";
+import { Job } from "bullmq";
+import { Injectable, Logger } from "@nestjs/common";
+import { Cron, CronExpression } from "@nestjs/schedule";
+import { InjectDataSource } from "@nestjs/typeorm";
+import { DataSource } from "typeorm";
+import { Redis } from "ioredis";
+import { InjectRedis } from "../common/redis.decorator";
 
 const BATCH_SIZE = 50;
 
 @Injectable()
-@Processor('incoming-bids')
+@Processor("incoming-bids")
 export class BullMqWorker extends WorkerHost {
   private readonly logger = new Logger(BullMqWorker.name);
   private batchBuffer: Map<string, any[]> = new Map();
@@ -53,20 +53,27 @@ export class BullMqWorker extends WorkerHost {
 
     try {
       const existing = await queryRunner.manager.query(
-        `SELECT amount, user_id FROM bids WHERE auction_id = $1 AND (amount, user_id, bid_time) IN (${batch.map((_, i) => `($${i * 3 + 2}, $${i * 3 + 3}, $${i * 3 + 4})`).join(', ')})`,
+        `SELECT amount, user_id FROM bids WHERE auction_id = $1 AND (amount, user_id, bid_time) IN (${batch.map((_, i) => `($${i * 3 + 2}, $${i * 3 + 3}, $${i * 3 + 4})`).join(", ")})`,
         [auctionId, ...batch.flatMap((b) => [b.amount, b.user_id, b.bid_time])],
       );
-      const existingSet = new Set(existing.map((r: any) => `${r.amount}:${r.user_id}`));
+      const existingSet = new Set(
+        existing.map((r: any) => `${r.amount}:${r.user_id}`),
+      );
 
-      const newBids = batch.filter((b) => !existingSet.has(`${b.amount}:${b.user_id}`));
+      const newBids = batch.filter(
+        (b) => !existingSet.has(`${b.amount}:${b.user_id}`),
+      );
       if (newBids.length === 0) {
         this.batchBuffer.delete(bufferKey);
         return;
       }
 
       const placeholders = newBids
-        .map((_, i) => `($${i * 4 + 1}, $${i * 4 + 2}, $${i * 4 + 3}, $${i * 4 + 4})`)
-        .join(', ');
+        .map(
+          (_, i) =>
+            `($${i * 4 + 1}, $${i * 4 + 2}, $${i * 4 + 3}, $${i * 4 + 4})`,
+        )
+        .join(", ");
 
       const values: any[] = [];
       newBids.forEach((b) => {
@@ -84,7 +91,9 @@ export class BullMqWorker extends WorkerHost {
       await queryRunner.commitTransaction();
     } catch (error) {
       await queryRunner.rollbackTransaction();
-      this.logger.error(`Batch insert failed for auction ${auctionId}: ${error.message}`);
+      this.logger.error(
+        `Batch insert failed for auction ${auctionId}: ${error.message}`,
+      );
       throw error;
     } finally {
       await queryRunner.release();

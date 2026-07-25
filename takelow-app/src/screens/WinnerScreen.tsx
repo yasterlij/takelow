@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { View, Text, Image, StyleSheet, Animated, ScrollView, ActivityIndicator } from 'react-native'
-import { Trophy, CreditCard, PartyPopper, AlertTriangle, Users, Clock, ImageIcon } from 'lucide-react-native'
+import { View, Text, Image, StyleSheet, Animated, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native'
+import { Trophy, CreditCard, PartyPopper, AlertTriangle, Users, Clock, ImageIcon, CheckCircle2, XCircle, Info } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { CTAButton, Card } from '../components/AuctionUI'
 import { api, type ApiWinnerResult, type ApiAuctionResult } from '../api'
@@ -42,8 +42,23 @@ export function WinnerScreen() {
   const savings = winner?.winning_bid_amount != null ? (auction.marketPrice - winner.winning_bid_amount) : 0
   const savingsPct = auction.marketPrice > 0 ? Math.round((savings / auction.marketPrice) * 100) : 0
   const winnerName = winner?.winner_name || (winner?.winner_user_id ? `User ${winner.winner_user_id.slice(0, 8)}` : null)
+  const winnerPhone = winner?.winner_phone || null
+  const maskPhone = (p: string | null) => p ? p.slice(0, 4) + "****" + p.slice(-2) : null
   const deadline = winner?.payment_deadline ? new Date(winner.payment_deadline) : null
   const deadlineHrs = deadline ? Math.max(0, Math.round((deadline.getTime() - Date.now()) / 3600000)) : null
+
+  const allBids = 'bids' in (winner || {}) ? (winner as any).bids as any[] : []
+  const amountCount = new Map<number, number>()
+  allBids.forEach((b: any) => amountCount.set(b.amount, (amountCount.get(b.amount) || 0) + 1))
+  const winningAmount = winner?.winning_bid_amount
+  const lowerAmounts = winningAmount != null && allBids.length > 0
+    ? [...new Set(allBids.filter((b: any) => b.amount < winningAmount).map((b: any) => b.amount))].sort((a: number, b: number) => a - b)
+    : []
+  const lowerBidsGrouped = lowerAmounts.map((amount: number) => ({ amount, count: amountCount.get(amount) || 1 }))
+  const [bidsPage, setBidsPage] = useState(0)
+  const BIDS_PAGE_SIZE = 10
+  const pagedBids = lowerBidsGrouped.slice(0, (bidsPage + 1) * BIDS_PAGE_SIZE)
+  const hasMore = pagedBids.length < lowerBidsGrouped.length
 
   return (
     <View style={{ flex: 1 }}>
@@ -110,12 +125,15 @@ export function WinnerScreen() {
                   </View>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
                     <Text style={{ fontSize: 12, color: colors.mutedForeground }}>Winner</Text>
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: colors.navy }}>{winnerName || 'Unknown'}</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: colors.navy, textAlign: 'right' }}>
+                      {winnerName || 'Unknown'}
+                      {winnerPhone && <Text style={{ fontWeight: '500', color: colors.mutedForeground }}>{'\n'}{maskPhone(winnerPhone)}</Text>}
+                    </Text>
                   </View>
                   {winner.lowest_unique_bid != null && (
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
                       <Text style={{ fontSize: 12, color: colors.mutedForeground }}>Lowest Unique Bid</Text>
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.emerald600 }}>{CURRENCY} {formatETB(winner.lowest_unique_bid)}</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.emerald600 }}>{CURRENCY} {formatETB(winner.lowest_unique_bid ?? 0)}</Text>
                     </View>
                   )}
                   {deadlineHrs != null && (
@@ -132,7 +150,7 @@ export function WinnerScreen() {
                   <View style={s.divider} />
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                     <Text style={{ fontSize: 13, color: colors.navy }}>Market Price</Text>
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: colors.mutedForeground, textDecorationLine: 'line-through' }}>{formatETB(auction.marketPrice)}</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: colors.mutedForeground, textDecorationLine: 'line-through' }}>{formatETB(auction.marketPrice ?? 0)}</Text>
                   </View>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
                     <Text style={{ fontSize: 13, color: colors.navy }}>Amount Saved</Text>
@@ -141,21 +159,84 @@ export function WinnerScreen() {
                 </Card>
               )}
 
-              {winner.all_winners && winner.all_winners.length > 1 && (
+              {winner.all_winners && winner.all_winners.length > 0 && (
                 <Card style={{ width: '100%', maxWidth: 320, padding: 16, marginTop: 16 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 }}>
                     <Users size={14} color={colors.primary} />
                     <Text style={{ fontSize: 12, fontWeight: '700', color: colors.navy }}>All Winners ({winner.all_winners.length})</Text>
                   </View>
-                  {winner.all_winners.map((w, i) => (
-                    <View key={w.user_id} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, borderTopWidth: i > 0 ? 1 : 0, borderTopColor: colors.border }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>#{i + 1}</Text>
-                        <Text style={{ fontSize: 11, color: colors.mutedForeground }}>{w.name || w.user_id.slice(0, 8)}</Text>
+                  {winner.all_winners.map((w, i) => {
+                    const wDeadline = w.payment_deadline ? new Date(w.payment_deadline) : null
+                    const wDeadlineHrs = wDeadline ? Math.max(0, Math.round((wDeadline.getTime() - Date.now()) / 3600000)) : null
+                    const isCurrentUser = w.user_id === user?.id
+                    return (
+                      <View key={w.user_id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6, borderTopWidth: i > 0 ? 1 : 0, borderTopColor: colors.border }}>
+                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>#{w.rank ?? (i + 1)}</Text>
+                          <View style={{ flex: 1 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                              <Text style={{ fontSize: 11, color: colors.mutedForeground }} numberOfLines={1}>
+                                {w.name || w.user_id.slice(0, 8)}
+                              </Text>
+                              {w.phone && (
+                                <Text style={{ fontSize: 9, color: colors.mutedForeground + '99' }}>{maskPhone(w.phone)}</Text>
+                              )}
+                              {isCurrentUser && (
+                                <View style={{ borderRadius: 4, backgroundColor: colors.primary + '22', paddingHorizontal: 4, paddingVertical: 1 }}>
+                                  <Text style={{ fontSize: 8, fontWeight: '700', color: colors.primary }}>You</Text>
+                                </View>
+                              )}
+                            </View>
+                            {w.payment_status && (
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 }}>
+                                {w.payment_status === 'PAID' ? (
+                                  <CheckCircle2 size={8} color={colors.emerald600} />
+                                ) : w.payment_status === 'EXPIRED' ? (
+                                  <XCircle size={8} color={colors.destructive} />
+                                ) : null}
+                                <Text style={{ fontSize: 9, fontWeight: '600', color: w.payment_status === 'PAID' ? colors.emerald600 : w.payment_status === 'EXPIRED' ? colors.destructive : colors.mutedForeground }}>
+                                  {w.payment_status}
+                                </Text>
+                              </View>
+                            )}
+                          </View>
+                        </View>
+                        <View style={{ alignItems: 'flex-end' }}>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: colors.navy }}>{CURRENCY} {formatETB(w.amount ?? 0)}</Text>
+                          {wDeadlineHrs != null && w.payment_status !== 'PAID' && (
+                            <Text style={{ fontSize: 8, color: wDeadlineHrs < 6 ? colors.destructive : colors.mutedForeground }}>
+                              {wDeadlineHrs > 0 ? `${wDeadlineHrs}h left` : 'Expired'}
+                            </Text>
+                          )}
+                        </View>
                       </View>
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: colors.navy }}>{CURRENCY} {formatETB(w.amount)}</Text>
+                    )
+                  })}
+                </Card>
+              )}
+
+              {winner.winner_user_id && (
+                <Card style={{ width: '100%', maxWidth: 320, padding: 16, marginTop: 16, borderColor: colors.primary + '20', backgroundColor: colors.accent }}>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <Info size={14} color={colors.primary} style={{ marginTop: 2 }} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.navy, marginBottom: 6 }}>Next Steps</Text>
+                      <View style={{ gap: 4 }}>
+                        <Text style={{ fontSize: 11, color: colors.mutedForeground, lineHeight: 16 }}>
+                          <Text style={{ color: colors.primary, fontWeight: '700' }}>1. </Text>
+                          Complete payment before the deadline
+                        </Text>
+                        <Text style={{ fontSize: 11, color: colors.mutedForeground, lineHeight: 16 }}>
+                          <Text style={{ color: colors.primary, fontWeight: '700' }}>2. </Text>
+                          Collect your item at the designated collection point
+                        </Text>
+                        <Text style={{ fontSize: 11, color: colors.mutedForeground, lineHeight: 16 }}>
+                          <Text style={{ color: colors.primary, fontWeight: '700' }}>3. </Text>
+                          Present payment confirmation for collection
+                        </Text>
+                      </View>
                     </View>
-                  ))}
+                  </View>
                 </Card>
               )}
 
@@ -164,7 +245,7 @@ export function WinnerScreen() {
                   <Text style={{ fontSize: 12, fontWeight: '700', color: colors.navy, marginBottom: 8 }}>Your Bid</Text>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                     <Text style={{ fontSize: 13, color: colors.mutedForeground }}>Amount</Text>
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary }}>{CURRENCY} {formatETB(winner.my_bid.amount)}</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary }}>{CURRENCY} {formatETB(winner.my_bid.amount ?? 0)}</Text>
                   </View>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
                     <Text style={{ fontSize: 13, color: colors.mutedForeground }}>Fee Paid</Text>
@@ -175,17 +256,102 @@ export function WinnerScreen() {
                 </Card>
               )}
 
-              {'bids' in winner && winner.bids.length > 0 && (
+              {allBids.length > 0 && (
                 <Card style={{ width: '100%', maxWidth: 320, padding: 16, marginTop: 16 }}>
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: colors.navy, marginBottom: 8 }}>All Bids ({winner.bids.length})</Text>
-                  <ScrollView style={{ maxHeight: 160 }}>
-                    {winner.bids.map((b: any) => (
-                      <View key={b.id} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}>
-                        <Text style={{ fontSize: 11, fontWeight: '500', color: colors.mutedForeground }}>{b.user_id.slice(0, 8)}...</Text>
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: colors.navy }}>{CURRENCY} {formatETB(b.amount)}</Text>
+                  <View style={{ marginBottom: 8 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: colors.navy }}>Bids ({allBids.length})</Text>
+                  </View>
+                  {/* ── Winning bid always on top ── */}
+                  {winningAmount != null && (() => {
+                    const winnerBid = allBids.find((b: any) => b.amount === winningAmount)
+                    if (!winnerBid) return null
+                    return (
+                      <View style={{
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        paddingVertical: 8,
+                        paddingHorizontal: 10,
+                        borderRadius: 8,
+                        marginBottom: 10,
+                        backgroundColor: colors.emerald600 + '18',
+                        borderWidth: 1,
+                        borderColor: colors.emerald600 + '30',
+                      }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1 }}>
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: colors.emerald800 }} numberOfLines={1}>
+                            {winnerBid.user_id.slice(0, 8)}...
+                          </Text>
+                          {winnerBid.user_id === user?.id && (
+                            <View style={{ borderRadius: 4, backgroundColor: colors.primary + '22', paddingHorizontal: 4, paddingVertical: 1 }}>
+                              <Text style={{ fontSize: 8, fontWeight: '700', color: colors.primary }}>You</Text>
+                            </View>
+                          )}
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <View style={{ borderRadius: 4, backgroundColor: colors.emerald600 + '22', paddingHorizontal: 6, paddingVertical: 2 }}>
+                            <Text style={{ fontSize: 9, fontWeight: '700', color: colors.emerald600 }}>Winner</Text>
+                          </View>
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: colors.emerald600 }}>
+                            {CURRENCY} {formatETB(winningAmount ?? 0)}
+                          </Text>
+                        </View>
                       </View>
-                    ))}
-                  </ScrollView>
+                    )
+                  })()}
+                  {/* ── Bids below the winning amount ── */}
+                  {lowerBidsGrouped.length > 0 && (
+                    <>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                        <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+                        <Text style={{ fontSize: 9, fontWeight: '500', color: colors.mutedForeground }}>Amounts below winner (lowest ↑)</Text>
+                        <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+                      </View>
+                      {pagedBids.map(({ amount, count }: { amount: number; count: number }) => (
+                        <View key={amount} style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          paddingVertical: 6,
+                          paddingHorizontal: 8,
+                          borderRadius: 8,
+                          marginBottom: 2,
+                          backgroundColor: colors.card,
+                        }}>
+                          <Text style={{ fontSize: 11, fontWeight: '500', color: colors.mutedForeground }}>
+                            {count} bidder{count > 1 ? 's' : ''}
+                          </Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            {count > 1 && (
+                              <Text style={{ fontSize: 9, fontWeight: '500', color: colors.mutedForeground }}>×{count}</Text>
+                            )}
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.navy }}>
+                              {CURRENCY} {formatETB(amount ?? 0)}
+                            </Text>
+                          </View>
+                        </View>
+                      ))}
+                      {hasMore && (
+                        <TouchableOpacity
+                          onPress={() => setBidsPage((p: number) => p + 1)}
+                          activeOpacity={0.85}
+                          style={{
+                            marginTop: 8,
+                            borderRadius: 8,
+                            borderWidth: 1,
+                            borderColor: colors.border,
+                            backgroundColor: colors.card,
+                            paddingVertical: 10,
+                            alignItems: 'center',
+                          }}
+                        >
+                          <Text style={{ fontSize: 11, fontWeight: '600', color: colors.mutedForeground }}>
+                            Show {Math.min(BIDS_PAGE_SIZE, lowerBidsGrouped.length - pagedBids.length)} more
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </>
+                  )}
                 </Card>
               )}
             </>

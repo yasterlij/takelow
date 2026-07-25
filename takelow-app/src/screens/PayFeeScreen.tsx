@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { View, Text, ScrollView, StyleSheet, Modal, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native'
-import { Wallet, ShieldCheck, Info, Lock, X, AlertTriangle } from 'lucide-react-native'
+import { View, Text, ScrollView, StyleSheet, Modal, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, Linking } from 'react-native'
+import { Wallet, ShieldCheck, Info, Lock, X, AlertTriangle, Building2, ChevronDown, ChevronUp } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { AppBar, CTAButton, Card } from '../components/AuctionUI'
 import { AwashMark } from '../components/AuctionUI'
@@ -9,9 +9,12 @@ import { api } from '../api'
 import { colors, fontSize } from '../theme'
 
 export function PayFeeScreen() {
-  const { go, selectedId, walletBalance, payFee, getAuction } = useApp()
+  const { go, selectedId, walletBalance, payFee, getAuction, paymentMethod, setPaymentMethod } = useApp()
   const auction = getAuction(selectedId)
   if (!auction) return null
+
+  const [showMethods, setShowMethods] = useState(false)
+  const [selected, setSelected] = useState<'SIKINAPAY' | 'AWASH'>(paymentMethod)
 
   const [showPinModal, setShowPinModal] = useState(false)
   const [pinInput, setPinInput] = useState('')
@@ -37,6 +40,13 @@ export function PayFeeScreen() {
   }, [showPinModal])
 
   const handlePayPress = useCallback(async () => {
+    if (selected === 'SIKINAPAY') {
+      setPaymentMethod('SIKINAPAY')
+      payFee(auction.bidFee, 'SIKINAPAY')
+      return
+    }
+
+    setPaymentMethod('AWASH')
     setCheckingPin(true)
     try {
       const status = await api.wallet.pinStatus()
@@ -53,7 +63,7 @@ export function PayFeeScreen() {
     } finally {
       setCheckingPin(false)
     }
-  }, [])
+  }, [selected, auction, payFee, setPaymentMethod])
 
   const handleVerifyPin = useCallback(async () => {
     if (!pinInput) {
@@ -67,7 +77,7 @@ export function PayFeeScreen() {
       const res = await api.wallet.verifyPin(pinInput)
       if (res.valid) {
         setShowPinModal(false)
-        payFee(auction.bidFee)
+        payFee(auction.bidFee, 'AWASH')
       } else if (res.locked) {
         setPinLocked(true)
         setPinLockedUntil(res.lockedUntil)
@@ -105,7 +115,7 @@ export function PayFeeScreen() {
       await api.wallet.setPin(setupPin)
       setShowPinModal(false)
       setNeedsPinSetup(false)
-      payFee(auction.bidFee)
+      payFee(auction.bidFee, 'AWASH')
     } catch (err: any) {
       setSetupError('Failed to set wallet PIN. Please try again.')
     } finally {
@@ -163,16 +173,72 @@ export function PayFeeScreen() {
         </Card>
 
         <Text style={{ fontSize: 14, fontWeight: '700', color: colors.navy, marginTop: 24, marginBottom: 8 }}>Pay with</Text>
-        <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 12, borderColor: colors.primary + '66', padding: 16 }}>
-          <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: colors.navy, justifyContent: 'center', alignItems: 'center' }}>
-            <AwashMark size={32} />
+
+        <TouchableOpacity
+          onPress={() => setShowMethods(!showMethods)}
+          style={s.methodSelector}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            {selected === 'SIKINAPAY' ? (
+              <ShieldCheck size={20} color={colors.primary} />
+            ) : (
+              <Building2 size={20} color={colors.primary} />
+            )}
+            <View>
+              <Text style={s.methodSelectorTitle}>
+                {selected === 'SIKINAPAY' ? 'SikinaPay' : 'Awash Bank Wallet'}
+              </Text>
+              <Text style={s.methodSelectorSub}>Change payment method</Text>
+            </View>
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 14, fontWeight: '700', color: colors.navy }}>Awash Bank Mobile Money</Text>
-            <Text style={{ fontSize: 12, fontWeight: '500', color: colors.mutedForeground }}><Wallet size={14} /> Balance: {CURRENCY} {formatETB(walletBalance)}</Text>
+          {showMethods ? <ChevronUp size={16} color={colors.mutedForeground} /> : <ChevronDown size={16} color={colors.mutedForeground} />}
+        </TouchableOpacity>
+
+        {showMethods && (
+          <View style={s.methodsList}>
+            <TouchableOpacity
+              onPress={() => { setSelected('SIKINAPAY'); setShowMethods(false) }}
+              style={[s.methodOption, selected === 'SIKINAPAY' && s.methodOptionSelected]}
+            >
+              <ShieldCheck size={20} color={colors.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={s.methodOptionTitle}>SikinaPay</Text>
+                <Text style={s.methodOptionSub}>Pay via online payment gateway</Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => { setSelected('AWASH'); setShowMethods(false) }}
+              style={[s.methodOption, selected === 'AWASH' && s.methodOptionSelected]}
+            >
+              <View style={{ width: 20, height: 20, justifyContent: 'center', alignItems: 'center' }}>
+                <AwashMark size={18} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.methodOptionTitle}>Awash Bank Wallet</Text>
+                <Text style={s.methodOptionSub}>Pay using your wallet balance</Text>
+              </View>
+            </TouchableOpacity>
           </View>
-          <View style={{ width: 16, height: 16, borderRadius: 8, borderWidth: 4, borderColor: colors.primary }} />
-        </Card>
+        )}
+
+        {selected === 'SIKINAPAY' && (
+          <View style={s.infoBox}>
+            <ShieldCheck size={16} color={colors.primary} />
+            <Text style={s.infoText}>Complete your payment securely within the app using SikinaPay checkout.</Text>
+          </View>
+        )}
+
+        {selected === 'AWASH' && (
+          <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 12, borderColor: colors.primary + '66', padding: 16, marginTop: 12 }}>
+            <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: colors.navy, justifyContent: 'center', alignItems: 'center' }}>
+              <AwashMark size={32} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: colors.navy }}>Awash Bank Wallet</Text>
+              <Text style={{ fontSize: 12, fontWeight: '500', color: colors.mutedForeground }}><Wallet size={14} /> Balance: {CURRENCY} {formatETB(walletBalance)}</Text>
+            </View>
+          </Card>
+        )}
 
         <View style={s.infoBox}>
           <Info size={16} color={colors.navy + '99'} />
@@ -181,7 +247,9 @@ export function PayFeeScreen() {
 
         <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, marginTop: 16 }}>
           <ShieldCheck size={16} color={colors.emerald600} />
-          <Text style={{ fontSize: 12, fontWeight: '500', color: colors.mutedForeground }}>Secured by Awash Bank</Text>
+          <Text style={{ fontSize: 12, fontWeight: '500', color: colors.mutedForeground }}>
+            Secured by {selected === 'SIKINAPAY' ? 'SikinaPay' : 'Awash Bank'}
+          </Text>
         </View>
       </ScrollView>
 
@@ -191,8 +259,18 @@ export function PayFeeScreen() {
             Insufficient balance — top up before paying
           </Text>
         )}
-        <CTAButton onPress={handlePayPress} disabled={walletBalance < auction.bidFee || checkingPin}>
-          {checkingPin ? 'Checking...' : `Pay ${CURRENCY} ${formatETB(auction.bidFee)}`}
+        <CTAButton onPress={handlePayPress} disabled={selected === 'AWASH' && (walletBalance < auction.bidFee || checkingPin)}>
+          {checkingPin ? 'Checking...' : selected === 'SIKINAPAY' ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <ShieldCheck size={18} color={colors.primaryForeground} />
+              <Text style={{ color: colors.primaryForeground, fontWeight: '700', fontSize: 14 }}>Pay {CURRENCY} {formatETB(auction.bidFee)} with SikinaPay</Text>
+            </View>
+          ) : (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Wallet size={18} color={colors.primaryForeground} />
+              <Text style={{ color: colors.primaryForeground, fontWeight: '700', fontSize: 14 }}>Pay {CURRENCY} {formatETB(auction.bidFee)} from Wallet</Text>
+            </View>
+          )}
         </CTAButton>
       </View>
 
@@ -295,6 +373,14 @@ function StatusBarCustom() {
 const s = StyleSheet.create({
   infoBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, borderRadius: 12, backgroundColor: colors.navy + '0D', padding: 12, marginTop: 16 },
   infoText: { fontSize: 12, fontWeight: '500', lineHeight: 18, color: colors.navy + 'B3', flex: 1 },
+  methodSelector: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 16, marginTop: 12 },
+  methodSelectorTitle: { fontSize: 14, fontWeight: '700', color: colors.navy },
+  methodSelectorSub: { fontSize: 12, color: colors.mutedForeground, marginTop: 2 },
+  methodsList: { borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 8, marginTop: 8 },
+  methodOption: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 8, padding: 12 },
+  methodOptionSelected: { backgroundColor: colors.primary + '1A' },
+  methodOptionTitle: { fontSize: 13, fontWeight: '700', color: colors.navy },
+  methodOptionSub: { fontSize: 11, color: colors.mutedForeground, marginTop: 2 },
   bottomCta: { position: 'absolute', bottom: 0, left: 0, right: 0, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.card + 'F2', padding: 16 },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
   modalSheet: { backgroundColor: colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, gap: 16 },

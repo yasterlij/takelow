@@ -77,9 +77,14 @@ export function BidConfirmedScreen() {
       </View>
       <View style={s.bottomCta}>
         {isAdmin ? (
-          <CTAButton variant="navy" onPress={() => go('monitor')}>
-            <Eye size={18} /> Monitor Auction
-          </CTAButton>
+          <View style={{ gap: 8 }}>
+            <CTAButton variant="orange" onPress={() => go('auctions')}>
+              <Home size={18} /> Back to Auctions
+            </CTAButton>
+            <CTAButton variant="navy" onPress={() => go('monitor')}>
+              <Eye size={18} /> Monitor Auction
+            </CTAButton>
+          </View>
         ) : (
           <CTAButton variant="outline" onPress={() => go('auctions')}>
             <Home size={18} /> Back to Auctions

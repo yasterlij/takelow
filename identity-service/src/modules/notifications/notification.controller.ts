@@ -1,12 +1,18 @@
 import {
   Controller,
   Post,
+  Get,
+  Param,
   Body,
   HttpCode,
   BadRequestException,
   Logger,
+  UseGuards,
+  Req,
+  Query,
 } from '@nestjs/common';
-import { NotificationService } from './notification.service';
+import { AuthGuard } from '@nestjs/passport';
+import { NotificationService, WinnerNotificationPayload } from './notification.service';
 
 @Controller('notify')
 export class NotificationController {
@@ -21,12 +27,68 @@ export class NotificationController {
     @Body('auction_id') auctionId: string,
     @Body('product_name') productName: string,
     @Body('payment_deadline') paymentDeadline?: string,
+    @Body('winning_amount') winningAmount?: number,
+    @Body('product_description') productDescription?: string,
+    @Body('collection_location') collectionLocation?: string,
+    @Body('collection_method') collectionMethod?: string,
+    @Body('collection_instructions') collectionInstructions?: string,
   ) {
     if (!userId || !auctionId || !productName) {
       throw new BadRequestException('Missing required fields: user_id, auction_id, product_name');
     }
-    await this.notificationService.sendYouWon(userId, auctionId, productName, paymentDeadline);
+
+    const payload: WinnerNotificationPayload = {
+      user_id: userId,
+      auction_id: auctionId,
+      product_name: productName,
+      product_description: productDescription,
+      winning_amount: winningAmount ?? 0,
+      payment_deadline: paymentDeadline || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      collection_location: collectionLocation,
+      collection_method: collectionMethod,
+      collection_instructions: collectionInstructions,
+    };
+
+    await this.notificationService.sendWinnerNotification(payload);
     return { notified: true };
+  }
+
+  @Post('winner-bulk')
+  @HttpCode(200)
+  async notifyWinnersBulk(
+    @Body('winners') winners: Array<{
+      user_id: string;
+      auction_id: string;
+      product_name: string;
+      winning_amount: number;
+      payment_deadline: string;
+      product_description?: string;
+      collection_location?: string;
+      collection_method?: string;
+      collection_instructions?: string;
+    }>,
+  ) {
+    if (!winners?.length) {
+      throw new BadRequestException('No winners provided');
+    }
+    for (const w of winners) {
+      try {
+        await this.notificationService.sendWinnerNotification({
+          user_id: w.user_id,
+          auction_id: w.auction_id,
+          product_name: w.product_name,
+          product_description: w.product_description,
+          winning_amount: w.winning_amount,
+          payment_deadline: w.payment_deadline,
+          collection_location: w.collection_location,
+          collection_method: w.collection_method,
+          collection_instructions: w.collection_instructions,
+        });
+      } catch (e) {
+        this.logger.warn(`Failed to notify winner ${w.user_id}: ${e.message}`);
+      }
+    }
+    return { notified: winners.length };
   }
 
   @Post('outbid')
@@ -94,5 +156,30 @@ export class NotificationController {
     }
     await this.notificationService.sendAuctionEndingSoon(userIds, auctionId, productName);
     return { notified: userIds.length };
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get('inbox')
+  async getInAppNotifications(
+    @Req() req: any,
+    @Query('unread') unreadOnly?: string,
+  ) {
+    return this.notificationService.getInAppNotifications(req.user.id, unreadOnly === 'true');
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Post('inbox/:id/read')
+  @HttpCode(200)
+  async markNotificationRead(@Param('id') id: string) {
+    await this.notificationService.markNotificationRead(id);
+    return { read: true };
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Post('inbox/read-all')
+  @HttpCode(200)
+  async markAllNotificationsRead(@Req() req: any) {
+    await this.notificationService.markAllNotificationsRead(req.user.id);
+    return { read: true };
   }
 }

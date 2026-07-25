@@ -6,71 +6,74 @@ import {
   Index,
   ManyToOne,
   JoinColumn,
-} from 'typeorm';
-import { Product } from '../../admin/entities/product.entity';
+} from "typeorm";
+import { Product } from "../../admin/entities/product.entity";
 
 export enum AuctionStatus {
-  ACTIVE = 'ACTIVE',
-  CLOSED = 'CLOSED',
-  EXPIRED = 'EXPIRED',
+  ACTIVE = "ACTIVE",
+  CLOSED = "CLOSED",
+  EXPIRED = "EXPIRED",
 }
 
 export enum PaymentStatus {
-  PENDING = 'PENDING',
-  PAID = 'PAID',
-  EXPIRED = 'EXPIRED',
+  PENDING = "PENDING",
+  PAID = "PAID",
+  EXPIRED = "EXPIRED",
 }
 
-@Entity('auctions')
+@Entity("auctions")
 export class Auction {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
   @Index()
-  @Column({ type: 'uuid' })
+  @Column({ type: "uuid" })
   product_id: string;
 
   @ManyToOne(() => Product, { nullable: true })
-  @JoinColumn({ name: 'product_id' })
+  @JoinColumn({ name: "product_id" })
   product: Product;
 
-  @Column({ type: 'timestamp' })
+  @Column({ type: "timestamp" })
   start_time: Date;
 
-  @Column({ type: 'timestamp' })
+  @Column({ type: "timestamp" })
   end_time: Date;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  @Column({ type: "decimal", precision: 12, scale: 2, nullable: true })
   min_bid: number;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  @Column({ type: "decimal", precision: 12, scale: 2, nullable: true })
   max_bid: number;
 
-  @Column({ type: 'int', default: 1 })
+  @Column({ type: "int", default: 1 })
   num_winners: number;
 
   @Column({
-    type: 'enum',
+    type: "enum",
     enum: AuctionStatus,
     default: AuctionStatus.ACTIVE,
   })
   status: AuctionStatus;
 
-  @Column({ type: 'uuid', nullable: true })
+  @Column({ type: "uuid", nullable: true })
   winner_user_id: string;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  @Column({ type: "decimal", precision: 12, scale: 2, nullable: true })
   winning_bid_amount: number;
 
   @Column({
-    type: 'enum',
+    type: "enum",
     enum: PaymentStatus,
     nullable: true,
   })
   payment_status: PaymentStatus;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: "timestamp", nullable: true })
   payment_deadline: Date;
+
+  @Column({ type: "timestamp", nullable: true })
+  last_payment_update: Date;
 
   @CreateDateColumn()
   created_at: Date;

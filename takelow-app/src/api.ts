@@ -24,12 +24,58 @@ export function getRefreshToken() {
   return _refreshToken
 }
 
+const FRIENDLY_ERRORS: Record<string, string> = {
+  ERR_AUTH_INVALID_CREDENTIALS: 'The phone number or password you entered is incorrect. Please try again.',
+  ERR_AUTH_FORBIDDEN: 'You do not have permission to perform this action. Please sign in with an admin account.',
+  ERR_AUTH_REQUIRED: 'Please sign in to continue.',
+  ERR_VALIDATION: 'Please check your input and try again.',
+  ERR_NOT_FOUND: 'The requested information could not be found.',
+  ERR_CONFLICT: 'This action could not be completed because of a conflict.',
+  ERR_RATE_LIMIT: 'You are moving too fast! Please wait a moment.',
+  ERR_SERVER: 'Something went wrong on our end. Please try again.',
+  ERR_NETWORK: 'Unable to connect to the server. Please check your internet connection.',
+  ERR_TIMEOUT: 'The request took too long. Please try again.',
+}
+
+export type ErrorCategory = 'auth' | 'validation' | 'network' | 'server' | 'unknown'
+
 class ApiError extends Error {
   status: number
-  constructor(status: number, message: string) {
+  errorCode: string
+  category: ErrorCategory
+
+  constructor(status: number, message: string, errorCode = 'ERR_SERVER') {
     super(message)
     this.status = status
+    this.errorCode = errorCode
+    this.category = getCategory(status, errorCode)
   }
+}
+
+function getCategory(status: number, errorCode: string): ErrorCategory {
+  if ([401, 403].includes(status)) return 'auth'
+  if ([400, 409, 422].includes(status)) return 'validation'
+  if (status === 429) return 'network'
+  if (status >= 500) return 'server'
+  if (errorCode.startsWith('ERR_AUTH')) return 'auth'
+  if (errorCode.startsWith('ERR_VALIDATION')) return 'validation'
+  return 'unknown'
+}
+
+export function getUserFriendlyMessage(err: unknown): string {
+  if (err instanceof ApiError) {
+    return FRIENDLY_ERRORS[err.errorCode] || err.message
+  }
+  if (err instanceof TypeError && err.message === 'Failed to fetch') {
+    return 'Unable to connect to the server. Please check your internet connection.'
+  }
+  if (err instanceof Error) {
+    if (err.message === 'No refresh token') return 'Your session has expired. Please sign in again.'
+    if (err.message === 'Token refresh failed') return 'Your session has expired. Please sign in again.'
+    if (err.message.includes('exhausted retries')) return 'The server is not responding. Please try again later.'
+    return err.message
+  }
+  return 'An unexpected error occurred. Please try again.'
 }
 
 const MAX_RETRIES = 2
@@ -62,6 +108,21 @@ async function refreshAuth(): Promise<void> {
   }
 }
 
+async function parseErrorBody(res: Response): Promise<{ message: string; errorCode: string }> {
+  try {
+    const json = await res.json()
+    return {
+      message: json.message || `Request failed (${res.status})`,
+      errorCode: json.errorCode || 'ERR_SERVER',
+    }
+  } catch {
+    return {
+      message: `Request failed (${res.status})`,
+      errorCode: 'ERR_SERVER',
+    }
+  }
+}
+
 async function request<T>(method: string, path: string, body?: unknown, base?: string, extraHeaders?: Record<string, string>): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (_token) headers['Authorization'] = `Bearer ${_token}`
@@ -72,26 +133,32 @@ async function request<T>(method: string, path: string, body?: unknown, base?: s
     try {
       const res = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined })
       if (res.ok) return res.json()
-      const text = await res.text()
+
       if (res.status === 401 && _refreshToken && attempt < MAX_RETRIES) {
         await refreshAuth()
         if (_token) headers['Authorization'] = `Bearer ${_token}`
         continue
       }
+
+      const { message, errorCode } = await parseErrorBody(res)
+
       if (res.status < 500) {
-        throw new ApiError(res.status, `API ${method} ${path} ${res.status}: ${text}`)
+        throw new ApiError(res.status, message, errorCode)
       }
       if (attempt === MAX_RETRIES) {
-        throw new Error(`API ${method} ${path} ${res.status}: ${text}`)
+        throw new ApiError(res.status, message, errorCode)
       }
     } catch (e) {
       if (e instanceof ApiError) throw e
-      if (attempt === MAX_RETRIES) throw e
+      if (e instanceof TypeError) {
+        throw new ApiError(0, 'Unable to connect to the server. Please check your internet connection.', 'ERR_NETWORK')
+      }
+      if (attempt === MAX_RETRIES) throw new ApiError(0, 'The server is not responding. Please try again later.', 'ERR_TIMEOUT')
       await new Promise((r) => setTimeout(r, RETRY_DELAY))
     }
   }
 
-  throw new Error(`API ${method} ${path}: exhausted retries`)
+  throw new ApiError(0, 'The server is not responding. Please try again later.', 'ERR_TIMEOUT')
 }
 
 export type ApiProduct = {
@@ -104,6 +171,16 @@ export type ApiProduct = {
   created_at: string
 }
 
+export type ApiWinnerInfo = {
+  user_id: string
+  amount: number
+  name: string | null
+  phone: string | null
+  rank: number
+  payment_status: string | null
+  payment_deadline: string | null
+}
+
 export type ApiAuction = {
   id: string
   product_id: string
@@ -114,6 +191,11 @@ export type ApiAuction = {
   winner_user_id: string | null
   winning_bid_amount: number | null
   created_at: string
+  winners?: ApiWinnerInfo[]
+  winnersCount?: number
+  payment_status?: string | null
+  payment_deadline?: string | null
+  num_winners?: number
 }
 
 export type ApiBid = {
@@ -133,11 +215,12 @@ export type ApiWinnerResult = {
   end_time: string
   winner_user_id: string | null
   winner_name: string | null
+  winner_phone: string | null
   winning_bid_amount: number | null
   total_bids: number
   unique_bidders: number
   lowest_unique_bid: number | null
-  all_winners: { user_id: string; amount: number; name: string | null }[]
+  all_winners: ApiWinnerInfo[]
   bids: ApiBid[]
   created_at: string
   payment_status: string | null
@@ -150,11 +233,12 @@ export type ApiAuctionResult = {
   status: string
   winner_user_id: string | null
   winner_name: string | null
+  winner_phone: string | null
   winning_bid_amount: number | null
   total_bids: number
   unique_bidders: number
   lowest_unique_bid: number | null
-  all_winners: { user_id: string; amount: number; name: string | null }[]
+  all_winners: ApiWinnerInfo[]
   my_bid: { amount: number; bid_time: string; service_fee_paid: boolean } | null
   created_at: string
   payment_status: string | null
@@ -237,7 +321,7 @@ export const api = {
   listProducts(page = 1, limit = 20) {
     return request<{ data: ApiProduct[]; meta: any }>('GET', `/admin/products?page=${page}&limit=${limit}`, undefined, ENGINE_API)
   },
-  createAuction(data: { product_id: string; start_time: string; end_time: string; min_bid?: number; max_bid?: number; num_winners?: number }) {
+  createAuction(data: { product_id: string; start_time: string; end_time: string; min_bid?: number; max_bid?: number }) {
     return request<ApiAuction>('POST', '/admin/auctions', data, ENGINE_API)
   },
   async listAuctions() {
@@ -251,7 +335,7 @@ export const api = {
   adminListAuctions(page = 1, limit = 100) {
     return request<{ data: ApiAuction[]; meta: any }>('GET', `/admin/auctions?page=${page}&limit=${limit}`, undefined, ENGINE_API)
   },
-  updateAuction(id: string, data: Partial<{ product_id: string; start_time: string; end_time: string; status: string; min_bid: number; max_bid: number; num_winners: number }>) {
+  updateAuction(id: string, data: Partial<{ product_id: string; start_time: string; end_time: string; status: string; min_bid: number; max_bid: number }>) {
     return request<ApiAuction>('PATCH', `/admin/auctions/${id}`, data, ENGINE_API)
   },
   deleteAuction(id: string) {
@@ -269,16 +353,41 @@ export const api = {
   getAuctionBids(id: string) {
     return request<ApiBid[]>('GET', `/admin/auctions/${id}/bids`, undefined, ENGINE_API)
   },
+  adminListUsers(page = 1, limit = 100, search?: string) {
+    const query = `page=${page}&limit=${limit}${search ? `&search=${encodeURIComponent(search)}` : ''}`
+    return request<{ data: ApiUser[]; meta: any }>('GET', `/admin/users?${query}`, undefined, IDENTITY_API)
+  },
+  getUser(id: string) {
+    return request<ApiUser>('GET', `/admin/users/${id}`, undefined, IDENTITY_API)
+  },
+  updateUser(id: string, data: Partial<{ role: string; full_name: string; phone_number: string }>) {
+    return request<ApiUser>('PATCH', `/admin/users/${id}`, data, IDENTITY_API)
+  },
   getAuction(id: string) {
     return request<ApiAuction>('GET', `/auctions/${id}`, undefined, QUERY_API)
   },
-  createPaymentLink(auctionId: string) {
-    return request<{ payment_url: string; transaction_id: string }>('POST', `/payments/${auctionId}/link`, undefined, ENGINE_API)
+  createPaymentLink(auctionId: string, paymentMethod?: string, customerPhone?: string) {
+    let path = `/payments/${auctionId}/link`
+    const params: string[] = []
+    if (paymentMethod) params.push(`payment_method=${encodeURIComponent(paymentMethod)}`)
+    if (customerPhone) params.push(`customer_phone=${encodeURIComponent(customerPhone)}`)
+    const qs = params.join('&')
+    if (qs) path += `?${qs}`
+    return request<{ payment_url: string; transaction_id: string; gateway: string }>('POST', path, undefined, ENGINE_API)
   },
   getPaymentLinkStatus(auctionId: string) {
-    return request<{ status: string; payment_url: string | null }>('GET', `/payments/${auctionId}/status`, undefined, ENGINE_API)
+    return request<{ status: string; payment_url: string | null; gateway?: string }>('GET', `/payments/${auctionId}/status`, undefined, ENGINE_API)
   },
   confirmPayment(auctionId: string) {
     return request<{ paid: boolean }>('POST', `/payments/${auctionId}/confirm`, undefined, ENGINE_API)
+  },
+  createBidFeePaymentLink(auctionId: string) {
+    return request<{ payment_url: string; transaction_id: string }>('POST', `/payments/bid-fee/${auctionId}/link`, undefined, ENGINE_API)
+  },
+  getBidFeePaymentStatus(auctionId: string) {
+    return request<{ status: string; payment_url: string | null }>('GET', `/payments/bid-fee/${auctionId}/status`, undefined, ENGINE_API)
+  },
+  payBidFeeWithWallet(auctionId: string) {
+    return request<{ paid: boolean }>('POST', `/payments/bid-fee/${auctionId}/wallet-pay`, undefined, ENGINE_API)
   },
 }

@@ -1,9 +1,9 @@
 import React, { createContext, useCallback, useContext, useState, useRef, useEffect } from 'react'
-import { View, Text, TouchableOpacity, Animated, StyleSheet, type ViewStyle } from 'react-native'
-import { CheckCircle2, AlertCircle, X } from 'lucide-react-native'
+import { View, Text, TouchableOpacity, Animated, StyleSheet } from 'react-native'
+import { CheckCircle2, AlertCircle, AlertTriangle, Info, X } from 'lucide-react-native'
 import { colors } from '../theme'
 
-type ToastType = 'success' | 'error' | 'info'
+export type ToastType = 'success' | 'error' | 'warning' | 'info'
 
 type Toast = {
   id: number
@@ -23,6 +23,35 @@ export function useToast() {
   return ctx
 }
 
+const DURATION = 4000
+
+const typeStyles: Record<ToastType, { icon: React.ReactNode; bg: string; border: string; bar: string }> = {
+  success: {
+    icon: <CheckCircle2 size={20} color={colors.emerald600} />,
+    bg: colors.emerald50,
+    border: colors.emerald200,
+    bar: colors.emerald500,
+  },
+  error: {
+    icon: <AlertCircle size={20} color={colors.destructive} />,
+    bg: '#FEF2F2',
+    border: '#FECACA',
+    bar: '#EF4444',
+  },
+  warning: {
+    icon: <AlertTriangle size={20} color={colors.warning} />,
+    bg: '#FFFBEB',
+    border: '#FDE68A',
+    bar: '#F59E0B',
+  },
+  info: {
+    icon: <Info size={20} color={colors.primary} />,
+    bg: '#EFF6FF',
+    border: '#BFDBFE',
+    bar: '#3B82F6',
+  },
+}
+
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([])
   const idRef = useRef(0)
@@ -32,7 +61,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     setToasts((prev) => [...prev, { id, message, type }])
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id))
-    }, 3500)
+    }, DURATION)
   }, [])
 
   return (
@@ -49,34 +78,54 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
 function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }) {
   const opacity = useRef(new Animated.Value(0)).current
+  const progress = useRef(new Animated.Value(1)).current
+  const ts = typeStyles[toast.type]
 
   useEffect(() => {
-    Animated.sequence([
-      Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true }),
-      Animated.delay(2800),
-      Animated.timing(opacity, { toValue: 0, duration: 300, useNativeDriver: true }),
+    Animated.parallel([
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+        Animated.delay(DURATION - 500),
+        Animated.timing(opacity, { toValue: 0, duration: 300, useNativeDriver: true }),
+      ]),
+      Animated.timing(progress, {
+        toValue: 0,
+        duration: DURATION - 100,
+        useNativeDriver: false,
+      }),
     ]).start()
   }, [])
 
-  const icon = toast.type === 'success' ? <CheckCircle2 size={18} color={colors.emerald600} /> : <AlertCircle size={18} color={colors.destructive} />
-  const bg = toast.type === 'success' ? colors.emerald50 : toast.type === 'error' ? '#FEF2F2' : colors.secondary
-
   return (
-    <Animated.View style={[s.toast, { backgroundColor: bg, opacity, transform: [{ translateY: opacity.interpolate({ inputRange: [0, 1], outputRange: [-20, 0] }) }] }]}>
-      {icon}
-      <Text style={s.toastText}>{toast.message}</Text>
-      <TouchableOpacity onPress={onDismiss} style={{ padding: 4 }}><X size={16} color={colors.mutedForeground} /></TouchableOpacity>
+    <Animated.View style={[s.toast, { backgroundColor: ts.bg, borderColor: ts.border, opacity, transform: [{ translateY: opacity.interpolate({ inputRange: [0, 1], outputRange: [-20, 0] }) }] }]}>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, flex: 1 }}>
+        <View style={{ marginTop: 1 }}>{ts.icon}</View>
+        <Text style={{ flex: 1, fontSize: 13, fontWeight: '600', color: colors.navy, lineHeight: 18 }}>{toast.message}</Text>
+        <TouchableOpacity onPress={onDismiss} style={{ padding: 2, marginTop: -2 }}><X size={16} color={colors.mutedForeground} /></TouchableOpacity>
+      </View>
+      <Animated.View style={{ height: 3, backgroundColor: ts.bar, borderRadius: 2, marginTop: 8, width: progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }} />
     </Animated.View>
   )
 }
 
 const s = StyleSheet.create({
-  container: { position: 'absolute', top: 60, left: 16, right: 16, gap: 8, zIndex: 9999 },
-  toast: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1, shadowRadius: 8, elevation: 4,
+  container: {
+    position: 'absolute',
+    top: 60,
+    left: 16,
+    right: 16,
+    gap: 8,
+    zIndex: 9999,
   },
-  toastText: { flex: 1, fontSize: 13, fontWeight: '600', color: colors.navy },
+  toast: {
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 6,
+  },
 })

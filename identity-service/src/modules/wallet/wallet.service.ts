@@ -1,18 +1,22 @@
-import { Injectable, BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, UnauthorizedException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { User } from '../auth/entities/user.entity';
 import { Transaction, TransactionType } from './entities/transaction.entity';
+import { EpsteinWalletService } from './epstein.service';
 
 @Injectable()
 export class WalletService {
+  private readonly logger = new Logger(WalletService.name);
+
   constructor(
     @InjectRepository(User)
     private userRepository: Repository<User>,
     @InjectRepository(Transaction)
     private transactionRepository: Repository<Transaction>,
     private dataSource: DataSource,
+    private epsteinWalletService: EpsteinWalletService,
   ) {}
 
   async deposit(userId: string, amount: number, referenceId: string): Promise<User> {

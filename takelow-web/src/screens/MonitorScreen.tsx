@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { Bell, Users, Radio, Eye, TrendingDown, Trophy } from "lucide-react"
 import { useApp } from "../AppContext"
-import { AppBar, PhoneStatusBar, CTAButton, Card } from "../components/AuctionUI"
+import { AppBar, CTAButton, Card } from "../components/AuctionUI"
 import { Countdown } from "../components/Countdown"
 import { CURRENCY, formatETB } from "../mockDataV0"
 
@@ -22,10 +22,7 @@ export function MonitorScreen() {
     return () => clearInterval(t)
   }, [])
 
-  useEffect(() => {
-    const t = setInterval(() => setBidCount((b) => b + (Math.random() > 0.5 ? 1 : 0)), 3000)
-    return () => clearInterval(t)
-  }, [])
+
 
   useEffect(() => {
     if (seconds <= 0) {
@@ -41,9 +38,9 @@ export function MonitorScreen() {
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto">
-      <div className="bg-navy rounded-t-[2rem] overflow-hidden"><PhoneStatusBar dark /></div>
+      
       <AppBar title="Auction in Progress" onBack={() => go("bid-confirmed")} />
-      <div className="flex-1 px-5 pb-28 pt-5">
+      <div className="flex-1 px-5 pb-6 pt-5">
         <div className="flex items-center justify-center">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700 animate-pulse">
             <Radio className="size-3.5" /> LIVE
@@ -52,16 +49,12 @@ export function MonitorScreen() {
 
         <Card className="mt-4 items-center p-5 text-center">
           <div className="mx-auto flex size-24 items-center justify-center rounded-2xl bg-secondary">
-            <img src={auction.images?.[0] || "/placeholder.svg"} alt={auction.name} className="h-20 w-auto object-contain" />
+            <img src={auction.images?.[0] || "/placeholder.svg"} alt={auction.name} loading="lazy" decoding="async" className="h-20 w-auto object-contain" />
           </div>
           <h2 className="mt-3 font-display text-lg font-extrabold text-navy">{auction.name}</h2>
           <span className="text-xs font-medium text-muted-foreground">Time Left</span>
           <div className="mt-2 flex justify-center"><Countdown seconds={seconds} size="lg" /></div>
-          {auction.numWinners && auction.numWinners > 1 && (
-            <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-navy/10 px-2.5 py-0.5 text-[11px] font-semibold text-navy">
-              <Trophy className="size-3" /> {auction.numWinners} winner{auction.numWinners > 1 ? "s" : ""}
-            </span>
-          )}
+
         </Card>
 
         {auction.maxBid && (

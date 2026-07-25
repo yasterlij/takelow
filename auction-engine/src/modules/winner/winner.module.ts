@@ -1,17 +1,18 @@
-import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { ScheduleModule } from '@nestjs/schedule';
-import { WinnerService } from './winner.service';
-import { AuctionClosureService } from './auction-closure.service';
-import { AuctionNotificationService } from './auction-notification.service';
-import { Auction } from './entities/auction.entity';
-import { Bid } from '../bidding/entities/bid.entity';
-import { WorkerModule } from '../worker/worker.module';
+import { Module } from "@nestjs/common";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { ScheduleModule } from "@nestjs/schedule";
+import { WinnerService } from "./winner.service";
+import { AuctionClosureService } from "./auction-closure.service";
+import { AuctionNotificationService } from "./auction-notification.service";
+import { Auction } from "./entities/auction.entity";
+import { Winner } from "./entities/winner.entity";
+import { Bid } from "../bidding/entities/bid.entity";
+import { WorkerModule } from "../worker/worker.module";
 
 @Module({
   imports: [
     ScheduleModule.forRoot(),
-    TypeOrmModule.forFeature([Auction, Bid]),
+    TypeOrmModule.forFeature([Auction, Bid, Winner]),
     WorkerModule,
   ],
   providers: [WinnerService, AuctionClosureService, AuctionNotificationService],

@@ -28,20 +28,20 @@ export function RegisterScreen() {
     setLoading(true)
     const ok = await register(cleanPhone, cleanPw, cleanName)
     setLoading(false)
-    if (!ok) setLocalError(authError || "Registration failed")
+    if (!ok) setLocalError(authError || "Unable to create account. Please try again.")
   }
 
   const displayError = localError || authError
 
   return (
-    <div className="flex min-h-screen flex-col bg-gradient-to-b from-navy to-[#0d1533] px-6">
+    <div className="flex min-h-screen flex-col bg-gradient-to-br from-awash-blue via-awash-blue-dark to-[#001224] px-6">
       <div className="flex flex-1 flex-col items-center justify-center">
-        <AwashLogo variant="light" />
-        <h1 className="mt-8 font-display text-2xl font-extrabold text-navy-foreground">Create Account</h1>
-        <p className="mt-1 text-sm font-medium text-navy-foreground/60">Join TakeLow auction platform</p>
+        <div className="animate-float-rotate"><AwashLogo variant="light" /></div>
+        <h1 className="mt-8 font-display text-2xl font-extrabold text-white">Create Account</h1>
+        <p className="mt-1 text-sm font-medium text-white/60">Join TakeLow auction platform</p>
 
         {displayError && (
-          <div className="mt-6 flex w-full max-w-xs items-center gap-2 rounded-xl bg-destructive/15 p-3 text-xs font-semibold text-destructive">
+          <div className="mt-6 flex w-full max-w-xs items-center gap-2 rounded-xl bg-destructive/20 backdrop-blur-sm border border-destructive/30 p-3 text-xs font-semibold text-destructive">
             <AlertCircle className="size-4 shrink-0" />
             <span>{displayError}</span>
           </div>
@@ -49,39 +49,39 @@ export function RegisterScreen() {
 
         <div className="mt-8 w-full max-w-xs space-y-4">
           <div>
-            <label className="mb-1.5 block text-xs font-semibold text-navy-foreground/70">Full Name</label>
-            <div className="flex items-center gap-3 rounded-xl border border-navy-muted/30 bg-white/10 px-4 py-3 text-navy-foreground transition-colors focus-within:border-primary/50">
-              <User className="size-4.5 shrink-0 opacity-60" />
-              <input ref={nameRef} value={name} onChange={(e) => { setName(e.target.value); setLocalError("") }} placeholder="Selam Tesfaye" className="flex-1 bg-transparent text-sm font-medium outline-none placeholder:text-navy-foreground/30" onKeyDown={(e) => e.key === "Enter" && phoneRef.current?.focus()} />
+            <label className="mb-1.5 block text-xs font-semibold text-white/70">Full Name</label>
+            <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/10 backdrop-blur-sm px-4 py-3 text-white transition-colors focus-within:border-awash-gold/50 focus-within:bg-white/15">
+              <User className="size-4.5 shrink-0 text-white/60" />
+              <input ref={nameRef} value={name} onChange={(e) => { setName(e.target.value); setLocalError("") }} placeholder="Selam Tesfaye" className="flex-1 bg-transparent text-sm font-medium outline-none placeholder:text-white/30 text-white" onKeyDown={(e) => e.key === "Enter" && phoneRef.current?.focus()} />
             </div>
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-semibold text-navy-foreground/70">Phone Number</label>
-            <div className="flex items-center gap-3 rounded-xl border border-navy-muted/30 bg-white/10 px-4 py-3 text-navy-foreground transition-colors focus-within:border-primary/50">
-              <Smartphone className="size-4.5 shrink-0 opacity-60" />
-              <input ref={phoneRef} value={phone} onChange={(e) => { setPhone(e.target.value.replace(/\D/g, "")); setLocalError("") }} placeholder="091 XXX XXXX" maxLength={10} className="flex-1 bg-transparent text-sm font-medium outline-none placeholder:text-navy-foreground/30" onKeyDown={(e) => e.key === "Enter" && pwRef.current?.focus()} />
+            <label className="mb-1.5 block text-xs font-semibold text-white/70">Phone Number</label>
+            <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/10 backdrop-blur-sm px-4 py-3 text-white transition-colors focus-within:border-awash-gold/50 focus-within:bg-white/15">
+              <Smartphone className="size-4.5 shrink-0 text-white/60" />
+              <input ref={phoneRef} value={phone} onChange={(e) => { setPhone(e.target.value.replace(/\D/g, "")); setLocalError("") }} placeholder="091 XXX XXXX" maxLength={10} className="flex-1 bg-transparent text-sm font-medium outline-none placeholder:text-white/30 text-white" onKeyDown={(e) => e.key === "Enter" && pwRef.current?.focus()} />
             </div>
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-semibold text-navy-foreground/70">Password</label>
-            <div className="flex items-center gap-3 rounded-xl border border-navy-muted/30 bg-white/10 px-4 py-3 text-navy-foreground transition-colors focus-within:border-primary/50">
-              <Lock className="size-4.5 shrink-0 opacity-60" />
-              <input ref={pwRef} type={showPw ? "text" : "password"} value={password} onChange={(e) => { setPassword(e.target.value); setLocalError("") }} placeholder="min 4 characters" className="flex-1 bg-transparent text-sm font-medium outline-none placeholder:text-navy-foreground/30" onKeyDown={(e) => e.key === "Enter" && handleRegister()} />
-              <button onClick={() => setShowPw((s) => !s)} className="opacity-60" tabIndex={-1}>
+            <label className="mb-1.5 block text-xs font-semibold text-white/70">Password</label>
+            <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/10 backdrop-blur-sm px-4 py-3 text-white transition-colors focus-within:border-awash-gold/50 focus-within:bg-white/15">
+              <Lock className="size-4.5 shrink-0 text-white/60" />
+              <input ref={pwRef} type={showPw ? "text" : "password"} value={password} onChange={(e) => { setPassword(e.target.value); setLocalError("") }} placeholder="min 4 characters" className="flex-1 bg-transparent text-sm font-medium outline-none placeholder:text-white/30 text-white" onKeyDown={(e) => e.key === "Enter" && handleRegister()} />
+              <button onClick={() => setShowPw((s) => !s)} className="text-white/60 hover:text-white" tabIndex={-1}>
                 {showPw ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
               </button>
             </div>
           </div>
         </div>
 
-        <button onClick={handleRegister} disabled={loading} className="mt-8 flex w-full max-w-xs items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 transition-all active:translate-y-px disabled:opacity-60">
+        <button onClick={handleRegister} disabled={loading} className="mt-8 flex w-full max-w-xs items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-awash-gold to-awash-gold-light py-3.5 text-sm font-bold text-awash-blue shadow-lg shadow-primary/30 transition-all hover:shadow-primary/40 active:translate-y-px disabled:opacity-60">
           {loading ? <Loader2 className="size-4 animate-spin" /> : null}
           {loading ? "Creating account..." : "Create Account"}
         </button>
 
-        <p className="mt-6 text-xs font-medium text-navy-foreground/50">
+        <p className="mt-6 text-xs font-medium text-white/50">
           Already have an account?{" "}
-          <button onClick={() => go("login")} className="font-bold text-primary">Sign In</button>
+          <button onClick={() => go("login")} className="font-bold text-awash-gold hover:text-awash-gold-light transition-colors">Sign In</button>
         </p>
       </div>
     </div>

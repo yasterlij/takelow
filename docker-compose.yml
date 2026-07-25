@@ -68,10 +68,14 @@ services:
       SIKINA_SECRET_KEY: ${SIKINA_SECRET_KEY:-}
       SIKINA_WEBHOOK_SECRET: ${SIKINA_WEBHOOK_SECRET:-}
       SIKINA_BASE_URL: ${SIKINA_BASE_URL:-https://sandbox.sikinapay.com}
-      SIKINA_SUCCESS_REDIRECT_URL: ${SIKINA_SUCCESS_REDIRECT_URL:-}
-      SIKINA_FAILED_REDIRECT_URL: ${SIKINA_FAILED_REDIRECT_URL:-}
+      SIKINA_SUCCESS_REDIRECT_URL: ${SIKINA_SUCCESS_REDIRECT_URL:-http://localhost?payment=success&clientReferenceId=CLIENT_REF}
+      SIKINA_FAILED_REDIRECT_URL: ${SIKINA_FAILED_REDIRECT_URL:-http://localhost?payment=failed&clientReferenceId=CLIENT_REF}
       SIKINA_WEBHOOK_URL: ${SIKINA_WEBHOOK_URL:-}
-      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:5173}
+      AWASH_MERCHANT_ID: ${AWASH_MERCHANT_ID:-}
+      AWASH_SECRET_KEY: ${AWASH_SECRET_KEY:-}
+      AWASH_WEBHOOK_SECRET: ${AWASH_WEBHOOK_SECRET:-}
+      AWASH_BASE_URL: ${AWASH_BASE_URL:-https://sandbox.awashbank.com}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost}
     ports:
       - "3002:3000"
 
@@ -85,6 +89,14 @@ services:
       READ_REPLICA_URL: postgresql://admin:secret@postgres-replica:5432/takelow_db
     ports:
       - "3003:3000"
+
+  awash-bank-ui:
+    build: ./awash-bank-ui-ux
+    depends_on: [auction-engine]
+    environment:
+      AWASH_API_URL: http://auction-engine:3000/api/v1
+    ports:
+      - "3004:3000"
 
   web:
     build: ./takelow-web

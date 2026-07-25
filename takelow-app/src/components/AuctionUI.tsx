@@ -1,8 +1,47 @@
-import React, { Children, isValidElement } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, type ViewStyle, type TextStyle } from 'react-native'
-import { ChevronLeft, Signal, Wifi, BatteryFull } from 'lucide-react-native'
-import Svg, { Circle, Path } from 'react-native-svg'
+import React, { Children } from 'react'
+import { View, Text, TouchableOpacity, StyleSheet, type ViewStyle } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
+import { ChevronLeft, Signal, Wifi, BatteryFull, Gavel, Trophy, Zap } from 'lucide-react-native'
+import Svg, { Circle, Path, LinearGradient as SvgGradient, Stop, Defs } from 'react-native-svg'
 import { colors, borderRadius, fontSize, spacing } from '../theme'
+
+// ─── Awash Bank Brand Mark ──────────────────────────────────────────
+
+export function AwashMark({ size = 32 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 48 48">
+      <Defs>
+        <SvgGradient id="awashBlueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <Stop offset="0%" stopColor="#002B5C" />
+          <Stop offset="100%" stopColor="#001F3F" />
+        </SvgGradient>
+      </Defs>
+      <Circle cx="24" cy="24" r="23" fill="url(#awashBlueGrad)" />
+      <Path d="M9 27c4-6 9-9 15-9s11 3 15 9" fill="none" stroke="#C8A642" strokeWidth="3.4" strokeLinecap="round" />
+      <Path d="M12 20c3.5-4.5 7.5-6.8 12-6.8S32.5 15.5 36 20" fill="none" stroke="#FFFFFF" strokeWidth="3" strokeLinecap="round" opacity="0.9" />
+      <Circle cx="24" cy="30.5" r="3.2" fill="#C8A642" />
+    </Svg>
+  )
+}
+
+export function AwashLogo({ variant = 'light', size = 32 }: { variant?: 'light' | 'dark'; size?: number }) {
+  const topColor = variant === 'light' ? colors.awashBlueForeground : colors.awashBlue
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+      <AwashMark size={size} />
+      <View>
+        <Text style={{ fontFamily: 'System', fontWeight: '800', fontSize: 18, letterSpacing: -0.5, color: topColor }}>
+          Awash Bank
+        </Text>
+        <Text style={{ fontSize: 11, fontWeight: '600', letterSpacing: 0.5, color: colors.primary }}>
+          Reverse Auction
+        </Text>
+      </View>
+    </View>
+  )
+}
+
+// ─── Buttons ─────────────────────────────────────────────────────────
 
 export function CTAButton({
   children,
@@ -12,51 +51,147 @@ export function CTAButton({
   style,
 }: {
   children: React.ReactNode
-  variant?: 'primary' | 'navy' | 'outline'
+  variant?: 'primary' | 'navy' | 'orange' | 'outline'
   onPress?: () => void
   disabled?: boolean
   style?: ViewStyle
 }) {
-  const bg = variant === 'primary' ? colors.primary : variant === 'navy' ? colors.navy : colors.card
-  const txt = variant === 'primary' ? colors.primaryForeground : variant === 'navy' ? colors.navyForeground : colors.foreground
-  const bd = variant === 'outline' ? colors.border : 'transparent'
-
+  if (variant === 'primary') {
+    return (
+      <TouchableOpacity onPress={onPress} disabled={disabled} style={style} activeOpacity={0.85}>
+        <LinearGradient
+          colors={['#C8A642', '#D4B85E', '#C8A642']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={[s.ctaBase, { opacity: disabled ? 0.5 : 1, shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 6 }]}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'center' }}>
+            {Children.map(children, (child) =>
+              typeof child === 'string' || typeof child === 'number' ? (
+                <Text style={[s.ctaText, { color: colors.primaryForeground }]}>{child}</Text>
+              ) : (child)
+            )}
+          </View>
+        </LinearGradient>
+      </TouchableOpacity>
+    )
+  }
+  if (variant === 'navy') {
+    return (
+      <TouchableOpacity onPress={onPress} disabled={disabled} style={style} activeOpacity={0.85}>
+        <LinearGradient
+          colors={['#002B5C', '#003D7A', '#002B5C']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={[s.ctaBase, { opacity: disabled ? 0.5 : 1, shadowColor: colors.awashBlue, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 6 }]}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'center' }}>
+            {Children.map(children, (child) =>
+              typeof child === 'string' || typeof child === 'number' ? (
+                <Text style={[s.ctaText, { color: '#FFFFFF' }]}>{child}</Text>
+              ) : (child)
+            )}
+          </View>
+        </LinearGradient>
+      </TouchableOpacity>
+    )
+  }
+  if (variant === 'orange') {
+    return (
+      <TouchableOpacity onPress={onPress} disabled={disabled} style={style} activeOpacity={0.85}>
+        <LinearGradient
+          colors={['#F59E0B', '#EA580C', '#F59E0B']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={[s.ctaBase, { opacity: disabled ? 0.5 : 1, shadowColor: '#EA580C', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 6 }]}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'center' }}>
+            {Children.map(children, (child) =>
+              typeof child === 'string' || typeof child === 'number' ? (
+                <Text style={[s.ctaText, { color: '#FFFFFF' }]}>{child}</Text>
+              ) : (child)
+            )}
+          </View>
+        </LinearGradient>
+      </TouchableOpacity>
+    )
+  }
   return (
-    <TouchableOpacity
-      onPress={onPress}
-      disabled={disabled}
-      style={[
-        s.ctaBase,
-        { backgroundColor: bg, borderColor: bd, opacity: disabled ? 0.5 : 1 },
-        style,
-      ]}
-      activeOpacity={0.85}
-    >
+    <TouchableOpacity onPress={onPress} disabled={disabled} style={[s.ctaBase, { backgroundColor: 'rgba(255,255,255,0.8)', borderColor: colors.border, opacity: disabled ? 0.5 : 1 }, style]} activeOpacity={0.85}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'center' }}>
         {Children.map(children, (child) =>
           typeof child === 'string' || typeof child === 'number' ? (
-            <Text style={[s.ctaText, { color: txt }]}>{child}</Text>
-          ) : (
-            child
-          ),
+            <Text style={[s.ctaText, { color: colors.foreground }]}>{child}</Text>
+          ) : (child)
         )}
       </View>
     </TouchableOpacity>
   )
 }
 
-export function Card({
-  children,
-  style,
-}: {
-  children: React.ReactNode
-  style?: ViewStyle
+export function GoldButton({ children, onPress, disabled, style }: {
+  children: React.ReactNode; onPress?: () => void; disabled?: boolean; style?: ViewStyle
 }) {
-  return <View style={[s.card, style]}>{children}</View>
+  return (
+    <TouchableOpacity onPress={onPress} disabled={disabled} style={style} activeOpacity={0.85}>
+      <LinearGradient
+        colors={['#C8A642', '#D4B85E', '#C8A642']}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={[s.ctaBase, { opacity: disabled ? 0.5 : 1, shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 6 }]}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'center' }}>
+          {Children.map(children, (child) =>
+            typeof child === 'string' || typeof child === 'number' ? (
+              <Text style={[s.ctaText, { color: colors.primaryForeground }]}>{child}</Text>
+            ) : (child)
+          )}
+        </View>
+      </LinearGradient>
+    </TouchableOpacity>
+  )
 }
 
+export function NavyButton({ children, onPress, disabled, style }: {
+  children: React.ReactNode; onPress?: () => void; disabled?: boolean; style?: ViewStyle
+}) {
+  return (
+    <TouchableOpacity onPress={onPress} disabled={disabled} style={style} activeOpacity={0.85}>
+      <LinearGradient
+        colors={['#002B5C', '#003D7A', '#002B5C']}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={[s.ctaBase, { opacity: disabled ? 0.5 : 1, shadowColor: colors.awashBlue, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 12, elevation: 6 }]}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'center' }}>
+          {Children.map(children, (child) =>
+            typeof child === 'string' || typeof child === 'number' ? (
+              <Text style={[s.ctaText, { color: '#FFFFFF' }]}>{child}</Text>
+            ) : (child)
+          )}
+        </View>
+      </LinearGradient>
+    </TouchableOpacity>
+  )
+}
+
+// ─── Card ────────────────────────────────────────────────────────────
+
+export function Card({ children, style }: { children: React.ReactNode; style?: ViewStyle }) {
+  return (
+    <View style={[s.glassCard, style]}>
+      {children}
+    </View>
+  )
+}
+
+export function GoldCard({ children, style }: { children: React.ReactNode; style?: ViewStyle }) {
+  return (
+    <View style={[s.glassCard, { borderColor: colors.primary + '4D', backgroundColor: colors.accent + 'CC' }, style]}>
+      {children}
+    </View>
+  )
+}
+
+// ─── Phone Status Bar ───────────────────────────────────────────────
+
 export function PhoneStatusBar({ dark = false }: { dark?: boolean }) {
-  const tone = dark ? colors.navyForeground : colors.navy
+  const tone = dark ? '#FFFFFF' : colors.awashBlue
   return (
     <View style={s.statusBar}>
       <Text style={[s.statusTime, { color: tone }]}>9:41</Text>
@@ -69,6 +204,8 @@ export function PhoneStatusBar({ dark = false }: { dark?: boolean }) {
   )
 }
 
+// ─── App Bar ─────────────────────────────────────────────────────────
+
 export function AppBar({
   title,
   onBack,
@@ -78,45 +215,73 @@ export function AppBar({
   title: string
   onBack?: () => void
   right?: React.ReactNode
-  variant?: 'navy' | 'light'
+  variant?: 'navy' | 'light' | 'gold'
 }) {
-  const bg = variant === 'navy' ? colors.navy : colors.card
-  const txt = variant === 'navy' ? colors.navyForeground : colors.foreground
+  const txtStyles = {
+    navy: '#FFFFFF',
+    gold: colors.primaryForeground,
+    light: colors.foreground,
+  }
+  const txt = txtStyles[variant]
   return (
-    <View style={[s.appBar, { backgroundColor: bg }]}>
-      {onBack ? (
-        <TouchableOpacity onPress={onBack} style={s.appBarBtn} activeOpacity={0.7}>
-          <ChevronLeft size={20} color={txt} />
-        </TouchableOpacity>
-      ) : (
-        <View style={s.appBarBtn} />
+    <View style={s.appBarOuter}>
+      {variant === 'navy' && (
+        <LinearGradient colors={['#002B5C', '#003D7A', '#002B5C']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
       )}
-      <Text style={[s.appBarTitle, { color: txt }]} numberOfLines={1}>{title}</Text>
-      <View style={s.appBarBtn}>{right}</View>
+      <View style={[s.appBarInner, { backgroundColor: variant === 'light' ? 'rgba(255,255,255,0.8)' : 'transparent' }]}>
+        {onBack ? (
+          <TouchableOpacity onPress={onBack} style={s.appBarBtn} activeOpacity={0.7}>
+            <ChevronLeft size={20} color={txt} />
+          </TouchableOpacity>
+        ) : (
+          <View style={s.appBarBtn} />
+        )}
+        <Text style={[s.appBarTitle, { color: txt }]} numberOfLines={1}>{title}</Text>
+        <View style={s.appBarBtn}>{right}</View>
+      </View>
     </View>
   )
 }
 
-export function Badge({
-  children,
-  tone = 'orange',
-  style,
-}: {
-  children: React.ReactNode
-  tone?: 'orange' | 'navy' | 'green' | 'muted'
-  style?: ViewStyle
+// ─── Stats ───────────────────────────────────────────────────────────
+
+export function StatBlock({ label, value, accent }: {
+  label: string; value: string; accent?: boolean
 }) {
-  const bgMap = {
-    orange: colors.accent,
-    navy: colors.navy + '1A',
-    green: colors.emerald100,
-    muted: colors.muted,
+  return (
+    <View style={{ flexDirection: 'column' }}>
+      <Text style={{ fontSize: 11, fontWeight: '500', textTransform: 'uppercase', letterSpacing: 1, color: colors.mutedForeground }}>
+        {label}
+      </Text>
+      <Text style={{ fontFamily: 'System', fontWeight: '800', fontSize: 16, color: accent ? colors.primary : colors.foreground }}>
+        {value}
+      </Text>
+    </View>
+  )
+}
+
+// ─── Badges ──────────────────────────────────────────────────────────
+
+export function Badge({
+  children, tone = 'gold', style,
+}: {
+  children: React.ReactNode; tone?: 'gold' | 'navy' | 'green' | 'muted' | 'blue' | 'orange'; style?: ViewStyle
+}) {
+  const bgMap: Record<string, string> = {
+    orange: '#FFF0E6CC',
+    gold: colors.accent + 'CC',
+    navy: colors.awashBlue + '18',
+    green: colors.emerald100 + 'CC',
+    muted: colors.muted + 'CC',
+    blue: colors.awashBlue + 'E0',
   }
-  const txtMap = {
-    orange: colors.accentForeground,
-    navy: colors.navy,
+  const txtMap: Record<string, string> = {
+    orange: '#C2410C',
+    gold: colors.accentForeground,
+    navy: colors.awashBlue,
     green: colors.emerald700,
     muted: colors.mutedForeground,
+    blue: '#FFFFFF',
   }
   return (
     <View style={[s.badge, { backgroundColor: bgMap[tone] }, style]}>
@@ -125,54 +290,139 @@ export function Badge({
   )
 }
 
-export function AwashMark({ size = 32 }: { size?: number }) {
+export function BadgeGold({ children, style }: { children: React.ReactNode; style?: ViewStyle }) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 48 48">
-      <Circle cx="24" cy="24" r="23" fill="#1e2a6b" />
-      <Path d="M9 27c4-6 9-9 15-9s11 3 15 9" fill="none" stroke="#f47b20" strokeWidth="3.4" strokeLinecap="round" />
-      <Path d="M12 20c3.5-4.5 7.5-6.8 12-6.8S32.5 15.5 36 20" fill="none" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" opacity="0.9" />
-      <Circle cx="24" cy="30.5" r="3.2" fill="#f47b20" />
-    </Svg>
+    <View style={[s.badgeGold, style]}>
+      <Text style={[s.badgeText, { color: colors.accentForeground, fontWeight: '700' }]}>{children}</Text>
+    </View>
   )
 }
 
-export function AwashLogo({ variant = 'light', size = 32 }: { variant?: 'light' | 'dark'; size?: number }) {
-  const topColor = variant === 'light' ? colors.navy : colors.white
+// ─── Countdown Pill ──────────────────────────────────────────────────
+
+export function CountdownPill({ time, urgent }: {
+  time: { d: string; h: string; m: string; s: string }; urgent: boolean
+}) {
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-      <AwashMark size={size} />
+    <View style={[s.timePill, {
+      backgroundColor: urgent ? colors.primary + '25' : colors.awashBlue + 'CC',
+      borderWidth: 1,
+      borderColor: urgent ? colors.primary + '40' : 'rgba(255,255,255,0.15)',
+    }]}>
+      <Text style={[s.timePillText, { color: urgent ? colors.primary : '#FFFFFF' }]}>
+        {time.d !== '00' ? `${parseInt(time.d)}d ` : ''}{time.h}:{time.m}:{time.s}
+      </Text>
+    </View>
+  )
+}
+
+// ─── Savings Badge ───────────────────────────────────────────────────
+
+export function SavingsBadge({ percent }: { percent: number }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: 20, backgroundColor: colors.emerald50 + 'CC', paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: colors.emerald100 }}>
+      <Zap size={10} color={colors.emerald600} />
+      <Text style={{ fontSize: 10, fontWeight: '700', color: colors.emerald600 }}>{percent}% off</Text>
+    </View>
+  )
+}
+
+// ─── Section Header ──────────────────────────────────────────────────
+
+export function SectionHeader({
+  icon: Icon, title, subtitle, gold,
+}: {
+  icon?: React.ComponentType<{ size?: number; color?: string }>
+  title: string; subtitle?: string; gold?: boolean
+}) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+      {Icon && (
+        <View style={{
+          width: 40, height: 40, borderRadius: 12,
+          backgroundColor: gold ? colors.primary + '18' : colors.awashBlue + '18',
+          borderWidth: 1,
+          borderColor: gold ? colors.primary + '30' : colors.awashBlue + '25',
+          justifyContent: 'center', alignItems: 'center',
+        }}>
+          <Icon size={18} color={gold ? colors.primary : colors.awashBlue} />
+        </View>
+      )}
       <View>
-        <Text style={{ fontFamily: 'System', fontWeight: '800', fontSize: 18, letterSpacing: -0.5, color: topColor }}>
-          AwashBank
+        <Text style={{ fontFamily: 'System', fontWeight: '800', fontSize: 18, letterSpacing: -0.3, color: gold ? colors.primary : colors.foreground }}>
+          {title}
         </Text>
-        <Text style={{ fontSize: 11, fontWeight: '600', letterSpacing: 0.5, color: colors.primary }}>
-          Mobile Money
-        </Text>
+        {subtitle && (
+          <Text style={{ fontSize: 12, fontWeight: '500', color: colors.mutedForeground, marginTop: 1 }}>
+            {subtitle}
+          </Text>
+        )}
       </View>
     </View>
   )
 }
 
-export function StatBlock({
-  label,
-  value,
-  accent,
-}: {
-  label: string
-  value: string
-  accent?: boolean
-}) {
+// ─── Winner Badge ────────────────────────────────────────────────────
+
+export function WinnerBadge({ name, amount }: { name: string; amount: string }) {
   return (
-    <View style={{ flexDirection: 'column' }}>
-      <Text style={{ fontSize: 11, fontWeight: '500', textTransform: 'uppercase', letterSpacing: 1, color: colors.mutedForeground }}>
-        {label}
-      </Text>
-      <Text style={{ fontFamily: 'System', fontWeight: '700', fontSize: 14, color: accent ? colors.primary : colors.navy }}>
-        {value}
-      </Text>
+    <View style={{
+      flexDirection: 'row', alignItems: 'center', gap: 8,
+      borderRadius: 20, backgroundColor: colors.primary + '18',
+      borderWidth: 1, borderColor: colors.primary + '33',
+      paddingHorizontal: 16, paddingVertical: 8,
+      shadowColor: colors.primary, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8,
+    }}>
+      <Trophy size={14} color={colors.primary} />
+      <Text style={{ fontSize: 14, fontWeight: '700', color: colors.accentForeground }}>{name}</Text>
+      <Text style={{ fontSize: 14, color: colors.mutedForeground }}>·</Text>
+      <Text style={{ fontSize: 14, fontWeight: '700', color: colors.primary }}>{amount}</Text>
     </View>
   )
 }
+
+// ─── Divider ─────────────────────────────────────────────────────────
+
+export function Divider({ style }: { style?: ViewStyle }) {
+  return <View style={[{ height: 1, backgroundColor: colors.border }, style]} />
+}
+
+// ─── Tab Item ────────────────────────────────────────────────────────
+
+export function TabItem({
+  icon: Icon, label, active, onPress,
+}: {
+  icon: React.ComponentType<{ size?: number; color?: string }>
+  label: string; active?: boolean; onPress?: () => void
+}) {
+  return (
+    <TouchableOpacity onPress={onPress} style={s.tabItem} activeOpacity={0.7}>
+      <Icon size={22} color={active ? colors.primary : colors.neutralGray400} />
+      <Text style={[s.tabItemLabel, { color: active ? colors.primary : colors.neutralGray400, fontWeight: active ? '700' : '500' }]}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  )
+}
+
+// ─── Bottom Tab Bar ──────────────────────────────────────────────────
+
+export function BottomTabBar({
+  items, activeTab, onTabChange,
+}: {
+  items: Array<{ id: string; label: string; icon: React.ComponentType<{ size?: number; color?: string }> }>
+  activeTab?: string; onTabChange?: (id: string) => void
+}) {
+  return (
+    <View style={s.bottomTabBar}>
+      {items.map((item) => (
+        <TabItem key={item.id} icon={item.icon} label={item.label} active={item.id === activeTab} onPress={() => onTabChange?.(item.id)} />
+      ))}
+    </View>
+  )
+}
+
+// ─── Styles ─────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
   ctaBase: {
@@ -180,19 +430,24 @@ const s = StyleSheet.create({
     borderRadius: borderRadius.xl,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
     paddingHorizontal: spacing.xl,
+    overflow: 'hidden',
   },
   ctaText: {
     fontSize: fontSize.md,
     fontWeight: '700',
     letterSpacing: 0.3,
   },
-  card: {
+  glassCard: {
     borderRadius: borderRadius.xl,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.card,
+    borderColor: colors.border + '99',
+    backgroundColor: 'rgba(255,255,255,0.85)',
+    shadowColor: colors.awashBlue,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 3,
   },
   statusBar: {
     flexDirection: 'row',
@@ -210,7 +465,10 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  appBar: {
+  appBarOuter: {
+    overflow: 'hidden',
+  },
+  appBarInner: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
@@ -236,8 +494,55 @@ const s = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
+  badgeGold: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: borderRadius.full,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    backgroundColor: colors.primary + '18',
+    borderWidth: 1,
+    borderColor: colors.primary + '33',
+  },
   badgeText: {
     fontSize: 11,
     fontWeight: '600',
+  },
+  timePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  timePillText: {
+    fontSize: 10,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+  },
+  bottomTabBar: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255,255,255,0.85)',
+    borderTopWidth: 1,
+    borderTopColor: colors.border + '80',
+    paddingBottom: 20,
+    paddingTop: 6,
+    shadowColor: colors.awashBlue,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  tabItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+  },
+  tabItemLabel: {
+    fontSize: 10,
+    marginTop: 2,
   },
 })

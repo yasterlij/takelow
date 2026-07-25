@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { View, Text, ScrollView, TouchableOpacity, Image, TextInput, StyleSheet, Alert, Platform, Modal, Dimensions, ActivityIndicator } from 'react-native'
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker'
 import * as ImagePicker from 'expo-image-picker'
-import { Plus, X, Pencil, XCircle, Trash2, Eye, Calendar, ImageIcon, Search, Filter, Upload, BarChart3, TrendingDown, ArrowUpRight, Camera } from 'lucide-react-native'
+import { Plus, X, Pencil, XCircle, Trash2, Eye, Calendar, ImageIcon, Search, Filter, Upload, BarChart3, TrendingDown, ArrowUpRight, Camera, Trophy } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { AppBar, CTAButton, Badge, Card } from '../components/AuctionUI'
 import { CURRENCY, formatETB } from '../mockDataV0'
@@ -166,12 +166,13 @@ export function AdminAuctionsScreen() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [name, setName] = useState('')
-  const [category, setCategory] = useState('Electronics')
+  const CATEGORIES = ['Computer', 'Electronics', 'Phone/Tablet', 'Car', 'Machinery']
+const [category, setCategory] = useState('Computer')
   const [marketPrice, setMarketPrice] = useState('')
   const [bidFee, setBidFee] = useState('10')
   const [minBid, setMinBid] = useState('')
   const [maxBid, setMaxBid] = useState('')
-  const [numWinners, setNumWinners] = useState('1')
+
   const [description, setDescription] = useState('')
   const [highlights, setHighlights] = useState('')
   const [imageUrl, setImageUrl] = useState('')
@@ -185,8 +186,8 @@ export function AdminAuctionsScreen() {
   const [showLightbox, setShowLightbox] = useState(false)
 
   const resetForm = () => {
-    setName(''); setCategory('Electronics'); setMarketPrice(''); setBidFee('10')
-    setMinBid(''); setMaxBid(''); setNumWinners('1')
+    setName(''); setCategory('Computer'); setMarketPrice(''); setBidFee('10')
+    setMinBid(''); setMaxBid('')
     setDescription(''); setHighlights(''); setImageUrl('')
     setStartDate(new Date()); setEndDate(new Date(Date.now() + 7 * 86400000))
   }
@@ -202,9 +203,9 @@ export function AdminAuctionsScreen() {
     setHighlights(Array.isArray(a.highlights) ? a.highlights.join(', ') : '')
     setMinBid(a.minBid != null ? String(a.minBid) : '')
     setMaxBid(a.maxBid != null ? String(a.maxBid) : '')
-    setNumWinners(String(a.numWinners ?? 1))
     const end = a.endTime ? new Date(a.endTime) : new Date(Date.now() + 7 * 86400000)
-    setStartDate(end)
+    const start = new Date(end.getTime() - 7 * 86400000)
+    setStartDate(start)
     setEndDate(end)
     setShowForm(true)
   }
@@ -254,7 +255,6 @@ export function AdminAuctionsScreen() {
         endTime: endDate.toISOString(),
         minBid: minBid ? Number(minBid) : undefined,
         maxBid: maxBid ? Number(maxBid) : undefined,
-        numWinners: numWinners ? Number(numWinners) : 1,
       })
     } else {
       await addAuction({
@@ -262,7 +262,6 @@ export function AdminAuctionsScreen() {
         startTime: startDate.toISOString(), endTime: endDate.toISOString(),
         minBid: minBid ? Number(minBid) : undefined,
         maxBid: maxBid ? Number(maxBid) : undefined,
-        numWinners: numWinners ? Number(numWinners) : 1,
       })
     }
     setSubmitting(false)
@@ -299,7 +298,7 @@ export function AdminAuctionsScreen() {
       <View style={{ backgroundColor: colors.navy }}>
         <StatusBarCustom />
       </View>
-      <AppBar title="Auction Management" onBack={() => go('admin-dashboard')} right={
+      <AppBar title="Auction Management" onBack={() => go('auctions')} right={
         <TouchableOpacity style={{ width: 32, height: 32, justifyContent: 'center', alignItems: 'center' }} onPress={openCreate}>
           <Plus size={20} color={colors.navyForeground} />
         </TouchableOpacity>
@@ -360,11 +359,32 @@ export function AdminAuctionsScreen() {
               <TextInput value={marketPrice} onChangeText={(t) => setMarketPrice(t.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1').replace(/(\.\d{2})\d+/g, '$1'))} placeholder="Market price" placeholderTextColor={colors.mutedForeground} style={[s.input, { flex: 1 }]} keyboardType="decimal-pad" />
               <TextInput value={bidFee} onChangeText={(t) => setBidFee(t.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1').replace(/(\.\d{2})\d+/g, '$1'))} placeholder="Bid fee" placeholderTextColor={colors.mutedForeground} style={[s.input, { flex: 1 }]} keyboardType="decimal-pad" />
             </View>
+            <Text style={{ fontSize: 10, fontWeight: '600', color: colors.mutedForeground, marginBottom: 4 }}>Category</Text>
+            <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+              {CATEGORIES.map((c) => (
+                <TouchableOpacity
+                  key={c}
+                  onPress={() => setCategory(c)}
+                  style={{
+                    paddingHorizontal: 14,
+                    paddingVertical: 8,
+                    borderRadius: 20,
+                    backgroundColor: category === c ? colors.navy : colors.card,
+                    borderWidth: 1,
+                    borderColor: category === c ? colors.navy : colors.border,
+                  }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: category === c ? colors.navyForeground : colors.mutedForeground }}>
+                    {c}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
             <Text style={{ fontSize: 10, fontWeight: '600', color: colors.mutedForeground, marginBottom: 4 }}>Bid Configuration (optional)</Text>
             <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
               <TextInput value={minBid} onChangeText={(t) => setMinBid(t.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1').replace(/(\.\d{2})\d+/g, '$1'))} placeholder="Min total bids" placeholderTextColor={colors.mutedForeground} style={[s.input, { flex: 1 }]} keyboardType="decimal-pad" />
               <TextInput value={maxBid} onChangeText={(t) => setMaxBid(t.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1').replace(/(\.\d{2})\d+/g, '$1'))} placeholder="Max total bids" placeholderTextColor={colors.mutedForeground} style={[s.input, { flex: 1 }]} keyboardType="decimal-pad" />
-              <TextInput value={numWinners} onChangeText={(t) => setNumWinners(t.replace(/\D/g, ''))} placeholder="Winners" placeholderTextColor={colors.mutedForeground} style={[s.input, { flex: 1 }]} keyboardType="numeric" />
+
             </View>
             <TextInput value={description} onChangeText={setDescription} placeholder="Description" placeholderTextColor={colors.mutedForeground} style={s.input} multiline numberOfLines={2} />
             <TextInput value={highlights} onChangeText={setHighlights} placeholder="Highlights (comma separated)" placeholderTextColor={colors.mutedForeground} style={s.input} />
@@ -421,7 +441,21 @@ export function AdminAuctionsScreen() {
                       {bidAmounts.length > 0 ? ` · Avg ${CURRENCY}${formatETB(avgBid)}` : ''}
                     </Text>
                   </View>
-                  <TouchableOpacity onPress={() => openEdit(a)} style={s.iconBtn}><Pencil size={12} color={colors.mutedForeground} /></TouchableOpacity>
+                  {a.status === 'closed' ? (
+                    <TouchableOpacity onPress={async () => {
+                      try {
+                        const mod = await import('../api')
+                        const res = await mod.api.drawWinner(a.id)
+                        Alert.alert('Winner Result', res.winner_name ? `Winner: ${res.winner_name}\nAmount: ${CURRENCY} ${formatETB(res.winning_bid_amount ?? 0)}` : 'No unique winner found')
+                      } catch {
+                        Alert.alert('Error', 'Failed to draw winner')
+                      }
+                    }} style={[s.iconBtn, { borderColor: colors.primary + '4D', backgroundColor: colors.primary + '14' }]}>
+                      <Trophy size={12} color={colors.primary} />
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity onPress={() => openEdit(a)} style={s.iconBtn}><Pencil size={12} color={colors.mutedForeground} /></TouchableOpacity>
+                  )}
                   <TouchableOpacity onPress={() => setViewBidsId(viewBidsId === a.id ? null : a.id)} style={s.iconBtn}><Eye size={12} color={colors.mutedForeground} /></TouchableOpacity>
                   {a.status !== 'closed' && (
                     <TouchableOpacity onPress={() => handleClose(a.id)} style={s.closeBtn}><XCircle size={12} color={colors.destructive} /></TouchableOpacity>

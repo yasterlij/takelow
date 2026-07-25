@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from 'react'
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native'
-import { Gavel, Trophy, Eye, Shield, Home } from 'lucide-react-native'
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
+import { Gavel, Trophy, Shield, Loader2, Sparkles, CheckCircle2, ArrowLeft } from 'lucide-react-native'
 import { useApp } from '../AppContext'
-import { CTAButton } from '../components/AuctionUI'
+import { PhoneStatusBar, CTAButton, AwashLogo } from '../components/AuctionUI'
+import { colors, CURRENCY } from '../theme'
+import { formatETB } from '../mockDataV0'
 import { api } from '../api'
-import { colors } from '../theme'
 
 export function ClosedScreen() {
-  const { go, selectedId, getAuction, user } = useApp()
-  const isAdmin = user?.role === 'admin'
+  const { go, selectedId, user, getAuction } = useApp()
   const auction = getAuction(selectedId)
+  const isAdmin = user?.role === 'admin'
   const [progress, setProgress] = useState(0)
   const [done, setDone] = useState(false)
   const [revealing, setRevealing] = useState(false)
@@ -18,7 +19,7 @@ export function ClosedScreen() {
     const t = setInterval(() => {
       setProgress((p) => {
         if (p >= 100) { clearInterval(t); return 100 }
-        return Math.min(p + 4, 100)
+        return p + 4
       })
     }, 90)
     return () => clearInterval(t)
@@ -43,83 +44,137 @@ export function ClosedScreen() {
     }
   }
 
+  if (!auction) return null
+
+  const savings = Math.round((1 - auction.bidFee / auction.marketPrice) * 100)
+
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <StatusBarCustom />
-      <View style={s.body}>
-        <View style={s.iconCircle}>
-          {done ? <Trophy size={48} strokeWidth={1.5} color={colors.primary} /> : <Gavel size={44} strokeWidth={1.5} color={colors.primary} />}
+    <View style={{ flex: 1, backgroundColor: colors.neutralGray50 }}>
+      {/* Header */}
+      <View style={{ backgroundColor: colors.awashBlue, overflow: 'hidden' }}>
+        <PhoneStatusBar dark />
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10 }}>
+          <TouchableOpacity onPress={() => go('home')} style={{ width: 32, height: 32, justifyContent: 'center', alignItems: 'center' }}>
+            <ArrowLeft size={20} color="#FFF" />
+          </TouchableOpacity>
+          <View style={{ flex: 1 }} />
+          <AwashLogo variant="light" size={22} />
         </View>
-        <Text style={s.title}>Auction Closed</Text>
-        <Text style={s.subtitle}>
-          {done
-            ? `${auction?.name || 'Auction'} has ended.${isAdmin ? ' The lowest unique bid has been determined.' : ''}`
-            : `Finding the lowest unique bid for ${auction?.name || 'auction'}...`}
+      </View>
+
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 32 }}>
+        {/* Animated Icon */}
+        <View style={{
+          width: 88, height: 88, borderRadius: 44,
+          backgroundColor: done ? colors.primary : colors.awashBlue,
+          justifyContent: 'center', alignItems: 'center',
+          shadowColor: done ? colors.primary : colors.awashBlue,
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: done ? 0.4 : 0.2,
+          shadowRadius: 20,
+          elevation: 8,
+        }}>
+          {done ? (
+            <Trophy size={44} color={colors.primaryForeground} />
+          ) : (
+            <Gavel size={44} color={colors.primary} />
+          )}
+        </View>
+        {done && (
+          <View style={{
+            position: 'absolute', top: -4, right: 8,
+            width: 32, height: 32, borderRadius: 16,
+            backgroundColor: colors.emerald500,
+            justifyContent: 'center', alignItems: 'center',
+          }}>
+            <CheckCircle2 size={18} color="#FFF" />
+          </View>
+        )}
+
+        <Text style={{ fontFamily: 'System', fontWeight: '800', fontSize: 24, color: colors.foreground, marginTop: 24 }}>
+          {done ? 'Auction Closed!' : 'Closing Auction...'}
         </Text>
 
-        <View style={s.progressBarOuter}>
-          <View style={[s.progressBarInner, { width: `${progress}%` }]} />
+        {/* Auction Badge */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12, backgroundColor: colors.awashBlue + '1A', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: colors.awashBlue + '33' }}>
+          <Gavel size={14} color={colors.awashBlue} />
+          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.awashBlue }}>{auction.name}</Text>
         </View>
-        <Text style={s.progressLabel}>
-          {done ? 'Result ready' : `Analyzing bids... ${progress}%`}
-        </Text>
 
+        {/* Progress */}
+        <View style={{ width: '100%', maxWidth: 280, marginTop: 32, alignItems: 'center' }}>
+          {done ? (
+            <View style={{ alignItems: 'center', gap: 16 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.primary + '1A', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 6, borderWidth: 1, borderColor: colors.primary + '33' }}>
+                <Sparkles size={14} color={colors.primary} />
+                <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>Result Ready</Text>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 24 }}>
+                <View style={{ alignItems: 'center' }}>
+                  <Text style={{ fontSize: 9, fontWeight: '500', textTransform: 'uppercase', letterSpacing: 1, color: colors.mutedForeground }}>Bid Fee</Text>
+                  <Text style={{ fontFamily: 'System', fontWeight: '800', fontSize: 16, color: colors.primary }}>{CURRENCY} {formatETB(auction.bidFee)}</Text>
+                </View>
+                <View style={{ alignItems: 'center' }}>
+                  <Text style={{ fontSize: 9, fontWeight: '500', textTransform: 'uppercase', letterSpacing: 1, color: colors.mutedForeground }}>Savings</Text>
+                  <Text style={{ fontFamily: 'System', fontWeight: '800', fontSize: 16, color: colors.emerald600 }}>{savings}%</Text>
+                </View>
+                <View style={{ alignItems: 'center' }}>
+                  <Text style={{ fontSize: 9, fontWeight: '500', textTransform: 'uppercase', letterSpacing: 1, color: colors.mutedForeground }}>Bidders</Text>
+                  <Text style={{ fontFamily: 'System', fontWeight: '800', fontSize: 16, color: colors.awashBlue }}>{auction.totalBids || auction.bidders}</Text>
+                </View>
+              </View>
+            </View>
+          ) : (
+            <>
+              <View style={{ width: '100%', height: 10, borderRadius: 5, backgroundColor: colors.neutralGray200, overflow: 'hidden' }}>
+                <View style={{ width: `${progress}%`, height: '100%', borderRadius: 5, backgroundColor: colors.primary }} />
+              </View>
+              <Text style={{ fontSize: 11, fontWeight: '600', color: colors.mutedForeground, marginTop: 8, fontVariant: ['tabular-nums'] }}>
+                Analyzing bids... {progress}%
+              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12, backgroundColor: colors.accent, borderRadius: 12, padding: 10, borderWidth: 1, borderColor: colors.primary + '33' }}>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={{ fontSize: 11, fontWeight: '500', color: colors.primary }}>Finding the lowest unique bid...</Text>
+              </View>
+            </>
+          )}
+        </View>
+
+        {/* Non-admin info */}
         {done && !isAdmin && (
-          <View style={s.infoBox}>
-            <Shield size={16} color={colors.warning} />
-            <Text style={s.infoText}>
+          <View style={{ flexDirection: 'row', gap: 8, marginTop: 24, backgroundColor: '#FEF3C7', borderRadius: 12, padding: 12, maxWidth: 280, borderWidth: 1, borderColor: '#FDE68A' }}>
+            <Shield size={16} color={colors.warning} style={{ marginTop: 1 }} />
+            <Text style={{ fontSize: 11, fontWeight: '500', color: '#92400E', flex: 1 }}>
               Results are being reviewed by the admin. You will be notified once the winner is declared.
             </Text>
           </View>
         )}
+
+        {/* Admin prompt */}
         {done && isAdmin && (
-          <Text style={s.adminHint}>Close the auction to draw and reveal the winner.</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 24, backgroundColor: colors.awashBlue + '1A', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: colors.awashBlue + '33' }}>
+            <Shield size={14} color={colors.awashBlue} />
+            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.awashBlue }}>Close to draw and reveal the winner</Text>
+          </View>
         )}
       </View>
 
-      <View style={s.bottomCta}>
+      {/* Bottom Actions */}
+      <View style={{ borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.card, padding: 16 }}>
         {isAdmin ? (
           <CTAButton disabled={!done || revealing} onPress={handleReveal}>
             {revealing ? (
-              <ActivityIndicator size="small" color={colors.primaryForeground} />
+              <><ActivityIndicator size="small" color={colors.primaryForeground} /> Closing & Drawing...</>
             ) : done ? (
-              <>
-                <Eye size={18} />
-                <Text> Reveal Winner</Text>
-              </>
+              <><Trophy size={16} color={colors.primaryForeground} /> Reveal Winner</>
             ) : (
-              <Text>Determining...</Text>
+              'Determining...'
             )}
           </CTAButton>
         ) : (
-          <CTAButton variant="outline" onPress={() => go('home')}>
-            <Home size={18} />
-            <Text> Back to Home</Text>
-          </CTAButton>
+          <CTAButton variant="outline" onPress={() => go('home')}>Back to Home</CTAButton>
         )}
       </View>
     </View>
   )
 }
-
-function StatusBarCustom() {
-  return (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4, backgroundColor: colors.navy }}>
-      <Text style={{ fontSize: 13, fontWeight: '600', color: colors.navyForeground }}>9:41</Text>
-    </View>
-  )
-}
-
-const s = StyleSheet.create({
-  body: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
-  iconCircle: { width: 88, height: 88, borderRadius: 44, backgroundColor: colors.navy, justifyContent: 'center', alignItems: 'center' },
-  title: { fontSize: 24, fontWeight: '800', color: colors.navy, marginTop: 24 },
-  subtitle: { fontSize: 14, fontWeight: '500', color: colors.mutedForeground, textAlign: 'center', maxWidth: 300, marginTop: 8, lineHeight: 20 },
-  progressBarOuter: { width: '100%', maxWidth: 300, height: 10, borderRadius: 5, backgroundColor: colors.secondary, marginTop: 32, overflow: 'hidden' },
-  progressBarInner: { height: 10, borderRadius: 5, backgroundColor: colors.primary },
-  progressLabel: { fontSize: 13, fontWeight: '700', color: colors.navy, fontVariant: ['tabular-nums'], marginTop: 12 },
-  bottomCta: { borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.card, padding: 16 },
-  infoBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A', borderRadius: 12, padding: 12, maxWidth: 300, marginTop: 24 },
-  infoText: { flex: 1, fontSize: 12, fontWeight: '500', color: '#92400E', lineHeight: 18 },
-  adminHint: { fontSize: 14, fontWeight: '600', color: colors.navy, textAlign: 'center', maxWidth: 300, marginTop: 24 },
-})

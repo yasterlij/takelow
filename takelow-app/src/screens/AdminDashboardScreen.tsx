@@ -1,6 +1,6 @@
 import React from 'react'
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native'
-import { Gavel, Users, TrendingUp, DollarSign, Clock, AlertTriangle, CheckCircle2, XCircle } from 'lucide-react-native'
+import { Gavel, Users, TrendingUp, DollarSign, Clock, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { CTAButton, Badge } from '../components/AuctionUI'
 import { CURRENCY, formatETB } from '../mockDataV0'
@@ -11,7 +11,7 @@ export function AdminDashboardScreen() {
   const active = auctions.filter((a) => a.status !== 'closed')
   const closed = auctions.filter((a) => a.status === 'closed')
   const extended = auctions.filter((a) => a.endTime && new Date(a.endTime).getTime() > Date.now() + 86400000)
-  const totalRevenue = allBids.length * 10
+  const totalRevenue = allBids.length * 50
 
   const stats = [
     { icon: Gavel, label: 'Active Auctions', value: active.length, color: colors.primary },
@@ -21,7 +21,7 @@ export function AdminDashboardScreen() {
   ]
 
   const paymentStats = [
-    { label: 'Pending Payment', count: 0, icon: Clock, color: colors.orange },
+    { label: 'Pending', count: closed.length, icon: Clock, color: colors.orange },
     { label: 'Paid', count: 0, icon: CheckCircle2, color: colors.emerald600 },
     { label: 'Expired', count: 0, icon: XCircle, color: colors.destructive },
   ]
@@ -30,7 +30,10 @@ export function AdminDashboardScreen() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={{ backgroundColor: colors.navy, paddingTop: 48, paddingHorizontal: 20, paddingBottom: 12 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Text style={{ fontSize: 20, fontWeight: '800', color: colors.navyForeground }}>Admin Panel</Text>
+          <View>
+            <Text style={{ fontSize: 20, fontWeight: '800', color: colors.navyForeground }}>Admin Panel</Text>
+            <Text style={{ fontSize: 12, fontWeight: '500', color: colors.navyForeground + '99', marginTop: 2 }}>Dashboard overview</Text>
+          </View>
           <Badge tone="orange">Admin</Badge>
         </View>
       </View>
@@ -45,11 +48,21 @@ export function AdminDashboardScreen() {
           ))}
         </View>
 
+        <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
+          {paymentStats.map((s) => (
+            <View key={s.label} style={{ flex: 1, borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, alignItems: 'center' }}>
+              <s.icon size={16} color={s.color} />
+              <Text style={{ fontSize: 18, fontWeight: '800', color: colors.navy, fontVariant: ['tabular-nums'], marginTop: 4 }}>{s.count}</Text>
+              <Text style={{ fontSize: 10, fontWeight: '500', color: colors.mutedForeground, marginTop: 2 }}>{s.label}</Text>
+            </View>
+          ))}
+        </View>
+
         {extended.length > 0 && (
-          <View style={[s2.section, { borderColor: colors.orange + '44', backgroundColor: colors.secondary }]}>
+          <View style={[s2.section, { borderColor: colors.orange + '44', backgroundColor: colors.secondary, marginTop: 16 }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <AlertTriangle size={16} color={colors.orange} />
-              <Text style={[s2.sectionTitle, { color: colors.orangeDark }]}>{extended.length} Extended Auction(s)</Text>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.orange + 'CC' }}>{extended.length} Extended Auction(s)</Text>
             </View>
             {extended.map((a) => (
               <Text key={a.id} style={{ fontSize: 11, color: colors.orange, marginTop: 4 }}>

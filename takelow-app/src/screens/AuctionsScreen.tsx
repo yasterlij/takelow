@@ -109,12 +109,17 @@ const loveItems = [
 export function AuctionsScreen() {
   const { go, selectAuction, myBids, auctions, auctionsLoading, refreshAuctions } = useApp()
   const [category, setCategory] = useState('All')
+  const [showClosed, setShowClosed] = useState(false)
 
-  const categories = useMemo(() => ['All', ...Array.from(new Set(auctions.map((a) => a.category)))], [auctions])
+  const liveAuctions = useMemo(() => auctions.filter((a) => a.status !== 'closed'), [auctions])
+  const closedAuctions = useMemo(() => auctions.filter((a) => a.status === 'closed'), [auctions])
+
+  const categories = useMemo(() => ['All', ...Array.from(new Set(liveAuctions.map((a) => a.category)))], [liveAuctions])
   const filtered = useMemo(() => {
-    const unique = Array.from(new Map(auctions.map((a) => [a.id, a])).values())
+    const source = showClosed ? closedAuctions : liveAuctions
+    const unique = Array.from(new Map(source.map((a) => [a.id, a])).values())
     return category === 'All' ? unique : unique.filter((a) => a.category === category)
-  }, [category, auctions])
+  }, [category, showClosed, liveAuctions, closedAuctions])
 
   const [refreshing, setRefreshing] = useState(false)
   const onRefresh = useCallback(async () => {
@@ -143,13 +148,28 @@ export function AuctionsScreen() {
           <>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <View>
-                <Text style={s.pageTitle}>Reverse Auctions</Text>
-                <Text style={s.pageSub}>Lowest unique bid wins. Bid low, be unique!</Text>
+                <Text style={s.pageTitle}>{showClosed ? 'Closed Auctions' : 'Reverse Auctions'}</Text>
+                <Text style={s.pageSub}>{showClosed ? 'Recently ended auctions' : 'Lowest unique bid wins. Bid low, be unique!'}</Text>
               </View>
-              <Badge tone="green">
-                <View style={s.greenDot} />
-                {' '}{auctions.length} Live
+              <Badge tone={showClosed ? 'muted' : 'green'}>
+                <View style={[s.greenDot, { backgroundColor: showClosed ? colors.mutedForeground : colors.emerald500 }]} />
+                {' '}{showClosed ? closedAuctions.length : liveAuctions.length} {showClosed ? 'Closed' : 'Live'}
               </Badge>
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+              <TouchableOpacity
+                onPress={() => setShowClosed(false)}
+                style={[s.chip, !showClosed ? { backgroundColor: colors.navy, borderColor: colors.navy } : { backgroundColor: colors.card, borderColor: colors.border }]}
+              >
+                <Text style={[s.chipText, { color: !showClosed ? colors.navyForeground : colors.mutedForeground }]}>Live</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setShowClosed(true)}
+                style={[s.chip, showClosed ? { backgroundColor: colors.navy, borderColor: colors.navy } : { backgroundColor: colors.card, borderColor: colors.border }]}
+              >
+                <Text style={[s.chipText, { color: showClosed ? colors.navyForeground : colors.mutedForeground }]}>Closed ({closedAuctions.length})</Text>
+              </TouchableOpacity>
             </View>
 
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16, marginHorizontal: -16, paddingHorizontal: 16 }}>

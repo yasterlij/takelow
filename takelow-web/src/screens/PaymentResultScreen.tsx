@@ -1,48 +1,96 @@
-import { useEffect, useState } from "react"
-import { Check, X, ExternalLink, Loader2, ArrowRight } from "lucide-react"
+import { useEffect, useState, useRef } from "react"
+import { Check, X, ExternalLink, Loader2, ArrowRight, Gavel, ArrowLeft } from "lucide-react"
 import { useApp } from "../AppContext"
 import { api } from "../api"
-import { PhoneStatusBar, CTAButton, Card } from "../components/AuctionUI"
+import { CTAButton, Card } from "../components/AuctionUI"
 import { CURRENCY, formatETB } from "../mockDataV0"
 
 type ResultType = "success" | "failed" | "pending"
 
 export function PaymentResultScreen() {
-  const { go, selectedId, userBid, getAuction } = useApp()
+  const { go, selectedId, userBid, getAuction, paymentContext, setFeePaid } = useApp()
   const auction = getAuction(selectedId)
   const [polling, setPolling] = useState(true)
   const [result, setResult] = useState<ResultType>("pending")
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const amount = userBid ?? 0
+  const isBidFee = paymentContext === 'bid-fee'
 
   useEffect(() => {
     let cancelled = false
+
     const check = async () => {
       try {
         if (selectedId) {
-          const status = await api.getPaymentLinkStatus(selectedId)
+          const status = isBidFee
+            ? await api.getBidFeePaymentStatus(selectedId)
+            : await api.getPaymentLinkStatus(selectedId)
           if (!cancelled) {
-            if (status.status === "SUCCESSFUL") setResult("success")
-            else if (["FAILED", "CANCELLED", "EXPIRED"].includes(status.status))
+            if (status.status === "SUCCESSFUL") {
+              setResult("success")
+              setPolling(false)
+              return true
+            } else if (["FAILED", "CANCELLED", "EXPIRED"].includes(status.status)) {
               setResult("failed")
+              setPolling(false)
+              return true
+            }
           }
         } else {
-          setResult("success")
+          if (!cancelled) {
+            setResult("success")
+            setPolling(false)
+            return true
+          }
         }
       } catch {
-        setResult("failed")
-      } finally {
-        if (!cancelled) setPolling(false)
+        if (!cancelled) {
+          setResult("failed")
+        }
       }
+      return false
     }
-    check()
-    return () => { cancelled = true }
-  }, [selectedId])
 
-  const amount = userBid ?? 0
+    check().then((done) => {
+      if (!done && !cancelled) {
+        pollRef.current = setInterval(async () => {
+          const finished = await check()
+          if (finished && pollRef.current) {
+            clearInterval(pollRef.current)
+          }
+        }, 3000)
+        setTimeout(() => {
+          if (pollRef.current) clearInterval(pollRef.current)
+          if (!cancelled) setPolling(false)
+        }, 60000)
+      }
+    })
 
-  if (polling) {
+    return () => {
+      cancelled = true
+      if (pollRef.current) clearInterval(pollRef.current)
+    }
+  }, [selectedId, isBidFee])
+
+  const handleSuccessAction = () => {
+    if (isBidFee) {
+      setFeePaid(true)
+      go('place-bid')
+    } else {
+      go('delivery')
+    }
+  }
+
+  if (polling && result === "pending") {
     return (
       <div className="flex flex-1 flex-col overflow-y-auto">
-        <div className="bg-navy rounded-t-[2rem] overflow-hidden"><PhoneStatusBar dark /></div>
+        <div className="flex items-center gap-3 border-b border-border bg-white/80 px-4 py-3 backdrop-blur-md">
+          <button onClick={() => go("auctions")} className="flex size-8 items-center justify-center rounded-full text-neutral-600 transition-colors hover:bg-neutral-100">
+            <ArrowLeft className="size-5" />
+          </button>
+          <h1 className="font-display text-base font-bold text-awash-blue">Payment</h1>
+        </div>
         <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6">
           <Loader2 className="size-10 animate-spin text-primary" />
           <p className="text-sm font-medium text-muted-foreground">Verifying payment status...</p>
@@ -54,7 +102,12 @@ export function PaymentResultScreen() {
   if (result === "success") {
     return (
       <div className="flex flex-1 flex-col overflow-y-auto">
-        <div className="bg-navy rounded-t-[2rem] overflow-hidden"><PhoneStatusBar dark /></div>
+        <div className="flex items-center gap-3 border-b border-border bg-white/80 px-4 py-3 backdrop-blur-md">
+          <button onClick={() => go("auctions")} className="flex size-8 items-center justify-center rounded-full text-neutral-600 transition-colors hover:bg-neutral-100">
+            <ArrowLeft className="size-5" />
+          </button>
+          <h1 className="font-display text-base font-bold text-awash-blue">Payment</h1>
+        </div>
         <div className="flex flex-1 flex-col items-center justify-center px-6 py-10 text-center">
           <div className="relative">
             <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/30" />
@@ -84,8 +137,8 @@ export function PaymentResultScreen() {
           </Card>
         </div>
         <div className="border-t border-border bg-card p-4">
-          <CTAButton onClick={() => go("delivery")}>
-            <ArrowRight className="size-[18px]" /> Track Delivery
+          <CTAButton onClick={handleSuccessAction}>
+            {isBidFee ? <><Gavel className="size-[18px]" /> Continue to Place Bid</> : <><ArrowRight className="size-[18px]" /> Track Delivery</>}
           </CTAButton>
         </div>
       </div>
@@ -94,7 +147,12 @@ export function PaymentResultScreen() {
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto">
-      <div className="bg-navy rounded-t-[2rem] overflow-hidden"><PhoneStatusBar dark /></div>
+      <div className="flex items-center gap-3 border-b border-border bg-white/80 px-4 py-3 backdrop-blur-md">
+        <button onClick={() => go("auctions")} className="flex size-8 items-center justify-center rounded-full text-neutral-600 transition-colors hover:bg-neutral-100">
+          <ArrowLeft className="size-5" />
+        </button>
+        <h1 className="font-display text-base font-bold text-awash-blue">Payment</h1>
+      </div>
       <div className="flex flex-1 flex-col items-center justify-center px-6 py-10 text-center">
         <div className="relative">
           <span className="flex size-20 items-center justify-center rounded-full bg-red-100 text-red-500">
@@ -107,7 +165,7 @@ export function PaymentResultScreen() {
         </p>
       </div>
       <div className="border-t border-border bg-card p-4">
-        <CTAButton onClick={() => go("pay-winning")}>
+        <CTAButton onClick={() => go(isBidFee ? "pay-fee" : "pay-winning")}>
           <ExternalLink className="size-[18px]" /> Try Again
         </CTAButton>
       </div>

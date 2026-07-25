@@ -120,3 +120,20 @@ export class AdminController {
     return this.auditService.list(parseInt(page), parseInt(limit), action);
   }
 }
+
+@Controller('admin/audit')
+export class AuditController {
+  constructor(private auditService: AuditService) {}
+
+  @Post('log')
+  async logEvent(@Body() body: {
+    actor_id: string;
+    actor_phone?: string;
+    action: string;
+    entity_type: string;
+    entity_id: string;
+    details?: Record<string, any>;
+  }) {
+    return this.auditService.log(body);
+  }
+}

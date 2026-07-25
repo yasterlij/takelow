@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { Sparkles, TrendingDown, CheckCircle2, Loader2 } from "lucide-react"
 import { useApp } from "../AppContext"
-import { AppBar, PhoneStatusBar, CTAButton, Card } from "../components/AuctionUI"
+import { AppBar, CTAButton, Card } from "../components/AuctionUI"
 import { CURRENCY } from "../mockDataV0"
 
 export function PlaceBidScreen() {
@@ -29,9 +29,9 @@ export function PlaceBidScreen() {
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto">
-      <div className="bg-navy rounded-t-[2rem] overflow-hidden"><PhoneStatusBar dark /></div>
+      
       <AppBar title="Place Your Bid" onBack={() => go("pay-fee")} />
-      <div className="flex-1 px-5 pb-28 pt-5">
+      <div className="flex-1 px-5 pb-6 pt-5">
         <div className="flex items-center gap-2 rounded-xl bg-emerald-50 p-3">
           <CheckCircle2 className="size-[18px] flex-shrink-0 text-emerald-600" />
           <p className="text-xs font-semibold text-emerald-700">Bid fee paid. You&apos;re in the auction for {auction.name}!</p>
@@ -44,9 +44,7 @@ export function PlaceBidScreen() {
           {auction.minBid && (
             <span className="inline-flex items-center rounded-md bg-accent px-2.5 py-1 text-[10px] font-semibold text-primary">Min {auction.minBid} bids</span>
           )}
-          {auction.numWinners && auction.numWinners > 1 && (
-            <span className="inline-flex items-center rounded-md bg-accent px-2.5 py-1 text-[10px] font-semibold text-primary">{auction.numWinners} winners</span>
-          )}
+
         </div>
 
         {auction.maxBid && (

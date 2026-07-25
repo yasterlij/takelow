@@ -7,7 +7,7 @@ export const typeOrmConfig: TypeOrmModuleOptions = {
   type: 'postgres',
   url: process.env.DATABASE_URL || 'postgresql://admin:secret@localhost:5432/takelow_db',
   entities: [User, Transaction, Otp],
-  synchronize: true,
+  synchronize: false,
   logging: process.env.NODE_ENV !== 'production',
   extra: {
     max: 50,

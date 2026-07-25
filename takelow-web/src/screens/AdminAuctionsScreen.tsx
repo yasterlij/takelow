@@ -1,24 +1,24 @@
 import { useState, useMemo, useRef } from "react"
-import { Plus, X, Pencil, XCircle, Trash2, Eye, ImageIcon, Filter, Search, Upload, BarChart3, TrendingDown, ArrowUpRight, Camera, Link } from "lucide-react"
+import { Plus, X, Pencil, XCircle, Trash2, Eye, ImageIcon, Filter, Search, Upload, BarChart3, TrendingDown, ArrowUpRight, Camera, Link, Trophy, PartyPopper } from "lucide-react"
 import { useApp } from "../AppContext"
 import { CTAButton, Badge, Card } from "../components/AuctionUI"
 import { CURRENCY, formatETB } from "../mockDataV0"
 import type { Auction } from "../mockDataV0"
 
-function AuctionThumb({ src }: { src?: string }) {
+function AuctionThumb({ src, onClick }: { src?: string; onClick?: () => void }) {
   const [err, setErr] = useState(false)
   const hasSrc = src && (src.startsWith("data:") || src.startsWith("http") || src.startsWith("/"))
   if (err || !hasSrc) {
     return (
-      <div className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-secondary to-muted">
-        <ImageIcon className="size-5 text-muted-foreground/30" />
+      <div className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-neutral-100 to-neutral-50">
+        <ImageIcon className="size-5 text-neutral-300/30" />
       </div>
     )
   }
   return (
-    <div className="size-14 shrink-0 overflow-hidden rounded-xl bg-secondary">
-      <img src={src} alt="" onError={() => setErr(true)} className="h-full w-full object-cover" />
-    </div>
+    <button onClick={onClick} className="size-14 shrink-0 overflow-hidden rounded-xl bg-neutral-100">
+      <img src={src} alt="" loading="lazy" decoding="async" onError={() => setErr(true)} className="h-full w-full object-cover" />
+    </button>
   )
 }
 
@@ -42,7 +42,6 @@ function BidChart({ amounts, total }: { amounts: number[]; total: number }) {
     const bucketSize = range / count
     const result = Array.from({ length: count }, (_, i) => {
       const start = min + i * bucketSize
-      const end = start + bucketSize
       return { label: `${CURRENCY} ${formatETB(Math.round(start))}`, count: 0 }
     })
     amounts.forEach((a) => {
@@ -62,15 +61,15 @@ function BidChart({ amounts, total }: { amounts: number[]; total: number }) {
       <div className="flex items-end gap-1" style={{ height: 48 }}>
         {buckets.map((b, i) => (
           <div key={i} className="group relative flex flex-1 flex-col items-center justify-end">
-            <div className="mb-0.5 text-[8px] font-bold text-navy opacity-0 transition-opacity group-hover:opacity-100">{b.count}</div>
+            <div className="mb-0.5 text-[8px] font-bold text-awash-blue opacity-0 transition-opacity group-hover:opacity-100">{b.count}</div>
             <div
-              className="w-full rounded-t-sm bg-gradient-to-t from-primary/60 to-primary/40 transition-all hover:from-primary/80"
+              className="w-full rounded-t-sm bg-gradient-to-t from-awash-gold/60 to-awash-gold-light/40 transition-all hover:from-awash-gold/80"
               style={{ height: `${(b.count / maxCount) * 100}%`, minHeight: b.count > 0 ? 4 : 0 }}
             />
           </div>
         ))}
       </div>
-      <div className="flex justify-between text-[7px] text-muted-foreground">
+      <div className="flex justify-between text-[7px] text-neutral-400">
         <span>{buckets[0]?.label || ""}</span>
         <span>{buckets[buckets.length - 1]?.label || ""}</span>
       </div>
@@ -95,34 +94,43 @@ function ImageUploadBox({ src, onFile, onClear }: { src: string; onFile: (dataUr
 
   return (
     <div className="flex flex-col items-center gap-2">
-      <div className="relative size-20 overflow-hidden rounded-xl border-2 border-dashed border-border bg-secondary transition-colors hover:border-primary/40">
+      <div className="relative size-20 overflow-hidden rounded-xl border-2 border-dashed border-border bg-neutral-100 transition-colors hover:border-awash-gold/40">
         {src && !err ? (
-          <img src={src} alt="Preview" onError={() => setErr(true)} className="h-full w-full object-cover" />
+          <img src={src} alt="Preview" loading="lazy" decoding="async" onError={() => setErr(true)} className="h-full w-full object-cover" />
         ) : (
           <div className="flex h-full w-full flex-col items-center justify-center gap-1">
-            <Camera className="size-5 text-muted-foreground/40" />
-            <span className="text-[8px] font-medium text-muted-foreground/40">Upload</span>
+            <Camera className="size-5 text-neutral-400/40" />
+            <span className="text-[8px] font-medium text-neutral-400/40">Upload</span>
           </div>
         )}
         <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} className="absolute inset-0 cursor-pointer opacity-0" />
         {src && (
-          <button onClick={(e) => { e.stopPropagation(); onClear(); setErr(false); if (fileRef.current) fileRef.current.value = "" }} className="absolute -right-1.5 -top-1.5 flex size-4 items-center justify-center rounded-full bg-destructive text-white shadow">
+          <button onClick={(e) => { e.stopPropagation(); onClear(); setErr(false); if (fileRef.current) fileRef.current.value = "" }} className="absolute -right-1.5 -top-1.5 flex size-4 items-center justify-center rounded-full bg-red-500 text-white shadow">
             <X className="size-3" />
           </button>
         )}
       </div>
-      <button onClick={() => fileRef.current?.click()} className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-secondary px-3 py-1.5 text-[10px] font-semibold text-navy transition-colors hover:border-primary/40 hover:bg-primary/5">
+      <button onClick={() => fileRef.current?.click()} className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-neutral-100 px-3 py-1.5 text-[10px] font-semibold text-awash-blue transition-colors hover:border-awash-gold/40 hover:bg-awash-gold/5">
         <Upload className="size-3.5" /> Browse & Upload
       </button>
-      <button onClick={() => setShowUrlInput(!showUrlInput)} className="flex items-center gap-1 text-[9px] font-semibold text-muted-foreground hover:text-primary">
+      <button onClick={() => setShowUrlInput(!showUrlInput)} className="flex items-center gap-1 text-[9px] font-semibold text-neutral-400 hover:text-awash-gold">
         <Link className="size-3" /> {showUrlInput ? "Hide URL" : "Paste URL"}
       </button>
       {showUrlInput && (
         <div className="flex w-full gap-1">
-          <input value={urlValue} onChange={(e) => setUrlValue(e.target.value)} placeholder="https://..." className="min-w-0 flex-1 rounded-lg border border-border bg-secondary px-2 py-1 text-[10px] outline-none focus:border-primary" />
-          <button onClick={() => { if (urlValue) { onFile(urlValue); setUrlValue("") } }} className="rounded-lg bg-primary px-2 py-1 text-[9px] font-semibold text-primary-foreground">Set</button>
+          <input value={urlValue} onChange={(e) => setUrlValue(e.target.value)} placeholder="https://..." className="min-w-0 flex-1 rounded-lg border border-border bg-neutral-100 px-2 py-1 text-[10px] outline-none focus:border-awash-gold" />
+          <button onClick={() => { if (urlValue) { onFile(urlValue); setUrlValue("") } }} className="rounded-lg bg-awash-gold px-2 py-1 text-[9px] font-semibold text-awash-blue">Set</button>
         </div>
       )}
+    </div>
+  )
+}
+
+function ImageLightbox({ src, onClose }: { src: string; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-scale-in" onClick={onClose}>
+      <button onClick={onClose} className="absolute right-4 top-4 z-10 rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/20"><X className="size-6" /></button>
+      <img src={src} alt="" loading="lazy" decoding="async" className="max-h-[85vh] max-w-[90vw] rounded-lg object-contain shadow-2xl" onClick={(e) => e.stopPropagation()} />
     </div>
   )
 }
@@ -132,7 +140,7 @@ function toDatetimeLocal(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
-const emptyForm = { name: "", category: "Electronics", marketPrice: "", bidFee: "10", description: "", highlights: "", imageUrl: "", startTime: "", endTime: "", minBid: "", maxBid: "", numWinners: "1" }
+const emptyForm = { name: "", category: "Computer", marketPrice: "", bidFee: "10", description: "", highlights: "", imageUrl: "", startTime: "", endTime: "", minBid: "", maxBid: "" }
 
 export function AdminAuctionsScreen() {
   const { go, auctions, addAuction, updateAuction, deleteAuction, closeAuction, allBids } = useApp()
@@ -149,6 +157,9 @@ export function AdminAuctionsScreen() {
   const [form, setForm] = useState({ ...emptyForm, startTime: defaultStart, endTime: defaultEnd })
   const [submitting, setSubmitting] = useState(false)
   const [imgPreviewErr, setImgPreviewErr] = useState(false)
+  const [lightboxImg, setLightboxImg] = useState<string | null>(null)
+  const [drawingWinner, setDrawingWinner] = useState<string | null>(null)
+  const [winnerResult, setWinnerResult] = useState<{ auctionId: string; winnerName?: string; amount?: number | null } | null>(null)
 
   const resetForm = () => {
     setForm({ ...emptyForm, startTime: defaultStart, endTime: defaultEnd })
@@ -163,13 +174,14 @@ export function AdminAuctionsScreen() {
 
   const openEdit = (a: Auction) => {
     setEditingId(a.id)
+    const startDate = a.endTime ? new Date(new Date(a.endTime).getTime() - 7 * 86400000) : now
+    const endDate = a.endTime ? new Date(a.endTime) : new Date(now.getTime() + 7 * 86400000)
     setForm({
       name: a.name, category: a.category, marketPrice: String(a.marketPrice), bidFee: "10",
       description: a.description, highlights: a.highlights.join(", "),
-      imageUrl: a.images?.[0] || "", startTime: defaultStart, endTime: defaultEnd,
+      imageUrl: a.images?.[0] || "", startTime: toDatetimeLocal(startDate), endTime: toDatetimeLocal(endDate),
       minBid: a.minBid != null ? String(a.minBid) : "",
       maxBid: a.maxBid != null ? String(a.maxBid) : "",
-      numWinners: a.numWinners != null ? String(a.numWinners) : "1",
     })
     setImgPreviewErr(false)
     setShowForm(true)
@@ -181,7 +193,6 @@ export function AdminAuctionsScreen() {
     const highlights = form.highlights ? form.highlights.split(",").map((h) => h.trim()).filter(Boolean) : []
     const minBid = form.minBid ? Number(form.minBid) : undefined
     const maxBid = form.maxBid ? Number(form.maxBid) : undefined
-    const numWinners = form.numWinners ? Number(form.numWinners) : undefined
     const base = {
       name: form.name, category: form.category, marketPrice: Number(form.marketPrice),
       description: form.description, highlights,
@@ -190,7 +201,6 @@ export function AdminAuctionsScreen() {
       ...(form.endTime ? { endTime: new Date(form.endTime).toISOString() } : {}),
       ...(minBid != null ? { minBid } : {}),
       ...(maxBid != null ? { maxBid } : {}),
-      ...(numWinners != null ? { numWinners } : {}),
     }
     if (editingId) {
       await updateAuction(editingId, base)
@@ -216,6 +226,19 @@ export function AdminAuctionsScreen() {
     if (window.confirm("Close this auction early?")) await closeAuction(id)
   }
 
+  const handleDrawWinner = async (id: string, name: string) => {
+    setDrawingWinner(id)
+    setWinnerResult(null)
+    try {
+      const mod = await import("../api")
+      const result = await mod.api.drawWinner(id)
+      setWinnerResult({ auctionId: id, winnerName: result.winner_name, amount: result.winning_bid_amount })
+    } catch {
+      setWinnerResult({ auctionId: id, winnerName: undefined, amount: undefined })
+    }
+    setDrawingWinner(null)
+  }
+
   const filtered = auctions.filter((a) => {
     if (statusFilter !== "all" && a.status !== statusFilter) return false
     if (search && !a.name.toLowerCase().includes(search.toLowerCase())) return false
@@ -224,30 +247,32 @@ export function AdminAuctionsScreen() {
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto">
-      <div className="sticky top-0 z-10 border-b border-border bg-white px-5 pb-3 pt-12">
+      {lightboxImg && <ImageLightbox src={lightboxImg} onClose={() => setLightboxImg(null)} />}
+
+      <div className="sticky top-0 z-10 border-b border-border bg-white/80 backdrop-blur-md px-5 pb-3 pt-12">
         <div className="flex items-center justify-between">
           <div>
-            <button onClick={() => go("admin-dashboard")} className="mb-2 text-xs font-semibold text-primary">&larr; Back</button>
-            <h1 className="font-display text-xl font-extrabold text-navy">Auction Management</h1>
+             <button onClick={() => go("auctions")} className="mb-2 text-xs font-semibold text-awash-gold hover:text-awash-gold-dark">&larr; Auctions</button>
+            <h1 className="font-display text-xl font-extrabold text-awash-blue">Auction Management</h1>
           </div>
-          <button onClick={openCreate} className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:bg-primary/90">
+          <button onClick={openCreate} className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-awash-gold to-awash-gold-light px-4 py-2.5 text-xs font-bold text-awash-blue shadow-lg shadow-primary/20 transition-all hover:shadow-primary/30">
             <Plus className="size-3.5" /> Create Auction
           </button>
         </div>
         <div className="mt-3 flex items-center gap-2">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-neutral-400" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search auctions..."
-              className="w-full rounded-xl border border-border bg-secondary py-2 pl-8 pr-3 text-xs font-medium outline-none placeholder:text-muted-foreground/50 focus:border-primary"
+              className="w-full rounded-xl border border-border/60 bg-white py-2 pl-8 pr-3 text-xs font-medium outline-none placeholder:text-neutral-400/50 focus:border-awash-gold"
             />
           </div>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="rounded-xl border border-border bg-secondary px-3 py-2 text-xs font-semibold text-navy outline-none focus:border-primary"
+            className="rounded-xl border border-border/60 bg-white px-3 py-2 text-xs font-semibold text-awash-blue outline-none focus:border-awash-gold"
           >
             <option value="all">All</option>
             <option value="live">Live</option>
@@ -259,17 +284,17 @@ export function AdminAuctionsScreen() {
 
       <div className="flex-1 px-5 pb-8 pt-4">
         {showForm && (
-          <Card className="mb-4 space-y-3 border border-primary/20 p-4 shadow-lg">
+          <Card className="mb-4 space-y-3 border border-awash-gold/20 p-4 shadow-lg">
             <div className="flex items-center justify-between">
-              <h2 className="font-display text-sm font-bold text-navy">{editingId ? "Edit Auction" : "New Auction"}</h2>
-              <button onClick={() => { setShowForm(false); setEditingId(null) }} className="rounded-lg p-1 hover:bg-muted"><X className="size-4 text-muted-foreground" /></button>
+              <h2 className="font-display text-sm font-bold text-awash-blue">{editingId ? "Edit Auction" : "New Auction"}</h2>
+              <button onClick={() => { setShowForm(false); setEditingId(null) }} className="rounded-lg p-1 hover:bg-neutral-100"><X className="size-4 text-neutral-400" /></button>
             </div>
 
             <div className="flex gap-3">
               <div className="flex-1 space-y-3">
-                <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Product name" className="w-full rounded-xl border border-border bg-secondary px-3 py-2.5 text-xs font-medium outline-none focus:border-primary" />
-                <select value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))} className="w-full rounded-xl border border-border bg-secondary px-3 py-2.5 text-xs font-medium outline-none focus:border-primary">
-                  {["Electronics", "Smartphones", "Computers", "Audio", "Gaming"].map((c) => <option key={c}>{c}</option>)}
+                <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Product name" className="w-full rounded-xl border border-border/60 bg-white px-3 py-2.5 text-xs font-medium outline-none focus:border-awash-gold" />
+                <select value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))} className="w-full rounded-xl border border-border/60 bg-white px-3 py-2.5 text-xs font-medium outline-none focus:border-awash-gold">
+                  {["Computer", "Electronics", "Phone/Tablet", "Car", "Machinery"].map((c) => <option key={c}>{c}</option>)}
                 </select>
               </div>
               <div className="flex-shrink-0">
@@ -282,33 +307,30 @@ export function AdminAuctionsScreen() {
             </div>
 
             <div className="flex gap-3">
-              <input value={form.marketPrice} onChange={(e) => setForm((f) => ({ ...f, marketPrice: e.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1").replace(/(\.\d{2})\d+/g, "$1") }))} placeholder="Market price" className="w-1/2 rounded-xl border border-border bg-secondary px-3 py-2.5 text-xs font-medium outline-none focus:border-primary" />
-              <input value={form.bidFee} onChange={(e) => setForm((f) => ({ ...f, bidFee: e.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1").replace(/(\.\d{2})\d+/g, "$1") }))} placeholder="Bid fee" className="w-1/2 rounded-xl border border-border bg-secondary px-3 py-2.5 text-xs font-medium outline-none focus:border-primary" />
+              <input value={form.marketPrice} onChange={(e) => setForm((f) => ({ ...f, marketPrice: e.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1").replace(/(\.\d{2})\d+/g, "$1") }))} placeholder="Market price" className="w-1/2 rounded-xl border border-border/60 bg-white px-3 py-2.5 text-xs font-medium outline-none focus:border-awash-gold" />
+              <input value={form.bidFee} onChange={(e) => setForm((f) => ({ ...f, bidFee: e.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1").replace(/(\.\d{2})\d+/g, "$1") }))} placeholder="Bid fee" className="w-1/2 rounded-xl border border-border/60 bg-white px-3 py-2.5 text-xs font-medium outline-none focus:border-awash-gold" />
             </div>
             <div className="flex gap-3">
               <label className="flex-1">
-                <span className="mb-1 block text-[10px] font-semibold text-muted-foreground">Min Bids (optional)</span>
-                <input value={form.minBid} onChange={(e) => setForm((f) => ({ ...f, minBid: e.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1").replace(/(\.\d{2})\d+/g, "$1") }))} placeholder="e.g. 5" className="w-full rounded-xl border border-border bg-secondary px-3 py-2.5 text-xs font-medium outline-none focus:border-primary" />
+                <span className="mb-1 block text-[10px] font-semibold text-neutral-400">Min Bids (optional)</span>
+                <input value={form.minBid} onChange={(e) => setForm((f) => ({ ...f, minBid: e.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1").replace(/(\.\d{2})\d+/g, "$1") }))} placeholder="e.g. 5" className="w-full rounded-xl border border-border/60 bg-white px-3 py-2.5 text-xs font-medium outline-none focus:border-awash-gold" />
               </label>
               <label className="flex-1">
-                <span className="mb-1 block text-[10px] font-semibold text-muted-foreground">Max Bids (optional)</span>
-                <input value={form.maxBid} onChange={(e) => setForm((f) => ({ ...f, maxBid: e.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1").replace(/(\.\d{2})\d+/g, "$1") }))} placeholder="e.g. 100" className="w-full rounded-xl border border-border bg-secondary px-3 py-2.5 text-xs font-medium outline-none focus:border-primary" />
+                <span className="mb-1 block text-[10px] font-semibold text-neutral-400">Max Bids (optional)</span>
+                <input value={form.maxBid} onChange={(e) => setForm((f) => ({ ...f, maxBid: e.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1").replace(/(\.\d{2})\d+/g, "$1") }))} placeholder="e.g. 100" className="w-full rounded-xl border border-border/60 bg-white px-3 py-2.5 text-xs font-medium outline-none focus:border-awash-gold" />
               </label>
-              <label className="flex-1">
-                <span className="mb-1 block text-[10px] font-semibold text-muted-foreground">Winners</span>
-                <input value={form.numWinners} onChange={(e) => setForm((f) => ({ ...f, numWinners: e.target.value.replace(/\D/g, "") }))} placeholder="1" className="w-full rounded-xl border border-border bg-secondary px-3 py-2.5 text-xs font-medium outline-none focus:border-primary" />
-              </label>
+
             </div>
-            <textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="Description" className="w-full rounded-xl border border-border bg-secondary px-3 py-2.5 text-xs font-medium outline-none focus:border-primary" rows={2} />
-            <input value={form.highlights} onChange={(e) => setForm((f) => ({ ...f, highlights: e.target.value }))} placeholder="Highlights (comma separated)" className="w-full rounded-xl border border-border bg-secondary px-3 py-2.5 text-xs font-medium outline-none focus:border-primary" />
+            <textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="Description" className="w-full rounded-xl border border-border/60 bg-white px-3 py-2.5 text-xs font-medium outline-none focus:border-awash-gold" rows={2} />
+            <input value={form.highlights} onChange={(e) => setForm((f) => ({ ...f, highlights: e.target.value }))} placeholder="Highlights (comma separated)" className="w-full rounded-xl border border-border/60 bg-white px-3 py-2.5 text-xs font-medium outline-none focus:border-awash-gold" />
             <div className="flex gap-3">
               <label className="flex-1">
-                <span className="mb-1 block text-[10px] font-semibold text-muted-foreground">Start</span>
-                <input type="datetime-local" value={form.startTime} onChange={(e) => setForm((f) => ({ ...f, startTime: e.target.value }))} className="w-full rounded-xl border border-border bg-secondary px-3 py-2.5 text-xs font-medium outline-none focus:border-primary" />
+                <span className="mb-1 block text-[10px] font-semibold text-neutral-400">Start</span>
+                <input type="datetime-local" value={form.startTime} onChange={(e) => setForm((f) => ({ ...f, startTime: e.target.value }))} className="w-full rounded-xl border border-border/60 bg-white px-3 py-2.5 text-xs font-medium outline-none focus:border-awash-gold" />
               </label>
               <label className="flex-1">
-                <span className="mb-1 block text-[10px] font-semibold text-muted-foreground">End</span>
-                <input type="datetime-local" value={form.endTime} onChange={(e) => setForm((f) => ({ ...f, endTime: e.target.value }))} className="w-full rounded-xl border border-border bg-secondary px-3 py-2.5 text-xs font-medium outline-none focus:border-primary" />
+                <span className="mb-1 block text-[10px] font-semibold text-neutral-400">End</span>
+                <input type="datetime-local" value={form.endTime} onChange={(e) => setForm((f) => ({ ...f, endTime: e.target.value }))} className="w-full rounded-xl border border-border/60 bg-white px-3 py-2.5 text-xs font-medium outline-none focus:border-awash-gold" />
               </label>
             </div>
             <CTAButton onClick={handleSubmit} disabled={submitting || !form.name || !form.marketPrice}>
@@ -318,7 +340,7 @@ export function AdminAuctionsScreen() {
         )}
 
         <div className="mb-3 flex items-center justify-between">
-          <p className="text-xs font-semibold text-muted-foreground">
+          <p className="text-xs font-semibold text-neutral-400">
             {filtered.length} of {auctions.length} auctions
           </p>
           <div className="flex gap-1.5">
@@ -328,11 +350,11 @@ export function AdminAuctionsScreen() {
         </div>
 
         {filtered.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 py-16 text-muted-foreground">
+          <div className="flex flex-col items-center gap-3 py-16 text-neutral-400">
             <Filter className="size-8 opacity-30" />
             <p className="text-sm font-medium">No matching auctions</p>
             {search || statusFilter !== "all" ? (
-              <button onClick={() => { setSearch(""); setStatusFilter("all") }} className="text-xs font-semibold text-primary">
+              <button onClick={() => { setSearch(""); setStatusFilter("all") }} className="text-xs font-semibold text-awash-gold">
                 Clear filters
               </button>
             ) : (
@@ -345,50 +367,77 @@ export function AdminAuctionsScreen() {
               const bids = allBids.filter((b) => b.auctionId === a.id)
               const bidAmounts = bids.map((b) => b.amount)
               const avgBid = bidAmounts.length > 0 ? Math.round(bidAmounts.reduce((s, v) => s + v, 0) / bidAmounts.length) : 0
+              const isClosed = a.status === "closed"
               return (
                 <div key={a.id}>
-                  <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 shadow-sm transition-all hover:border-primary/20 hover:shadow-md">
-                    <AuctionThumb src={a.images?.[0]} />
+                  <div className="flex items-center gap-3 rounded-2xl border border-border/60 bg-white p-3 shadow-sm transition-all hover:border-awash-gold/20 hover:shadow-md">
+                    <AuctionThumb src={a.images?.[0]} onClick={() => a.images?.[0] && setLightboxImg(a.images[0])} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="truncate text-sm font-bold text-navy">{a.name}</p>
+                        <p className="truncate text-sm font-bold text-awash-blue">{a.name}</p>
                         <StatusBadge status={a.status} />
                       </div>
-                      <p className="mt-0.5 text-xs font-medium text-muted-foreground">
+                      <p className="mt-0.5 text-xs font-medium text-neutral-400">
                         {a.bidders} bidders · {CURRENCY} {formatETB(a.marketPrice)}
                         {bidAmounts.length > 0 && (
                           <span className="ml-2">· Avg bid {CURRENCY} {formatETB(avgBid)}</span>
                         )}
                         {a.minBid && <span className="ml-2">· Min {a.minBid}</span>}
                         {a.maxBid && <span className="ml-2">· Max {a.maxBid}</span>}
-                        {a.numWinners && a.numWinners > 1 && <span className="ml-2">· {a.numWinners} winners</span>}
+
                       </p>
                     </div>
                     <div className="flex gap-1">
-                      <button onClick={() => openEdit(a)} className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-[10px] font-semibold text-navy hover:bg-muted" title="Edit">
-                        <Pencil className="size-3" />
-                      </button>
-                      <button onClick={() => setViewBidsId(viewBidsId === a.id ? null : a.id)} className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-[10px] font-semibold text-navy hover:bg-muted" title="View bids">
+                      {isClosed ? (
+                        <button
+                          onClick={() => handleDrawWinner(a.id, a.name)}
+                          disabled={drawingWinner === a.id}
+                          className="flex items-center gap-1 rounded-lg bg-awash-gold/10 border border-awash-gold/30 px-2.5 py-1.5 text-[10px] font-semibold text-awash-gold-dark hover:bg-awash-gold/20 transition-colors disabled:opacity-50"
+                          title="Draw Winner"
+                        >
+                          {drawingWinner === a.id ? "..." : <><Trophy className="size-3" /> Winner</>}
+                        </button>
+                      ) : (
+                        <button onClick={() => openEdit(a)} className="flex items-center gap-1 rounded-lg border border-border/60 px-2.5 py-1.5 text-[10px] font-semibold text-awash-blue hover:bg-neutral-50 transition-colors" title="Edit">
+                          <Pencil className="size-3" />
+                        </button>
+                      )}
+                      <button onClick={() => setViewBidsId(viewBidsId === a.id ? null : a.id)} className="flex items-center gap-1 rounded-lg border border-border/60 px-2.5 py-1.5 text-[10px] font-semibold text-awash-blue hover:bg-neutral-50 transition-colors" title="View bids">
                         <Eye className="size-3" />
                       </button>
-                      {a.status !== "closed" && (
-                        <button onClick={() => handleClose(a.id)} className="flex items-center gap-1 rounded-lg border border-amber-200 px-2.5 py-1.5 text-[10px] font-semibold text-amber-700 hover:bg-amber-50" title="Close early">
+                      {!isClosed && (
+                        <button onClick={() => handleClose(a.id)} className="flex items-center gap-1 rounded-lg border border-amber-200 px-2.5 py-1.5 text-[10px] font-semibold text-amber-700 hover:bg-amber-50 transition-colors" title="Close early">
                           <XCircle className="size-3" />
                         </button>
                       )}
-                      <button onClick={() => handleDelete(a.id)} className="flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1.5 text-[10px] font-semibold text-red-600 hover:bg-red-50" title="Delete">
+                      <button onClick={() => handleDelete(a.id)} className="flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1.5 text-[10px] font-semibold text-red-600 hover:bg-red-50 transition-colors" title="Delete">
                         <Trash2 className="size-3" />
                       </button>
                     </div>
                   </div>
+
+                  {winnerResult && winnerResult.auctionId === a.id && (
+                    <div className="mx-2 mb-2 -mt-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 shadow-inner animate-scale-in">
+                      <div className="flex items-center gap-2">
+                        <PartyPopper className="size-4 text-emerald-600" />
+                        <p className="text-xs font-bold text-emerald-800">Winner Result</p>
+                      </div>
+                      <p className="mt-1 text-xs font-medium text-emerald-700">
+                        {winnerResult.winnerName
+                          ? `Winner: ${winnerResult.winnerName} — ${winnerResult.amount ? `${CURRENCY} ${formatETB(winnerResult.amount)}` : ""}`
+                          : "No unique winner found for this auction."}
+                      </p>
+                    </div>
+                  )}
+
                   {viewBidsId === a.id && (
-                    <div className="-mt-2 mb-2 mx-2 rounded-2xl border border-border bg-gradient-to-br from-secondary/60 to-card p-3 shadow-inner">
+                    <div className="-mt-2 mb-2 mx-2 rounded-2xl border border-border/60 bg-gradient-to-br from-neutral-50 to-white p-3 shadow-inner">
                       <div className="flex items-center justify-between">
-                        <p className="flex items-center gap-2 text-[11px] font-bold text-navy">
+                        <p className="flex items-center gap-2 text-[11px] font-bold text-awash-blue">
                           <Eye className="size-3.5" /> Bids ({bids.length})
                         </p>
                         {bidAmounts.length > 1 && (
-                          <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                          <div className="flex items-center gap-2 text-[10px] text-neutral-400">
                             <span className="flex items-center gap-1">
                               <TrendingDown className="size-3" /> Min: {CURRENCY} {formatETB(Math.min(...bidAmounts))}
                             </span>
@@ -402,16 +451,16 @@ export function AdminAuctionsScreen() {
                       {bids.length > 1 && <BidChart amounts={bidAmounts} total={bids.length} />}
 
                       {bids.length === 0 ? (
-                        <p className="py-2 text-center text-[10px] text-muted-foreground">No bids placed yet</p>
+                        <p className="py-2 text-center text-[10px] text-neutral-400">No bids placed yet</p>
                       ) : (
                         <div className="mt-2 flex flex-col gap-1">
                           {bids.map((b, i) => (
                             <div key={i} className="flex items-center justify-between rounded-lg bg-white/60 px-3 py-1.5">
-                              <span className="flex items-center gap-2 text-[10px] font-medium text-muted-foreground">
-                                <span className="flex size-4 items-center justify-center rounded-full bg-navy/10 text-[8px] font-bold text-navy/60">{i + 1}</span>
+                              <span className="flex items-center gap-2 text-[10px] font-medium text-neutral-400">
+                                <span className="flex size-4 items-center justify-center rounded-full bg-awash-blue/10 text-[8px] font-bold text-awash-blue/60">{i + 1}</span>
                                 {b.userName || "Anonymous"}
                               </span>
-                              <span className="text-[11px] font-bold text-navy">{CURRENCY} {formatETB(b.amount)}</span>
+                              <span className="text-[11px] font-bold text-awash-blue">{CURRENCY} {formatETB(b.amount)}</span>
                             </div>
                           ))}
                         </div>

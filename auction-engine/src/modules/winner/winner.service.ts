@@ -1,10 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Redis } from 'ioredis';
-import { InjectRedis } from '../common/redis.decorator';
-import { Bid } from '../bidding/entities/bid.entity';
-import { Auction } from '../winner/entities/auction.entity';
+import { Injectable, Logger } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { Redis } from "ioredis";
+import { InjectRedis } from "../common/redis.decorator";
+import { Bid } from "../bidding/entities/bid.entity";
+import { Auction } from "./entities/auction.entity";
+import { Winner, WinnerPaymentStatus } from "./entities/winner.entity";
 
 @Injectable()
 export class WinnerService {
@@ -14,6 +15,7 @@ export class WinnerService {
     @InjectRedis() private readonly redis: Redis,
     @InjectRepository(Bid) private bidRepository: Repository<Bid>,
     @InjectRepository(Auction) private auctionRepository: Repository<Auction>,
+    @InjectRepository(Winner) private winnerRepository: Repository<Winner>,
   ) {}
 
   async calculateWinners(auctionId: string): Promise<{
@@ -23,16 +25,72 @@ export class WinnerService {
   }> {
     const auction = await this.auctionRepository.findOne({
       where: { id: auctionId },
-      select: ['num_winners'],
+      select: ["status"],
     });
-    const numWinners = auction?.num_winners ?? 1;
 
-    const result = await this.calculateWinnersFromRedis(auctionId, numWinners);
+    if (auction?.status === "CLOSED" || auction?.status === "EXPIRED") {
+      return this.getPersistedWinners(auctionId);
+    }
+
+    const result = await this.calculateWinnersFromRedis(auctionId, 1);
     if (result.found) {
       return result;
     }
 
-    return this.calculateWinnersFromDb(auctionId, numWinners);
+    return this.calculateWinnersFromDb(auctionId, 1);
+  }
+
+  async getPersistedWinners(auctionId: string): Promise<{
+    winningAmounts: number[];
+    totalBids: number;
+    winners: { amount: number; userId: string }[];
+  }> {
+    const totalBids = await this.bidRepository.count({
+      where: { auction_id: auctionId },
+    });
+
+    const persistedWinners = await this.winnerRepository.find({
+      where: { auction_id: auctionId },
+      order: { rank: "ASC" },
+    });
+
+    return {
+      winningAmounts: persistedWinners.map((w) => w.amount),
+      totalBids,
+      winners: persistedWinners.map((w) => ({
+        amount: w.amount,
+        userId: w.user_id,
+      })),
+    };
+  }
+
+  async persistWinners(
+    auctionId: string,
+    winners: { amount: number; userId: string }[],
+    paymentDeadline: Date,
+  ): Promise<Winner[]> {
+    const existing = await this.winnerRepository.find({
+      where: { auction_id: auctionId },
+    });
+    if (existing.length > 0) {
+      this.logger.warn(
+        `Winners already exist for auction ${auctionId}, skipping persist`,
+      );
+      return existing;
+    }
+
+    const entities = winners.map((w, i) =>
+      this.winnerRepository.create({
+        auction_id: auctionId,
+        user_id: w.userId,
+        amount: w.amount,
+        rank: i + 1,
+        payment_status: WinnerPaymentStatus.PENDING,
+        payment_deadline: paymentDeadline,
+      }),
+    );
+
+    return this.winnerRepository.save(entities);
   }
 
   private async calculateWinnersFromRedis(
@@ -44,7 +102,9 @@ export class WinnerService {
     totalBids: number;
     winners: { amount: number; userId: string }[];
   }> {
-    const totalBidsStr = await this.redis.get(`takelow:auction:${auctionId}:total_bids`);
+    const totalBidsStr = await this.redis.get(
+      `takelow:auction:${auctionId}:total_bids`,
+    );
     if (totalBidsStr === null) {
       return { found: false, winningAmounts: [], totalBids: 0, winners: [] };
     }
@@ -87,7 +147,7 @@ export class WinnerService {
   }> {
     const bids = await this.bidRepository.find({
       where: { auction_id: auctionId },
-      order: { bid_time: 'ASC' },
+      order: { bid_time: "ASC" },
     });
 
     const totalBids = bids.length;
@@ -112,7 +172,7 @@ export class WinnerService {
     const selected = uniqueAmounts.slice(0, numWinners);
     const winners = selected.map((amount) => ({
       amount,
-      userId: earliestPerAmount.get(amount) || '',
+      userId: earliestPerAmount.get(amount) || "",
     }));
 
     return { winningAmounts: selected, totalBids, winners };
@@ -124,7 +184,7 @@ export class WinnerService {
   ): Promise<string | null> {
     const bid = await this.bidRepository.findOne({
       where: { auction_id: auctionId, amount },
-      order: { bid_time: 'ASC' },
+      order: { bid_time: "ASC" },
     });
     return bid?.user_id || null;
   }
@@ -135,11 +195,11 @@ export class WinnerService {
     if (count > 0) return count;
 
     const dbCount = await this.bidRepository
-      .createQueryBuilder('bid')
-      .where('bid.auction_id = :auctionId', { auctionId })
-      .select('COUNT(DISTINCT bid.user_id)', 'count')
+      .createQueryBuilder("bid")
+      .where("bid.auction_id = :auctionId", { auctionId })
+      .select("COUNT(DISTINCT bid.user_id)", "count")
       .getRawOne();
-    return parseInt(dbCount?.count || '0', 10);
+    return parseInt(dbCount?.count || "0", 10);
   }
 
   async getAuctionStats(auctionId: string): Promise<{
@@ -147,7 +207,8 @@ export class WinnerService {
     uniqueBidders: number;
     lowestUniqueBid: number | null;
   }> {
-    const { winningAmounts, totalBids } = await this.calculateWinners(auctionId);
+    const { winningAmounts, totalBids } =
+      await this.calculateWinners(auctionId);
     const uniqueBidders = await this.getUniqueBiddersCount(auctionId);
     return {
       totalBids,
@@ -167,5 +228,33 @@ export class WinnerService {
 
     await this.redis.del(...keys);
     this.logger.debug(`Cleaned up Redis keys for auction ${auctionId}`);
+  }
+
+  async updateWinnerPaymentStatus(
+    auctionId: string,
+    userId: string,
+    status: WinnerPaymentStatus,
+  ): Promise<void> {
+    await this.winnerRepository.update(
+      { auction_id: auctionId, user_id: userId },
+      { payment_status: status },
+    );
+  }
+
+  async getAuctionWinners(auctionId: string): Promise<Winner[]> {
+    return this.winnerRepository.find({
+      where: { auction_id: auctionId },
+      order: { rank: "ASC" },
+    });
+  }
+
+  async getNextUnpaidWinner(auctionId: string): Promise<Winner | null> {
+    return this.winnerRepository.findOne({
+      where: {
+        auction_id: auctionId,
+        payment_status: WinnerPaymentStatus.PENDING,
+      },
+      order: { rank: "ASC" },
+    });
   }
 }

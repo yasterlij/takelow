@@ -47,11 +47,7 @@ export function PlaceBidScreen() {
               <Text style={s.statChipText}>Min {auction.minBid} bids</Text>
             </View>
           )}
-          {auction.numWinners && auction.numWinners > 1 && (
-            <View style={s.statChip}>
-              <Text style={s.statChipText}>{auction.numWinners} winners</Text>
-            </View>
-          )}
+
         </View>
 
         {auction.maxBid && (

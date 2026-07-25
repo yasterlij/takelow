@@ -7,16 +7,21 @@ import {
   Req,
   NotFoundException,
   BadRequestException,
-} from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { PaymentService } from './payment.service';
-import { Auction, AuctionStatus as AS, PaymentStatus } from '../winner/entities/auction.entity';
+  Query,
+} from "@nestjs/common";
+import { AuthGuard } from "@nestjs/passport";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { PaymentService } from "./payment.service";
+import {
+  Auction,
+  AuctionStatus as AS,
+  PaymentStatus,
+} from "../winner/entities/auction.entity";
 
 const BID_FEE = 50;
 
-@Controller('payments')
+@Controller("payments")
 export class PaymentController {
   constructor(
     private paymentService: PaymentService,
@@ -24,21 +29,31 @@ export class PaymentController {
     private auctionRepository: Repository<Auction>,
   ) {}
 
-  @UseGuards(AuthGuard('jwt'))
-  @Post(':auctionId/link')
-  async createPaymentLink(@Param('auctionId') auctionId: string, @Req() req: any) {
+  @UseGuards(AuthGuard("jwt"))
+  @Post(":auctionId/link")
+  async createPaymentLink(
+    @Param("auctionId") auctionId: string,
+    @Req() req: any,
+    @Query("payment_method") paymentMethod?: string,
+    @Query("customer_phone") customerPhone?: string,
+  ) {
     const user = req.user;
     const auction = await this.auctionRepository.findOne({
       where: { id: auctionId },
-      relations: ['product'],
+      relations: ["product"],
     });
-    if (!auction) throw new NotFoundException('Auction not found');
+    if (!auction) throw new NotFoundException("Auction not found");
     if (auction.winner_user_id !== user.id) {
-      throw new BadRequestException('Only the winner can initiate payment');
+      throw new BadRequestException("Only the winner can initiate payment");
     }
-    if (auction.status !== AS.CLOSED || auction.payment_status !== PaymentStatus.PENDING) {
-      throw new BadRequestException('Auction is not eligible for payment');
+    if (
+      auction.status !== AS.CLOSED ||
+      auction.payment_status !== PaymentStatus.PENDING
+    ) {
+      throw new BadRequestException("Auction is not eligible for payment");
     }
+
+    const method = (paymentMethod as "SIKINAPAY" | "AWASH") || "SIKINAPAY";
 
     const description = `Payment for ${auction.product?.name || auction.id}`;
     const result = await this.paymentService.createPaymentLink(
@@ -46,42 +61,65 @@ export class PaymentController {
       user.id,
       Number(auction.winning_bid_amount),
       description,
+      method,
+      customerPhone,
     );
-    return { payment_url: result.paymentUrl, transaction_id: result.transactionId };
+    return {
+      payment_url: result.paymentUrl,
+      transaction_id: result.transactionId,
+      gateway: method,
+    };
   }
 
-  @UseGuards(AuthGuard('jwt'))
-  @Post(':auctionId/confirm')
-  async confirmPayment(@Param('auctionId') auctionId: string, @Req() req: any) {
+  @UseGuards(AuthGuard("jwt"))
+  @Post(":auctionId/confirm")
+  async confirmPayment(@Param("auctionId") auctionId: string, @Req() req: any) {
     try {
       await this.paymentService.markAsPaid(auctionId);
       return { paid: true };
     } catch (e) {
-      if (e.message?.includes('not found')) throw new NotFoundException(e.message);
+      if (e.message?.includes("not found"))
+        throw new NotFoundException(e.message);
       throw new BadRequestException(e.message);
     }
   }
 
-  @UseGuards(AuthGuard('jwt'))
-  @Get(':auctionId/status')
-  async getPaymentLinkStatus(@Param('auctionId') auctionId: string, @Req() req: any) {
-    const transaction = await this.paymentService.findTransaction(auctionId, req.user.id);
+  @UseGuards(AuthGuard("jwt"))
+  @Get(":auctionId/status")
+  async getPaymentLinkStatus(
+    @Param("auctionId") auctionId: string,
+    @Req() req: any,
+  ) {
+    const transaction = await this.paymentService.findTransaction(
+      auctionId,
+      req.user.id,
+    );
     return {
-      status: transaction?.status || 'NONE',
-      payment_url: transaction?.sikina_payment_url || null,
+      status: transaction?.status || "NONE",
+      payment_url:
+        transaction?.sikina_payment_url ||
+        transaction?.awash_payment_url ||
+        null,
+      gateway: transaction?.gateway || "SIKINAPAY",
     };
   }
 
-  @UseGuards(AuthGuard('jwt'))
-  @Post('bid-fee/:auctionId/link')
-  async createBidFeePaymentLink(@Param('auctionId') auctionId: string, @Req() req: any) {
+  @UseGuards(AuthGuard("jwt"))
+  @Post("bid-fee/:auctionId/link")
+  async createBidFeePaymentLink(
+    @Param("auctionId") auctionId: string,
+    @Req() req: any,
+  ) {
     const user = req.user;
     const auction = await this.auctionRepository.findOne({
       where: { id: auctionId },
     });
-    if (!auction) throw new NotFoundException('Auction not found');
+    if (!auction) throw new NotFoundException("Auction not found");
     if (auction.status !== AS.ACTIVE) {
-      throw new BadRequestException('Auction is not active');
+      throw new BadRequestException("Auction is not active");
+    }
+    if (Date.now() > auction.end_time.getTime()) {
+      throw new BadRequestException("Auction has already ended");
     }
 
     const result = await this.paymentService.createBidFeePaymentLink(
@@ -89,12 +127,74 @@ export class PaymentController {
       user.id,
       BID_FEE,
     );
-    return { payment_url: result.paymentUrl, transaction_id: result.transactionId };
+    return {
+      payment_url: result.paymentUrl,
+      transaction_id: result.transactionId,
+    };
   }
 
-  @UseGuards(AuthGuard('jwt'))
-  @Get('bid-fee/:auctionId/status')
-  async getBidFeePaymentStatus(@Param('auctionId') auctionId: string, @Req() req: any) {
+  @UseGuards(AuthGuard("jwt"))
+  @Get("bid-fee/:auctionId/status")
+  async getBidFeePaymentStatus(
+    @Param("auctionId") auctionId: string,
+    @Req() req: any,
+  ) {
     return this.paymentService.getBidFeePaymentStatus(auctionId, req.user.id);
+  }
+
+  @UseGuards(AuthGuard("jwt"))
+  @Post("bid-fee/:auctionId/wallet-pay")
+  async payBidFeeWithWallet(
+    @Param("auctionId") auctionId: string,
+    @Req() req: any,
+  ) {
+    const user = req.user;
+    const auction = await this.auctionRepository.findOne({
+      where: { id: auctionId },
+    });
+    if (!auction) throw new NotFoundException("Auction not found");
+    if (auction.status !== AS.ACTIVE) {
+      throw new BadRequestException("Auction is not active");
+    }
+    if (Date.now() > auction.end_time.getTime()) {
+      throw new BadRequestException("Auction has already ended");
+    }
+
+    await this.paymentService.createBidFeeWalletPayment(
+      auctionId,
+      user.id,
+      BID_FEE,
+    );
+    return { paid: true };
+  }
+
+  @UseGuards(AuthGuard("jwt"))
+  @Post(":auctionId/wallet-pay")
+  async payWinningWithWallet(
+    @Param("auctionId") auctionId: string,
+    @Req() req: any,
+  ) {
+    const user = req.user;
+    const auction = await this.auctionRepository.findOne({
+      where: { id: auctionId },
+      relations: ["product"],
+    });
+    if (!auction) throw new NotFoundException("Auction not found");
+    if (auction.winner_user_id !== user.id) {
+      throw new BadRequestException("Only the winner can initiate payment");
+    }
+    if (
+      auction.status !== AS.CLOSED ||
+      auction.payment_status !== PaymentStatus.PENDING
+    ) {
+      throw new BadRequestException("Auction is not eligible for payment");
+    }
+
+    await this.paymentService.createWinningWalletPayment(
+      auctionId,
+      user.id,
+      Number(auction.winning_bid_amount),
+    );
+    return { paid: true };
   }
 }

@@ -1,6 +1,6 @@
 import { Gavel, Clock, TicketCheck, Trophy, ChevronRight, Hash } from "lucide-react"
 import { useApp } from "../AppContext"
-import { AppBar, PhoneStatusBar, Badge, CTAButton } from "../components/AuctionUI"
+import { AppBar, Badge, CTAButton } from "../components/AuctionUI"
 import { useCountdown } from "../components/Countdown"
 import { CURRENCY, formatETB, formatCountdown } from "../mockDataV0"
 
@@ -20,10 +20,7 @@ export function MyBidsScreen() {
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto">
-      <div className="bg-navy rounded-t-[2rem] overflow-hidden">
-        <PhoneStatusBar dark />
-        <AppBar title="My Bids" onBack={() => go("auctions")} />
-      </div>
+      <AppBar title="My Bids" onBack={() => go("auctions")} />
       <div className="flex-1 px-4 pb-8 pt-4">
         <div className="mb-4 flex items-center justify-between">
           <div>
@@ -65,6 +62,8 @@ export function MyBidsScreen() {
                     <img
                       src={auction.images?.[0] || "/placeholder.svg"}
                       alt={auction.name}
+                      loading="lazy"
+                      decoding="async"
                       className="h-full w-full object-contain p-1.5"
                     />
                   </div>

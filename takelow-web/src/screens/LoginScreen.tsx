@@ -22,20 +22,20 @@ export function LoginScreen() {
     setLoading(true)
     const ok = await login(clean, password.trim())
     setLoading(false)
-    if (!ok) setLocalError(authError || "Invalid phone or password")
+    if (!ok) setLocalError(authError || "Unable to sign in. Please check your phone number and password.")
   }
 
   const displayError = localError || authError
 
   return (
-    <div className="flex min-h-screen flex-col bg-gradient-to-b from-navy to-[#0d1533] px-6">
+    <div className="flex min-h-screen flex-col bg-gradient-to-br from-awash-blue via-awash-blue-dark to-[#001224] px-6">
       <div className="flex flex-1 flex-col items-center justify-center">
-        <AwashLogo variant="light" />
-        <h1 className="mt-8 font-display text-2xl font-extrabold text-navy-foreground">Welcome Back</h1>
-        <p className="mt-1 text-sm font-medium text-navy-foreground/60">Sign in to your TakeLow account</p>
+        <div className="animate-float-rotate"><AwashLogo variant="light" /></div>
+        <h1 className="mt-8 font-display text-2xl font-extrabold text-white">Welcome Back</h1>
+        <p className="mt-1 text-sm font-medium text-white/60">Sign in to your TakeLow account</p>
 
         {displayError && (
-          <div className="mt-6 flex w-full max-w-xs items-center gap-2 rounded-xl bg-destructive/15 p-3 text-xs font-semibold text-destructive">
+          <div className="mt-6 flex w-full max-w-xs items-center gap-2 rounded-xl bg-destructive/20 backdrop-blur-sm border border-destructive/30 p-3 text-xs font-semibold text-destructive">
             <AlertCircle className="size-4 shrink-0" />
             <span>{displayError}</span>
           </div>
@@ -43,34 +43,34 @@ export function LoginScreen() {
 
         <div className="mt-8 w-full max-w-xs space-y-4">
           <div>
-            <label className="mb-1.5 block text-xs font-semibold text-navy-foreground/70">Phone Number</label>
-            <div className="flex items-center gap-3 rounded-xl border border-navy-muted/30 bg-white/10 px-4 py-3 text-navy-foreground transition-colors focus-within:border-primary/50">
-              <Smartphone className="size-4.5 shrink-0 opacity-60" />
+            <label className="mb-1.5 block text-xs font-semibold text-white/70">Phone Number</label>
+            <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/10 backdrop-blur-sm px-4 py-3 text-white transition-colors focus-within:border-awash-gold/50 focus-within:bg-white/15">
+              <Smartphone className="size-4.5 shrink-0 text-white/60" />
               <input
                 ref={phoneRef}
                 value={phone}
                 onChange={(e) => { setPhone(e.target.value.replace(/\D/g, "")); setLocalError("") }}
                 placeholder="091 XXX XXXX"
-                className="flex-1 bg-transparent text-sm font-medium outline-none placeholder:text-navy-foreground/30"
+                className="flex-1 bg-transparent text-sm font-medium outline-none placeholder:text-white/30 text-white"
                 maxLength={10}
                 onKeyDown={(e) => e.key === "Enter" && pwRef.current?.focus()}
               />
             </div>
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-semibold text-navy-foreground/70">Password</label>
-            <div className="flex items-center gap-3 rounded-xl border border-navy-muted/30 bg-white/10 px-4 py-3 text-navy-foreground transition-colors focus-within:border-primary/50">
-              <Lock className="size-4.5 shrink-0 opacity-60" />
+            <label className="mb-1.5 block text-xs font-semibold text-white/70">Password</label>
+            <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/10 backdrop-blur-sm px-4 py-3 text-white transition-colors focus-within:border-awash-gold/50 focus-within:bg-white/15">
+              <Lock className="size-4.5 shrink-0 text-white/60" />
               <input
                 ref={pwRef}
                 type={showPw ? "text" : "password"}
                 value={password}
                 onChange={(e) => { setPassword(e.target.value); setLocalError("") }}
                 placeholder="password"
-                className="flex-1 bg-transparent text-sm font-medium outline-none placeholder:text-navy-foreground/30"
+                className="flex-1 bg-transparent text-sm font-medium outline-none placeholder:text-white/30 text-white"
                 onKeyDown={(e) => e.key === "Enter" && handleLogin()}
               />
-              <button onClick={() => setShowPw((s) => !s)} className="opacity-60" tabIndex={-1}>
+              <button onClick={() => setShowPw((s) => !s)} className="text-white/60 hover:text-white" tabIndex={-1}>
                 {showPw ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
               </button>
             </div>
@@ -80,15 +80,15 @@ export function LoginScreen() {
         <button
           onClick={handleLogin}
           disabled={loading}
-          className="mt-8 flex w-full max-w-xs items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 transition-all active:translate-y-px disabled:opacity-60"
+          className="mt-8 flex w-full max-w-xs items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-awash-gold to-awash-gold-light py-3.5 text-sm font-bold text-awash-blue shadow-lg shadow-primary/30 transition-all hover:shadow-primary/40 active:translate-y-px disabled:opacity-60"
         >
           {loading ? <Loader2 className="size-4 animate-spin" /> : null}
           {loading ? "Signing in..." : "Sign In"}
         </button>
 
-        <p className="mt-6 text-xs font-medium text-navy-foreground/50">
+        <p className="mt-6 text-xs font-medium text-white/50">
           Don't have an account?{" "}
-          <button onClick={() => go("register")} className="font-bold text-primary">
+          <button onClick={() => go("register")} className="font-bold text-awash-gold hover:text-awash-gold-light transition-colors">
             Register
           </button>
         </p>

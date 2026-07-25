@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
 import { Check, X, ArrowRight, RefreshCw } from 'lucide-react-native'
 import { useApp } from '../AppContext'
@@ -13,34 +13,63 @@ export function PaymentResultScreen() {
   const auction = getAuction(selectedId)
   const [polling, setPolling] = useState(true)
   const [result, setResult] = useState<ResultType>('pending')
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
     let cancelled = false
-    const check = async () => {
+
+    const check = async (): Promise<boolean> => {
       try {
         if (selectedId) {
           const status = await api.getPaymentLinkStatus(selectedId)
           if (!cancelled) {
-            if (status.status === 'SUCCESSFUL') setResult('success')
-            else if (['FAILED', 'CANCELLED', 'EXPIRED'].includes(status.status))
+            if (status.status === 'SUCCESSFUL') {
+              setResult('success')
+              setPolling(false)
+              return true
+            } else if (['FAILED', 'CANCELLED', 'EXPIRED'].includes(status.status)) {
               setResult('failed')
+              setPolling(false)
+              return true
+            }
           }
         } else {
-          setResult('success')
+          if (!cancelled) {
+            setResult('success')
+            setPolling(false)
+            return true
+          }
         }
       } catch {
-        setResult('failed')
-      } finally {
-        if (!cancelled) setPolling(false)
+        if (!cancelled) setResult('failed')
       }
+      return false
     }
-    check()
-    return () => { cancelled = true }
+
+    check().then((done) => {
+      if (!done && !cancelled) {
+        pollRef.current = setInterval(async () => {
+          const finished = await check()
+          if (finished && pollRef.current) {
+            clearInterval(pollRef.current)
+          }
+        }, 3000)
+        setTimeout(() => {
+          if (pollRef.current) clearInterval(pollRef.current)
+          if (!cancelled) setPolling(false)
+        }, 60000)
+      }
+    })
+
+    return () => {
+      cancelled = true
+      if (pollRef.current) clearInterval(pollRef.current)
+    }
   }, [selectedId])
 
   const amount = userBid ?? 0
 
-  if (polling) {
+  if (polling && result === 'pending') {
     return (
       <View style={s.container}>
         <ActivityIndicator size="large" color={colors.primary} />
@@ -70,7 +99,7 @@ export function PaymentResultScreen() {
           </View>
           <View style={s.row}>
             <Text style={s.label}>Status</Text>
-            <Text style={[s.value, { color: colors.success }]}>Completed</Text>
+            <Text style={[s.value, { color: colors.emerald500 }]}>Completed</Text>
           </View>
         </View>
         <TouchableOpacity style={s.btn} onPress={() => go('delivery')} activeOpacity={0.8}>
@@ -116,7 +145,7 @@ const s = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: colors.success,
+    backgroundColor: colors.emerald500,
     alignItems: 'center',
     justifyContent: 'center',
   },

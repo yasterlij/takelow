@@ -1,21 +1,30 @@
-import { Check, Download, Truck } from "lucide-react"
+import { Check, Download, Truck, Wallet, ShieldCheck, Building2, ArrowLeft } from "lucide-react"
 import { useApp } from "../AppContext"
-import { PhoneStatusBar, CTAButton, Card } from "../components/AuctionUI"
+import { CTAButton, Card } from "../components/AuctionUI"
 import { CURRENCY, formatETB } from "../mockDataV0"
 
+const METHOD_LABELS: Record<string, { label: string; icon: any }> = {
+  WALLET: { label: "Wallet", icon: Wallet },
+  SIKINAPAY: { label: "SikinaPay", icon: ShieldCheck },
+  AWASH: { label: "Awash Bank", icon: Building2 },
+}
+
 export function PaymentConfirmedScreen() {
-  const { go, selectedId, userBid, getAuction } = useApp()
+  const { go, selectedId, userBid, getAuction, lastPaymentMethod } = useApp()
+  const methodInfo = METHOD_LABELS[lastPaymentMethod || ''] || { label: "Mobile Money", icon: ShieldCheck }
+  const PayIcon = methodInfo.icon
   const auction = getAuction(selectedId)
   if (!auction) return null
 
-  const ref = "AWB" + Math.floor(100000 + Math.random() * 899999)
-
   return (
     <div className="flex flex-1 flex-col overflow-y-auto">
-      <div className="bg-navy rounded-t-[2rem] overflow-hidden">
-        <PhoneStatusBar dark />
+      <div className="flex items-center gap-3 border-b border-border bg-white/80 px-4 py-3 backdrop-blur-md">
+        <button onClick={() => go("auctions")} className="flex size-8 items-center justify-center rounded-full text-neutral-600 transition-colors hover:bg-neutral-100">
+          <ArrowLeft className="size-5" />
+        </button>
+        <h1 className="font-display text-base font-bold text-awash-blue">Payment Confirmed</h1>
       </div>
-      <div className="flex flex-1 flex-col items-center px-6 pb-28 pt-10 text-center">
+      <div className="flex flex-1 flex-col items-center px-6 pb-6 pt-10 text-center">
         <div className="relative">
           <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/30" />
           <span className="relative flex size-20 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-500/30">
@@ -37,10 +46,6 @@ export function PaymentConfirmedScreen() {
           </div>
           <dl className="mt-3 space-y-2 text-xs">
             <div className="flex justify-between">
-              <dt className="text-muted-foreground">Reference</dt>
-              <dd className="font-semibold text-navy">{ref}</dd>
-            </div>
-            <div className="flex justify-between">
               <dt className="text-muted-foreground">Product</dt>
               <dd className="font-semibold text-navy">{auction.name}</dd>
             </div>
@@ -52,7 +57,7 @@ export function PaymentConfirmedScreen() {
             </div>
             <div className="flex justify-between">
               <dt className="text-muted-foreground">Paid via</dt>
-              <dd className="font-semibold text-navy">Mobile Money</dd>
+              <dd className="flex items-center gap-1 font-semibold text-navy"><PayIcon className="size-3.5" /> {methodInfo.label}</dd>
             </div>
           </dl>
           <button className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-border py-2 text-xs font-bold text-navy hover:bg-muted">

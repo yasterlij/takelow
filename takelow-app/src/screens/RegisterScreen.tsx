@@ -22,7 +22,7 @@ export function RegisterScreen() {
     if (!phone.trim()) { setLocalError('Please enter your phone number'); phoneRef.current?.focus(); return false }
     if (phone.trim().length < 9) { setLocalError('Phone number must be at least 9 digits'); phoneRef.current?.focus(); return false }
     if (!password.trim()) { setLocalError('Please enter a password'); pwRef.current?.focus(); return false }
-    if (password.length < 6) { setLocalError('Password must be at least 6 characters'); pwRef.current?.focus(); return false }
+    if (password.length < 8) { setLocalError('Password must be at least 8 characters'); pwRef.current?.focus(); return false }
     return true
   }
 
@@ -30,9 +30,9 @@ export function RegisterScreen() {
     setLocalError('')
     if (!validate()) return
     setLoading(true)
-    const ok = await register(name.trim(), phone.trim(), password.trim())
+    const err = await register(name.trim(), phone.trim(), password.trim())
     setLoading(false)
-    if (!ok) setLocalError(authError || 'Registration failed')
+    if (err) setLocalError(err)
   }
 
   const displayError = localError || authError
@@ -92,7 +92,7 @@ export function RegisterScreen() {
               value={password}
               onChangeText={(t) => { setPassword(t); setLocalError('') }}
               secureTextEntry={!showPw}
-              placeholder="min 6 characters"
+              placeholder="min 8 characters"
               placeholderTextColor={colors.white + '40'}
               style={s.input}
               returnKeyType="go"

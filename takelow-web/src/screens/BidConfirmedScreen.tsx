@@ -1,6 +1,6 @@
-import { Check, Eye, Home, MessageSquareText } from "lucide-react"
+import { Check, Eye, Home, MessageSquareText, ArrowLeft } from "lucide-react"
 import { useApp } from "../AppContext"
-import { PhoneStatusBar, CTAButton, Card } from "../components/AuctionUI"
+import { CTAButton, Card } from "../components/AuctionUI"
 import { CURRENCY, formatETB } from "../mockDataV0"
 
 export function BidConfirmedScreen() {
@@ -15,8 +15,11 @@ export function BidConfirmedScreen() {
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto">
-      <div className="bg-navy rounded-t-[2rem] overflow-hidden">
-        <PhoneStatusBar dark />
+      <div className="flex items-center gap-3 border-b border-border bg-white/80 px-4 py-3 backdrop-blur-md">
+        <button onClick={() => go("auctions")} className="flex size-8 items-center justify-center rounded-full text-neutral-600 transition-colors hover:bg-neutral-100">
+          <ArrowLeft className="size-5" />
+        </button>
+        <h1 className="font-display text-base font-bold text-awash-blue">Bid Submitted</h1>
       </div>
       <div className="flex flex-1 flex-col items-center justify-center px-6 py-10 text-center">
         <div className="relative">
@@ -66,9 +69,17 @@ export function BidConfirmedScreen() {
       </div>
       <div className="border-t border-border bg-card p-4">
         {isAdmin ? (
-          <CTAButton variant="navy" onClick={() => go("monitor")}>
-            <Eye className="size-[18px]" /> Monitor Auction
-          </CTAButton>
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={() => go("auctions")}
+              className="btn relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl px-5 py-3 text-sm font-bold shadow-lg transition-all active:scale-[0.98] bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-amber-500/30 hover:shadow-amber-500/40"
+            >
+              <Home className="size-[18px]" /> Back to Auctions
+            </button>
+            <CTAButton variant="navy" onClick={() => go("monitor")}>
+              <Eye className="size-[18px]" /> Monitor Auction
+            </CTAButton>
+          </div>
         ) : (
           <CTAButton variant="outline" onClick={() => go("auctions")}>
             <Home className="size-[18px]" /> Back to Auctions

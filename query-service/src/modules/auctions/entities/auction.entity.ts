@@ -34,6 +34,9 @@ export class Auction {
   @Column({ type: 'timestamp' })
   end_time: Date;
 
+  @Column({ type: 'int', default: 1 })
+  num_winners: number;
+
   @Column({
     type: 'enum',
     enum: AuctionStatus,
@@ -46,6 +49,12 @@ export class Auction {
 
   @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
   winning_bid_amount: number;
+
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  payment_status: string;
+
+  @Column({ type: 'timestamp', nullable: true })
+  payment_deadline: Date;
 
   @CreateDateColumn()
   created_at: Date;

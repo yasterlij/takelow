@@ -19,12 +19,17 @@ export type Auction = {
   totalBids: number
   minBid?: number
   maxBid?: number
-  numWinners?: number
+  winning_bid_amount?: number | null
+  winners?: { user_id: string; amount: number; name: string | null; rank: number; payment_status: string | null; payment_deadline: string | null }[]
+  winnersCount?: number
+  payment_status?: string | null
+  payment_deadline?: string | null
 }
 
 export { CURRENCY }
-export function formatETB(amount: number): string {
-  return Number(amount.toFixed(2)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+export function formatETB(amount: number | null | undefined): string {
+  const n = Number(amount ?? 0)
+  return Number(n.toFixed(2)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 export function formatCountdown(totalSeconds: number): { d: string; h: string; m: string; s: string } {

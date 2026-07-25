@@ -1,8 +1,8 @@
-import { Controller, Get } from '@nestjs/common';
-import { Redis } from 'ioredis';
-import { InjectRedis } from './redis.decorator';
-import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
+import { Controller, Get } from "@nestjs/common";
+import { Redis } from "ioredis";
+import { InjectRedis } from "./redis.decorator";
+import { InjectDataSource } from "@nestjs/typeorm";
+import { DataSource } from "typeorm";
 
 interface HealthCheckResult {
   status: string;
@@ -12,7 +12,7 @@ interface HealthCheckResult {
   database?: string;
 }
 
-@Controller('health')
+@Controller("health")
 export class HealthController {
   constructor(
     @InjectRedis() private readonly redis: Redis,
@@ -22,37 +22,37 @@ export class HealthController {
   @Get()
   async check() {
     const checks: HealthCheckResult = {
-      status: 'ok',
+      status: "ok",
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
     };
 
     try {
       await this.redis.ping();
-      checks.redis = 'connected';
+      checks.redis = "connected";
     } catch {
-      checks.redis = 'disconnected';
-      checks.status = 'degraded';
+      checks.redis = "disconnected";
+      checks.status = "degraded";
     }
 
     try {
-      await this.dataSource.query('SELECT 1');
-      checks.database = 'connected';
+      await this.dataSource.query("SELECT 1");
+      checks.database = "connected";
     } catch {
-      checks.database = 'disconnected';
-      checks.status = 'degraded';
+      checks.database = "disconnected";
+      checks.status = "degraded";
     }
 
     return checks;
   }
 
-  @Get('ready')
+  @Get("ready")
   async readiness() {
     try {
-      await this.dataSource.query('SELECT 1');
-      return { status: 'ready' };
+      await this.dataSource.query("SELECT 1");
+      return { status: "ready" };
     } catch {
-      return { status: 'not ready' };
+      return { status: "not ready" };
     }
   }
 }

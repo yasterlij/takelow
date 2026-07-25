@@ -1,9 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between } from 'typeorm';
-import { Cron, CronExpression } from '@nestjs/schedule';
-import { Auction, AuctionStatus as AS } from './entities/auction.entity';
-import { Bid } from '../bidding/entities/bid.entity';
+import { Injectable, Logger } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, Between } from "typeorm";
+import { Cron, CronExpression } from "@nestjs/schedule";
+import { Auction, AuctionStatus as AS } from "./entities/auction.entity";
+import { Bid } from "../bidding/entities/bid.entity";
 
 const FIVE_MINUTES_MS = 5 * 60 * 1000;
 
@@ -30,7 +30,7 @@ export class AuctionNotificationService {
         status: AS.ACTIVE,
         start_time: Between(windowStart, windowEnd),
       },
-      relations: ['product'],
+      relations: ["product"],
       take: 20,
     });
 
@@ -40,15 +40,23 @@ export class AuctionNotificationService {
 
       try {
         const productName = auction.product?.name || auction.id;
-        await fetch('http://identity-service:3000/api/v1/notify/auction-started', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ auction_id: auction.id, product_name: productName }),
-        });
+        await fetch(
+          "http://identity-service:3000/api/v1/notify/auction-started",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              auction_id: auction.id,
+              product_name: productName,
+            }),
+          },
+        );
 
         this.logger.log(`Notified: ${productName} auction started`);
       } catch (e) {
-        this.logger.warn(`Failed to notify started for ${auction.id}: ${e.message}`);
+        this.logger.warn(
+          `Failed to notify started for ${auction.id}: ${e.message}`,
+        );
       }
     }
   }
@@ -65,7 +73,7 @@ export class AuctionNotificationService {
         status: AS.ACTIVE,
         end_time: Between(windowStart, windowEnd),
       },
-      relations: ['product'],
+      relations: ["product"],
       take: 20,
     });
 
@@ -75,9 +83,9 @@ export class AuctionNotificationService {
 
       try {
         const bidders = await this.bidRepository
-          .createQueryBuilder('bid')
-          .where('bid.auction_id = :auctionId', { auctionId: auction.id })
-          .select('DISTINCT bid.user_id', 'user_id')
+          .createQueryBuilder("bid")
+          .where("bid.auction_id = :auctionId", { auctionId: auction.id })
+          .select("DISTINCT bid.user_id", "user_id")
           .getRawMany();
 
         const userIds: string[] = bidders.map((b: any) => b.user_id);
@@ -85,15 +93,23 @@ export class AuctionNotificationService {
 
         const productName = auction.product?.name || auction.id;
 
-        await fetch('http://identity-service:3000/api/v1/notify/ending-soon', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ user_ids: userIds, auction_id: auction.id, product_name: productName }),
+        await fetch("http://identity-service:3000/api/v1/notify/ending-soon", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            user_ids: userIds,
+            auction_id: auction.id,
+            product_name: productName,
+          }),
         });
 
-        this.logger.log(`Notified ${userIds.length} bidders: ${productName} ending soon`);
+        this.logger.log(
+          `Notified ${userIds.length} bidders: ${productName} ending soon`,
+        );
       } catch (e) {
-        this.logger.warn(`Failed to notify ending soon for ${auction.id}: ${e.message}`);
+        this.logger.warn(
+          `Failed to notify ending soon for ${auction.id}: ${e.message}`,
+        );
       }
     }
   }

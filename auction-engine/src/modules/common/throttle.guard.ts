@@ -4,9 +4,9 @@ import {
   ExecutionContext,
   HttpException,
   HttpStatus,
-} from '@nestjs/common';
-import { Redis } from 'ioredis';
-import { InjectRedis } from './redis.decorator';
+} from "@nestjs/common";
+import { Redis } from "ioredis";
+import { InjectRedis } from "./redis.decorator";
 
 @Injectable()
 export class ThrottleGuard implements CanActivate {
@@ -28,7 +28,7 @@ export class ThrottleGuard implements CanActivate {
 
     if (current > this.maxRequests) {
       throw new HttpException(
-        'Too many requests. Please slow down.',
+        "Too many requests. Please slow down.",
         HttpStatus.TOO_MANY_REQUESTS,
       );
     }

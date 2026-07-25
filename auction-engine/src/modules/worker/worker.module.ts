@@ -1,12 +1,12 @@
-import { Module } from '@nestjs/common';
-import { BullModule } from '@nestjs/bullmq';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { BullMqWorker } from './bullmq.worker';
+import { Module } from "@nestjs/common";
+import { BullModule } from "@nestjs/bullmq";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { BullMqWorker } from "./bullmq.worker";
 
 @Module({
   imports: [
     BullModule.registerQueue({
-      name: 'incoming-bids',
+      name: "incoming-bids",
     }),
     TypeOrmModule.forFeature([]),
   ],

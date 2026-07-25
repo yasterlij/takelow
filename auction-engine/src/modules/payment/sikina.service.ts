@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import * as crypto from 'node:crypto';
+import { Injectable, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import * as crypto from "node:crypto";
 
 export interface SikinaPayLinkParams {
   amount: number;
@@ -44,12 +44,16 @@ export class SikinaService {
   private readonly webhookSecret: string;
 
   constructor(private configService: ConfigService) {
-    this.baseUrl = this.configService.get<string>('app.sikinaBaseUrl')!;
-    this.secretKey = this.configService.get<string>('app.sikinaSecretKey')!;
-    this.webhookSecret = this.configService.get<string>('app.sikinaWebhookSecret')!;
+    this.baseUrl = this.configService.get<string>("app.sikinaBaseUrl")!;
+    this.secretKey = this.configService.get<string>("app.sikinaSecretKey")!;
+    this.webhookSecret = this.configService.get<string>(
+      "app.sikinaWebhookSecret",
+    )!;
   }
 
-  async generatePaymentLink(params: SikinaPayLinkParams): Promise<SikinaPayLinkResponse> {
+  async generatePaymentLink(
+    params: SikinaPayLinkParams,
+  ): Promise<SikinaPayLinkResponse> {
     const url = `${this.baseUrl}/api/v1/gateway/generatePaymentLink`;
 
     const body: Record<string, any> = {
@@ -71,41 +75,52 @@ export class SikinaService {
     this.logger.log(`SikinaPay request: ${JSON.stringify(body)}`);
 
     const res = await fetch(url, {
-      method: 'POST',
+      method: "POST",
       headers: this.getHeaders(),
       body: JSON.stringify(body),
     });
 
     if (!res.ok) {
       const text = await res.text();
-      this.logger.error(`SikinaPay generatePaymentLink failed: ${res.status} ${text}`);
-      throw new Error(`SikinaPay payment link creation failed: ${res.status} ${text}`);
+      this.logger.error(
+        `SikinaPay generatePaymentLink failed: ${res.status} ${text}`,
+      );
+      throw new Error(
+        `SikinaPay payment link creation failed: ${res.status} ${text}`,
+      );
     }
 
     return res.json();
   }
 
-  async getPaymentStatus(clientReferenceId: string, transactionDate: string): Promise<string> {
+  async getPaymentStatus(
+    clientReferenceId: string,
+    transactionDate: string,
+  ): Promise<string> {
     const url = `${this.baseUrl}/api/v1/gateway/getPaymentStatus`;
 
     const res = await fetch(url, {
-      method: 'POST',
+      method: "POST",
       headers: this.getHeaders(),
       body: JSON.stringify({ clientReferenceId, transactionDate }),
     });
 
     if (!res.ok) {
       this.logger.error(`SikinaPay getPaymentStatus failed: ${res.status}`);
-      return 'PENDING';
+      return "PENDING";
     }
 
     const data = await res.json();
-    return data.responseMessage || 'PENDING';
+    return data.responseMessage || "PENDING";
   }
 
-  verifyWebhookSignature(rawBody: string, signatureHeader: string, toleranceSeconds = 300): boolean {
+  verifyWebhookSignature(
+    rawBody: string,
+    signatureHeader: string,
+    toleranceSeconds = 300,
+  ): boolean {
     const parts = Object.fromEntries(
-      signatureHeader.split(',').map((kv) => kv.split('=')),
+      signatureHeader.split(",").map((kv) => kv.split("=")),
     );
     const t = Number(parts.t);
     const v1 = parts.v1;
@@ -114,19 +129,19 @@ export class SikinaService {
     if (Math.abs(Date.now() / 1000 - t) > toleranceSeconds) return false;
 
     const expected = crypto
-      .createHmac('sha256', this.webhookSecret)
+      .createHmac("sha256", this.webhookSecret)
       .update(`${t}.${rawBody}`)
-      .digest('hex');
+      .digest("hex");
 
-    const a = Buffer.from(expected, 'hex');
-    const b = Buffer.from(v1, 'hex');
+    const a = Buffer.from(expected, "hex");
+    const b = Buffer.from(v1, "hex");
     return a.length === b.length && crypto.timingSafeEqual(a, b);
   }
 
   private getHeaders(): Record<string, string> {
     return {
       Authorization: `Bearer ${this.secretKey}`,
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     };
   }
 }

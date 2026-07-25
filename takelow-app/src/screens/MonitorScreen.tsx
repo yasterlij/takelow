@@ -85,11 +85,7 @@ export function MonitorScreen() {
           <View style={{ marginTop: 8 }}>
             <Countdown seconds={seconds} size="lg" />
           </View>
-          {auction.numWinners && auction.numWinners > 1 && (
-            <Badge tone="navy" style={{ marginTop: 8 }}>
-              <Trophy size={12} /> {auction.numWinners} winner{auction.numWinners > 1 ? 's' : ''}
-            </Badge>
-          )}
+
         </Card>
 
         {auction.maxBid && (

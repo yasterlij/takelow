@@ -27,9 +27,9 @@ export function LoginScreen() {
     setLocalError('')
     if (!validate()) return
     setLoading(true)
-    const ok = await login(phone.trim(), password.trim())
+    const err = await login(phone.trim(), password.trim())
     setLoading(false)
-    if (!ok) setLocalError(authError || 'Invalid phone or password')
+    if (err) setLocalError(err)
   }
 
   const displayError = localError || authError

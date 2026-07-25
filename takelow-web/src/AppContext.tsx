@@ -1,14 +1,16 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, useRef } from "react"
 import type { ReactNode } from "react"
-import { api, setApiToken, setRefreshToken, getApiToken, getRefreshToken } from "./api"
+import { api, setApiToken, setRefreshToken, getApiToken, getRefreshToken, getUserFriendlyMessage } from "./api"
+import { toast } from "./store/toast.store"
 import type { Auction } from "./mockDataV0"
 
 export type View =
   | "login" | "register" | "home" | "auctions" | "my-bids"
   | "product" | "pay-fee" | "place-bid" | "bid-confirmed"
-  | "monitor" | "closed" | "winner" | "pay-winning" | "payment-confirmed" | "delivery"
-  | "admin-dashboard" | "admin-auctions" | "admin-users" | "deposit"
+  | "monitor" | "closed" | "winner" | "pay-winning" | "payment-confirmed" | "payment-verifying" | "delivery"
+  | "admin-dashboard" | "admin-auctions" | "admin-products" | "admin-users" | "deposit"
   | "payment-success" | "payment-failed"
+  | "closed-auctions"
 
 export type UserRole = "admin" | "user"
 
@@ -35,6 +37,9 @@ type AppState = {
   bidTicketNumber: string | null
   feePaid: boolean
   walletBalance: number
+  paymentMethod: 'SIKINAPAY' | 'AWASH' | 'WALLET'
+  lastPaymentMethod: 'SIKINAPAY' | 'AWASH' | 'WALLET' | null
+  paymentContext: 'bid-fee' | 'winning' | null
   myBids: PlacedBid[]
   user: User | null
   allBids: PlacedBid[]
@@ -43,15 +48,19 @@ type AppState = {
   authError: string | null
   go: (view: View) => void
   selectAuction: (id: string) => void
-  payFee: (fee: number) => Promise<void>
+  setSelectedIdOnly: (id: string) => void
+  setFeePaid: (paid: boolean) => void
+  payFee: (fee: number, paymentMethod?: 'SIKINAPAY' | 'AWASH') => Promise<void>
   submitBid: (amount: number) => Promise<void>
-  payWinning: (amount: number) => Promise<void>
+  payWinning: (amount: number, paymentMethod?: 'SIKINAPAY' | 'AWASH' | 'WALLET', customerPhone?: string) => Promise<void>
+  setPaymentMethod: (method: 'SIKINAPAY' | 'AWASH' | 'WALLET') => void
+  checkPaymentStatus: () => Promise<boolean>
   reset: () => void
   login: (phone: string, password: string) => Promise<boolean>
   register: (phone: string, password: string, name: string) => Promise<boolean>
   logout: () => void
-  addAuction: (a: { name: string; category: string; marketPrice: number; bidFee: number; description: string; highlights: string[]; startTime: string; endTime: string; images?: string[]; minBid?: number; maxBid?: number; numWinners?: number }) => Promise<void>
-  updateAuction: (id: string, data: Partial<Pick<Auction, "name" | "category" | "marketPrice" | "description" | "highlights" | "images">> & { startTime?: string; endTime?: string; minBid?: number; maxBid?: number; numWinners?: number }) => Promise<void>
+  addAuction: (a: { name: string; category: string; marketPrice: number; bidFee: number; description: string; highlights: string[]; startTime: string; endTime: string; images?: string[]; minBid?: number; maxBid?: number }) => Promise<void>
+  updateAuction: (id: string, data: Partial<Pick<Auction, "name" | "category" | "marketPrice" | "description" | "highlights" | "images">> & { startTime?: string; endTime?: string; minBid?: number; maxBid?: number }) => Promise<void>
   deleteAuction: (id: string) => Promise<void>
   closeAuction: (id: string) => Promise<void>
   refreshAuctions: () => Promise<void>
@@ -84,7 +93,20 @@ function mapAuction(apiAuction: any): Auction {
     highlights: [],
     minBid: apiAuction.min_bid ?? undefined,
     maxBid: apiAuction.max_bid ?? undefined,
-    numWinners: apiAuction.num_winners ?? 1,
+    winners: apiAuction.winners?.map((w: any) => ({
+      user_id: w.user_id,
+      amount: w.amount,
+      rank: w.rank,
+      payment_status: w.payment_status,
+      payment_deadline: w.payment_deadline,
+      name: w.name,
+      phone: w.phone,
+    })),
+    winnersCount: apiAuction.winners_count ?? apiAuction.winners?.length ?? 0,
+    winning_bid_amount: apiAuction.winning_bid_amount ?? null,
+    winner_user_id: apiAuction.winner_user_id ?? null,
+    payment_status: apiAuction.payment_status,
+    total_revenue: apiAuction.total_revenue,
   }
 }
 
@@ -98,6 +120,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [bidTicketNumber, setBidTicketNumber] = useState<string | null>(null)
   const [feePaid, setFeePaid] = useState(false)
   const [walletBalance, setWalletBalance] = useState(INITIAL_BALANCE)
+  const [paymentMethod, setPaymentMethodState] = useState<'SIKINAPAY' | 'AWASH' | 'WALLET'>('WALLET')
+  const [lastPaymentMethod, setLastPaymentMethod] = useState<'SIKINAPAY' | 'AWASH' | 'WALLET' | null>(null)
+  const [paymentContext, setPaymentContext] = useState<'bid-fee' | 'winning' | null>(null)
   const [myBids, setMyBids] = useState<PlacedBid[]>([])
   const [allBids, setAllBids] = useState<PlacedBid[]>([])
   const [auctions, setAuctions] = useState<Auction[]>([])
@@ -106,6 +131,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [authError, setAuthError] = useState<string | null>(null)
   const [hydrated, setHydrated] = useState(false)
   const refreshing = useRef(false)
+  const logoutRef = useRef<() => void>(() => {})
 
   useEffect(() => {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -138,6 +164,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [auctions, allBids, myBids, walletBalance, user, hydrated])
 
   useEffect(() => {
+    const onSessionExpired = () => logoutRef.current()
+    window.addEventListener('session-expired', onSessionExpired)
+    return () => window.removeEventListener('session-expired', onSessionExpired)
+  }, [])
+
+  useEffect(() => {
     if (!hydrated) return
     refreshAuctions()
   }, [hydrated])
@@ -150,7 +182,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [hydrated, user, view])
 
   const go = useCallback((next: View) => {
-    const adminViews: View[] = ['admin-dashboard', 'admin-auctions', 'admin-users', 'monitor', 'winner']
+    const adminViews: View[] = ['admin-dashboard', 'admin-auctions', 'admin-products', 'admin-users', 'monitor']
     if (adminViews.includes(next) && user?.role !== 'admin') return
     setView(next)
   }, [user])
@@ -160,36 +192,42 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setFeePaid(false)
     setUserBid(null)
     setBidTicketNumber(null)
-    setView('product')
+    setPaymentContext(null)
+    const auction = auctions.find((a) => a.id === id)
+    if (auction?.status === 'closed') {
+      setView('winner')
+    } else {
+      setView('product')
+    }
+  }, [auctions])
+
+  const setSelectedIdOnly = useCallback((id: string) => {
+    setSelectedId(id)
   }, [])
 
-  const payFee = useCallback(async (fee: number) => {
+  const payFee = useCallback(async (fee: number, paymentMethod?: 'SIKINAPAY' | 'AWASH') => {
     if (!selectedId) return
     try {
       setAuthError(null)
+      if (paymentMethod === 'AWASH') {
+        await api.payBidFeeWithWallet(selectedId)
+        setFeePaid(true)
+        setView('place-bid')
+        return
+      }
+      setPaymentContext('bid-fee')
+      setView('payment-verifying')
+      const popup = window.open('', '_blank', 'popup,width=600,height=700')
       const { payment_url } = await api.createBidFeePaymentLink(selectedId)
-      window.open(payment_url, '_blank')
-      // Start polling for payment status
-      const pollInterval = setInterval(async () => {
-        try {
-          const status = await api.getBidFeePaymentStatus(selectedId)
-          if (status.status === 'SUCCESSFUL') {
-            clearInterval(pollInterval)
-            setFeePaid(true)
-            setView('place-bid')
-          } else if (status.status === 'FAILED' || status.status === 'EXPIRED' || status.status === 'CANCELLED') {
-            clearInterval(pollInterval)
-            setAuthError('Bid fee payment failed. Please try again.')
-          }
-        } catch {
-          clearInterval(pollInterval)
-          setAuthError('Failed to check payment status.')
-        }
-      }, 3000)
-      // Stop polling after 5 minutes
-      setTimeout(() => clearInterval(pollInterval), 300000)
-    } catch {
-      setAuthError('Failed to create payment link. Please try again.')
+      if (popup && !popup.closed) {
+        popup.location.href = payment_url
+      } else {
+        window.location.href = payment_url
+      }
+    } catch (e) {
+      const msg = getUserFriendlyMessage(e)
+      setAuthError(msg)
+      toast(msg, "error")
     }
   }, [selectedId])
 
@@ -209,20 +247,55 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setView('bid-confirmed')
       refreshWallet()
       setTimeout(() => refreshAuctions(), 3000)
-    } catch {
-      setAuthError('Failed to place bid. Please try again.')
+    } catch (e) {
+      const msg = getUserFriendlyMessage(e)
+      setAuthError(msg)
+      toast(msg, "error")
     }
   }, [selectedId, user])
 
-  const payWinning = useCallback(async (amount: number) => {
+  const setPaymentMethod = useCallback((method: 'SIKINAPAY' | 'AWASH' | 'WALLET') => {
+    setPaymentMethodState(method)
+  }, [])
+
+  const payWinning = useCallback(async (amount: number, method?: 'SIKINAPAY' | 'AWASH' | 'WALLET', customerPhone?: string) => {
     if (!selectedId) return
     try {
       setAuthError(null)
-      const { payment_url } = await api.createPaymentLink(selectedId)
-      window.open(payment_url, '_blank')
-      setView('payment-confirmed')
+      const pm = method || paymentMethod
+      if (pm === 'WALLET') {
+        await api.payWinningWithWallet(selectedId)
+        setLastPaymentMethod('WALLET')
+        refreshWallet()
+        refreshAuctions()
+        setView('payment-confirmed')
+        return
+      }
+      setPaymentContext('winning')
+      setLastPaymentMethod(pm)
+      setView('payment-verifying')
+      const popup = window.open('', '_blank', 'popup,width=600,height=700')
+      const { payment_url } = await api.createPaymentLink(selectedId, pm, customerPhone)
+      if (popup && !popup.closed) {
+        popup.location.href = payment_url
+      } else {
+        window.location.href = payment_url
+      }
+    } catch (e) {
+      const msg = getUserFriendlyMessage(e)
+      setAuthError(msg)
+      toast(msg, "error")
+    }
+  }, [selectedId, paymentMethod])
+
+  const checkPaymentStatus = useCallback(async () => {
+    if (!selectedId) return false
+    try {
+      const status = await api.getPaymentLinkStatus(selectedId)
+      if (status.status === 'SUCCESSFUL') return true
+      return false
     } catch {
-      setAuthError('Failed to create payment link. Please try again.')
+      return false
     }
   }, [selectedId])
 
@@ -233,6 +306,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setBidTicketNumber(null)
     setFeePaid(false)
     setWalletBalance(INITIAL_BALANCE)
+    setPaymentMethodState('SIKINAPAY')
+    setPaymentContext(null)
     setMyBids([])
   }, [])
 
@@ -249,7 +324,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const unique = Array.from(new Map(allMapped.map((a) => [a.id, a])).values())
       setAuctions(unique)
     } catch {
-      // silent
+      toast("Failed to refresh auctions", "error")
     } finally {
       setAuctionsLoading(false)
       refreshing.current = false
@@ -260,7 +335,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const res = await api.wallet.balance()
       setWalletBalance(res.balance)
-    } catch { /* silent */ }
+    } catch {
+      toast("Failed to fetch wallet balance", "error")
+    }
   }, [])
 
   const fetchAuctionById = useCallback(async (id: string): Promise<Auction | undefined> => {
@@ -303,8 +380,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       refreshWallet()
       refreshAuctions()
       return true
-    } catch (e: any) {
-      setAuthError(e.message || 'Invalid credentials')
+    } catch (e: unknown) {
+      setAuthError(getUserFriendlyMessage(e))
       return false
     }
   }, [])
@@ -326,8 +403,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       refreshWallet()
       refreshAuctions()
       return true
-    } catch (e: any) {
-      setAuthError(e.message || 'Registration failed')
+    } catch (e: unknown) {
+      setAuthError(getUserFriendlyMessage(e))
       return false
     }
   }, [])
@@ -354,8 +431,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     setView('login')
   }, [])
+  logoutRef.current = logout
 
-  const addAuction = useCallback(async (a: { name: string; category: string; marketPrice: number; bidFee: number; description: string; highlights: string[]; startTime: string; endTime: string; images?: string[]; minBid?: number; maxBid?: number; numWinners?: number }) => {
+  const addAuction = useCallback(async (a: { name: string; category: string; marketPrice: number; bidFee: number; description: string; highlights: string[]; startTime: string; endTime: string; images?: string[]; minBid?: number; maxBid?: number }) => {
     if (user?.role !== 'admin') return
     try {
       const product = await api.createProduct({
@@ -364,11 +442,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       })
       await api.createAuction({
         product_id: product.id, start_time: a.startTime, end_time: a.endTime,
-        min_bid: a.minBid, max_bid: a.maxBid, num_winners: a.numWinners,
+        min_bid: a.minBid, max_bid: a.maxBid,
       })
       await refreshAuctions()
-    } catch {
-      // silent
+      toast("Auction created successfully", "success")
+    } catch (e: any) {
+      toast(e?.message || "Failed to create auction", "error")
     }
     setView('admin-auctions')
   }, [refreshAuctions, user])
@@ -378,7 +457,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       await api.closeAuction(id)
       await refreshAuctions()
-    } catch { /* silent */ }
+      toast("Auction closed successfully", "success")
+    } catch (e: any) {
+      toast(e?.message || "Failed to close auction", "error")
+    }
   }, [refreshAuctions, user])
 
   const updateAuction = useCallback(async (id: string, data: any) => {
@@ -396,18 +478,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
             ...(data.images !== undefined ? { image_urls: data.images } : {}),
           })
         }
-        if (data.startTime || data.endTime || data.minBid != null || data.maxBid != null || data.numWinners != null) {
+        if (data.startTime || data.endTime || data.minBid != null || data.maxBid != null) {
           await api.updateAuction(id, {
             ...(data.startTime ? { start_time: data.startTime } : {}),
             ...(data.endTime ? { end_time: data.endTime } : {}),
             ...(data.minBid != null ? { min_bid: data.minBid } : {}),
             ...(data.maxBid != null ? { max_bid: data.maxBid } : {}),
-            ...(data.numWinners != null ? { num_winners: data.numWinners } : {}),
+
           })
         }
       }
       await refreshAuctions()
-    } catch { /* silent */ }
+      toast("Auction updated successfully", "success")
+    } catch (e: any) {
+      toast(e?.message || "Failed to update auction", "error")
+    }
   }, [refreshAuctions, user])
 
   const deleteAuction = useCallback(async (id: string) => {
@@ -415,7 +500,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       await api.deleteAuction(id)
       await refreshAuctions()
-    } catch { /* silent */ }
+      toast("Auction deleted successfully", "success")
+    } catch (e: any) {
+      toast(e?.message || "Failed to delete auction", "error")
+    }
   }, [refreshAuctions, user])
 
   const getAuction = useCallback((id: string | null | undefined): Auction | undefined => {
@@ -424,15 +512,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [auctions])
 
   const value = useMemo(() => ({
-    view, selectedId, userBid, bidTicketNumber, feePaid, walletBalance, myBids, user, allBids,
+    view, selectedId, userBid, bidTicketNumber, feePaid, walletBalance, paymentMethod, lastPaymentMethod, paymentContext, myBids, user, allBids,
     auctions, auctionsLoading, authError,
-    go, selectAuction, payFee, submitBid, payWinning, reset,
+    go, selectAuction, setSelectedIdOnly, setFeePaid, payFee, submitBid, payWinning, setPaymentMethod, checkPaymentStatus, reset,
     login, register, logout, addAuction, updateAuction, deleteAuction, closeAuction,
     refreshAuctions, refreshWallet, fetchAuctionById, getAuction,
   }), [
-    view, selectedId, userBid, bidTicketNumber, feePaid, walletBalance, myBids, user, allBids,
+    view, selectedId, userBid, bidTicketNumber, feePaid, walletBalance, paymentMethod, lastPaymentMethod, paymentContext, myBids, user, allBids,
     auctions, auctionsLoading, authError,
-    go, selectAuction, payFee, submitBid, payWinning, reset,
+    go, selectAuction, setSelectedIdOnly, setFeePaid, payFee, submitBid, payWinning, setPaymentMethod, checkPaymentStatus, reset,
     login, register, logout, addAuction, updateAuction, deleteAuction, closeAuction,
     refreshAuctions, refreshWallet, fetchAuctionById, getAuction,
   ])
