@@ -5,6 +5,7 @@ import { REDIS_CLIENT } from '../src/modules/common/redis.decorator';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Bid } from '../src/modules/bidding/entities/bid.entity';
 import { Auction } from '../src/modules/winner/entities/auction.entity';
+import { Winner } from '../src/modules/winner/entities/winner.entity';
 
 function createMockRedis(): Partial<Record<keyof Redis, jest.Mock>> {
   return {
@@ -18,11 +19,16 @@ function createMockRedis(): Partial<Record<keyof Redis, jest.Mock>> {
 function createMockRepo() {
   return {
     findOne: jest.fn(),
-    find: jest.fn(),
+    find: jest.fn().mockResolvedValue([]),
+    count: jest.fn().mockResolvedValue(0),
     createQueryBuilder: jest.fn(() => ({
       where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
       select: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      addOrderBy: jest.fn().mockReturnThis(),
       getRawOne: jest.fn().mockResolvedValue({ count: '0' }),
+      getRawMany: jest.fn().mockResolvedValue([{ amount: 2, user_id: 'user-1' }]),
     })),
   };
 }
@@ -32,11 +38,13 @@ describe('WinnerService (Section 11.1 - Test Case 1 & 2)', () => {
   let mockRedis: ReturnType<typeof createMockRedis>;
   let mockBidRepo: ReturnType<typeof createMockRepo>;
   let mockAuctionRepo: ReturnType<typeof createMockRepo>;
+  let mockWinnerRepo: ReturnType<typeof createMockRepo>;
 
   beforeEach(async () => {
     mockRedis = createMockRedis();
     mockBidRepo = createMockRepo();
     mockAuctionRepo = createMockRepo();
+    mockWinnerRepo = createMockRepo();
 
     mockAuctionRepo.findOne.mockResolvedValue({ num_winners: 1 });
 
@@ -46,6 +54,7 @@ describe('WinnerService (Section 11.1 - Test Case 1 & 2)', () => {
         { provide: REDIS_CLIENT, useValue: mockRedis },
         { provide: getRepositoryToken(Bid), useValue: mockBidRepo },
         { provide: getRepositoryToken(Auction), useValue: mockAuctionRepo },
+        { provide: getRepositoryToken(Winner), useValue: mockWinnerRepo },
       ],
     }).compile();
 

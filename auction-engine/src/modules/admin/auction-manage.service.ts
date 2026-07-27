@@ -240,8 +240,13 @@ export class AuctionManageService {
   ): Promise<{ name: string | null; phone: string | null } | null> {
     if (!userId) return null;
     try {
+      const identityBase = process.env.IDENTITY_SERVICE_URL || "http://localhost:3001";
+      const headers: Record<string, string> = {};
+      const internalApiKey = process.env.INTERNAL_API_KEY || "";
+      if (internalApiKey) headers["x-internal-api-key"] = internalApiKey;
       const res = await fetch(
-        `http://identity-service:3000/api/v1/wallet/user/${userId}`,
+        `${identityBase}/api/v1/wallet/user/${userId}/internal`,
+        { headers },
       );
       if (!res.ok) return null;
       const data = await res.json();
@@ -272,8 +277,14 @@ export class AuctionManageService {
       });
     }
 
-    const stats = await this.winnerService.getAuctionStats(auctionId);
-    const { winners } = await this.winnerService.calculateWinners(auctionId);
+    const { winningAmounts, totalBids, winners } =
+      await this.winnerService.calculateWinners(auctionId);
+    const uniqueBidders = await this.winnerService.getUniqueBiddersCount(auctionId);
+    const stats = {
+      totalBids,
+      uniqueBidders,
+      lowestUniqueBid: winningAmounts.length > 0 ? winningAmounts[0] : null,
+    };
     const primaryWinnerInfo = await this.resolveWinnerUserInfo(
       auction.winner_user_id,
     );

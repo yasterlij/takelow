@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PassportModule } from '@nestjs/passport';
 import { JwtModule } from '@nestjs/jwt';
 import { typeOrmConfig } from './config/typeorm.config';
@@ -22,9 +22,12 @@ import { JwtStrategy } from './modules/common/jwt.strategy';
     }),
     TypeOrmModule.forRoot(typeOrmConfig),
     PassportModule,
-    JwtModule.register({
-      secret: process.env.JWT_SECRET || 'takelow-jwt-secret',
-      signOptions: { expiresIn: '15m' },
+    JwtModule.registerAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        secret: config.get('app.jwtSecret'),
+        signOptions: { expiresIn: '15m' },
+      }),
     }),
     AuctionsModule,
     ProductsModule,

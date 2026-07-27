@@ -1,37 +1,42 @@
 SOFTWARE REQUIREMENTS SPECIFICATION (SRS)
 TakeLow Auction Platform — "Take It. Low."
-Version: 3.1 (Current Implementation)
+Version: 4.0 (Enhanced)
 Tech Stack: NestJS, React, React Native (Expo), PostgreSQL, Redis, BullMQ, Socket.io
 
 SECTION 1: INTRODUCTION & SCOPE
 1.1 Purpose
-The TakeLow platform is a mobile-first (Android/iOS) and web-based auction system using a Lowest Unique Bid (LUB) mechanism. The winner is the user who submits the lowest unique integer bid amount before the timer expires.
+The TakeLow platform is a mobile-first (Android/iOS) and web-based auction system using a Lowest Unique Bid (LUB) mechanism. The winner is the user who submits the lowest unique bid amount (up to 2 decimal places) before the timer expires.
 
 1.2 Core Business Rule (The Algorithm)
-If ETB 1 is submitted twice, ETB 2 once, ETB 3 twice, and ETB 4 once, the lowest unique bid is ETB 2 — that user wins.
-STRICT RULE: Only integer bid amounts. No decimals.
+If ETB 1.00 is submitted twice, ETB 2.50 once, ETB 3.00 twice, and ETB 4.00 once, the lowest unique bid is ETB 2.50 — that user wins.
+RULE: Bid amounts support up to 2 decimal places (e.g., 10.50). Minimum bid is 1.00 ETB.
 
 1.3 Scope
 The system includes:
 1. Cross-platform Web (React) and Native Mobile (React Native/Expo) apps.
 2. 3-microservice distributed backend (Identity, Engine, Query).
-3. User authentication via phone + PIN (password), wallet management, real-time bidding, and automated winner determination via Redis ZSET.
+3. User authentication via phone + password, wallet management, real-time bidding, and automated winner determination via Redis ZSET.
 4. Mock fintech wallet (no live payment integration).
+5. **OWASP Top 10 security controls** including internal API key auth, rate limiting, SSRF protection, and audit logging.
 
 SECTION 2: FUNCTIONAL REQUIREMENTS (FR)
 FR-01: User Authentication & Profile
-  FR-01.1: Register and login using phone number + PIN (bcrypt-hashed). PIN is used as the primary credential.
-  FR-01.2: JWT-based authentication with 15-minute access tokens and refresh tokens. Automatic token refresh on 401 responses.
+  FR-01.1: Register and login using phone number + password (bcrypt-hashed, cost 12).
+  FR-01.2: JWT-based authentication with 15-minute access tokens and 7-day refresh tokens. Automatic token refresh on 401 responses.
   FR-01.3: Wallet PIN (separate from auth PIN) required to approve bid fee payments. PIN has 5-attempt lockout (30 min).
-  FR-01.4: Users can view their bid history and won items.
-  FR-01.5: 30 seed users created on startup for testing (all login with PIN 0000). Admin users use PIN 1234.
+  FR-01.4: Users can view their bid history and won items. Profile update endpoint (PATCH /auth/profile) for name/email changes.
+  FR-01.5: 30 seed users created on startup for testing (all login with password 0000). Admin users use password 1234.
+  FR-01.6: **Rate limiting**: Login limited to 5 attempts per minute per identifier (email/phone) via Redis. Brute-force protection on all auth endpoints.
+  FR-01.7: **Failed login auditing**: All failed login attempts are logged to the audit trail with identifier, reason, and timestamp.
 
 FR-02: Auction Bidding Engine (Core Business Logic)
-  FR-02.1 (Bid Placement): Users enter an integer bid amount and pay a non-refundable "Bid Service Fee" (50 ETB) from their wallet.
-  FR-02.2 (Bid Service Fee): Wallet PIN must be verified before fee is deducted. Fee deducted atomically on bid submission.
-  FR-02.3 (Real-time Updates): Socket.io pushes bid updates (total_bids, new bid amount) to all subscribed users in real-time. A 30-second polling fallback refreshes auction data.
-  FR-02.4 (LUB Calculation): Redis ZSET tracks bid frequencies and unique bids in real-time (ZINCRBY / ZREM). On auction close, ZRANGEBYSCORE finds the lowest unique bid in O(log N).
+  FR-02.1 (Bid Placement): Users enter a bid amount (up to 2 decimal places, min 1.00) and pay a non-refundable "Bid Service Fee" (minimum 1.00 ETB, configurable via BID_FEE) from their wallet.
+  FR-02.2 (Bid Service Fee): Fee deducted atomically via wallet service call on bid submission. Supports both SikinaPay and wallet payment methods. Bid fee must be at least 1.00 and is configured via the BID_FEE environment variable.
+  FR-02.3 (Real-time Updates): Socket.io pushes bid updates (total_bids, new bid amount) to all subscribed users in real-time. WebSocket CORS restricted to configured origins.
+  FR-02.4 (LUB Calculation): Redis ZSET tracks bid frequencies and unique bids in real-time (ZINCRBY / ZREM). On auction close, ZRANGEBYSCORE finds the lowest unique bid in O(log N). **Batch winner calculation** uses a single DB query for all winning amounts instead of N individual queries.
   FR-02.5 (Ticket Number): Each successful bid generates a unique ticket number (BID_ + 12 hex chars) stored in the bid record and returned to the client.
+  FR-02.6 (Outbid Notifications): When a bid makes a previously unique amount non-unique, all previous bidders at that amount receive an outbid alert via the notification service.
+  FR-02.7 (Bid Validation): Bid amount validated server-side with class-validator (@IsNumber, maxDecimalPlaces: 2, @Min(1.00)). Nonce+timestamp headers prevent replay attacks.
 
 FR-03: Product & Auction Management
   FR-03.1 (Product Details): Display images, descriptions, and current market value per product.
@@ -41,18 +46,28 @@ FR-03: Product & Auction Management
 
 FR-04: Notifications
   FR-04.1 (Mock SMS): Console-logged SMS notification with ticket number after each successful bid.
-  FR-04.2 (No real push notifications): FCM/APNS not implemented. Placeholder for future.
+  FR-04.2 (Outbid Alerts): Console-logged outbid notification when a bidder is displaced (their amount becomes non-unique).
+  FR-04.3 (No real push notifications): FCM/APNS not implemented. Placeholder for future.
 
 FR-05: Payments & Wallet
   FR-05.1: Internal wallet with deposit, balance check, and PIN-protected withdrawals.
-  FR-05.2: Bid fee deduction (50 ETB) happens on bid placement via the auction engine calling the identity service.
+  FR-05.2: Bid fee (configurable via BID_FEE env var, minimum 1.00) is collected on bid placement via the auction engine calling the identity service.
   FR-05.3: Wallet balance refreshes after every bid and on login.
   FR-05.4: No real fintech/fintech payment integration — fully mock.
 
 SECTION 3: NON-FUNCTIONAL REQUIREMENTS (NFR)
   NFR-01 (Performance): Redis-based bid tracking handles high concurrency. BullMQ batch worker (batch size 50) persists bids asynchronously.
+NFR-14 (Query Optimization): N+1 queries eliminated in auction listing (2 batch aggregate queries replace 2N per-auction queries). Composite indexes on auctions(status,end_time), auctions(status,payment_status,winner_user_id), bids(auction_id,amount), bids(auction_id,user_id). Selective .select() minimizes fetched columns.
+NFR-15 (Paginated Responses): Wallet transactions and favorites endpoints return { data, total } with offset/limit pagination.
   NFR-02 (Real-time): Socket.io WebSocket connections for live bid updates.
-  NFR-03 (Security): JWT auth with 15-min expiry + auto-refresh. Bid nonce/timestamp headers prevent replay attacks. Wallet PIN with lockout.
+  NFR-03 (Security): JWT auth with 15-min expiry + auto-refresh. JWT secrets validated on startup (reject well-known defaults). Bid nonce/timestamp headers prevent replay attacks. Wallet PIN with lockout.
+NFR-07 (Internal Auth): All service-to-service calls use x-internal-api-key header validated by InternalAuthGuard. Admin endpoints require internal key or admin role.
+NFR-08 (SSRF Protection): Image upload/download restricted to HTTPS URLs only. Private IP ranges (10.x, 172.16-31.x, 192.168.x, 127.x) blocked. MIME type + extension validation enforced.
+NFR-09 (OTP/Log Sanitization): Sensitive fields (phone, OTP codes) masked in logs. Error responses do not leak internal details.
+NFR-10 (CSRF): Internal API key header required for mutating admin endpoints (double-submit cookie pattern equivalent via INTERNAL_API_KEY).
+NFR-11 (CORS): All services locked to CORS_ORIGINS env var. WebSocket connections validated against whitelist.
+NFR-12 (Ban/Blocklist): User ban status checked on every JWT authentication (DB + Redis blocklist). Banned users cannot obtain valid tokens.
+NFR-13 (Error Handling): Zero silent .catch() patterns. All promise rejections logged at minimum to warn level.
   NFR-04 (Platform):
     Web: React with Tailwind CSS.
     Mobile: React Native (Expo) for Android/iOS.
@@ -108,11 +123,12 @@ Table: Auctions
   end_time (TIMESTAMP)
   status (ENUM: 'ACTIVE', 'CLOSED', 'EXPIRED')
   winner_user_id (UUID, Foreign Key to Users, Nullable)
-  winning_bid_amount (INTEGER, Nullable)
-  min_bid (INTEGER, Nullable)
-  max_bid (INTEGER, Nullable)
+  winning_bid_amount (DECIMAL(10,2), Nullable)
+  min_bid (DECIMAL(10,2), Nullable)
+  max_bid (DECIMAL(10,2), Nullable)
   num_winners (INTEGER, default 1)
   created_at (TIMESTAMP)
+  Indexes: (status, end_time), (status, payment_status, winner_user_id)
 
 Table: Products
   id (UUID, Primary Key)
@@ -127,17 +143,18 @@ Table: Bids
   id (UUID, Primary Key)
   user_id (UUID, Foreign Key to Users)
   auction_id (UUID, Foreign Key to Auctions)
-  amount (INTEGER)
+  amount (DECIMAL(10,2))
   bid_time (TIMESTAMP)
   service_fee_paid (BOOLEAN, default TRUE)
   ticket_number (VARCHAR, nullable) — BID_XXXXXXXXXXXX format
   created_at (TIMESTAMP)
+  Indexes: (auction_id, amount), (auction_id, user_id)
 
 Table: Winners
   id (UUID, Primary Key)
   auction_id (UUID, Foreign Key to Auctions)
   user_id (UUID, Foreign Key to Users)
-  amount (INTEGER)
+  amount (DECIMAL(10,2))
   payment_status (VARCHAR, default 'pending')
   payment_deadline (TIMESTAMP)
   created_at (TIMESTAMP)
@@ -158,12 +175,18 @@ SECTION 6: CRITICAL ALGORITHMS & LOGIC
   Bids are buffered in-memory and flushed to PostgreSQL in batches of 50 to reduce DB write pressure.
   On auction closure, flushAuction() persists all remaining buffered bids before closeAuction() runs.
 
-6.3 Wallet PIN Lockout
+6.3 Batch Winner Bidder Resolution
+  Instead of N individual findOne queries for each unique bid amount (O(N) DB round trips),
+  a single findEarliestBidders() query fetches the earliest bidder per amount in one round trip.
+  Combined with batch aggregate statistics for bid counts and frequency, this eliminates N+1 query
+  patterns across winner calculation and auction listing.
+
+6.4 Wallet PIN Lockout
   5 consecutive failed PIN attempts lock the wallet for 30 minutes (pin_locked_until).
   Successful PIN verification resets pin_attempts to 0.
   Lock expiry resets attempts automatically on next attempt.
 
-6.4 Token Refresh Flow
+6.5 Token Refresh Flow
   All API requests go through a unified request() function.
   On 401 response, the function automatically calls POST /auth/refresh with the stored refresh token.
   On success, retries the original request with the new access token.
@@ -175,6 +198,7 @@ SECTION 7: API CONTRACT DEFINITIONS
   POST /api/v1/auth/login/phone — { phone_number, password } → { access_token, refresh_token, user }
   POST /api/v1/auth/refresh — { refresh_token } → { access_token, refresh_token }
   GET /api/v1/auth/profile → { id, phone_number, full_name, role, wallet_balance }
+  PATCH /api/v1/auth/profile — { full_name?, email? } → { id, phone_number, full_name, email, role }
 
 7.2 Wallet
   GET /api/v1/wallet/balance → { balance }
@@ -182,7 +206,8 @@ SECTION 7: API CONTRACT DEFINITIONS
   POST /api/v1/wallet/set-pin — { pin } → { set: true }
   POST /api/v1/wallet/verify-pin — { pin } → { valid, attemptsRemaining, locked, lockedUntil }
   GET /api/v1/wallet/pin-status → { hasPin, attemptsRemaining, locked, lockedUntil }
-  POST /api/v1/wallet/deduct-fee — { user_id, amount } → { deducted: true }
+  POST /api/v1/wallet/deduct-fee — { user_id, amount } (InternalAuthGuard) → { deducted: true }
+  GET /api/v1/wallet/transactions?offset=0&limit=20 → { data: Transaction[], total: number }
 
 7.3 Auctions (Query Service)
   GET /api/v1/auctions/active → Auction[] (with stats: total_bids, unique_bidders)
@@ -282,6 +307,18 @@ SECTION 10: EDGE CASES & EXCEPTION HANDLING
   Problem: repository.save() on a partial entity (loaded with .select()) nullifies unselected columns.
   Solution: Always use repository.update() with explicit column names for partial writes.
 
+10.8 N+1 Query on Auction Listing
+  Problem: Per-auction aggregate queries cause O(N) DB round trips.
+  Solution: Two batch queries (total bids + unique bidders per auction) replace 2N individual queries.
+
+10.9 Silent Error Swallowing
+  Problem: .catch(()=>{}) hides errors and makes debugging impossible.
+  Solution: All rejected promises logged at minimum to warn level. Zero silent .catch() in the codebase.
+
+10.10 JWT Secret Leak via Default Config
+  Problem: CI/test environments using well-known default JWT secrets allow token forgery.
+  Solution: Config module validates JWT_SECRET !== 'default-secret-change-me' on startup and throws otherwise.
+
 SECTION 11: TESTING STRATEGY
 11.1 Backend Tests (Jest)
   Identity Service: 2 unit tests (wallet PIN verification, user registration).
@@ -289,6 +326,11 @@ SECTION 11: TESTING STRATEGY
 
 11.2 TypeScript Compilation
   All 5 projects (identity-service, auction-engine, query-service, takelow-app, takelow-web) must compile with npx tsc --noEmit producing zero errors.
+
+11.3 Security Verification
+  JWT secrets validated on startup (ConfigService throws if default).
+  Internal API key required for all service-to-service and admin endpoints.
+  SSRF protection verified via MIME header + private IP range checks.
 
 SECTION 12: SEED DATA
   Script: scripts/seed.js

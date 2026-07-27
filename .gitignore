@@ -1,6 +1,8 @@
 node_modules/
 dist/
 .env
+.env.*
+!.env.example
 *.log
 .DS_Store
 coverage/
@@ -8,3 +10,9 @@ coverage/
 graphify-out/
 .expo/
 *.tsbuildinfo
+.idea/
+.vscode/
+INPUT_PATH/
+uploads/
+*.sqlite
+*.db

@@ -27,6 +27,7 @@ const PAYMENT_DEADLINE_HOURS = 24;
 @Injectable()
 export class PaymentService {
   private readonly logger = new Logger(PaymentService.name);
+  private readonly bidFee: number;
   private readonly successRedirectUrl: string;
   private readonly failedRedirectUrl: string;
 
@@ -45,6 +46,7 @@ export class PaymentService {
     private configService: ConfigService,
     @InjectRedis() private readonly redis: Redis,
   ) {
+    this.bidFee = this.configService.get<number>("app.bidFee")!;
     this.successRedirectUrl =
       this.configService.get<string>("app.sikinaSuccessRedirectUrl")! ||
       `${this.configService.get<string>("app.appBaseUrl")!}/payment/success`;
@@ -58,7 +60,7 @@ export class PaymentService {
     userId: string,
     amount: number,
     description: string,
-    paymentMethod: "WALLET" | "SIKINAPAY" | "AWASH" = "SIKINAPAY",
+    paymentMethod: "SIKINAPAY" | "AWASH" = "SIKINAPAY",
     customerPhone?: string,
   ): Promise<{ paymentUrl: string; transactionId: string }> {
     const shortAuctionId = auctionId.split("-")[0];
@@ -74,17 +76,11 @@ export class PaymentService {
     if (existing?.sikina_payment_url || existing?.awash_payment_url) {
       const paymentUrl =
         existing.sikina_payment_url || existing.awash_payment_url!;
-      if (existing.gateway === PaymentGateway.SIKINAPAY) {
-        existing.status = PaymentTransactionStatus.SUCCESSFUL;
-        await this.paymentTransactionRepository.save(existing);
-        await this.markAsPaid(auctionId, userId);
-      }
       return { paymentUrl: paymentUrl!, transactionId: existing.id };
     }
 
     let paymentUrl: string;
-    let gateway = PaymentGateway.SIKINAPAY;
-    let confirmed = false;
+    let gateway: PaymentGateway;
 
     if (paymentMethod === "AWASH") {
       try {
@@ -99,21 +95,17 @@ export class PaymentService {
         paymentUrl = awashResponse.paymentUrl;
         gateway = PaymentGateway.AWASH;
       } catch (e) {
-        this.logger.warn(
-          `Awash payment link creation failed, using fallback: ${e.message}`,
+        this.logger.error(
+          `Awash payment link creation failed: ${e.message}`,
         );
-        paymentUrl = `https://pay.awashbank.com/${clientReferenceId}?amount=${amount}&currency=ETB`;
-        gateway = PaymentGateway.AWASH;
+        throw e;
       }
-    } else if (paymentMethod === "WALLET") {
-      paymentUrl = `https://pay.awashbank.com/${clientReferenceId}?amount=${amount}&currency=ETB`;
     } else {
       try {
         const sikinaParams: any = {
           amount,
           clientReferenceId,
           description,
-          currency: "ETB",
           language: "en",
         };
         if (this.successRedirectUrl?.startsWith("https://")) {
@@ -125,12 +117,12 @@ export class PaymentService {
         const sikinaResponse =
           await this.sikinaService.generatePaymentLink(sikinaParams);
         paymentUrl = sikinaResponse.paymentUrl;
-        confirmed = true;
+        gateway = PaymentGateway.SIKINAPAY;
       } catch (e) {
-        this.logger.warn(
-          `SikinaPay payment link creation failed, using fallback: ${e.message}`,
+        this.logger.error(
+          `SikinaPay payment link creation failed: ${e.message}`,
         );
-        paymentUrl = `${this.successRedirectUrl || "http://localhost:5173"}/payment/success?clientReferenceId=${clientReferenceId}`;
+        throw e;
       }
     }
 
@@ -139,32 +131,21 @@ export class PaymentService {
       user_id: userId,
       amount,
       client_reference_id: clientReferenceId,
-      payment_type:
-        paymentMethod === "WALLET"
-          ? PaymentType.WALLET
-          : PaymentType.WINNING_BID,
-      status: confirmed
-        ? PaymentTransactionStatus.SUCCESSFUL
-        : PaymentTransactionStatus.PENDING,
+      payment_type: PaymentType.WINNING_BID,
+      status: PaymentTransactionStatus.PENDING,
       currency: "ETB",
       gateway,
       customer_phone: customerPhone,
       sikina_payment_url:
         paymentMethod === "SIKINAPAY" ? paymentUrl : undefined,
       awash_payment_url:
-        paymentMethod === "AWASH" || paymentMethod === "WALLET"
-          ? paymentUrl
-          : undefined,
+        paymentMethod === "AWASH" ? paymentUrl : undefined,
     });
     const saved = await this.paymentTransactionRepository.save(transaction);
 
     this.logger.log(
       `Payment link created for auction ${auctionId}, user ${userId} via ${gateway}: ${paymentUrl}`,
     );
-
-    if (confirmed) {
-      await this.markAsPaid(auctionId, userId);
-    }
 
     return { paymentUrl, transactionId: saved.id };
   }
@@ -183,6 +164,7 @@ export class PaymentService {
     auctionId: string,
     userId: string,
     amount: number,
+    paymentMethod: "SIKINAPAY" | "AWASH" = "SIKINAPAY",
   ): Promise<{ paymentUrl: string; transactionId: string }> {
     const shortAuctionId = auctionId.split("-")[0];
     const clientReferenceId = `fee-${shortAuctionId}-${userId.split("-")[0]}-${Date.now()}`;
@@ -197,8 +179,6 @@ export class PaymentService {
       },
     });
     if (existing?.sikina_payment_url) {
-      existing.status = PaymentTransactionStatus.SUCCESSFUL;
-      await this.paymentTransactionRepository.save(existing);
       return {
         paymentUrl: existing.sikina_payment_url,
         transactionId: existing.id,
@@ -211,40 +191,89 @@ export class PaymentService {
       };
     }
 
-    const sikinaParams: any = {
-      amount,
-      clientReferenceId,
-      description,
-      language: "en",
-    };
+    let paymentUrl: string;
+    let gateway: PaymentGateway;
 
-    if (this.successRedirectUrl?.startsWith("https://")) {
-      sikinaParams.paymentSuccessfulRedirectUrl = `${this.successRedirectUrl}?client_reference_id=${clientReferenceId}&type=bid_fee`;
-    }
-    if (this.failedRedirectUrl?.startsWith("https://")) {
-      sikinaParams.paymentFailedRedirectUrl = `${this.failedRedirectUrl}?client_reference_id=${clientReferenceId}&type=bid_fee`;
-    }
+    if (paymentMethod === "AWASH") {
+      const awashResponse = await this.awashService.generatePaymentLink({
+        amount,
+        clientReferenceId,
+        description,
+        redirectSuccessUrl: this.successRedirectUrl,
+        redirectFailUrl: this.failedRedirectUrl,
+      });
+      paymentUrl = awashResponse.paymentUrl;
+      gateway = PaymentGateway.AWASH;
+    } else {
+      const sikinaParams: any = {
+        amount,
+        clientReferenceId,
+        description,
+        language: "en",
+      };
 
-    const sikinaResponse =
-      await this.sikinaService.generatePaymentLink(sikinaParams);
+      if (this.successRedirectUrl?.startsWith("https://")) {
+        sikinaParams.paymentSuccessfulRedirectUrl = `${this.successRedirectUrl}?client_reference_id=${clientReferenceId}&type=bid_fee`;
+      }
+      if (this.failedRedirectUrl?.startsWith("https://")) {
+        sikinaParams.paymentFailedRedirectUrl = `${this.failedRedirectUrl}?client_reference_id=${clientReferenceId}&type=bid_fee`;
+      }
+
+      const sikinaResponse =
+        await this.sikinaService.generatePaymentLink(sikinaParams);
+      paymentUrl = sikinaResponse.paymentUrl;
+      gateway = PaymentGateway.SIKINAPAY;
+    }
 
     const transaction = this.paymentTransactionRepository.create({
       auction_id: auctionId,
       user_id: userId,
       amount,
       client_reference_id: clientReferenceId,
-      sikina_payment_url: sikinaResponse.paymentUrl,
-      status: PaymentTransactionStatus.SUCCESSFUL,
+      sikina_payment_url: paymentMethod === "SIKINAPAY" ? paymentUrl : undefined,
+      awash_payment_url: paymentMethod === "AWASH" ? paymentUrl : undefined,
+      status: PaymentTransactionStatus.PENDING,
       currency: "ETB",
       payment_type: PaymentType.BID_FEE,
+      gateway,
     });
     const saved = await this.paymentTransactionRepository.save(transaction);
 
     this.logger.log(
-      `Bid fee payment link created for auction ${auctionId}, user ${userId}: ${sikinaResponse.paymentUrl}`,
+      `Bid fee payment link created for auction ${auctionId}, user ${userId} via ${gateway}: ${paymentUrl}`,
     );
 
-    return { paymentUrl: sikinaResponse.paymentUrl, transactionId: saved.id };
+    return { paymentUrl, transactionId: saved.id };
+  }
+
+  private async deductFromWallet(
+    userId: string,
+    amount: number,
+    description: string,
+  ): Promise<void> {
+    const identityBase =
+      process.env.IDENTITY_SERVICE_URL || "http://localhost:3001";
+
+    const res = await fetch(
+      `${identityBase}/api/v1/wallet/deduct-fee`,
+      {
+        method: "POST",
+        headers: this.getInternalHeaders(),
+        body: JSON.stringify({ user_id: userId, amount }),
+      },
+    );
+
+    if (!res.ok) {
+      const text = await res.text();
+      let message: string;
+      try {
+        const parsed = JSON.parse(text);
+        message = parsed.message || text;
+      } catch {
+        message = text;
+      }
+      throw new Error(message);
+    }
   }
 
   async createBidFeeWalletPayment(
@@ -261,6 +290,8 @@ export class PaymentService {
       },
     });
     if (existing) return;
+
+    await this.deductFromWallet(userId, amount, `Bid fee for auction ${auctionId}`);
 
     const shortAuctionId = auctionId.split("-")[0];
     const clientReferenceId = `fee-${shortAuctionId}-${userId.split("-")[0]}-${Date.now()}`;
@@ -296,6 +327,8 @@ export class PaymentService {
     });
     if (existing) return;
 
+    await this.deductFromWallet(userId, amount, `Winning payment for auction ${auctionId}`);
+
     const shortAuctionId = auctionId.split("-")[0];
     const clientReferenceId = `win-${shortAuctionId}-${userId.split("-")[0]}-${Date.now()}`;
 
@@ -320,19 +353,60 @@ export class PaymentService {
 
   async getBidFeePaymentStatus(
     auctionId: string,
-    userId: string,
+    userId?: string,
   ): Promise<{ status: string; payment_url: string | null }> {
+    const where: any = {
+      auction_id: auctionId,
+      payment_type: PaymentType.BID_FEE,
+    };
+    if (userId) where.user_id = userId;
+
     const transaction = await this.paymentTransactionRepository.findOne({
-      where: {
-        auction_id: auctionId,
-        user_id: userId,
-        payment_type: PaymentType.BID_FEE,
-      },
+      where,
       order: { created_at: "DESC" },
     });
 
+    let status = transaction?.status || "NONE";
+
+    if (status === "PENDING" && transaction?.client_reference_id) {
+      try {
+        const transactionDate =
+          transaction.created_at.toISOString().split("T")[0];
+        this.logger.log(
+          `Querying SikinaPay for ${transaction.client_reference_id} on ${transactionDate}`,
+        );
+        const remoteStatus = await this.sikinaService.getPaymentStatus(
+          transaction.client_reference_id,
+          transactionDate,
+        );
+        this.logger.log(
+          `SikinaPay returned ${remoteStatus} for ${transaction.client_reference_id}`,
+        );
+        if (remoteStatus === "SUCCESSFUL") {
+          await this.handleSuccessfulPayment(
+            transaction.client_reference_id,
+            "",
+            {},
+          );
+          status = "SUCCESSFUL";
+        } else if (
+          ["FAILED", "EXPIRED", "CANCELLED", "REVOKED"].includes(remoteStatus)
+        ) {
+          await this.paymentTransactionRepository.update(
+            { id: transaction.id },
+            { status: remoteStatus as PaymentTransactionStatus },
+          );
+          status = remoteStatus;
+        }
+      } catch (e) {
+        this.logger.warn(
+          `SikinaPay status check failed for ${transaction?.client_reference_id}: ${e.message}`,
+        );
+      }
+    }
+
     return {
-      status: transaction?.status || "NONE",
+      status,
       payment_url:
         transaction?.sikina_payment_url ||
         transaction?.awash_payment_url ||
@@ -593,7 +667,7 @@ export class PaymentService {
         auction.id,
         nextWinner.user_id,
         nextWinner.amount,
-      ).catch(() => {});
+      ).catch((e) => this.logger.warn(`Failed to notify new winner: ${e.message}`));
     } else {
       auction.payment_status = PaymentStatus.EXPIRED;
       auction.status = AS.EXPIRED;
@@ -613,7 +687,14 @@ export class PaymentService {
       auction.id,
       currentWinner?.user_id,
       nextWinner?.user_id,
-    ).catch(() => {});
+    ).catch((e) => this.logger.warn(`Failed to log payment expiry: ${e.message}`));
+  }
+
+  private getInternalHeaders(): Record<string, string> {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    const internalApiKey = process.env.INTERNAL_API_KEY || "";
+    if (internalApiKey) headers["x-internal-api-key"] = internalApiKey;
+    return headers;
   }
 
   private async logPaymentExpiryEvent(
@@ -624,7 +705,7 @@ export class PaymentService {
     try {
       await fetch("http://identity-service:3000/api/v1/admin/audit/log", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: this.getInternalHeaders(),
         body: JSON.stringify({
           actor_id: "system",
           actor_phone: "system",
@@ -660,7 +741,7 @@ export class PaymentService {
 
       await fetch("http://identity-service:3000/api/v1/notify/winner", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: this.getInternalHeaders(),
         body: JSON.stringify({
           user_id: userId,
           auction_id: auctionId,

@@ -7,11 +7,12 @@ import { CURRENCY, formatETB } from "../mockDataV0"
 export function PayFeeScreen() {
   const { go, payFee, getAuction, selectedId, authError, paymentMethod, setPaymentMethod } = useApp()
   const auction = getAuction(selectedId)
-  if (!auction) return null
 
   const [loading, setLoading] = useState(false)
   const [showMethods, setShowMethods] = useState(false)
   const [selected, setSelected] = useState<'SIKINAPAY' | 'AWASH' | 'WALLET'>(paymentMethod === 'WALLET' ? 'SIKINAPAY' : paymentMethod)
+
+  if (!auction) return null
 
   const handlePayClick = async () => {
     setPaymentMethod(selected)

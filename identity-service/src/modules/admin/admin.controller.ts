@@ -15,6 +15,7 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import { Roles } from '../common/roles.decorator';
 import { RolesGuard } from '../common/roles.guard';
+import { InternalAuthGuard } from '../common/internal-auth.guard';
 import { AdminService } from './admin.service';
 import { AuditService } from './audit.service';
 import { Response } from 'express';
@@ -125,6 +126,7 @@ export class AdminController {
 export class AuditController {
   constructor(private auditService: AuditService) {}
 
+  @UseGuards(InternalAuthGuard)
   @Post('log')
   async logEvent(@Body() body: {
     actor_id: string;

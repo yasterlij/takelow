@@ -14,6 +14,7 @@ export function DepositScreen() {
   const [amount, setAmount] = useState('')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const numericAmount = parseFloat(amount || '0')
   const valid = numericAmount > 0
@@ -21,12 +22,15 @@ export function DepositScreen() {
   const handleDeposit = async () => {
     if (!valid || loading) return
     setLoading(true)
+    setError(null)
     try {
       await api.wallet.deposit(numericAmount)
       await refreshWallet()
       setSuccess(true)
       setTimeout(() => { setSuccess(false); go('home') }, 2000)
-    } catch {
+    } catch (e: any) {
+      setError(e?.message || 'Deposit failed. Please try again.')
+    } finally {
       setLoading(false)
     }
   }
@@ -73,6 +77,10 @@ export function DepositScreen() {
             </TouchableOpacity>
           ))}
         </View>
+
+        {error ? (
+          <Text style={{ fontSize: 13, fontWeight: '600', color: colors.destructive, marginTop: 12, textAlign: 'center' }}>{error}</Text>
+        ) : null}
 
         {success ? (
           <Card style={{ alignItems: 'center', padding: 24, marginTop: 24, borderColor: colors.emerald500, backgroundColor: colors.emerald50 + '80' }}>

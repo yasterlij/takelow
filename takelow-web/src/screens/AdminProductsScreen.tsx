@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react"
 import { Package, Plus, Search, X, Pencil, Trash2, Camera, Link, Upload, ImageIcon, Filter, DollarSign, ShoppingBag, Tag } from "lucide-react"
 import { useApp } from "../AppContext"
 import { api } from "../api"
+import { AdminLayout } from "../components/AdminLayout"
 import { CTAButton, Badge, Card } from "../components/AuctionUI"
 import { CURRENCY, formatETB } from "../mockDataV0"
 
@@ -176,24 +177,23 @@ export function AdminProductsScreen() {
   })
 
   const totalValue = products.reduce((sum, p) => sum + Number(p.current_market_price || 0), 0)
-  const inUseCount = auctions.filter((a) => products.some((p) => p.id === a.id)).length
+  const inUseCount = products.filter((p) => auctions.some((a) => a.productId === p.id)).length
 
   return (
-    <div className="flex flex-1 flex-col overflow-y-auto">
+    <AdminLayout
+      title="Product Management"
+      subtitle={`${products.length} products`}
+      actions={
+        <button onClick={openCreate} className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-awash-gold to-awash-gold-light px-4 py-2 text-xs font-bold text-awash-blue shadow-lg shadow-primary/20 transition-all hover:shadow-primary/30">
+          <Plus className="size-3.5" /> New Product
+        </button>
+      }
+    >
+      <div className="space-y-4">
       {lightboxImg && <ImageLightbox src={lightboxImg} onClose={() => setLightboxImg(null)} />}
 
-      <div className="sticky top-0 z-10 border-b border-border bg-white/80 backdrop-blur-md px-5 pb-3 pt-12">
-        <div className="flex items-center justify-between">
-          <div>
-             <button onClick={() => go("auctions")} className="mb-2 text-xs font-semibold text-awash-gold hover:text-awash-gold-dark">&larr; Auctions</button>
-            <h1 className="font-display text-xl font-extrabold text-awash-blue">Product Management</h1>
-          </div>
-          <button onClick={openCreate} className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-awash-gold to-awash-gold-light px-4 py-2.5 text-xs font-bold text-awash-blue shadow-lg shadow-primary/20 transition-all hover:shadow-primary/30">
-            <Plus className="size-3.5" /> New Product
-          </button>
-        </div>
-        <div className="mt-3 flex items-center gap-2">
-          <div className="relative flex-1">
+      <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 min-w-[180px]">
             <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-neutral-400" />
             <input
               value={search}
@@ -213,10 +213,8 @@ export function AdminProductsScreen() {
             </select>
           )}
         </div>
-      </div>
 
-      <div className="flex-1 px-5 pb-8 pt-4">
-        <div className="grid grid-cols-3 gap-3 mb-4">
+      <div className="grid grid-cols-3 gap-3">
           <Card className="items-center p-3 text-center">
             <ShoppingBag className="size-5 text-awash-gold" />
             <p className="mt-1 font-display text-2xl font-extrabold text-awash-blue tabular-nums">{loading ? "..." : products.length}</p>
@@ -344,6 +342,6 @@ export function AdminProductsScreen() {
           </div>
         )}
       </div>
-    </div>
+    </AdminLayout>
   )
 }

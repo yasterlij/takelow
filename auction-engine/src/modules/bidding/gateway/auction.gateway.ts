@@ -7,9 +7,14 @@ import {
 } from "@nestjs/websockets";
 import { Server, Socket } from "socket.io";
 import { Logger } from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
+
+const ALLOWED_WS_ORIGINS = (process.env.CORS_ORIGINS || "http://localhost:5173,http://localhost:3000")
+  .split(",")
+  .map((o) => o.trim());
 
 @WebSocketGateway({
-  cors: { origin: "*" },
+  cors: { origin: ALLOWED_WS_ORIGINS },
   namespace: "/auctions",
 })
 export class AuctionGateway
@@ -17,10 +22,30 @@ export class AuctionGateway
 {
   private readonly logger = new Logger(AuctionGateway.name);
 
+  constructor(private readonly jwtService: JwtService) {}
+
   @WebSocketServer()
   server: Server;
 
-  handleConnection(client: Socket): void {
+  async handleConnection(client: Socket): Promise<void> {
+    const token =
+      (client.handshake.auth as { token?: string })?.token ||
+      (client.handshake.headers.authorization || "").replace(/^Bearer\s+/i, "");
+
+    if (!token) {
+      this.logger.warn(`Client ${client.id} rejected: no auth token`);
+      client.disconnect(true);
+      return;
+    }
+
+    try {
+      await this.jwtService.verifyAsync(token);
+    } catch {
+      this.logger.warn(`Client ${client.id} rejected: invalid auth token`);
+      client.disconnect(true);
+      return;
+    }
+
     this.logger.log(`Client connected: ${client.id}`);
   }
 
@@ -48,11 +73,5 @@ export class AuctionGateway
     this.server
       .to(`auction:${payload.auction_id}`)
       .emit("auction:update", payload);
-  }
-
-  broadcastServerTime(auctionId: string, serverTime: string): void {
-    this.server
-      .to(`auction:${auctionId}`)
-      .emit("server_time", { server_time: serverTime });
   }
 }

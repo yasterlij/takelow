@@ -14,6 +14,7 @@ export function WinnerScreen() {
   const [error, setError] = useState<string | null>(null)
 
   const [refreshKey, setRefreshKey] = useState(0)
+  const [bidsPage, setBidsPage] = useState(0)
 
   useEffect(() => {
     if (!selectedId) return
@@ -50,7 +51,6 @@ export function WinnerScreen() {
     ? [...new Set(allBids.filter((b) => b.amount < winningAmount).map((b) => b.amount))].sort((a, b) => a - b)
     : []
   const lowerBidsGrouped = lowerAmounts.map((amount) => ({ amount, count: amountCount.get(amount) || 1 }))
-  const [bidsPage, setBidsPage] = useState(0)
   const BIDS_PAGE_SIZE = 10
   const pagedBids = lowerBidsGrouped.slice(0, (bidsPage + 1) * BIDS_PAGE_SIZE)
   const hasMore = pagedBids.length < lowerBidsGrouped.length

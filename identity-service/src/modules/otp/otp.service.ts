@@ -4,11 +4,13 @@ import { Repository, LessThan } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Redis } from 'ioredis';
 import { Inject } from '@nestjs/common';
+import * as crypto from 'crypto';
 import { Otp } from './entities/otp.entity';
 
 @Injectable()
 export class OtpService {
   private readonly logger = new Logger(OtpService.name);
+  private readonly MAX_VERIFY_ATTEMPTS = 5;
 
   constructor(
     @InjectRepository(Otp)
@@ -26,7 +28,7 @@ export class OtpService {
       throw new BadRequestException('Too many OTP requests. Wait 60 seconds.');
     }
 
-    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const code = String(crypto.randomInt(100000, 1000000));
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
     await this.otpRepository.upsert(
@@ -34,14 +36,23 @@ export class OtpService {
       ['phone_number'],
     );
 
-    this.logger.log(`OTP for ${phoneNumber}: ${code}`);
+    this.logger.log(`OTP generated for ${phoneNumber.replace(/\d(?=\d{2})/g, '*')}`);
 
     return { expires_in: 300 };
   }
 
   async verifyOtp(phoneNumber: string, code: string): Promise<boolean> {
+    const verifyKey = `otp:verify:rate:${phoneNumber}`;
+    const attempts = await this.redis.incr(verifyKey);
+    if (attempts === 1) {
+      await this.redis.pexpire(verifyKey, 5 * 60 * 1000);
+    }
+    if (attempts > this.MAX_VERIFY_ATTEMPTS) {
+      throw new BadRequestException('Too many OTP attempts. Wait 5 minutes.');
+    }
+
     const otp = await this.otpRepository.findOne({
-      where: { phone_number: phoneNumber, code, verified: false },
+      where: { phone_number: phoneNumber, verified: false },
     });
 
     if (!otp) {
@@ -53,8 +64,13 @@ export class OtpService {
       throw new BadRequestException('OTP has expired');
     }
 
+    if (otp.code !== code) {
+      throw new BadRequestException('Invalid or expired OTP');
+    }
+
     otp.verified = true;
     await this.otpRepository.save(otp);
+    await this.redis.del(verifyKey);
 
     return true;
   }

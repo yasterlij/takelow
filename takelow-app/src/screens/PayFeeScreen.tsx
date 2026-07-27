@@ -11,7 +11,6 @@ import { colors, fontSize } from '../theme'
 export function PayFeeScreen() {
   const { go, selectedId, walletBalance, payFee, getAuction, paymentMethod, setPaymentMethod } = useApp()
   const auction = getAuction(selectedId)
-  if (!auction) return null
 
   const [showMethods, setShowMethods] = useState(false)
   const [selected, setSelected] = useState<'SIKINAPAY' | 'AWASH'>(paymentMethod)
@@ -40,6 +39,7 @@ export function PayFeeScreen() {
   }, [showPinModal])
 
   const handlePayPress = useCallback(async () => {
+    if (!auction) return
     if (selected === 'SIKINAPAY') {
       setPaymentMethod('SIKINAPAY')
       payFee(auction.bidFee, 'SIKINAPAY')
@@ -66,6 +66,7 @@ export function PayFeeScreen() {
   }, [selected, auction, payFee, setPaymentMethod])
 
   const handleVerifyPin = useCallback(async () => {
+    if (!auction) return
     if (!pinInput) {
       setPinError('Please enter your wallet PIN')
       return
@@ -101,6 +102,7 @@ export function PayFeeScreen() {
   }, [pinInput, auction, payFee, pinLocked])
 
   const handleSetupPin = useCallback(async () => {
+    if (!auction) return
     if (!setupPin || setupPin.length < 4 || setupPin.length > 6 || !/^\d+$/.test(setupPin)) {
       setSetupError('PIN must be 4–6 digits')
       return
@@ -154,6 +156,8 @@ export function PayFeeScreen() {
     tickRef.current = setInterval(update, 1000)
     return () => clearInterval(tickRef.current)
   }, [pinLocked, pinLockedUntil])
+
+  if (!auction) return null
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>

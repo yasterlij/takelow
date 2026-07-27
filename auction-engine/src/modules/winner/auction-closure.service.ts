@@ -75,7 +75,7 @@ export class AuctionClosureService {
         auction.id,
         totalBids,
         auction.min_bid,
-      ).catch(() => {});
+      ).catch((e) => this.logger.warn(`Failed to send extension notification: ${e.message}`));
       return;
     }
 
@@ -122,6 +122,7 @@ export class AuctionClosureService {
             auction.id,
             winners,
             paymentDeadline,
+            queryRunner.manager,
           );
 
           await queryRunner.commitTransaction();
@@ -132,9 +133,11 @@ export class AuctionClosureService {
           );
 
           this.logClosureEvent(auction.id, "AUTO_CLOSE", winners).catch(
-            () => {},
+            (e) => this.logger.warn(`Failed to log closure event: ${e.message}`),
           );
-          this.sendWinnerNotifications(auction, winners).catch(() => {});
+          this.sendWinnerNotifications(auction, winners).catch(
+            (e) => this.logger.warn(`Failed to send winner notifications: ${e.message}`),
+          );
         }
       } else {
         auction.status = AS.EXPIRED;
@@ -210,9 +213,14 @@ export class AuctionClosureService {
     }));
 
     try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      const internalApiKey = process.env.INTERNAL_API_KEY || "";
+      if (internalApiKey) headers["x-internal-api-key"] = internalApiKey;
       await fetch("http://identity-service:3000/api/v1/notify/winner-bulk", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ winners: winnerPayloads }),
       });
     } catch (e) {
@@ -228,11 +236,16 @@ export class AuctionClosureService {
     min: number,
   ): Promise<void> {
     try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      const internalApiKey = process.env.INTERNAL_API_KEY || "";
+      if (internalApiKey) headers["x-internal-api-key"] = internalApiKey;
       await fetch(
         "http://identity-service:3000/api/v1/notify/auction-extended",
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers,
           body: JSON.stringify({
             auction_id: auctionId,
             current_bids: current,
@@ -251,9 +264,14 @@ export class AuctionClosureService {
     winners: { amount: number; userId: string }[],
   ): Promise<void> {
     try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      const internalApiKey = process.env.INTERNAL_API_KEY || "";
+      if (internalApiKey) headers["x-internal-api-key"] = internalApiKey;
       await fetch("http://identity-service:3000/api/v1/admin/audit/log", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           actor_id: "system",
           actor_phone: "system",

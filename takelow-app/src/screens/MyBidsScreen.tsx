@@ -21,14 +21,17 @@ function TimeLeft({ seconds }: { seconds: number }) {
 }
 
 export function MyBidsScreen() {
-  const { go, myBids, selectAuction, getAuction, auctionsLoading } = useApp()
+  const { go, myBids, selectAuction, getAuction, auctionsLoading, refreshAuctions } = useApp()
   const [refreshing, setRefreshing] = useState(false)
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
-    await new Promise((r) => setTimeout(r, 1000))
-    setRefreshing(false)
-  }, [])
+    try {
+      await refreshAuctions()
+    } finally {
+      setRefreshing(false)
+    }
+  }, [refreshAuctions])
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>

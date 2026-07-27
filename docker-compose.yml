@@ -1,13 +1,14 @@
-version: '3.8'
 services:
   postgres-primary:
     image: citusdata/citus:12.1
+    platform: linux/amd64
+    restart: unless-stopped
     environment:
       POSTGRES_DB: takelow_db
       POSTGRES_USER: admin
-      POSTGRES_PASSWORD: secret
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secret}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -15,56 +16,62 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
-  postgres-replica:
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_DB: takelow_db
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: secret
-      POSTGRES_PRIMARY_URL: postgresql://admin:secret@postgres-primary:5432/takelow_db
-    ports:
-      - "5433:5432"
-    depends_on:
-      postgres-primary:
-        condition: service_healthy
-    volumes:
-      - replica_data:/var/lib/postgresql/data
+    networks:
+      - backend
 
   redis:
     image: redis:7-alpine
+    platform: linux/arm64
+    restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     command: redis-server --appendonly yes
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 3s
       retries: 5
+    networks:
+      - backend
 
   identity-service:
     build: ./identity-service
+    platform: linux/arm64
+    restart: unless-stopped
     depends_on:
       postgres-primary:
         condition: service_healthy
       redis:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://admin:secret@postgres-primary:5432/takelow_db
+      DATABASE_URL: postgresql://admin:${POSTGRES_PASSWORD:-secret}@postgres-primary:5432/takelow_db
       REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
+      FINTECH_WEBHOOK_SECRET: ${FINTECH_WEBHOOK_SECRET:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:3000,http://localhost}
     ports:
       - "3001:3000"
+    networks:
+      - backend
+      - frontend
 
   auction-engine:
     build: ./auction-engine
+    platform: linux/arm64
+    restart: unless-stopped
     depends_on:
       postgres-primary:
         condition: service_healthy
       redis:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://admin:secret@postgres-primary:5432/takelow_db
+      DATABASE_URL: postgresql://admin:${POSTGRES_PASSWORD:-secret}@postgres-primary:5432/takelow_db
       REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
       SIKINA_SECRET_KEY: ${SIKINA_SECRET_KEY:-}
       SIKINA_WEBHOOK_SECRET: ${SIKINA_WEBHOOK_SECRET:-}
       SIKINA_BASE_URL: ${SIKINA_BASE_URL:-https://sandbox.sikinapay.com}
@@ -76,34 +83,61 @@ services:
       AWASH_WEBHOOK_SECRET: ${AWASH_WEBHOOK_SECRET:-}
       AWASH_BASE_URL: ${AWASH_BASE_URL:-https://sandbox.awashbank.com}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost}
+      IDENTITY_SERVICE_URL: http://identity-service:3000
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:3000,http://localhost}
     ports:
       - "3002:3000"
+    networks:
+      - backend
+      - frontend
 
   query-service:
     build: ./query-service
+    platform: linux/arm64
+    restart: unless-stopped
     depends_on:
-      postgres-replica:
-        condition: service_started
+      postgres-primary:
+        condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://admin:secret@postgres-primary:5432/takelow_db
-      READ_REPLICA_URL: postgresql://admin:secret@postgres-replica:5432/takelow_db
+      DATABASE_URL: postgresql://admin:${POSTGRES_PASSWORD:-secret}@postgres-primary:5432/takelow_db
+      JWT_SECRET: ${JWT_SECRET:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:3000,http://localhost}
     ports:
       - "3003:3000"
+    networks:
+      - backend
+      - frontend
 
   awash-bank-ui:
     build: ./awash-bank-ui-ux
-    depends_on: [auction-engine]
+    platform: linux/arm64
+    restart: unless-stopped
+    depends_on:
+      - auction-engine
     environment:
       AWASH_API_URL: http://auction-engine:3000/api/v1
     ports:
       - "3004:3000"
+    networks:
+      - backend
+      - frontend
 
   web:
     build: ./takelow-web
-    depends_on: [identity-service, auction-engine, query-service]
+    platform: linux/arm64
+    restart: unless-stopped
+    depends_on:
+      - identity-service
+      - auction-engine
+      - query-service
     ports:
       - "80:80"
+    networks:
+      - frontend
 
 volumes:
   postgres_data:
-  replica_data:
+
+networks:
+  backend:
+  frontend:

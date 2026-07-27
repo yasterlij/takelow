@@ -4,7 +4,6 @@ import { Repository, DataSource } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { User } from '../auth/entities/user.entity';
 import { Transaction, TransactionType } from './entities/transaction.entity';
-import { EpsteinWalletService } from './epstein.service';
 
 @Injectable()
 export class WalletService {
@@ -16,7 +15,6 @@ export class WalletService {
     @InjectRepository(Transaction)
     private transactionRepository: Repository<Transaction>,
     private dataSource: DataSource,
-    private epsteinWalletService: EpsteinWalletService,
   ) {}
 
   async deposit(userId: string, amount: number, referenceId: string): Promise<User> {
@@ -131,18 +129,24 @@ export class WalletService {
   }
 
   async getBalance(userId: string): Promise<number> {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      select: ['wallet_balance'],
+    });
     if (!user) {
       throw new NotFoundException('User not found');
     }
     return Number(user.wallet_balance);
   }
 
-  async getTransactions(userId: string): Promise<Transaction[]> {
-    return this.transactionRepository.find({
+  async getTransactions(userId: string, page = 1, limit = 20): Promise<{ data: Transaction[]; total: number }> {
+    const [data, total] = await this.transactionRepository.findAndCount({
       where: { user_id: userId },
       order: { created_at: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
     });
+    return { data, total };
   }
 
   async resolveUser(id: string): Promise<User | null> {
@@ -177,32 +181,38 @@ export class WalletService {
 
     // Check if currently locked
     if (user.pin_locked_until && user.pin_locked_until > new Date()) {
-      const remainingMs = user.pin_locked_until.getTime() - Date.now();
       return { valid: false, attemptsRemaining: 0, locked: true, lockedUntil: user.pin_locked_until };
     }
 
-    // If lock expired, reset
+    // If lock expired, reset atomically
     if (user.pin_locked_until && user.pin_locked_until <= new Date()) {
       await this.userRepository.update(user.id, { pin_attempts: 0, pin_locked_until: null as any });
+      user.pin_attempts = 0;
     }
 
     const valid = await bcrypt.compare(pin, user.wallet_pin_hash);
 
     if (!valid) {
-      const newAttempts = (user.pin_attempts || 0) + 1;
+      // Atomic increment prevents the race where concurrent verify calls
+      // both read the same pin_attempts and overwrite each other.
+      await this.userRepository.increment({ id: userId }, 'pin_attempts', 1);
+      const updated = await this.userRepository.findOne({
+        where: { id: userId },
+        select: ['pin_attempts', 'pin_locked_until'],
+      });
+      const newAttempts = updated?.pin_attempts ?? 1;
       const locked = newAttempts >= this.MAX_PIN_ATTEMPTS;
       const lockedUntil = locked ? new Date(Date.now() + this.PIN_LOCKOUT_MINUTES * 60 * 1000) : null;
 
-      await this.userRepository.update(user.id, {
-        pin_attempts: newAttempts,
-        pin_locked_until: lockedUntil as any,
-      });
+      if (locked) {
+        await this.userRepository.update(user.id, { pin_locked_until: lockedUntil as any });
+      }
 
-      const attemptsRemaining = locked ? 0 : this.MAX_PIN_ATTEMPTS - newAttempts;
+      const attemptsRemaining = locked ? 0 : Math.max(0, this.MAX_PIN_ATTEMPTS - newAttempts);
       return { valid: false, attemptsRemaining, locked, lockedUntil };
     }
 
-    // Success — reset attempts
+    // Success — reset attempts atomically
     if ((user.pin_attempts || 0) > 0 || user.pin_locked_until) {
       await this.userRepository.update(user.id, { pin_attempts: 0, pin_locked_until: null as any });
     }

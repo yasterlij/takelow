@@ -2,7 +2,7 @@
   "name": "takelow",
   "private": true,
   "scripts": {
-    "docker:up": "docker compose up -d postgres-primary postgres-replica redis",
+    "docker:up": "docker compose up -d postgres-primary redis",
     "docker:down": "docker compose down",
     "db:migrate": "bash scripts/migrate-raw.sh",
     "db:setup": "npm run docker:up && bash scripts/wait-for-db.sh && npm run db:migrate && npm run seed",

@@ -9,4 +9,5 @@ for i in $(seq 1 20); do
   fi
   sleep 2
 done
-echo "  ⚠ PostgreSQL not ready after 40s, continuing anyway..."
+echo "  ✗ PostgreSQL not ready after 40s, aborting" >&2
+exit 1

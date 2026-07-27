@@ -3,9 +3,12 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { PaymentService } from '../src/modules/payment/payment.service';
 import { SikinaService } from '../src/modules/payment/sikina.service';
+import { AwashService } from '../src/modules/payment/awash.service';
+import { REDIS_CLIENT } from '../src/modules/common/redis.decorator';
 import { PaymentTransaction, PaymentTransactionStatus, PaymentType } from '../src/modules/payment/entities/payment-transaction.entity';
 import { Auction } from '../src/modules/winner/entities/auction.entity';
 import { Bid } from '../src/modules/bidding/entities/bid.entity';
+import { Winner } from '../src/modules/winner/entities/winner.entity';
 import { WinnerService } from '../src/modules/winner/winner.service';
 
 function createMockRepo() {
@@ -15,6 +18,7 @@ function createMockRepo() {
     create: jest.fn(),
     save: jest.fn(),
     update: jest.fn(),
+    count: jest.fn(),
   };
 }
 
@@ -23,7 +27,9 @@ describe('PaymentService - Bid Fee Payment', () => {
   let mockPaymentTransactionRepo: ReturnType<typeof createMockRepo>;
   let mockAuctionRepo: ReturnType<typeof createMockRepo>;
   let mockBidRepo: ReturnType<typeof createMockRepo>;
+  let mockWinnerRepo: ReturnType<typeof createMockRepo>;
   let mockSikinaService: Partial<SikinaService>;
+  let mockAwashService: Partial<AwashService>;
   let mockWinnerService: Partial<WinnerService>;
   let mockConfigService: Partial<ConfigService>;
 
@@ -31,12 +37,19 @@ describe('PaymentService - Bid Fee Payment', () => {
     mockPaymentTransactionRepo = createMockRepo();
     mockAuctionRepo = createMockRepo();
     mockBidRepo = createMockRepo();
+    mockWinnerRepo = createMockRepo();
     
     mockSikinaService = {
       generatePaymentLink: jest.fn(),
     };
     
-    mockWinnerService = {};
+    mockAwashService = {};
+    
+    mockWinnerService = {
+      updateWinnerPaymentStatus: jest.fn(),
+      getNextUnpaidWinner: jest.fn(),
+      calculateWinners: jest.fn(),
+    };
     
     mockConfigService = {
       get: jest.fn((key: string) => {
@@ -55,9 +68,19 @@ describe('PaymentService - Bid Fee Payment', () => {
         { provide: getRepositoryToken(Auction), useValue: mockAuctionRepo },
         { provide: getRepositoryToken(Bid), useValue: mockBidRepo },
         { provide: getRepositoryToken(PaymentTransaction), useValue: mockPaymentTransactionRepo },
+        { provide: getRepositoryToken(Winner), useValue: mockWinnerRepo },
         { provide: WinnerService, useValue: mockWinnerService },
         { provide: SikinaService, useValue: mockSikinaService },
+        { provide: AwashService, useValue: mockAwashService },
         { provide: ConfigService, useValue: mockConfigService },
+        {
+          provide: REDIS_CLIENT,
+          useValue: {
+            set: jest.fn(),
+            del: jest.fn(),
+            get: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
@@ -230,6 +253,7 @@ describe('PaymentService - Bid Fee Payment', () => {
       };
       mockAuctionRepo.findOne.mockResolvedValue(mockAuction);
       mockAuctionRepo.save.mockResolvedValue({ ...mockAuction, payment_status: 'PAID' });
+      mockWinnerRepo.count.mockResolvedValue(0);
 
       await service.handleSuccessfulPayment(clientReferenceId, paymentReferenceId, {});
 

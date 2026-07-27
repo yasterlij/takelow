@@ -11,6 +11,10 @@ env:
   EKS_CLUSTER: takelow-production
   AWS_REGION: us-east-1
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -36,7 +40,10 @@ jobs:
       - run: npm run build
         working-directory: ${{ matrix.service }}
 
-      - run: npm test
+      - run: npm test --if-present
+        working-directory: ${{ matrix.service }}
+
+      - run: npx tsc --noEmit
         working-directory: ${{ matrix.service }}
 
   test-web:
@@ -126,12 +133,22 @@ jobs:
         run: aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER }} --region ${{ env.AWS_REGION }}
 
       - name: Apply K8s manifests
+        env:
+          JWT_SECRET: ${{ secrets.K8S_JWT_SECRET }}
+          JWT_REFRESH_SECRET: ${{ secrets.K8S_JWT_REFRESH_SECRET }}
+          INTERNAL_API_KEY: ${{ secrets.K8S_INTERNAL_API_KEY }}
+          DB_PASSWORD: ${{ secrets.K8S_DB_PASSWORD }}
+          FINTECH_WEBHOOK_SECRET: ${{ secrets.K8S_FINTECH_WEBHOOK_SECRET }}
+          SIKINA_SECRET_KEY: ${{ secrets.K8S_SIKINA_SECRET_KEY }}
+          SIKINA_WEBHOOK_SECRET: ${{ secrets.K8S_SIKINA_WEBHOOK_SECRET }}
+          AWASH_MERCHANT_ID: ${{ secrets.K8S_AWASH_MERCHANT_ID }}
+          AWASH_SECRET_KEY: ${{ secrets.K8S_AWASH_SECRET_KEY }}
+          AWASH_WEBHOOK_SECRET: ${{ secrets.K8S_AWASH_WEBHOOK_SECRET }}
+          ENCRYPTION_KEY: ${{ secrets.K8S_ENCRYPTION_KEY }}
         run: |
-          kubectl apply -f k8s/config.yaml
-          kubectl apply -f k8s/deployments.yaml
-          kubectl apply -f k8s/web.yaml
-          kubectl apply -f k8s/hpa.yaml
-          kubectl apply -f k8s/ingress.yaml
+          for f in k8s/config.yaml k8s/deployments.yaml k8s/web.yaml k8s/hpa.yaml k8s/ingress.yaml; do
+            envsubst < "$f" | kubectl apply -f -
+          done
 
       - name: Rollout restart
         run: |
@@ -168,5 +185,6 @@ jobs:
           filename: load-tests/bid-flood.js
           flags: --vus 10000 --duration 60s
         env:
-          BASE_URL: https://api.takelow.com/api/v1
+          BASE_URL: ${{ secrets.K6_BASE_URL }}
+          AUCTION_ID: ${{ secrets.K6_AUCTION_ID }}
           K6_CLOUD_TOKEN: ${{ secrets.K6_CLOUD_TOKEN }}

@@ -30,11 +30,14 @@ export class FavoritesService {
     });
   }
 
-  async getUserFavorites(userId: string): Promise<Favorite[]> {
-    return this.favoriteRepository.find({
+  async getUserFavorites(userId: string, page = 1, limit = 20): Promise<{ data: Favorite[]; total: number }> {
+    const [data, total] = await this.favoriteRepository.findAndCount({
       where: { user_id: userId },
       order: { created_at: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
     });
+    return { data, total };
   }
 
   async isFavorite(userId: string, auctionId: string): Promise<boolean> {

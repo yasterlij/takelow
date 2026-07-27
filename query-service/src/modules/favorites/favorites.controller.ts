@@ -6,6 +6,7 @@ import {
   Param,
   UseGuards,
   Req,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { FavoritesService } from './favorites.service';
@@ -22,13 +23,13 @@ export class FavoritesController {
 
   @UseGuards(AuthGuard('jwt'))
   @Post(':auctionId')
-  async addFavorite(@Param('auctionId') auctionId: string, @Req() req: any) {
+  async addFavorite(@Param('auctionId', new ParseUUIDPipe()) auctionId: string, @Req() req: any) {
     return this.favoritesService.addFavorite(req.user.id, auctionId);
   }
 
   @UseGuards(AuthGuard('jwt'))
   @Delete(':auctionId')
-  async removeFavorite(@Param('auctionId') auctionId: string, @Req() req: any) {
+  async removeFavorite(@Param('auctionId', new ParseUUIDPipe()) auctionId: string, @Req() req: any) {
     await this.favoritesService.removeFavorite(req.user.id, auctionId);
     return { removed: true };
   }

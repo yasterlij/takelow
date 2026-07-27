@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, ServiceUnavailableException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import * as crypto from "node:crypto";
 
@@ -74,11 +74,19 @@ export class SikinaService {
 
     this.logger.log(`SikinaPay request: ${JSON.stringify(body)}`);
 
-    const res = await fetch(url, {
-      method: "POST",
-      headers: this.getHeaders(),
-      body: JSON.stringify(body),
-    });
+    let res;
+    try {
+      res = await fetch(url, {
+        method: "POST",
+        headers: this.getHeaders(),
+        body: JSON.stringify(body),
+      });
+    } catch {
+      this.logger.error("SikinaPay generatePaymentLink: network unreachable");
+      throw new ServiceUnavailableException(
+        "SikinaPay service is currently unavailable",
+      );
+    }
 
     if (!res.ok) {
       const text = await res.text();
@@ -99,6 +107,8 @@ export class SikinaService {
   ): Promise<string> {
     const url = `${this.baseUrl}/api/v1/gateway/getPaymentStatus`;
 
+    this.logger.log(`Fetching ${url} for ${clientReferenceId}`);
+
     const res = await fetch(url, {
       method: "POST",
       headers: this.getHeaders(),
@@ -106,12 +116,19 @@ export class SikinaService {
     });
 
     if (!res.ok) {
-      this.logger.error(`SikinaPay getPaymentStatus failed: ${res.status}`);
+      const text = await res.text().catch(() => "");
+      this.logger.error(
+        `SikinaPay getPaymentStatus failed: ${res.status} ${text.slice(0, 200)}`,
+      );
       return "PENDING";
     }
 
     const data = await res.json();
-    return data.responseMessage || "PENDING";
+    this.logger.log(
+      `SikinaPay getPaymentStatus response: ${JSON.stringify(data)}`,
+    );
+    const rawStatus = data.status || data.responseMessage || "PENDING";
+    return rawStatus.toUpperCase();
   }
 
   verifyWebhookSignature(

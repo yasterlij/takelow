@@ -1,4 +1,5 @@
 import { useEffect, useCallback, useState } from "react"
+import { AnimatePresence, motion } from "framer-motion"
 import { useApp, AppProvider } from "./AppContext"
 import { LoginScreen } from "./screens/LoginScreen"
 import { RegisterScreen } from "./screens/RegisterScreen"
@@ -17,12 +18,17 @@ import { PayWinningScreen } from "./screens/PayWinningScreen"
 import { PaymentConfirmedScreen } from "./screens/PaymentConfirmedScreen"
 import { PaymentResultScreen } from "./screens/PaymentResultScreen"
 import { PaymentVerifyingScreen } from "./screens/PaymentVerifyingScreen"
+import { SikinaPayCheckoutScreen } from "./screens/SikinaPayCheckoutScreen"
 import { DeliveryScreen } from "./screens/DeliveryScreen"
 import { DepositScreen } from "./screens/DepositScreen"
 import { AdminDashboardScreen } from "./screens/AdminDashboardScreen"
 import { AdminAuctionsScreen } from "./screens/AdminAuctionsScreen"
 import { AdminProductsScreen } from "./screens/AdminProductsScreen"
 import { AdminUsersScreen } from "./screens/AdminUsersScreen"
+import { AdminTransactionsScreen } from "./screens/AdminTransactionsScreen"
+import { AdminAuditScreen } from "./screens/AdminAuditScreen"
+import { AdminMonitorListScreen } from "./screens/AdminMonitorListScreen"
+import { AdminAuctionMonitorScreen } from "./screens/AdminAuctionMonitorScreen"
 import { AwashMark, BottomTabBar } from "./components/AuctionUI"
 import { ErrorBoundary } from "./components/ErrorBoundary"
 import { ToastContainer } from "./components/Toast"
@@ -32,33 +38,48 @@ import { Gavel, Wallet, PiggyBank, TicketCheck, Shield, LogOut, Trophy, Menu, X 
 function ScreenRouter() {
   const { view, user } = useApp()
   const isAdmin = user?.role === "admin"
+  const adminViews = ["admin-dashboard", "admin-auctions", "admin-products", "admin-users", "admin-transactions", "admin-audit", "admin-monitor", "admin-auction-monitor"]
+  const isAdminView = adminViews.includes(view)
+
+  let screen
   switch (view) {
-    case "login": return <LoginScreen />
-    case "register": return <RegisterScreen />
-    case "home": return <HomeScreen />
-    case "auctions": return <AuctionsScreen />
-    case "my-bids": return <MyBidsScreen />
-    case "product": return <ProductScreen />
-    case "pay-fee": return <PayFeeScreen />
-    case "place-bid": return <PlaceBidScreen />
-    case "bid-confirmed": return <BidConfirmedScreen />
-    case "monitor": return isAdmin ? <MonitorScreen /> : <HomeScreen />
-    case "closed": return <ClosedScreen />
-    case "closed-auctions": return <ClosedAuctionsScreen />
-    case "winner": return <WinnerScreen />
-    case "pay-winning": return <PayWinningScreen />
-    case "payment-confirmed": return <PaymentConfirmedScreen />
-    case "delivery": return <DeliveryScreen />
-    case "payment-verifying": return <PaymentVerifyingScreen />
-    case "payment-success": return <PaymentResultScreen />
-    case "deposit": return <DepositScreen />
-    case "payment-failed": return <PaymentResultScreen />
-    case "admin-dashboard": return isAdmin ? <AdminDashboardScreen /> : <HomeScreen />
-    case "admin-auctions": return isAdmin ? <AdminAuctionsScreen /> : <HomeScreen />
-    case "admin-products": return isAdmin ? <AdminProductsScreen /> : <HomeScreen />
-    case "admin-users": return isAdmin ? <AdminUsersScreen /> : <HomeScreen />
-    default: return user ? <HomeScreen /> : <LoginScreen />
+    case "login": screen = <LoginScreen />; break
+    case "register": screen = <RegisterScreen />; break
+    case "home": screen = <HomeScreen />; break
+    case "auctions": screen = <AuctionsScreen />; break
+    case "my-bids": screen = <MyBidsScreen />; break
+    case "product": screen = <ProductScreen />; break
+    case "pay-fee": screen = <PayFeeScreen />; break
+    case "place-bid": screen = <PlaceBidScreen />; break
+    case "bid-confirmed": screen = <BidConfirmedScreen />; break
+    case "monitor": screen = isAdmin ? <MonitorScreen /> : <HomeScreen />; break
+    case "closed": screen = <ClosedScreen />; break
+    case "closed-auctions": screen = <ClosedAuctionsScreen />; break
+    case "winner": screen = <WinnerScreen />; break
+    case "pay-winning": screen = <PayWinningScreen />; break
+    case "payment-confirmed": screen = <PaymentConfirmedScreen />; break
+    case "delivery": screen = <DeliveryScreen />; break
+    case "payment-verifying": screen = <PaymentVerifyingScreen />; break
+    case "payment-success": screen = <PaymentResultScreen />; break
+    case "sikina-pay-checkout": screen = <SikinaPayCheckoutScreen />; break
+    case "deposit": screen = <DepositScreen />; break
+    case "payment-failed": screen = <PaymentResultScreen />; break
+    case "admin-dashboard": screen = isAdmin ? <AdminDashboardScreen /> : <HomeScreen />; break
+    case "admin-auctions": screen = isAdmin ? <AdminAuctionsScreen /> : <HomeScreen />; break
+    case "admin-products": screen = isAdmin ? <AdminProductsScreen /> : <HomeScreen />; break
+    case "admin-users": screen = isAdmin ? <AdminUsersScreen /> : <HomeScreen />; break
+    case "admin-transactions": screen = isAdmin ? <AdminTransactionsScreen /> : <HomeScreen />; break
+    case "admin-audit": screen = isAdmin ? <AdminAuditScreen /> : <HomeScreen />; break
+    case "admin-monitor": screen = isAdmin ? <AdminMonitorListScreen /> : <HomeScreen />; break
+    case "admin-auction-monitor": screen = isAdmin ? <AdminAuctionMonitorScreen /> : <HomeScreen />; break
+    default: screen = user ? <HomeScreen /> : <LoginScreen />
   }
+
+  if (isAdminView || view === "login" || view === "register") {
+    return <AnimatePresence mode="wait"><motion.div key={view} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>{screen}</motion.div></AnimatePresence>
+  }
+
+  return <AnimatePresence mode="wait"><motion.div key={view} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }} className="flex flex-1 flex-col">{screen}</motion.div></AnimatePresence>
 }
 
 function Navbar() {
@@ -114,7 +135,7 @@ function Navbar() {
             </span>
             <button
               onClick={logout}
-              className="sm:flex items-center gap-1.5 rounded-lg border border-border/60 bg-white/50 backdrop-blur-sm px-3 py-1.5 text-xs font-medium text-neutral-500 transition-all duration-300 hover:bg-red-50 hover:border-red-200 hover:text-red-600 hover:shadow-sm hidden"
+              className="hidden sm:flex items-center gap-1.5 rounded-lg border border-border/60 bg-white/50 backdrop-blur-sm px-3 py-1.5 text-xs font-medium text-neutral-500 transition-all duration-300 hover:bg-red-50 hover:border-red-200 hover:text-red-600 hover:shadow-sm"
             >
               <LogOut className="size-3.5" />
               Sign Out
@@ -239,7 +260,7 @@ function BottomNav() {
 }
 
 function AppContent() {
-  const { go, setSelectedIdOnly } = useApp()
+  const { go, setSelectedIdOnly, view, user } = useApp()
 
   const handlePaymentMessage = useCallback((event: MessageEvent) => {
     if (event.data?.type === "PAYMENT_SUCCESS") {
@@ -256,14 +277,25 @@ function AppContent() {
     return () => window.removeEventListener("message", handlePaymentMessage)
   }, [handlePaymentMessage])
 
+  const adminViews = ["admin-dashboard", "admin-auctions", "admin-products", "admin-users", "admin-transactions", "admin-audit", "admin-monitor", "admin-auction-monitor"]
+  const isFullScreen = adminViews.includes(view) || view === "login" || view === "register"
+
+  if (isFullScreen) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <RedirectHandler />
+        <ScreenRouter />
+        <ToastContainer />
+      </div>
+    )
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-dots">
       <RedirectHandler />
       <Navbar />
       <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 sm:px-6 py-4 sm:py-6 pb-[88px] sm:pb-6">
-        <div className="animate-fade-in flex-1 flex flex-col">
-          <ScreenRouter />
-        </div>
+        <ScreenRouter />
       </main>
       <BottomNav />
       <ToastContainer />

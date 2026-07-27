@@ -49,8 +49,7 @@ export function SikinaPayCheckout() {
           setStatus('failed')
         }
       } catch {
-        cleanup()
-        setStatus('failed')
+        // retry on next interval
       }
     }, POLL_INTERVAL)
 
@@ -77,8 +76,13 @@ export function SikinaPayCheckout() {
     cleanup()
     setSikinaPayUrl(null)
     if (sikinaPayContext === 'bid-fee') {
-      setFeePaid(true)
-      go('place-bid')
+      try {
+        await api.confirmBidFeePayment(selectedId!)
+        setFeePaid(true)
+        go('place-bid')
+      } catch {
+        go('pay-fee')
+      }
       return
     }
     try {

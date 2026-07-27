@@ -81,7 +81,6 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         rawMessage = (res as any).message || rawMessage;
       }
     } else if (exception instanceof Error) {
-      rawMessage = exception.message;
       this.logger.error(
         `[${requestId}] ${path} - ${exception.stack || exception.message}`,
       );
@@ -90,7 +89,9 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const errorInfo = ERROR_MAP[status] || { code: 'ERR_SERVER', label: 'Server Error' };
 
     let message: string;
-    if (Array.isArray(rawMessage) && rawMessage.length > 1) {
+    if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
+      message = FRIENDLY_MESSAGES['Internal server error'];
+    } else if (Array.isArray(rawMessage) && rawMessage.length > 1) {
       message = formatValidationErrors(rawMessage);
     } else {
       message = getFriendlyMessage(rawMessage);

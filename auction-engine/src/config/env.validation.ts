@@ -6,8 +6,7 @@ class EnvironmentVariables {
   PORT: number = 3000;
 
   @IsString()
-  @IsOptional()
-  JWT_SECRET: string = "takelow-jwt-secret";
+  JWT_SECRET: string;
 
   @IsString()
   DATABASE_URL: string;
@@ -17,7 +16,7 @@ class EnvironmentVariables {
 
   @IsNumber()
   @IsOptional()
-  BID_FEE: number = 50;
+  BID_FEE: number = 1;
 
   @IsString()
   @IsOptional()
@@ -62,6 +61,9 @@ class EnvironmentVariables {
   @IsString()
   @IsOptional()
   AWASH_BASE_URL: string = "https://sandbox.awashbank.com";
+
+  @IsString()
+  INTERNAL_API_KEY: string;
 }
 
 export function validate(config: Record<string, unknown>) {

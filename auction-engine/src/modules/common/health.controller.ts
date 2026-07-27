@@ -1,8 +1,9 @@
-import { Controller, Get } from "@nestjs/common";
+import { Controller, Get, Res } from "@nestjs/common";
 import { Redis } from "ioredis";
 import { InjectRedis } from "./redis.decorator";
 import { InjectDataSource } from "@nestjs/typeorm";
 import { DataSource } from "typeorm";
+import { Response } from "express";
 
 interface HealthCheckResult {
   status: string;
@@ -20,7 +21,7 @@ export class HealthController {
   ) {}
 
   @Get()
-  async check() {
+  async check(@Res({ passthrough: true }) res: Response) {
     const checks: HealthCheckResult = {
       status: "ok",
       timestamp: new Date().toISOString(),
@@ -43,15 +44,19 @@ export class HealthController {
       checks.status = "degraded";
     }
 
+    if (checks.status === "degraded") {
+      res.status(503);
+    }
     return checks;
   }
 
   @Get("ready")
-  async readiness() {
+  async readiness(@Res({ passthrough: true }) res: Response) {
     try {
       await this.dataSource.query("SELECT 1");
       return { status: "ready" };
     } catch {
+      res.status(503);
       return { status: "not ready" };
     }
   }

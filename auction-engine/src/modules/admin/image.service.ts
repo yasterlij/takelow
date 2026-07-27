@@ -2,7 +2,17 @@ import { Injectable, Logger, Inject } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import * as fs from "fs";
 import * as path from "path";
+import * as net from "net";
 import { v4 as uuidv4 } from "uuid";
+
+const ALLOWED_IMAGE_MIME_TYPES = [
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+];
+const ALLOWED_IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
 
 export const UPLOADS_DIR = path.join(process.cwd(), "uploads", "products");
 
@@ -27,7 +37,49 @@ export class ImageService {
     return str.startsWith("/uploads/") || str.includes("/uploads/");
   }
 
+  private isPrivateIp(hostname: string): boolean {
+    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0" || hostname === "::1") {
+      return true;
+    }
+    if (net.isIPv4(hostname)) {
+      const parts = hostname.split(".").map(Number);
+      if (parts[0] === 10) return true;
+      if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
+      if (parts[0] === 192 && parts[1] === 168) return true;
+      if (parts[0] === 127) return true;
+      if (parts[0] === 0) return true;
+      if (parts[0] === 169 && parts[1] === 254) return true;
+    }
+    return false;
+  }
+
+  private isAllowedUrl(url: string): boolean {
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== "https:") {
+        this.logger.warn(`SSRF blocked: non-HTTPS URL ${url}`);
+        return false;
+      }
+      if (this.isPrivateIp(parsed.hostname)) {
+        this.logger.warn(`SSRF blocked: private IP/hostname ${parsed.hostname} in URL ${url}`);
+        return false;
+      }
+      const ext = path.extname(parsed.pathname).toLowerCase();
+      if (ext && !ALLOWED_IMAGE_EXTENSIONS.includes(ext) && ext !== "") {
+        this.logger.warn(`SSRF blocked: disallowed extension ${ext} in URL ${url}`);
+        return false;
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async downloadImage(url: string): Promise<string | null> {
+    if (!this.isAllowedUrl(url)) {
+      this.logger.warn(`SSRF blocked download for: ${url}`);
+      return null;
+    }
     try {
       const response = await fetch(url, { signal: AbortSignal.timeout(15000) });
       if (!response.ok) {
@@ -35,6 +87,10 @@ export class ImageService {
         return null;
       }
       const contentType = response.headers.get("content-type") || "image/jpeg";
+      if (!ALLOWED_IMAGE_MIME_TYPES.includes(contentType.split(";")[0].trim().toLowerCase())) {
+        this.logger.warn(`SSRF blocked: disallowed MIME type ${contentType} from ${url}`);
+        return null;
+      }
       const ext = this.extensionFromMime(contentType) || ".jpg";
       const buffer = Buffer.from(await response.arrayBuffer());
       const filename = `${uuidv4()}${ext}`;

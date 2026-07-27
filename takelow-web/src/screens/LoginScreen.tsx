@@ -1,97 +1,165 @@
-import { useState, useRef } from "react"
-import { Eye, EyeOff, Smartphone, Lock, AlertCircle, Loader2 } from "lucide-react"
+import { useRef } from "react"
+import { motion, AnimatePresence } from "framer-motion"
+import { Smartphone, Lock, AlertCircle, Loader2, Sparkles } from "lucide-react"
 import { useApp } from "../AppContext"
 import { AwashLogo } from "../components/AuctionUI"
+import { FormField, FormPasswordInput } from "../components/FormField"
+import { useForm } from "../hooks/useForm"
+import { loginSchema, type LoginValues } from "../lib/validation"
 
 export function LoginScreen() {
   const { login, go, authError } = useApp()
-  const [phone, setPhone] = useState("")
-  const [password, setPassword] = useState("")
-  const [showPw, setShowPw] = useState(false)
-  const [localError, setLocalError] = useState("")
-  const [loading, setLoading] = useState(false)
   const phoneRef = useRef<HTMLInputElement>(null)
   const pwRef = useRef<HTMLInputElement>(null)
 
-  const handleLogin = async () => {
-    setLocalError("")
-    const clean = phone.trim()
-    if (!clean) { setLocalError("Please enter your phone number"); phoneRef.current?.focus(); return }
-    if (clean.length < 9) { setLocalError("Phone number must be at least 9 digits"); phoneRef.current?.focus(); return }
-    if (!password.trim()) { setLocalError("Please enter your password"); pwRef.current?.focus(); return }
-    setLoading(true)
-    const ok = await login(clean, password.trim())
-    setLoading(false)
-    if (!ok) setLocalError(authError || "Unable to sign in. Please check your phone number and password.")
+  const form = useForm<LoginValues>(loginSchema, {
+    phone_number: "",
+    password: "",
+  })
+
+  const onSubmit = async (values: LoginValues) => {
+    const ok = await login(values.phone_number, values.password)
+    if (!ok) {
+      form.setErrors({ _form: "Invalid phone number or password" } as any)
+    }
   }
 
-  const displayError = localError || authError
+  const displayError = (form.errors as any)._form || authError
 
   return (
-    <div className="flex min-h-screen flex-col bg-gradient-to-br from-awash-blue via-awash-blue-dark to-[#001224] px-6">
-      <div className="flex flex-1 flex-col items-center justify-center">
-        <div className="animate-float-rotate"><AwashLogo variant="light" /></div>
-        <h1 className="mt-8 font-display text-2xl font-extrabold text-white">Welcome Back</h1>
-        <p className="mt-1 text-sm font-medium text-white/60">Sign in to your TakeLow account</p>
+    <div className="relative flex min-h-screen flex-col overflow-hidden bg-gradient-to-br from-awash-blue via-awash-blue-dark to-[#001224] px-6">
+      {/* Decorative orbs */}
+      <motion.div
+        animate={{ y: [0, -30, 0], rotate: [0, 8, 0] }}
+        transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+        className="pointer-events-none absolute -left-20 top-10 size-72 rounded-full bg-primary/10 blur-3xl"
+      />
+      <motion.div
+        animate={{ y: [0, 40, 0], rotate: [0, -6, 0] }}
+        transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
+        className="pointer-events-none absolute -right-24 bottom-10 size-80 rounded-full bg-awash-blue-light/20 blur-3xl"
+      />
 
-        {displayError && (
-          <div className="mt-6 flex w-full max-w-xs items-center gap-2 rounded-xl bg-destructive/20 backdrop-blur-sm border border-destructive/30 p-3 text-xs font-semibold text-destructive">
-            <AlertCircle className="size-4 shrink-0" />
-            <span>{displayError}</span>
-          </div>
-        )}
-
-        <div className="mt-8 w-full max-w-xs space-y-4">
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold text-white/70">Phone Number</label>
-            <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/10 backdrop-blur-sm px-4 py-3 text-white transition-colors focus-within:border-awash-gold/50 focus-within:bg-white/15">
-              <Smartphone className="size-4.5 shrink-0 text-white/60" />
-              <input
-                ref={phoneRef}
-                value={phone}
-                onChange={(e) => { setPhone(e.target.value.replace(/\D/g, "")); setLocalError("") }}
-                placeholder="091 XXX XXXX"
-                className="flex-1 bg-transparent text-sm font-medium outline-none placeholder:text-white/30 text-white"
-                maxLength={10}
-                onKeyDown={(e) => e.key === "Enter" && pwRef.current?.focus()}
-              />
-            </div>
-          </div>
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold text-white/70">Password</label>
-            <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/10 backdrop-blur-sm px-4 py-3 text-white transition-colors focus-within:border-awash-gold/50 focus-within:bg-white/15">
-              <Lock className="size-4.5 shrink-0 text-white/60" />
-              <input
-                ref={pwRef}
-                type={showPw ? "text" : "password"}
-                value={password}
-                onChange={(e) => { setPassword(e.target.value); setLocalError("") }}
-                placeholder="password"
-                className="flex-1 bg-transparent text-sm font-medium outline-none placeholder:text-white/30 text-white"
-                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-              />
-              <button onClick={() => setShowPw((s) => !s)} className="text-white/60 hover:text-white" tabIndex={-1}>
-                {showPw ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <button
-          onClick={handleLogin}
-          disabled={loading}
-          className="mt-8 flex w-full max-w-xs items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-awash-gold to-awash-gold-light py-3.5 text-sm font-bold text-awash-blue shadow-lg shadow-primary/30 transition-all hover:shadow-primary/40 active:translate-y-px disabled:opacity-60"
+      <div className="relative flex flex-1 flex-col items-center justify-center py-12">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.85, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          className="animate-float-rotate"
         >
-          {loading ? <Loader2 className="size-4 animate-spin" /> : null}
-          {loading ? "Signing in..." : "Sign In"}
-        </button>
+          <AwashLogo variant="light" size={40} />
+        </motion.div>
 
-        <p className="mt-6 text-xs font-medium text-white/50">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
+          className="mt-8 text-center"
+        >
+          <h1 className="font-display text-2xl font-extrabold text-white">Welcome Back</h1>
+          <p className="mt-1.5 flex items-center justify-center gap-1.5 text-sm font-medium text-white/60">
+            <Sparkles className="size-3.5 text-primary" />
+            Sign in to your TakeLow account
+          </p>
+        </motion.div>
+
+        <AnimatePresence>
+          {displayError && (
+            <motion.div
+              initial={{ opacity: 0, height: 0, y: -8 }}
+              animate={{ opacity: 1, height: "auto", y: 0 }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mt-6 flex w-full max-w-xs items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/15 p-3 text-xs font-semibold text-destructive backdrop-blur-sm"
+            >
+              <AlertCircle className="size-4 shrink-0" />
+              <span>{displayError}</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.25, ease: [0.16, 1, 0.3, 1] }}
+          className="mt-8 w-full max-w-xs space-y-4"
+        >
+          <FormField
+            label="Phone Number"
+            error={form.errors.phone_number}
+            touched={form.touched.phone_number}
+            icon={<Smartphone className="size-4" />}
+            hint="Enter your 10-digit phone number"
+          >
+            <input
+              ref={phoneRef}
+              value={form.values.phone_number}
+              onChange={(e) => {
+                form.handleChange("phone_number", e.target.value.replace(/\D/g, ""))
+                form.setErrors({} as any)
+              }}
+              onBlur={() => form.handleBlur("phone_number")}
+              onKeyDown={(e) => e.key === "Enter" && pwRef.current?.focus()}
+              placeholder="091 XXX XXXX"
+              maxLength={15}
+              className={`w-full rounded-xl border bg-white/10 px-4 py-3 pl-11 text-sm font-medium text-white outline-none transition-all backdrop-blur-sm placeholder:text-white/30 focus:bg-white/15 ${
+                form.errors.phone_number && form.touched.phone_number
+                  ? "border-destructive/60 focus:border-destructive"
+                  : "border-white/10 focus:border-awash-gold/50"
+              }`}
+            />
+          </FormField>
+
+          <FormField
+            label="Password"
+            error={form.errors.password}
+            touched={form.touched.password}
+            icon={<Lock className="size-4" />}
+          >
+            <div className="relative">
+              <Lock className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-white/60" />
+              <FormPasswordInput
+                ref={pwRef}
+                theme="dark"
+                hasIcon
+                value={form.values.password}
+                onChange={(e) => {
+                  form.handleChange("password", e.target.value)
+                  form.setErrors({} as any)
+                }}
+                onBlur={() => form.handleBlur("password")}
+                onKeyDown={(e) => e.key === "Enter" && form.handleSubmit(onSubmit)}
+                invalid={!!form.errors.password && !!form.touched.password}
+                placeholder="Enter your password"
+                className="pl-11"
+              />
+            </div>
+          </FormField>
+        </motion.div>
+
+        <motion.button
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.35 }}
+          onClick={() => form.handleSubmit(onSubmit)}
+          disabled={form.isSubmitting}
+          whileTap={{ scale: 0.98 }}
+          className="mt-8 flex w-full max-w-xs items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-awash-gold to-awash-gold-light py-3.5 text-sm font-bold text-awash-blue shadow-lg shadow-primary/30 transition-all hover:shadow-primary/40 disabled:opacity-60"
+        >
+          {form.isSubmitting ? <Loader2 className="size-4 animate-spin" /> : null}
+          {form.isSubmitting ? "Signing in…" : "Sign In"}
+        </motion.button>
+
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+          className="mt-6 text-xs font-medium text-white/50"
+        >
           Don't have an account?{" "}
-          <button onClick={() => go("register")} className="font-bold text-awash-gold hover:text-awash-gold-light transition-colors">
+          <button onClick={() => go("register")} className="font-bold text-awash-gold transition-colors hover:text-awash-gold-light">
             Register
           </button>
-        </p>
+        </motion.p>
       </div>
     </div>
   )

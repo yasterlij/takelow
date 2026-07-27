@@ -15,6 +15,7 @@ export function WinnerScreen() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const pingAnim = useRef(new Animated.Value(1)).current
+  const [bidsPage, setBidsPage] = useState(0)
 
   useEffect(() => {
     if (!selectedId) return
@@ -55,7 +56,6 @@ export function WinnerScreen() {
     ? [...new Set(allBids.filter((b: any) => b.amount < winningAmount).map((b: any) => b.amount))].sort((a: number, b: number) => a - b)
     : []
   const lowerBidsGrouped = lowerAmounts.map((amount: number) => ({ amount, count: amountCount.get(amount) || 1 }))
-  const [bidsPage, setBidsPage] = useState(0)
   const BIDS_PAGE_SIZE = 10
   const pagedBids = lowerBidsGrouped.slice(0, (bidsPage + 1) * BIDS_PAGE_SIZE)
   const hasMore = pagedBids.length < lowerBidsGrouped.length

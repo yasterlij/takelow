@@ -2,15 +2,17 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, u
 import type { ReactNode } from "react"
 import { api, setApiToken, setRefreshToken, getApiToken, getRefreshToken, getUserFriendlyMessage } from "./api"
 import { toast } from "./store/toast.store"
+import { useAuctionSocket, applySocketUpdate } from "./hooks/useAuctionSocket"
 import type { Auction } from "./mockDataV0"
 
 export type View =
   | "login" | "register" | "home" | "auctions" | "my-bids"
   | "product" | "pay-fee" | "place-bid" | "bid-confirmed"
   | "monitor" | "closed" | "winner" | "pay-winning" | "payment-confirmed" | "payment-verifying" | "delivery"
-  | "admin-dashboard" | "admin-auctions" | "admin-products" | "admin-users" | "deposit"
+  | "admin-dashboard" | "admin-auctions" | "admin-products" | "admin-users" | "admin-transactions" | "admin-audit" | "admin-monitor" | "admin-auction-monitor" | "deposit"
   | "payment-success" | "payment-failed"
   | "closed-auctions"
+  | "sikina-pay-checkout"
 
 export type UserRole = "admin" | "user"
 
@@ -40,6 +42,8 @@ type AppState = {
   paymentMethod: 'SIKINAPAY' | 'AWASH' | 'WALLET'
   lastPaymentMethod: 'SIKINAPAY' | 'AWASH' | 'WALLET' | null
   paymentContext: 'bid-fee' | 'winning' | null
+  sikinaPayUrl: string | null
+  setSikinaPayUrl: (url: string | null) => void
   myBids: PlacedBid[]
   user: User | null
   allBids: PlacedBid[]
@@ -48,6 +52,7 @@ type AppState = {
   authError: string | null
   go: (view: View) => void
   selectAuction: (id: string) => void
+  selectAuctionForMonitor: (id: string) => void
   setSelectedIdOnly: (id: string) => void
   setFeePaid: (paid: boolean) => void
   payFee: (fee: number, paymentMethod?: 'SIKINAPAY' | 'AWASH') => Promise<void>
@@ -78,11 +83,12 @@ function mapAuction(apiAuction: any): Auction {
   const timeLeft = Math.max(0, Math.floor((new Date(apiAuction.end_time).getTime() - Date.now()) / 1000))
   return {
     id: apiAuction.id,
+    productId: apiAuction.product_id,
     name: apiAuction.product?.name || 'Unknown Product',
     category: apiAuction.product?.brand || '',
     images: apiAuction.product?.image_urls || [],
     marketPrice: Number(apiAuction.product?.current_market_price || 0),
-    bidFee: 50,
+    bidFee: 1,
     bidders: apiAuction.stats?.total_bids ?? 0,
     uniqueBidders: apiAuction.stats?.unique_bidders ?? 0,
     totalBids: apiAuction.stats?.total_bids ?? 0,
@@ -123,10 +129,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [paymentMethod, setPaymentMethodState] = useState<'SIKINAPAY' | 'AWASH' | 'WALLET'>('WALLET')
   const [lastPaymentMethod, setLastPaymentMethod] = useState<'SIKINAPAY' | 'AWASH' | 'WALLET' | null>(null)
   const [paymentContext, setPaymentContext] = useState<'bid-fee' | 'winning' | null>(null)
+  const [sikinaPayUrl, setSikinaPayUrl] = useState<string | null>(null)
   const [myBids, setMyBids] = useState<PlacedBid[]>([])
   const [allBids, setAllBids] = useState<PlacedBid[]>([])
   const [auctions, setAuctions] = useState<Auction[]>([])
   const [auctionsLoading, setAuctionsLoading] = useState(false)
+  useAuctionSocket(selectedId, (payload) => {
+    setAuctions((prev) => applySocketUpdate(prev, payload))
+  })
   const [user, setUser] = useState<User | null>(null)
   const [authError, setAuthError] = useState<string | null>(null)
   const [hydrated, setHydrated] = useState(false)
@@ -182,7 +192,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [hydrated, user, view])
 
   const go = useCallback((next: View) => {
-    const adminViews: View[] = ['admin-dashboard', 'admin-auctions', 'admin-products', 'admin-users', 'monitor']
+    const adminViews: View[] = ['admin-dashboard', 'admin-auctions', 'admin-products', 'admin-users', 'admin-transactions', 'admin-audit', 'admin-monitor', 'admin-auction-monitor', 'monitor']
     if (adminViews.includes(next) && user?.role !== 'admin') return
     setView(next)
   }, [user])
@@ -193,6 +203,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setUserBid(null)
     setBidTicketNumber(null)
     setPaymentContext(null)
+    setSikinaPayUrl(null)
     const auction = auctions.find((a) => a.id === id)
     if (auction?.status === 'closed') {
       setView('winner')
@@ -203,6 +214,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const setSelectedIdOnly = useCallback((id: string) => {
     setSelectedId(id)
+  }, [])
+
+  const selectAuctionForMonitor = useCallback((id: string) => {
+    setSelectedId(id)
+    setView('admin-auction-monitor')
   }, [])
 
   const payFee = useCallback(async (fee: number, paymentMethod?: 'SIKINAPAY' | 'AWASH') => {
@@ -216,14 +232,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return
       }
       setPaymentContext('bid-fee')
-      setView('payment-verifying')
-      const popup = window.open('', '_blank', 'popup,width=600,height=700')
-      const { payment_url } = await api.createBidFeePaymentLink(selectedId)
-      if (popup && !popup.closed) {
-        popup.location.href = payment_url
-      } else {
-        window.location.href = payment_url
-      }
+      const { payment_url } = await api.createBidFeePaymentLink(selectedId, paymentMethod)
+      setSikinaPayUrl(payment_url)
+      setView('sikina-pay-checkout')
     } catch (e) {
       const msg = getUserFriendlyMessage(e)
       setAuthError(msg)
@@ -276,14 +287,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       setPaymentContext('winning')
       setLastPaymentMethod(pm)
-      setView('payment-verifying')
-      const popup = window.open('', '_blank', 'popup,width=600,height=700')
       const { payment_url } = await api.createPaymentLink(selectedId, pm, customerPhone)
-      if (popup && !popup.closed) {
-        popup.location.href = payment_url
-      } else {
-        window.location.href = payment_url
-      }
+      setSikinaPayUrl(payment_url)
+      setView('sikina-pay-checkout')
     } catch (e) {
       const msg = getUserFriendlyMessage(e)
       setAuthError(msg)
@@ -311,6 +317,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setWalletBalance(INITIAL_BALANCE)
     setPaymentMethodState('SIKINAPAY')
     setPaymentContext(null)
+    setSikinaPayUrl(null)
     setMyBids([])
   }, [])
 
@@ -515,15 +522,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [auctions])
 
   const value = useMemo(() => ({
-    view, selectedId, userBid, bidTicketNumber, feePaid, walletBalance, paymentMethod, lastPaymentMethod, paymentContext, myBids, user, allBids,
+    view, selectedId, userBid, bidTicketNumber, feePaid, walletBalance, paymentMethod, lastPaymentMethod, paymentContext, sikinaPayUrl, setSikinaPayUrl, myBids, user, allBids,
     auctions, auctionsLoading, authError,
-    go, selectAuction, setSelectedIdOnly, setFeePaid, payFee, submitBid, payWinning, setPaymentMethod, checkPaymentStatus, reset,
+    go, selectAuction, selectAuctionForMonitor, setSelectedIdOnly, setFeePaid, payFee, submitBid, payWinning, setPaymentMethod, checkPaymentStatus, reset,
     login, register, logout, addAuction, updateAuction, deleteAuction, closeAuction,
     refreshAuctions, refreshWallet, fetchAuctionById, getAuction,
   }), [
-    view, selectedId, userBid, bidTicketNumber, feePaid, walletBalance, paymentMethod, lastPaymentMethod, paymentContext, myBids, user, allBids,
+    view, selectedId, userBid, bidTicketNumber, feePaid, walletBalance, paymentMethod, lastPaymentMethod, paymentContext, sikinaPayUrl, setSikinaPayUrl, myBids, user, allBids,
     auctions, auctionsLoading, authError,
-    go, selectAuction, setSelectedIdOnly, setFeePaid, payFee, submitBid, payWinning, setPaymentMethod, checkPaymentStatus, reset,
+    go, selectAuction, selectAuctionForMonitor, setSelectedIdOnly, setFeePaid, payFee, submitBid, payWinning, setPaymentMethod, checkPaymentStatus, reset,
     login, register, logout, addAuction, updateAuction, deleteAuction, closeAuction,
     refreshAuctions, refreshWallet, fetchAuctionById, getAuction,
   ])

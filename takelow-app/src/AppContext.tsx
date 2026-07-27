@@ -2,7 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import type { ReactNode } from 'react'
 import { Linking } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { api, setApiToken, setRefreshToken, getApiToken, getRefreshToken, getUserFriendlyMessage } from './api'
+import { api, setApiToken, setRefreshToken, getApiToken, getRefreshToken, getUserFriendlyMessage, onSessionExpired } from './api'
 import { useToast } from './components/Toast'
 import { useAuctionSocket, applySocketUpdate } from './hooks/useAuctionSocket'
 import { registerForPushNotifications, useNotificationObserver } from './hooks/usePushNotifications'
@@ -78,7 +78,7 @@ type AppState = {
 
 const AppContext = createContext<AppState | null>(null)
 
-const BID_FEE = 50
+const BID_FEE = 1
 const STORAGE_KEY = 'takelow_data'
 const INITIAL_BALANCE = 0
 
@@ -423,6 +423,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .catch(() => {})
     setView('login')
   }, [])
+
+  useEffect(() => {
+    onSessionExpired(() => logout())
+    return () => onSessionExpired(null)
+  }, [logout])
 
   const addAuction = useCallback(async (a: { name: string; category: string; marketPrice: number; bidFee: number; description: string; highlights: string[]; startTime: string; endTime: string; images?: string[]; minBid?: number; maxBid?: number }) => {
     if (user?.role !== 'admin') return

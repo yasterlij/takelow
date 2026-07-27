@@ -6,7 +6,18 @@ class EnvironmentVariables {
   PORT: number = 3000;
 
   @IsString()
+  JWT_SECRET: string;
+
+  @IsString()
   DATABASE_URL: string;
+
+  @IsString()
+  @IsOptional()
+  READ_REPLICA_URL?: string;
+
+  @IsString()
+  @IsOptional()
+  CORS_ORIGINS?: string;
 }
 
 export function validate(config: Record<string, unknown>) {

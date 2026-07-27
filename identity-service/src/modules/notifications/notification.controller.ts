@@ -12,6 +12,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { InternalAuthGuard } from '../common/internal-auth.guard';
 import { NotificationService, WinnerNotificationPayload } from './notification.service';
 
 @Controller('notify')
@@ -20,6 +21,7 @@ export class NotificationController {
 
   constructor(private notificationService: NotificationService) {}
 
+  @UseGuards(InternalAuthGuard)
   @Post('winner')
   @HttpCode(200)
   async notifyWinner(
@@ -53,6 +55,7 @@ export class NotificationController {
     return { notified: true };
   }
 
+  @UseGuards(InternalAuthGuard)
   @Post('winner-bulk')
   @HttpCode(200)
   async notifyWinnersBulk(
@@ -91,6 +94,7 @@ export class NotificationController {
     return { notified: winners.length };
   }
 
+  @UseGuards(InternalAuthGuard)
   @Post('bid-confirmation')
   @HttpCode(200)
   async sendBidConfirmationSms(
@@ -107,6 +111,7 @@ export class NotificationController {
     return { notified: true };
   }
 
+  @UseGuards(InternalAuthGuard)
   @Post('outbid')
   @HttpCode(200)
   async notifyOutbid(
@@ -121,6 +126,7 @@ export class NotificationController {
     return { notified: true };
   }
 
+  @UseGuards(InternalAuthGuard)
   @Post('auction-started')
   @HttpCode(200)
   async notifyAuctionStarted(
@@ -134,6 +140,7 @@ export class NotificationController {
     return { notified: true };
   }
 
+  @UseGuards(InternalAuthGuard)
   @Post('auction-extended')
   @HttpCode(200)
   async notifyAuctionExtended(
@@ -147,6 +154,7 @@ export class NotificationController {
     return { notified: true };
   }
 
+  @UseGuards(InternalAuthGuard)
   @Post('max-bid-reached')
   @HttpCode(200)
   async notifyMaxBidReached(
@@ -160,6 +168,7 @@ export class NotificationController {
     return { notified: true };
   }
 
+  @UseGuards(InternalAuthGuard)
   @Post('ending-soon')
   @HttpCode(200)
   async notifyEndingSoon(

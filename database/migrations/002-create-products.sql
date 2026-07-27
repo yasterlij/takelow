@@ -4,7 +4,8 @@ CREATE TABLE products (
     description TEXT,
     image_urls JSONB,
     current_market_price DECIMAL(12, 2) NOT NULL,
-    brand VARCHAR(255)
+    brand VARCHAR(255),
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX idx_products_name ON products (name);

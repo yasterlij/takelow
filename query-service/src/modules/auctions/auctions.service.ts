@@ -29,31 +29,43 @@ export class AuctionsService {
       take: 50,
     });
 
-    return Promise.all(
-      auctions.map(async (auction) => {
-        const totalBids = await this.bidRepository.count({
-          where: { auction_id: auction.id },
-        });
-        const uniqueBidders = await this.bidRepository
-          .createQueryBuilder('bid')
-          .where('bid.auction_id = :auctionId', { auctionId: auction.id })
-          .select('COUNT(DISTINCT bid.user_id)', 'count')
-          .getRawOne();
-        return {
-          id: auction.id,
-          product_id: auction.product_id,
-          product: auction.product || null,
-          start_time: auction.start_time,
-          end_time: auction.end_time,
-          time_remaining: this.computeTimeRemaining(auction.end_time),
-          stats: {
-            total_bids: totalBids,
-            unique_bidders: parseInt(uniqueBidders?.count || '0', 10),
-          },
-          status: auction.status,
-        };
-      }),
-    );
+    if (auctions.length === 0) return [];
+
+    const auctionIds = auctions.map((a) => a.id);
+
+    const [bidCounts, uniqueBidderRows] = await Promise.all([
+      this.bidRepository
+        .createQueryBuilder('bid')
+        .select('bid.auction_id', 'auction_id')
+        .addSelect('COUNT(*)', 'count')
+        .where('bid.auction_id IN (:...ids)', { ids: auctionIds })
+        .groupBy('bid.auction_id')
+        .getRawMany(),
+      this.bidRepository
+        .createQueryBuilder('bid')
+        .select('bid.auction_id', 'auction_id')
+        .addSelect('COUNT(DISTINCT bid.user_id)', 'count')
+        .where('bid.auction_id IN (:...ids)', { ids: auctionIds })
+        .groupBy('bid.auction_id')
+        .getRawMany(),
+    ]);
+
+    const bidCountMap = new Map(bidCounts.map((r: any) => [r.auction_id, parseInt(r.count, 10)]));
+    const uniqueBidderMap = new Map(uniqueBidderRows.map((r: any) => [r.auction_id, parseInt(r.count, 10)]));
+
+    return auctions.map((auction) => ({
+      id: auction.id,
+      product_id: auction.product_id,
+      product: auction.product || null,
+      start_time: auction.start_time,
+      end_time: auction.end_time,
+      time_remaining: this.computeTimeRemaining(auction.end_time),
+      stats: {
+        total_bids: bidCountMap.get(auction.id) || 0,
+        unique_bidders: uniqueBidderMap.get(auction.id) || 0,
+      },
+      status: auction.status,
+    }));
   }
 
   async getActiveAuction(auctionId: string): Promise<any> {
@@ -136,34 +148,40 @@ export class AuctionsService {
       }
     }
 
-    return Promise.all(
-      auctions.map(async (auction) => {
-        const totalBids = await this.bidRepository.count({
-          where: { auction_id: auction.id },
-        });
-        const auctionWinners = winnersByAuction.get(auction.id) || [];
-        return {
-          id: auction.id,
-          product_id: auction.product_id,
-          product: auction.product || null,
-          start_time: auction.start_time,
-          end_time: auction.end_time,
-          status: auction.status,
-          winner_user_id: auction.winner_user_id,
-          winning_bid_amount: auction.winning_bid_amount,
-          winners: auctionWinners.map((w) => ({
-            user_id: w.user_id,
-            amount: w.amount,
-            rank: w.rank,
-            payment_status: w.payment_status,
-            payment_deadline: w.payment_deadline,
-          })),
-          winners_count: auctionWinners.length,
-          stats: { total_bids: totalBids },
-          created_at: auction.created_at,
-        };
-      }),
-    );
+    if (auctions.length === 0) return [];
+
+    const bidCountRows = await this.bidRepository
+      .createQueryBuilder('bid')
+      .select('bid.auction_id', 'auction_id')
+      .addSelect('COUNT(*)', 'count')
+      .where('bid.auction_id IN (:...ids)', { ids: auctionIds })
+      .groupBy('bid.auction_id')
+      .getRawMany();
+    const bidCountMap = new Map(bidCountRows.map((r: any) => [r.auction_id, parseInt(r.count, 10)]));
+
+    return auctions.map((auction) => {
+      const auctionWinners = winnersByAuction.get(auction.id) || [];
+      return {
+        id: auction.id,
+        product_id: auction.product_id,
+        product: auction.product || null,
+        start_time: auction.start_time,
+        end_time: auction.end_time,
+        status: auction.status,
+        winner_user_id: auction.winner_user_id,
+        winning_bid_amount: auction.winning_bid_amount,
+        winners: auctionWinners.map((w) => ({
+          user_id: w.user_id,
+          amount: w.amount,
+          rank: w.rank,
+          payment_status: w.payment_status,
+          payment_deadline: w.payment_deadline,
+        })),
+        winners_count: auctionWinners.length,
+        stats: { total_bids: bidCountMap.get(auction.id) || 0 },
+        created_at: auction.created_at,
+      };
+    });
   }
 
   async getBidHistory(auctionId: string): Promise<Bid[]> {

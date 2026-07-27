@@ -6,12 +6,13 @@ class EnvironmentVariables {
   PORT: number = 3000;
 
   @IsString()
-  @IsOptional()
-  JWT_SECRET: string = 'takelow-jwt-secret';
+  JWT_SECRET: string;
 
   @IsString()
-  @IsOptional()
-  JWT_REFRESH_SECRET: string = 'takelow-refresh-secret';
+  JWT_REFRESH_SECRET: string;
+
+  @IsString()
+  INTERNAL_API_KEY: string;
 
   @IsString()
   DATABASE_URL: string;

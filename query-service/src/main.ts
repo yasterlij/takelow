@@ -27,7 +27,14 @@ async function bootstrap() {
     }),
   );
 
-  app.enableCors();
+  const allowedOrigins = (process.env.CORS_ORIGINS || "http://localhost:5173,http://localhost:3000,http://localhost")
+    .split(",")
+    .map((o) => o.trim());
+
+  app.enableCors({
+    origin: allowedOrigins,
+    credentials: true,
+  });
 
   await app.listen(port);
 }

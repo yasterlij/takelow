@@ -1,6 +1,7 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
@@ -10,11 +11,12 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   constructor(
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    configService: ConfigService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: process.env.JWT_SECRET || 'takelow-jwt-secret',
+      secretOrKey: configService.get<string>('app.jwtSecret'),
     });
   }
 
@@ -24,6 +26,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     });
     if (!user) {
       throw new UnauthorizedException('User not found');
+    }
+    if (user.is_banned) {
+      throw new UnauthorizedException('Account has been suspended');
     }
     return user;
   }

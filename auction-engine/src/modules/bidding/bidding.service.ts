@@ -10,6 +10,7 @@ import { InjectRedis } from "../common/redis.decorator";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { Auction } from "../winner/entities/auction.entity";
+import { Bid } from "./entities/bid.entity";
 import { AuctionClosureService } from "../winner/auction-closure.service";
 import { AuctionGateway } from "./gateway/auction.gateway";
 import { InjectQueue } from "@nestjs/bullmq";
@@ -32,6 +33,8 @@ export class BiddingService {
     @InjectQueue("incoming-bids") private readonly bidQueue: Queue,
     @InjectRepository(Auction)
     private readonly auctionRepository: Repository<Auction>,
+    @InjectRepository(Bid)
+    private readonly bidRepository: Repository<Bid>,
     @InjectRepository(PaymentTransaction)
     private readonly paymentTransactionRepository: Repository<PaymentTransaction>,
     private readonly closureService: AuctionClosureService,
@@ -85,6 +88,10 @@ export class BiddingService {
 
       await this.trackBidInRedis(auctionId, userId, amount);
 
+      this.notifyOutbidBidders(auctionId, userId, amount).catch(
+        (e) => this.logger.warn(`Failed to notify outbid bidders: ${e.message}`),
+      );
+
       const totalBidsStr = await this.redis.get(
         `takelow:auction:${auctionId}:total_bids`,
       );
@@ -110,7 +117,7 @@ export class BiddingService {
           `Max bids (${auction.max_bid}) reached for auction ${auctionId}, closing early`,
         );
         this.notifyMaxBidReached(auctionId, totalBids, auction.max_bid).catch(
-          () => {},
+          (e) => this.logger.warn(`Failed to send max-bid notification: ${e.message}`),
         );
         await this.closureService.closeSingleAuction(auctionId);
       }
@@ -131,17 +138,59 @@ export class BiddingService {
     }
   }
 
+  private async notifyOutbidBidders(
+    auctionId: string,
+    newBidderId: string,
+    amount: number,
+  ): Promise<void> {
+    const freq = await this.redis.zscore(
+      `takelow:auction:${auctionId}:frequencies`,
+      String(amount),
+    );
+    if (freq && Number(freq) > 1) {
+      const prevBidders = await this.bidRepository.find({
+        where: { auction_id: auctionId, amount },
+        select: ["user_id"],
+        order: { bid_time: "DESC" },
+        take: 20,
+      });
+      const notified = new Set<string>();
+      for (const bid of prevBidders) {
+        if (bid.user_id === newBidderId || notified.has(bid.user_id)) continue;
+        notified.add(bid.user_id);
+        try {
+          const headers: Record<string, string> = { "Content-Type": "application/json" };
+          const internalApiKey = process.env.INTERNAL_API_KEY || "";
+          if (internalApiKey) headers["x-internal-api-key"] = internalApiKey;
+          await fetch(
+            "http://identity-service:3000/api/v1/notify/outbid",
+            {
+              method: "POST",
+              headers,
+              body: JSON.stringify({ user_id: bid.user_id, auction_id: auctionId, bid_amount: amount }),
+            },
+          );
+        } catch {
+          // individual notification failure is non-critical
+        }
+      }
+    }
+  }
+
   private async notifyMaxBidReached(
     auctionId: string,
     total: number,
     max: number,
   ): Promise<void> {
     try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      const internalApiKey = process.env.INTERNAL_API_KEY || "";
+      if (internalApiKey) headers["x-internal-api-key"] = internalApiKey;
       await fetch(
         "http://identity-service:3000/api/v1/notify/max-bid-reached",
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers,
           body: JSON.stringify({
             auction_id: auctionId,
             total_bids: total,

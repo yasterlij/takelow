@@ -6,12 +6,15 @@ import {
   UseGuards,
   Req,
   Param,
+  Query,
   HttpCode,
   BadRequestException,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { InternalAuthGuard } from '../common/internal-auth.guard';
+import { AuthOrInternalGuard } from '../common/auth-or-internal.guard';
 import { WalletService } from './wallet.service';
 import { WebhookSignatureGuard } from './webhook.guard';
 
@@ -28,8 +31,16 @@ export class WalletController {
 
   @UseGuards(AuthGuard('jwt'))
   @Get('transactions')
-  async getTransactions(@Req() req: any) {
-    return this.walletService.getTransactions(req.user.id);
+  async getTransactions(
+    @Req() req: any,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.walletService.getTransactions(
+      req.user.id,
+      Math.max(1, parseInt(page || '1', 10)),
+      Math.min(100, Math.max(1, parseInt(limit || '20', 10))),
+    );
   }
 
   @UseGuards(AuthGuard('jwt'))
@@ -81,19 +92,31 @@ export class WalletController {
     return this.walletService.getPinStatus(req.user.id);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthOrInternalGuard)
   @Post('deduct-fee')
   @HttpCode(200)
-  async deductFee(@Body('user_id') userId: string, @Body('amount') amount: number) {
+  async deductFee(@Req() req: any, @Body('user_id') userId: string, @Body('amount') amount: number) {
     if (!userId || !amount || amount <= 0) {
       throw new BadRequestException('Invalid user_id or amount');
+    }
+    if (req.user && req.user.id !== userId && req.user.role !== 'admin') {
+      throw new UnauthorizedException('You can only deduct fees from your own account');
     }
     await this.walletService.deductBidFee(userId, amount);
     return { deducted: true };
   }
 
+  @UseGuards(AuthGuard('jwt'))
   @Get('user/:id')
   async resolveUserName(@Param('id') id: string) {
+    const user = await this.walletService.resolveUser(id);
+    if (!user) throw new NotFoundException('User not found');
+    return { id: user.id, full_name: user.full_name, phone_number: user.phone_number };
+  }
+
+  @UseGuards(InternalAuthGuard)
+  @Get('user/:id/internal')
+  async resolveUserNameInternal(@Param('id') id: string) {
     const user = await this.walletService.resolveUser(id);
     if (!user) throw new NotFoundException('User not found');
     return { id: user.id, full_name: user.full_name, phone_number: user.phone_number };

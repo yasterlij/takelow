@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { Repository, EntityManager } from "typeorm";
 import { Redis } from "ioredis";
 import { InjectRedis } from "../common/redis.decorator";
 import { Bid } from "../bidding/entities/bid.entity";
@@ -32,9 +32,13 @@ export class WinnerService {
       return this.getPersistedWinners(auctionId);
     }
 
-    const result = await this.calculateWinnersFromRedis(auctionId, 1);
-    if (result.found) {
-      return result;
+    try {
+      const result = await this.calculateWinnersFromRedis(auctionId, 1);
+      if (result.found) {
+        return result;
+      }
+    } catch (e) {
+      this.logger.warn(`Redis winner calc failed for ${auctionId}: ${e.message}`);
     }
 
     return this.calculateWinnersFromDb(auctionId, 1);
@@ -68,8 +72,10 @@ export class WinnerService {
     auctionId: string,
     winners: { amount: number; userId: string }[],
     paymentDeadline: Date,
+    manager?: EntityManager,
   ): Promise<Winner[]> {
-    const existing = await this.winnerRepository.find({
+    const repo = manager ? manager.getRepository(Winner) : this.winnerRepository;
+    const existing = await repo.find({
       where: { auction_id: auctionId },
     });
     if (existing.length > 0) {
@@ -80,7 +86,7 @@ export class WinnerService {
     }
 
     const entities = winners.map((w, i) =>
-      this.winnerRepository.create({
+      repo.create({
         auction_id: auctionId,
         user_id: w.userId,
         amount: w.amount,
@@ -90,7 +96,7 @@ export class WinnerService {
       }),
     );
 
-    return this.winnerRepository.save(entities);
+    return repo.save(entities);
   }
 
   private async calculateWinnersFromRedis(
@@ -121,16 +127,22 @@ export class WinnerService {
     }
 
     const winningAmounts = amounts.map((a) => parseFloat(a));
-    const winners: { amount: number; userId: string }[] = [];
+    const freqKey = `takelow:auction:${auctionId}:frequencies`;
 
-    for (const amount of winningAmounts) {
-      const freqKey = `takelow:auction:${auctionId}:frequencies`;
-      const freq = await this.redis.zscore(freqKey, String(amount));
-      if (freq && Number(freq) === 1) {
-        const userId = await this.findEarliestBidder(auctionId, amount);
-        if (userId) {
-          winners.push({ amount, userId });
-        }
+    const freqResults = await Promise.all(
+      winningAmounts.map((a) => this.redis.zscore(freqKey, String(a))),
+    );
+
+    const uniqueAmounts = winningAmounts.filter(
+      (_, i) => freqResults[i] && Number(freqResults[i]) === 1,
+    );
+
+    const earliestMap = await this.findEarliestBidders(auctionId, uniqueAmounts);
+    const winners: { amount: number; userId: string }[] = [];
+    for (const amount of uniqueAmounts) {
+      const userId = earliestMap.get(amount);
+      if (userId) {
+        winners.push({ amount, userId });
       }
     }
 
@@ -185,21 +197,51 @@ export class WinnerService {
     const bid = await this.bidRepository.findOne({
       where: { auction_id: auctionId, amount },
       order: { bid_time: "ASC" },
+      select: ["user_id"],
     });
     return bid?.user_id || null;
   }
 
-  async getUniqueBiddersCount(auctionId: string): Promise<number> {
-    const key = `takelow:auction:${auctionId}:bidders`;
-    const count = await this.redis.scard(key);
-    if (count > 0) return count;
-
-    const dbCount = await this.bidRepository
+  private async findEarliestBidders(
+    auctionId: string,
+    amounts: number[],
+  ): Promise<Map<number, string>> {
+    if (amounts.length === 0) return new Map();
+    const bids = await this.bidRepository
       .createQueryBuilder("bid")
+      .select(["DISTINCT ON (bid.amount) bid.amount", "bid.user_id"])
       .where("bid.auction_id = :auctionId", { auctionId })
-      .select("COUNT(DISTINCT bid.user_id)", "count")
-      .getRawOne();
-    return parseInt(dbCount?.count || "0", 10);
+      .andWhere("bid.amount IN (:...amounts)", { amounts })
+      .orderBy("bid.amount", "ASC")
+      .addOrderBy("bid.bid_time", "ASC")
+      .getRawMany();
+    const result = new Map<number, string>();
+    for (const bid of bids) {
+      result.set(Number(bid.amount), bid.user_id);
+    }
+    return result;
+  }
+
+  async getUniqueBiddersCount(auctionId: string): Promise<number> {
+    try {
+      const key = `takelow:auction:${auctionId}:bidders`;
+      const count = await this.redis.scard(key);
+      if (count > 0) return count;
+    } catch (e) {
+      this.logger.warn(`Redis scard failed for ${auctionId}: ${e.message}`);
+    }
+
+    try {
+      const dbCount = await this.bidRepository
+        .createQueryBuilder("bid")
+        .where("bid.auction_id = :auctionId", { auctionId })
+        .select("COUNT(DISTINCT bid.user_id)", "count")
+        .getRawOne();
+      return parseInt(dbCount?.count || "0", 10);
+    } catch (e) {
+      this.logger.error(`DB count query failed for ${auctionId}: ${e.message}`);
+      return 0;
+    }
   }
 
   async getAuctionStats(auctionId: string): Promise<{

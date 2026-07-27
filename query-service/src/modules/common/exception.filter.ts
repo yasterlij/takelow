@@ -54,13 +54,17 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         rawMessage = (res as any).message || rawMessage;
       }
     } else if (exception instanceof Error) {
-      rawMessage = exception.message;
-      this.logger.error(`[${requestId}] ${request.url} - ${exception.message}`);
+      this.logger.error(`[${requestId}] ${request.url} - ${exception.stack || exception.message}`);
     }
 
     const errorInfo = ERROR_MAP[status] || { code: 'ERR_SERVER', label: 'Server Error' };
 
-    const message = Array.isArray(rawMessage) ? rawMessage[0] : getFriendlyMessage(rawMessage);
+    let message: string;
+    if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
+      message = FRIENDLY_MESSAGES['Internal server error'];
+    } else {
+      message = Array.isArray(rawMessage) ? rawMessage[0] : getFriendlyMessage(rawMessage);
+    }
 
     response.status(status).json({
       statusCode: status,

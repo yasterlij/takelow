@@ -1,31 +1,33 @@
 import { useState } from "react"
-import { ArrowLeft, Wallet, Loader2, CheckCircle2 } from "lucide-react"
+import { motion, AnimatePresence } from "framer-motion"
+import { ArrowLeft, Wallet, Loader2, CheckCircle2, AlertCircle, Zap } from "lucide-react"
 import { useApp } from "../AppContext"
 import { api } from "../api"
+import { FormField } from "../components/FormField"
+import { useForm } from "../hooks/useForm"
+import { depositSchema, type DepositValues } from "../lib/validation"
 import { CURRENCY, formatETB } from "../mockDataV0"
 
+const QUICK_AMOUNTS = [100, 250, 500, 1000]
+
 export function DepositScreen() {
-  const { go, refreshWallet } = useApp()
-  const [amount, setAmount] = useState("")
+  const { go, refreshWallet, walletBalance } = useApp()
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [formError, setFormError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
 
-  const handleDeposit = async () => {
-    const num = Number(amount)
-    if (!num || num <= 0) {
-      setError("Enter a valid amount")
-      return
-    }
+  const form = useForm<DepositValues>(depositSchema, { amount: 0 })
+
+  const onSubmit = async (values: DepositValues) => {
     setLoading(true)
-    setError(null)
+    setFormError(null)
     try {
-      await api.wallet.deposit(num)
+      await api.wallet.deposit(values.amount)
       await refreshWallet()
       setSuccess(true)
-      setTimeout(() => go("home"), 1500)
+      setTimeout(() => go("home"), 1600)
     } catch (e: any) {
-      setError(e.message || "Deposit failed. Please try again.")
+      setFormError(e?.message || "Deposit failed. Please try again.")
     } finally {
       setLoading(false)
     }
@@ -34,9 +36,13 @@ export function DepositScreen() {
   return (
     <div className="flex flex-1 flex-col gap-6 pb-8">
       <div className="flex items-center gap-3">
-        <button onClick={() => go("home")} className="flex size-10 items-center justify-center rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm text-awash-blue hover:bg-white transition-all shadow-sm">
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          onClick={() => go("home")}
+          className="flex size-10 items-center justify-center rounded-xl border border-border/60 bg-white/80 text-awash-blue shadow-sm backdrop-blur-sm transition-all hover:bg-white"
+        >
           <ArrowLeft className="size-5" />
-        </button>
+        </motion.button>
         <div>
           <h1 className="font-display text-2xl font-extrabold tracking-tight text-foreground">Top Up Wallet</h1>
           <p className="text-sm font-medium text-neutral-500">Add funds to your Awash Wallet</p>
@@ -44,69 +50,126 @@ export function DepositScreen() {
       </div>
 
       <div className="mx-auto flex w-full max-w-md flex-col gap-6">
-        <div className="rounded-2xl border border-border/60 bg-white/70 backdrop-blur-sm p-6 shadow-[0_4px_20px_rgba(0,43,92,0.04)]">
-          <div className="flex flex-col items-center gap-4">
-            <div className="flex size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-awash-gold/20 to-awash-gold-light/10 border border-primary/20">
-              <Wallet className="size-8 text-awash-gold" />
-            </div>
-            <p className="text-center text-sm font-medium text-neutral-500">
-              Enter the amount you want to deposit into your Awash Wallet
-            </p>
+        {/* Balance card */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="overflow-hidden rounded-2xl bg-gradient-to-br from-awash-blue to-awash-blue-dark p-5 shadow-lg"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wide text-white/50">Current Balance</span>
+            <Wallet className="size-5 text-primary" />
           </div>
+          <p className="mt-2 font-display text-3xl font-extrabold tabular-nums text-white">
+            {CURRENCY} {formatETB(walletBalance)}
+          </p>
+        </motion.div>
 
-          <div className="mt-6">
-            <label className="mb-2 block text-xs font-semibold text-neutral-400">Amount</label>
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="rounded-2xl border border-border/60 bg-white/70 p-6 shadow-[0_4px_20px_rgba(0,43,92,0.04)] backdrop-blur-sm"
+        >
+          <FormField
+            label="Amount"
+            error={form.errors.amount}
+            touched={form.touched.amount}
+            hint="Maximum 2 decimal places. Up to 1,000,000 ETB."
+          >
             <div className="relative">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 font-display text-xl font-extrabold text-foreground">{CURRENCY}</span>
               <input
-                value={amount}
-                onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1"))}
+                value={form.values.amount ? String(form.values.amount) : ""}
+                onChange={(e) => {
+                  const clean = e.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1").replace(/(\.\d{2})\d+/g, "$1")
+                  form.handleChange("amount", clean ? Number(clean) : 0)
+                  setFormError(null)
+                }}
+                onBlur={() => form.handleBlur("amount")}
+                onKeyDown={(e) => e.key === "Enter" && form.handleSubmit(onSubmit)}
                 placeholder="0.00"
-                className="w-full rounded-xl border border-border bg-white px-10 py-4 font-display text-2xl font-extrabold text-foreground outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
+                inputMode="numeric"
+                className={`w-full rounded-xl border bg-white px-10 py-4 font-display text-2xl font-extrabold text-foreground outline-none transition-all focus:ring-2 ${
+                  form.errors.amount && form.touched.amount
+                    ? "border-destructive/60 focus:border-destructive focus:ring-destructive/20"
+                    : "border-border focus:border-primary focus:ring-primary/20"
+                }`}
               />
             </div>
-          </div>
+          </FormField>
 
-          {error && (
-            <div className="mt-3 rounded-xl bg-red-50 border border-red-200 px-4 py-3">
-              <p className="text-xs font-medium text-red-600">{error}</p>
-            </div>
-          )}
+          <AnimatePresence>
+            {formError && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mt-3 flex items-center gap-2 rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3"
+              >
+                <AlertCircle className="size-4 shrink-0 text-destructive" />
+                <p className="text-xs font-semibold text-destructive">{formError}</p>
+              </motion.div>
+            )}
+            {success && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="mt-3 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3"
+              >
+                <CheckCircle2 className="size-4 text-emerald-600" />
+                <p className="text-xs font-semibold text-emerald-700">Deposit successful! Redirecting…</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-          {success && (
-            <div className="mt-3 flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3">
-              <CheckCircle2 className="size-4 text-emerald-600" />
-              <p className="text-xs font-medium text-emerald-600">Deposit successful! Redirecting...</p>
-            </div>
-          )}
-
-          <button
-            onClick={handleDeposit}
-            disabled={loading || !amount}
-            className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-awash-gold to-awash-gold-light font-bold text-awash-blue shadow-lg shadow-primary/20 transition-all hover:shadow-primary/30 active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed"
+          <motion.button
+            whileTap={{ scale: 0.98 }}
+            onClick={() => form.handleSubmit(onSubmit)}
+            disabled={loading || !form.values.amount}
+            className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-awash-gold to-awash-gold-light font-bold text-awash-blue shadow-lg shadow-primary/20 transition-all hover:shadow-primary/30 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading ? (
-              <><Loader2 className="size-4 animate-spin" /> Processing...</>
+              <><Loader2 className="size-4 animate-spin" /> Processing…</>
             ) : (
-              <><Wallet className="size-4" /> Deposit {amount ? `${CURRENCY} ${formatETB(Number(amount))}` : ""}</>
+              <><Wallet className="size-4" /> Deposit{form.values.amount > 0 ? ` ${CURRENCY} ${formatETB(form.values.amount)}` : ""}</>
             )}
-          </button>
-        </div>
+          </motion.button>
+        </motion.div>
 
-        <div className="rounded-2xl border border-border/60 bg-white/50 backdrop-blur-sm p-4">
-          <h3 className="font-display text-sm font-bold text-foreground">Quick Deposit</h3>
-          <div className="mt-3 flex gap-2">
-            {[100, 250, 500, 1000].map((v) => (
-              <button
+        {/* Quick amounts */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="rounded-2xl border border-border/60 bg-white/50 p-4 backdrop-blur-sm"
+        >
+          <div className="flex items-center gap-1.5">
+            <Zap className="size-3.5 text-primary" />
+            <h3 className="font-display text-sm font-bold text-foreground">Quick Deposit</h3>
+          </div>
+          <div className="mt-3 grid grid-cols-4 gap-2">
+            {QUICK_AMOUNTS.map((v, i) => (
+              <motion.button
                 key={v}
-                onClick={() => setAmount(String(v))}
-                className="flex-1 rounded-xl border border-border bg-white py-2.5 text-sm font-bold text-awash-blue transition-all hover:border-primary/40 hover:bg-primary/5 active:scale-[0.97]"
+                whileTap={{ scale: 0.95 }}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.25 + i * 0.05 }}
+                onClick={() => {
+                  form.handleChange("amount", v)
+                  form.handleBlur("amount")
+                  setFormError(null)
+                }}
+                className={`rounded-xl border bg-white py-2.5 text-sm font-bold transition-all hover:border-primary/40 hover:bg-primary/5 ${
+                  form.values.amount === v ? "border-primary bg-primary/5 text-primary" : "border-border text-awash-blue"
+                }`}
               >
-                {CURRENCY} {v}
-              </button>
+                {v}
+              </motion.button>
             ))}
           </div>
-        </div>
+        </motion.div>
       </div>
     </div>
   )

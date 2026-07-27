@@ -2,11 +2,14 @@ import {
   Injectable,
   BadRequestException,
   ConflictException,
+  Inject,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import { User, AuthProvider } from './entities/user.entity';
 import { RegisterDto } from './dto/register.dto';
 import { SuperAppRegistry } from './adapters/super-app-registry';
@@ -18,6 +21,7 @@ export class AuthService {
     private userRepository: Repository<User>,
     private jwtService: JwtService,
     private superAppRegistry: SuperAppRegistry,
+    private configService: ConfigService,
   ) {}
 
   async register(dto: RegisterDto): Promise<{ user: User; access_token: string; refresh_token: string }> {
@@ -144,7 +148,7 @@ export class AuthService {
     let payload: any;
     try {
       payload = this.jwtService.verify(refreshToken, {
-        secret: process.env.JWT_REFRESH_SECRET || 'takelow-refresh-secret',
+        secret: this.configService.get<string>('app.jwtRefreshSecret'),
       });
     } catch {
       throw new BadRequestException('Invalid refresh token');
@@ -170,8 +174,61 @@ export class AuthService {
     };
   }
 
-  async getProfile(userId: string): Promise<User | null> {
-    return this.userRepository.findOne({ where: { id: userId } });
+  private readonly logger = new Logger(AuthService.name);
+
+  async getProfile(userId: string) {
+    return this.userRepository.findOne({
+      where: { id: userId },
+      select: [
+        'id',
+        'phone_number',
+        'email',
+        'full_name',
+        'avatar_url',
+        'role',
+        'wallet_balance',
+        'phone_verified',
+        'auth_provider',
+        'created_at',
+      ],
+    });
+  }
+
+  async updateProfile(userId: string, data: { full_name?: string; email?: string }) {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) throw new BadRequestException('User not found');
+    const update: Partial<User> = {};
+    if (data.full_name !== undefined) update.full_name = data.full_name;
+    if (data.email !== undefined) update.email = data.email;
+    if (Object.keys(update).length > 0) {
+      await this.userRepository.update(userId, update);
+    }
+    return this.getProfile(userId);
+  }
+
+  async logFailedLogin(identifier: string, actorId: string, reason: string): Promise<void> {
+    this.logger.warn(`Failed login attempt for ${identifier}, reason: ${reason}`);
+    try {
+      const internalApiKey = this.configService.get<string>('app.internalApiKey');
+      if (!internalApiKey) return;
+      await fetch('http://localhost:3000/api/v1/admin/audit/log', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-internal-api-key': internalApiKey,
+        },
+        body: JSON.stringify({
+          actor_id: actorId,
+          actor_phone: identifier,
+          action: 'LOGIN_FAILED',
+          entity_type: 'user',
+          entity_id: actorId,
+          details: { reason, timestamp: new Date().toISOString() },
+        }),
+      });
+    } catch (e) {
+      this.logger.warn(`Failed to log login attempt: ${e.message}`);
+    }
   }
 
   async registerPushToken(
@@ -190,12 +247,12 @@ export class AuthService {
     const payload = { sub: user.id, phone: user.phone_number, role: user.role, wallet_balance: user.wallet_balance };
 
     const access_token = this.jwtService.sign(payload, {
-      secret: process.env.JWT_SECRET || 'takelow-jwt-secret',
+      secret: this.configService.get<string>('app.jwtSecret'),
       expiresIn: '15m',
     });
 
     const refresh_token = this.jwtService.sign(payload, {
-      secret: process.env.JWT_REFRESH_SECRET || 'takelow-refresh-secret',
+      secret: this.configService.get<string>('app.jwtRefreshSecret'),
       expiresIn: '7d',
     });
 

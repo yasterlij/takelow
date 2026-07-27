@@ -54,6 +54,8 @@ spec:
           env:
             - name: SERVICE_NAME
               value: identity-service
+            - name: PORT
+              value: "3001"
           livenessProbe:
             httpGet:
               path: /api/v1/health
@@ -130,6 +132,8 @@ spec:
           env:
             - name: SERVICE_NAME
               value: auction-engine
+            - name: PORT
+              value: "3002"
           livenessProbe:
             httpGet:
               path: /api/v1/health
@@ -206,6 +210,8 @@ spec:
           env:
             - name: SERVICE_NAME
               value: query-service
+            - name: PORT
+              value: "3003"
           livenessProbe:
             httpGet:
               path: /api/v1/health

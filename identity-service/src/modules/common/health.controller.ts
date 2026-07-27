@@ -1,7 +1,8 @@
-import { Controller, Get, Inject } from '@nestjs/common';
+import { Controller, Get, Inject, Res, HttpCode } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { Redis } from 'ioredis';
+import { Response } from 'express';
 
 @Controller('health')
 export class HealthController {
@@ -11,7 +12,7 @@ export class HealthController {
   ) {}
 
   @Get()
-  async check() {
+  async check(@Res({ passthrough: true }) res: Response) {
     const checks: Record<string, string> = { status: 'ok' };
 
     try {
@@ -30,6 +31,9 @@ export class HealthController {
       checks['status'] = 'degraded';
     }
 
+    if (checks['status'] === 'degraded') {
+      res.status(503);
+    }
     return checks;
   }
 }

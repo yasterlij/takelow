@@ -7,7 +7,13 @@ CREATE TABLE auctions (
     end_time TIMESTAMP NOT NULL,
     status auction_status NOT NULL DEFAULT 'ACTIVE',
     winner_user_id UUID REFERENCES users(id),
-    winning_bid_amount INTEGER,
+    winning_bid_amount DECIMAL(12,2),
+    min_bid DECIMAL(12,2),
+    max_bid DECIMAL(12,2),
+    num_winners INT DEFAULT 1,
+    payment_status VARCHAR(20),
+    payment_deadline TIMESTAMP,
+    last_payment_update TIMESTAMP,
     created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 

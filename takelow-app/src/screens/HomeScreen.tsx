@@ -372,11 +372,11 @@ export function HomeScreen() {
 // ─── Inline CountdownPill ──
 function CountdownPill({ seconds, urgent }: { seconds: number; urgent: boolean }) {
   const t = useCountdown(seconds)
-  const { d, h, m, s } = formatCountdown(t)
+  const { d, h, m, s: secs } = formatCountdown(t)
   return (
     <View style={[s.timePill, { backgroundColor: urgent ? colors.primary + '20' : colors.awashBlue }]}>
       <Text style={[s.timePillText, { color: urgent ? colors.primary : '#FFF' }]}>
-        {d !== '00' ? `${parseInt(d)}d ` : ''}{h}:{m}:{s}
+        {d !== '00' ? `${parseInt(d)}d ` : ''}{h}:{m}:{secs}
       </Text>
     </View>
   )

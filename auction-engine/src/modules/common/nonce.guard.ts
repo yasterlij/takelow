@@ -28,7 +28,7 @@ export class NonceGuard implements CanActivate {
     const now = Date.now();
     const requestTime = parseInt(timestamp as string, 10);
 
-    if (Math.abs(now - requestTime) > 30000) {
+    if (Number.isNaN(requestTime) || Math.abs(now - requestTime) > 30000) {
       throw new HttpException(
         "Request timestamp too old. Clock skew detected.",
         HttpStatus.BAD_REQUEST,

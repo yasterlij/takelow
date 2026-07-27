@@ -8,6 +8,7 @@ import {
   NotFoundException,
   BadRequestException,
   Query,
+  Logger,
 } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { InjectRepository } from "@nestjs/typeorm";
@@ -18,16 +19,21 @@ import {
   AuctionStatus as AS,
   PaymentStatus,
 } from "../winner/entities/auction.entity";
-
-const BID_FEE = 50;
+import { ConfigService } from "@nestjs/config";
 
 @Controller("payments")
 export class PaymentController {
+  private readonly logger = new Logger(PaymentController.name);
+  private readonly bidFee: number;
+
   constructor(
     private paymentService: PaymentService,
+    private configService: ConfigService,
     @InjectRepository(Auction)
     private auctionRepository: Repository<Auction>,
-  ) {}
+  ) {
+    this.bidFee = this.configService.get<number>("app.bidFee")!;
+  }
 
   @UseGuards(AuthGuard("jwt"))
   @Post(":auctionId/link")
@@ -122,10 +128,13 @@ export class PaymentController {
       throw new BadRequestException("Auction has already ended");
     }
 
+    if (this.bidFee < 1) {
+      throw new BadRequestException("Bid fee must be at least 1.00");
+    }
     const result = await this.paymentService.createBidFeePaymentLink(
       auctionId,
       user.id,
-      BID_FEE,
+      this.bidFee,
     );
     return {
       payment_url: result.paymentUrl,
@@ -140,6 +149,29 @@ export class PaymentController {
     @Req() req: any,
   ) {
     return this.paymentService.getBidFeePaymentStatus(auctionId, req.user.id);
+  }
+
+  @UseGuards(AuthGuard("jwt"))
+  @Post("bid-fee/:auctionId/confirm")
+  async confirmBidFeePayment(
+    @Param("auctionId") auctionId: string,
+    @Req() req: any,
+  ) {
+    try {
+      const result = await this.paymentService.getBidFeePaymentStatus(
+        auctionId,
+        req.user.id,
+      );
+      if (result.status === "SUCCESSFUL") {
+        return { paid: true };
+      }
+      throw new BadRequestException("Bid fee payment not yet confirmed");
+    } catch (e) {
+      if (e instanceof NotFoundException || e instanceof BadRequestException) {
+        throw e;
+      }
+      throw new NotFoundException("Bid fee payment not confirmed");
+    }
   }
 
   @UseGuards(AuthGuard("jwt"))
@@ -160,10 +192,13 @@ export class PaymentController {
       throw new BadRequestException("Auction has already ended");
     }
 
+    if (this.bidFee < 1) {
+      throw new BadRequestException("Bid fee must be at least 1.00");
+    }
     await this.paymentService.createBidFeeWalletPayment(
       auctionId,
       user.id,
-      BID_FEE,
+      this.bidFee,
     );
     return { paid: true };
   }

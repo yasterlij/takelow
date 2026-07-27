@@ -9,7 +9,6 @@ import { colors } from '../theme'
 export function PayWinningScreen() {
   const { go, selectedId, userBid, payWinning, getAuction, authError, paymentMethod, setPaymentMethod } = useApp()
   const auction = getAuction(selectedId)
-  if (!auction) return null
 
   const amount = userBid ?? 0
   const deadline = (auction as any).payment_deadline ? new Date((auction as any).payment_deadline) : null
@@ -20,6 +19,8 @@ export function PayWinningScreen() {
   const [showMethods, setShowMethods] = useState(false)
   const [selected, setSelected] = useState<'SIKINAPAY' | 'AWASH'>(paymentMethod)
   const [customerPhone, setCustomerPhone] = useState('')
+
+  if (!auction) return null
 
   const handlePay = () => {
     setPaymentMethod(selected)

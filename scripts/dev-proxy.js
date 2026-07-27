@@ -27,9 +27,19 @@ app.use('/api/v1/auctions/:id/bid', (req, res, next) => {
   next();
 });
 
+app.use('/api/v1/payments/webhook', auctionProxy);
+app.use('/api/v1/payments', auctionProxy);
 app.use('/api/v1/auctions', queryProxy);
 app.use('/api/v1/products', queryProxy);
 app.use('/api/v1/favorites', queryProxy);
+app.use('/payment/success', (req, res) => {
+  const qs = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+  res.redirect(`http://localhost:5173/payment/success${qs}`);
+});
+app.use('/payment/failed', (req, res) => {
+  const qs = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+  res.redirect(`http://localhost:5173/payment/failed${qs}`);
+});
 app.use('/api', queryProxy);
 
 app.listen(PORT, () => {

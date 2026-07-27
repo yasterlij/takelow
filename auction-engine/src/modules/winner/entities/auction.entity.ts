@@ -49,6 +49,8 @@ export class Auction {
   @Column({ type: "int", default: 1 })
   num_winners: number;
 
+  @Index(["status", "end_time"])
+  @Index(["status", "payment_status", "winner_user_id"])
   @Column({
     type: "enum",
     enum: AuctionStatus,

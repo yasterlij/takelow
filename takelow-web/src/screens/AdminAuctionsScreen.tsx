@@ -1,6 +1,8 @@
-import { useState, useMemo, useRef } from "react"
+import { useState, useMemo, useRef, useEffect } from "react"
 import { Plus, X, Pencil, XCircle, Trash2, Eye, ImageIcon, Filter, Search, Upload, BarChart3, TrendingDown, ArrowUpRight, Camera, Link, Trophy, PartyPopper } from "lucide-react"
 import { useApp } from "../AppContext"
+import { api } from "../api"
+import { AdminLayout } from "../components/AdminLayout"
 import { CTAButton, Badge, Card } from "../components/AuctionUI"
 import { CURRENCY, formatETB } from "../mockDataV0"
 import type { Auction } from "../mockDataV0"
@@ -143,7 +145,7 @@ function toDatetimeLocal(date: Date): string {
 const emptyForm = { name: "", category: "Computer", marketPrice: "", bidFee: "10", description: "", highlights: "", imageUrl: "", startTime: "", endTime: "", minBid: "", maxBid: "" }
 
 export function AdminAuctionsScreen() {
-  const { go, auctions, addAuction, updateAuction, deleteAuction, closeAuction, allBids } = useApp()
+  const { go, auctions, addAuction, updateAuction, deleteAuction, closeAuction } = useApp()
   const now = new Date()
   const defaultStart = toDatetimeLocal(now)
   const defaultEnd = toDatetimeLocal(new Date(now.getTime() + 7 * 86400000))
@@ -152,6 +154,8 @@ export function AdminAuctionsScreen() {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [viewBidsId, setViewBidsId] = useState<string | null>(null)
+  const [bidsByAuction, setBidsByAuction] = useState<Record<string, { amount: number; user_id?: string; bid_time?: string; ticket_number?: string }[]>>({})
+  const [bidsLoading, setBidsLoading] = useState(false)
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [form, setForm] = useState({ ...emptyForm, startTime: defaultStart, endTime: defaultEnd })
@@ -160,6 +164,15 @@ export function AdminAuctionsScreen() {
   const [lightboxImg, setLightboxImg] = useState<string | null>(null)
   const [drawingWinner, setDrawingWinner] = useState<string | null>(null)
   const [winnerResult, setWinnerResult] = useState<{ auctionId: string; winnerName?: string; amount?: number | null } | null>(null)
+
+  useEffect(() => {
+    if (!viewBidsId) return
+    setBidsLoading(true)
+    api.getAuctionBids(viewBidsId)
+      .then((bids) => setBidsByAuction((prev) => ({ ...prev, [viewBidsId]: bids })))
+      .catch(() => setBidsByAuction((prev) => ({ ...prev, [viewBidsId]: [] })))
+      .finally(() => setBidsLoading(false))
+  }, [viewBidsId])
 
   const resetForm = () => {
     setForm({ ...emptyForm, startTime: defaultStart, endTime: defaultEnd })
@@ -230,8 +243,7 @@ export function AdminAuctionsScreen() {
     setDrawingWinner(id)
     setWinnerResult(null)
     try {
-      const mod = await import("../api")
-      const result = await mod.api.drawWinner(id)
+      const result = await api.drawWinner(id)
       setWinnerResult({ auctionId: id, winnerName: result.winner_name, amount: result.winning_bid_amount })
     } catch {
       setWinnerResult({ auctionId: id, winnerName: undefined, amount: undefined })
@@ -244,23 +256,23 @@ export function AdminAuctionsScreen() {
     if (search && !a.name.toLowerCase().includes(search.toLowerCase())) return false
     return true
   })
+  const activeCount = auctions.filter((a) => a.status !== "closed").length
 
   return (
-    <div className="flex flex-1 flex-col overflow-y-auto">
-      {lightboxImg && <ImageLightbox src={lightboxImg} onClose={() => setLightboxImg(null)} />}
+    <AdminLayout
+      title="Auction Management"
+      subtitle={`${auctions.length} auctions · ${activeCount} active`}
+      actions={
+        <button onClick={openCreate} className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-awash-gold to-awash-gold-light px-4 py-2 text-xs font-bold text-awash-blue shadow-lg shadow-primary/20 transition-all hover:shadow-primary/30">
+          <Plus className="size-3.5" /> Create
+        </button>
+      }
+    >
+      <div className="space-y-4">
+        {lightboxImg && <ImageLightbox src={lightboxImg} onClose={() => setLightboxImg(null)} />}
 
-      <div className="sticky top-0 z-10 border-b border-border bg-white/80 backdrop-blur-md px-5 pb-3 pt-12">
-        <div className="flex items-center justify-between">
-          <div>
-             <button onClick={() => go("auctions")} className="mb-2 text-xs font-semibold text-awash-gold hover:text-awash-gold-dark">&larr; Auctions</button>
-            <h1 className="font-display text-xl font-extrabold text-awash-blue">Auction Management</h1>
-          </div>
-          <button onClick={openCreate} className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-awash-gold to-awash-gold-light px-4 py-2.5 text-xs font-bold text-awash-blue shadow-lg shadow-primary/20 transition-all hover:shadow-primary/30">
-            <Plus className="size-3.5" /> Create Auction
-          </button>
-        </div>
-        <div className="mt-3 flex items-center gap-2">
-          <div className="relative flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 min-w-[180px]">
             <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-neutral-400" />
             <input
               value={search}
@@ -282,7 +294,7 @@ export function AdminAuctionsScreen() {
         </div>
       </div>
 
-      <div className="flex-1 px-5 pb-8 pt-4">
+      <div className="mt-4">
         {showForm && (
           <Card className="mb-4 space-y-3 border border-awash-gold/20 p-4 shadow-lg">
             <div className="flex items-center justify-between">
@@ -364,7 +376,7 @@ export function AdminAuctionsScreen() {
         ) : (
           <div className="flex flex-col gap-2">
             {filtered.map((a: Auction) => {
-              const bids = allBids.filter((b) => b.auctionId === a.id)
+              const bids = viewBidsId === a.id ? (bidsByAuction[a.id] ?? []) : []
               const bidAmounts = bids.map((b) => b.amount)
               const avgBid = bidAmounts.length > 0 ? Math.round(bidAmounts.reduce((s, v) => s + v, 0) / bidAmounts.length) : 0
               const isClosed = a.status === "closed"
@@ -450,7 +462,9 @@ export function AdminAuctionsScreen() {
 
                       {bids.length > 1 && <BidChart amounts={bidAmounts} total={bids.length} />}
 
-                      {bids.length === 0 ? (
+                      {bidsLoading && bids.length === 0 ? (
+                        <p className="py-2 text-center text-[10px] text-neutral-400">Loading bids…</p>
+                      ) : bids.length === 0 ? (
                         <p className="py-2 text-center text-[10px] text-neutral-400">No bids placed yet</p>
                       ) : (
                         <div className="mt-2 flex flex-col gap-1">
@@ -458,7 +472,7 @@ export function AdminAuctionsScreen() {
                             <div key={i} className="flex items-center justify-between rounded-lg bg-white/60 px-3 py-1.5">
                               <span className="flex items-center gap-2 text-[10px] font-medium text-neutral-400">
                                 <span className="flex size-4 items-center justify-center rounded-full bg-awash-blue/10 text-[8px] font-bold text-awash-blue/60">{i + 1}</span>
-                                {b.userName || "Anonymous"}
+                                {b.user_id ? `User ${b.user_id.slice(0, 8)}` : "Anonymous"}
                               </span>
                               <span className="text-[11px] font-bold text-awash-blue">{CURRENCY} {formatETB(b.amount)}</span>
                             </div>
@@ -473,6 +487,6 @@ export function AdminAuctionsScreen() {
           </div>
         )}
       </div>
-    </div>
+    </AdminLayout>
   )
 }

@@ -22,6 +22,7 @@ export type Auction = {
   status: AuctionStatus
   description: string
   highlights: string[]
+  productId?: string
   uniqueBidders?: number
   totalBids?: number
   minBid?: number

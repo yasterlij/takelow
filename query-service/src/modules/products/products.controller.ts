@@ -1,4 +1,4 @@
-import { Controller, Get, Param, UseInterceptors } from '@nestjs/common';
+import { Controller, Get, Param, UseInterceptors, ParseUUIDPipe } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { CacheInterceptor } from '../common/cache.interceptor';
 
@@ -13,7 +13,7 @@ export class ProductsController {
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string) {
+  async findOne(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.productsService.findOne(id);
   }
 }

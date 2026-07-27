@@ -82,6 +82,11 @@ const MAX_RETRIES = 2
 const RETRY_DELAY = 1000
 
 let _refreshing: Promise<void> | null = null
+let _sessionExpiredHandler: (() => void) | null = null
+
+export function onSessionExpired(handler: (() => void) | null) {
+  _sessionExpiredHandler = handler
+}
 
 async function refreshAuth(): Promise<void> {
   if (!_refreshToken) throw new Error('No refresh token')
@@ -95,6 +100,7 @@ async function refreshAuth(): Promise<void> {
     if (!res.ok) {
       _token = null
       _refreshToken = null
+      _sessionExpiredHandler?.()
       throw new Error('Token refresh failed')
     }
     const data = await res.json()
@@ -321,6 +327,9 @@ export const api = {
   listProducts(page = 1, limit = 20) {
     return request<{ data: ApiProduct[]; meta: any }>('GET', `/admin/products?page=${page}&limit=${limit}`, undefined, ENGINE_API)
   },
+  deleteProduct(id: string) {
+    return request<{ deleted: boolean; id: string }>('DELETE', `/admin/products/${id}`, undefined, ENGINE_API)
+  },
   createAuction(data: { product_id: string; start_time: string; end_time: string; min_bid?: number; max_bid?: number }) {
     return request<ApiAuction>('POST', '/admin/auctions', data, ENGINE_API)
   },
@@ -381,11 +390,17 @@ export const api = {
   confirmPayment(auctionId: string) {
     return request<{ paid: boolean }>('POST', `/payments/${auctionId}/confirm`, undefined, ENGINE_API)
   },
+  payWinningWithWallet(auctionId: string) {
+    return request<{ paid: boolean }>('POST', `/payments/${auctionId}/wallet-pay`, undefined, ENGINE_API)
+  },
   createBidFeePaymentLink(auctionId: string) {
     return request<{ payment_url: string; transaction_id: string }>('POST', `/payments/bid-fee/${auctionId}/link`, undefined, ENGINE_API)
   },
   getBidFeePaymentStatus(auctionId: string) {
     return request<{ status: string; payment_url: string | null }>('GET', `/payments/bid-fee/${auctionId}/status`, undefined, ENGINE_API)
+  },
+  confirmBidFeePayment(auctionId: string) {
+    return request<{ paid: boolean }>('POST', `/payments/bid-fee/${auctionId}/confirm`, undefined, ENGINE_API)
   },
   payBidFeeWithWallet(auctionId: string) {
     return request<{ paid: boolean }>('POST', `/payments/bid-fee/${auctionId}/wallet-pay`, undefined, ENGINE_API)

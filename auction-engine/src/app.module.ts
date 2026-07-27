@@ -39,6 +39,7 @@ import { HealthController } from "./modules/common/health.controller";
     }),
     PassportModule,
     JwtModule.registerAsync({
+      global: true,
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         secret: config.get("app.jwtSecret"),

@@ -4,6 +4,7 @@ import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Redis } from 'ioredis';
 import { BiddingService } from '../src/modules/bidding/bidding.service';
 import { Auction } from '../src/modules/winner/entities/auction.entity';
+import { Bid } from '../src/modules/bidding/entities/bid.entity';
 import { PaymentTransaction, PaymentTransactionStatus, PaymentType } from '../src/modules/payment/entities/payment-transaction.entity';
 import { AuctionClosureService } from '../src/modules/winner/auction-closure.service';
 import { AuctionGateway } from '../src/modules/bidding/gateway/auction.gateway';
@@ -48,6 +49,7 @@ describe('BiddingService - Bid Fee Payment Check', () => {
   let service: BiddingService;
   let mockRedis: ReturnType<typeof createMockRedis>;
   let mockAuctionRepo: ReturnType<typeof createMockRepo>;
+  let mockBidRepo: ReturnType<typeof createMockRepo>;
   let mockPaymentTransactionRepo: ReturnType<typeof createMockRepo>;
   let mockClosureService: Partial<AuctionClosureService>;
   let mockAuctionGateway: Partial<AuctionGateway>;
@@ -56,6 +58,7 @@ describe('BiddingService - Bid Fee Payment Check', () => {
   beforeEach(async () => {
     mockRedis = createMockRedis();
     mockAuctionRepo = createMockRepo();
+    mockBidRepo = createMockRepo();
     mockPaymentTransactionRepo = createMockRepo();
     
     mockClosureService = {
@@ -75,6 +78,7 @@ describe('BiddingService - Bid Fee Payment Check', () => {
         BiddingService,
         { provide: REDIS_CLIENT, useValue: mockRedis },
         { provide: getRepositoryToken(Auction), useValue: mockAuctionRepo },
+        { provide: getRepositoryToken(Bid), useValue: mockBidRepo },
         { provide: getRepositoryToken(PaymentTransaction), useValue: mockPaymentTransactionRepo },
         { provide: AuctionClosureService, useValue: mockClosureService },
         { provide: AuctionGateway, useValue: mockAuctionGateway },

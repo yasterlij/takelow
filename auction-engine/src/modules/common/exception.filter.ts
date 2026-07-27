@@ -15,6 +15,7 @@ const ERROR_MAP: Record<number, { code: string; label: string }> = {
   [HttpStatus.NOT_FOUND]: { code: "ERR_NOT_FOUND", label: "Not Found" },
   [HttpStatus.CONFLICT]: { code: "ERR_CONFLICT", label: "Conflict" },
   [HttpStatus.TOO_MANY_REQUESTS]: { code: "ERR_RATE_LIMIT", label: "Rate Limited" },
+  [HttpStatus.SERVICE_UNAVAILABLE]: { code: "ERR_SERVICE_UNAVAILABLE", label: "Service Unavailable" },
   [HttpStatus.INTERNAL_SERVER_ERROR]: { code: "ERR_SERVER", label: "Server Error" },
 };
 
@@ -33,6 +34,7 @@ const FRIENDLY_MESSAGES: Record<string, string> = {
   "CSRF token missing": "Session verification failed. Please refresh the page.",
   "CSRF token mismatch": "Session verification failed. Please refresh the page.",
   "Internal server error": "Something went wrong on our end. Please try again.",
+  "SikinaPay service unavailable": "Payment service is temporarily unavailable. Please try again.",
   "SikinaPay payment link creation failed": "Payment service is temporarily unavailable. Please try again.",
   "Auction not found": "The auction you are looking for could not be found.",
   "Only the winner can initiate payment": "Only the auction winner can process this payment.",
@@ -76,7 +78,6 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         rawMessage = (res as any).message || rawMessage;
       }
     } else if (exception instanceof Error) {
-      rawMessage = exception.message;
       this.logger.error(
         `[${requestId}] ${path} - ${exception.stack || exception.message}`,
       );
@@ -85,7 +86,11 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const errorInfo = ERROR_MAP[status] || { code: "ERR_SERVER", label: "Server Error" };
 
     let message: string;
-    if (Array.isArray(rawMessage) && rawMessage.length > 1) {
+    if (status === HttpStatus.SERVICE_UNAVAILABLE) {
+      message = getFriendlyMessage(rawMessage);
+    } else if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
+      message = FRIENDLY_MESSAGES["Internal server error"];
+    } else if (Array.isArray(rawMessage) && rawMessage.length > 1) {
       message = formatValidationErrors(rawMessage);
     } else {
       message = getFriendlyMessage(rawMessage);

@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { Platform } from 'react-native'
 import { io, Socket } from 'socket.io-client'
 import type { Auction } from '../mockDataV0'
+import { getApiToken } from '../api'
 
 const HOST = Platform.OS === 'android' ? '10.0.2.2' : 'localhost'
 const SOCKET_URL = `http://${HOST}:3002/auctions`
@@ -23,9 +24,15 @@ export function useAuctionSocket(
   onUpdateRef.current = onUpdate
 
   useEffect(() => {
+    const token = getApiToken()
+    if (!token) return
+
     const socket = io(SOCKET_URL, {
       transports: ['websocket'],
-      forceNew: true,
+      auth: { token },
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
     })
     socketRef.current = socket
 
@@ -42,7 +49,7 @@ export function useAuctionSocket(
 
   useEffect(() => {
     const socket = socketRef.current
-    if (!socket) return
+    if (!socket || !socket.connected) return
 
     if (subscribedRef.current && subscribedRef.current !== selectedId) {
       socket.emit('unsubscribe:auction', subscribedRef.current)

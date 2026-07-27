@@ -10,5 +10,7 @@ WORKDIR /app
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY package*.json ./
+RUN mkdir -p uploads && chown -R node:node .
 EXPOSE 3000
+USER node
 CMD ["node", "dist/main"]

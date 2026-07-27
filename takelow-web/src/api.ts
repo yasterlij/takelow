@@ -1,6 +1,7 @@
-const IDENTITY_API = "http://localhost:3001/api/v1"
-const ENGINE_API = "http://localhost:3002/api/v1"
-const QUERY_API = "http://localhost:3003/api/v1"
+const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) || "/api/v1"
+const IDENTITY_API = API_BASE
+const ENGINE_API = (import.meta.env.VITE_ENGINE_API_BASE_URL as string | undefined) || "http://localhost:3002/api/v1"
+const QUERY_API = API_BASE
 
 let _token: string | null = null
 let _refreshToken: string | null = null
@@ -337,11 +338,15 @@ export const api = {
   confirmPayment(auctionId: string) {
     return request<{ paid: boolean }>('POST', `/payments/${auctionId}/confirm`, undefined, ENGINE_API)
   },
-  createBidFeePaymentLink(auctionId: string) {
-    return request<{ payment_url: string; transaction_id: string }>('POST', `/payments/bid-fee/${auctionId}/link`, undefined, ENGINE_API)
-  },
+    createBidFeePaymentLink(auctionId: string, paymentMethod?: 'SIKINAPAY' | 'AWASH') {
+      const path = paymentMethod ? `/payments/bid-fee/${auctionId}/link?payment_method=${paymentMethod}` : `/payments/bid-fee/${auctionId}/link`
+      return request<{ payment_url: string; transaction_id: string }>('POST', path, undefined, ENGINE_API)
+    },
   getBidFeePaymentStatus(auctionId: string) {
     return request<{ status: string; payment_url: string | null }>('GET', `/payments/bid-fee/${auctionId}/status`, undefined, ENGINE_API)
+  },
+  confirmBidFeePayment(auctionId: string) {
+    return request<{ paid: boolean }>('POST', `/payments/bid-fee/${auctionId}/confirm`, undefined, ENGINE_API)
   },
   payBidFeeWithWallet(auctionId: string) {
     return request<{ paid: boolean }>('POST', `/payments/bid-fee/${auctionId}/wallet-pay`, undefined, ENGINE_API)
@@ -372,8 +377,57 @@ export const api = {
   getUser(id: string) {
     return request<ApiUser>('GET', `/admin/users/${id}`, undefined, IDENTITY_API)
   },
+  getUserDetail(id: string) {
+    return request<ApiUser & { bids: any[]; auctions: any[] }>('GET', `/admin/users/${id}/detail`, undefined, IDENTITY_API)
+  },
+  getUserTransactions(id: string) {
+    return request<any[]>('GET', `/admin/users/${id}/transactions`, undefined, IDENTITY_API)
+  },
   updateUser(id: string, data: Partial<{ role: string; full_name: string; phone_number: string }>) {
     return request<ApiUser>('PATCH', `/admin/users/${id}`, data, IDENTITY_API)
+  },
+  updateUserRole(id: string, role: 'user' | 'admin') {
+    return request<ApiUser>('PATCH', `/admin/users/${id}/role`, { role }, IDENTITY_API)
+  },
+  toggleUserBan(id: string) {
+    return request<ApiUser>('PATCH', `/admin/users/${id}/ban`, {}, IDENTITY_API)
+  },
+  bulkUpdateUserRole(ids: string[], role: 'user' | 'admin') {
+    return request<any>('POST', '/admin/users/bulk/role', { ids, role }, IDENTITY_API)
+  },
+  bulkToggleUserBan(ids: string[], banned: boolean) {
+    return request<any>('POST', '/admin/users/bulk/ban', { ids, banned }, IDENTITY_API)
+  },
+  adminListTransactions(page = 1, limit = 50) {
+    return request<{ data: any[]; meta: any }>('GET', `/admin/users/transactions/all?page=${page}&limit=${limit}`, undefined, IDENTITY_API)
+  },
+  adminListAuditLogs(page = 1, limit = 50) {
+    return request<{ data: any[]; meta: any }>('GET', `/admin/users/audit/list?page=${page}&limit=${limit}`, undefined, IDENTITY_API)
+  },
+  adminExportUsersCsv() {
+    return request<string>('GET', '/admin/users/export/csv', undefined, IDENTITY_API)
+  },
+  adminExportTransactionsCsv() {
+    return request<string>('GET', '/admin/users/transactions/export/csv', undefined, IDENTITY_API)
+  },
+  // Admin (engine) exports + bulk
+  adminExportAuctionsCsv() {
+    return request<string>('GET', '/admin/auctions/export/csv', undefined, ENGINE_API)
+  },
+  adminExportProductsCsv() {
+    return request<string>('GET', '/admin/products/export/csv', undefined, ENGINE_API)
+  },
+  adminBulkDeleteAuctions(ids: string[]) {
+    return request<any>('POST', '/admin/auctions/bulk-delete', { ids }, ENGINE_API)
+  },
+  adminBulkDeleteProducts(ids: string[]) {
+    return request<any>('POST', '/admin/products/bulk-delete', { ids }, ENGINE_API)
+  },
+  adminDownloadProductImages(id: string) {
+    return request<any>('POST', `/admin/products/${id}/download-images`, undefined, ENGINE_API)
+  },
+  adminGetStats() {
+    return request<any>('GET', '/admin/stats', undefined, QUERY_API)
   },
 
   // Notifications

@@ -1,167 +1,200 @@
-import { useState, useEffect } from "react"
-import { Gavel, Users, TrendingUp, DollarSign, AlertTriangle, Clock, CheckCircle2, XCircle, ShoppingBag, Package, Tag } from "lucide-react"
+import { useEffect, useState } from "react"
+import { motion } from "framer-motion"
+import {
+  Gavel, Users, TrendingUp, DollarSign, Package, Activity,
+  ArrowUpRight, Crown, Zap, Clock, Radio,
+} from "lucide-react"
 import { useApp } from "../AppContext"
-import { CTAButton, Badge } from "../components/AuctionUI"
+import { AdminLayout } from "../components/AdminLayout"
+import { StatCard } from "../components/StatCard"
 import { CURRENCY, formatETB } from "../mockDataV0"
-import { api, type ApiUser } from "../api"
+import { api } from "../api"
+import { toast } from "../store/toast.store"
+
+type Stats = {
+  users: { total: number; active_today: number }
+  auctions: { total: number; active: number; closed: number; expired: number }
+  bids: { total: number; last_24h: number }
+  products: { total: number }
+  finances: { wallet_total: number; revenue_total: number; revenue_today: number; deposits_total: number }
+  top_bidders: { phone_number: string; full_name: string; bid_count: number }[]
+  daily_bid_trend: { day: string; count: number }[]
+}
 
 export function AdminDashboardScreen() {
-  const { go, allBids, user, auctions } = useApp()
-  const [userList, setUserList] = useState<ApiUser[]>([])
-  const [userLoading, setUserLoading] = useState(true)
-  const [products, setProducts] = useState<any[]>([])
-  const [productsLoading, setProductsLoading] = useState(true)
+  const { go, auctions } = useApp()
+  const [stats, setStats] = useState<Stats | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    api.adminListUsers(1, 200)
-      .then((res) => setUserList(res.data))
-      .catch(() => {})
-      .finally(() => setUserLoading(false))
+    api.adminGetStats()
+      .then((s) => setStats(s as Stats))
+      .catch(() => toast("Failed to load dashboard stats", "error"))
+      .finally(() => setLoading(false))
   }, [])
 
-  useEffect(() => {
-    api.listProducts(1, 100)
-      .then((res) => setProducts((res as any).data || res || []))
-      .catch(() => {})
-      .finally(() => setProductsLoading(false))
-  }, [])
-
-  const active = auctions.filter((a) => a.status !== "closed")
-  const closed = auctions.filter((a) => a.status === "closed")
-  const extended = auctions.filter((a) => a.endTime && new Date(a.endTime).getTime() > Date.now() + 86400000)
-  const totalRevenue = allBids.length * 50
-  const totalProductValue = products.reduce((sum, p) => sum + Number(p.current_market_price || 0), 0)
-
-  const stats = [
-    { icon: Gavel, label: "Active Auctions", value: active.length, color: "text-awash-gold" },
-    { icon: ShoppingBag, label: "Products", value: productsLoading ? "..." : products.length, color: "text-awash-blue" },
-    { icon: Users, label: "Users", value: userLoading ? "..." : userList.length, color: "text-emerald-600" },
-    { icon: TrendingUp, label: "Total Bids", value: allBids.length, color: "text-awash-gold" },
-  ]
-
-  const paymentStats = [
-    { label: "Pending Payment", count: closed.filter((a) => a.status === "closed" && (!a.payment_status || a.payment_status === "PENDING")).length, icon: Clock, color: "text-amber-500" },
-    { label: "Paid", count: closed.filter((a) => a.payment_status === "PAID").length, icon: CheckCircle2, color: "text-emerald-600" },
-    { label: "Expired", count: closed.filter((a) => a.payment_status === "EXPIRED").length, icon: XCircle, color: "text-red-500" },
-  ]
-
-  const recentProducts = products.slice(0, 5)
+  const maxTrend = Math.max(1, ...(stats?.daily_bid_trend || []).map((d) => d.count))
+  const activeAuctions = auctions.filter((a) => a.status !== "closed")
 
   return (
-    <div className="flex flex-1 flex-col overflow-y-auto">
-      <div className="bg-gradient-to-r from-awash-blue to-awash-blue-dark px-5 pb-4 pt-12">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="font-display text-xl font-extrabold text-white">Admin Panel</h1>
-            <p className="text-xs font-medium text-white/60 mt-0.5">Dashboard overview</p>
-          </div>
-          <Badge tone="orange">Admin</Badge>
-        </div>
-      </div>
-      <div className="flex-1 space-y-4 px-5 pb-8 pt-5">
+    <AdminLayout
+      title="Dashboard"
+      subtitle="Platform overview and key metrics"
+      actions={
+        <button
+          onClick={() => go("admin-auctions")}
+          className="hidden items-center gap-1.5 rounded-xl bg-gradient-to-r from-primary to-awash-gold-light px-4 py-2 text-xs font-bold text-awash-blue shadow-lg shadow-primary/20 transition-all hover:shadow-primary/30 sm:flex"
+        >
+          <Zap className="size-3.5" />
+          New Auction
+        </button>
+      }
+    >
+      <div className="space-y-5">
+        {/* Stat cards */}
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {stats.map((s) => (
-            <div key={s.label} className="rounded-2xl border border-border/60 bg-white shadow-[0_4px_16px_rgba(0,43,92,0.04)] p-4">
-              <s.icon className={`size-5 ${s.color}`} />
-              <p className="mt-2 font-display text-2xl font-extrabold text-awash-blue tabular-nums">{s.value}</p>
-              <p className="text-xs font-medium text-neutral-400">{s.label}</p>
-            </div>
-          ))}
+          <StatCard icon={<Gavel className="size-5" />} label="Active Auctions" value={loading ? "—" : stats?.auctions.active ?? 0} accent="gold" delay={0} />
+          <StatCard icon={<Users className="size-5" />} label="Total Users" value={loading ? "—" : stats?.users.total ?? 0} hint={`${stats?.users.active_today ?? 0} active today`} accent="blue" delay={0.06} />
+          <StatCard icon={<TrendingUp className="size-5" />} label="Total Bids" value={loading ? "—" : stats?.bids.total ?? 0} hint={`${stats?.bids.last_24h ?? 0} in last 24h`} accent="emerald" delay={0.12} />
+          <StatCard icon={<DollarSign className="size-5" />} label="Revenue" value={loading ? "—" : `${CURRENCY} ${formatETB(stats?.finances.revenue_total ?? 0)}`} hint={`${CURRENCY} ${formatETB(stats?.finances.revenue_today ?? 0)} today`} accent="amber" delay={0.18} />
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
-          {paymentStats.map((s) => (
-            <div key={s.label} className="rounded-2xl border border-border/60 bg-white/70 p-3 text-center">
-              <s.icon className={`mx-auto size-4 ${s.color}`} />
-              <p className="mt-1 font-display text-lg font-extrabold text-awash-blue tabular-nums">{s.count}</p>
-              <p className="text-[10px] font-medium text-neutral-400">{s.label}</p>
+        {/* Charts + activity */}
+        <div className="grid gap-4 lg:grid-cols-3">
+          {/* Bid trend chart */}
+          <div className="rounded-2xl border border-border/60 bg-white p-5 shadow-[0_4px_20px_rgba(0,43,92,0.04)] lg:col-span-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-display text-sm font-bold text-awash-blue">Bid Activity</h2>
+                <p className="text-xs font-medium text-neutral-400">Daily bids over the last 7 days</p>
+              </div>
+              <Activity className="size-4 text-neutral-300" />
             </div>
-          ))}
-        </div>
-
-        {extended.length > 0 && (
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="size-4 text-amber-600" />
-              <p className="text-xs font-bold text-amber-800">{extended.length} Extended Auction(s)</p>
-            </div>
-            {extended.map((a) => (
-              <p key={a.id} className="mt-1 text-[10px] text-amber-700 ml-6">
-                {a.name} — extended due to low bids
-              </p>
-            ))}
-          </div>
-        )}
-
-        <div className="rounded-2xl border border-border/60 bg-white shadow-[0_4px_16px_rgba(0,43,92,0.04)] p-4">
-          <h2 className="font-display text-sm font-bold text-awash-blue">All Auctions ({auctions.length})</h2>
-          <div className="mt-3 space-y-2">
-            {auctions.slice(0, 10).map((a) => {
-              const isExtended = a.endTime && new Date(a.endTime).getTime() > Date.now() + 86400000
-              return (
-                <div key={a.id} className="flex items-center justify-between rounded-xl bg-neutral-50 px-3 py-2.5">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="text-xs font-semibold text-awash-blue">{a.name}</p>
-                      {isExtended && <Badge tone="orange">Extended</Badge>}
-                    </div>
-                    <p className="text-[10px] font-medium text-neutral-400">
-                      {a.totalBids || a.bidders} bids · {a.uniqueBidders || a.bidders} bidders
-                      {a.maxBid ? ` · max ${a.maxBid}` : ""}
-                      {a.minBid ? ` · min ${a.minBid}` : ""}
-                    </p>
-                  </div>
-                  <Badge tone={a.status === "ending-soon" ? "orange" : a.status === "live" ? "green" : "muted"}>
-                    {a.status === "ending-soon" ? "Ending" : a.status}
-                  </Badge>
+            <div className="mt-6 flex h-40 items-end justify-between gap-2">
+              {(stats?.daily_bid_trend || []).length === 0 && !loading && (
+                <div className="flex h-full w-full flex-col items-center justify-center text-neutral-300">
+                  <Activity className="size-8 mb-2 opacity-40" />
+                  <p className="text-xs font-medium">No bid activity yet</p>
                 </div>
-              )
-            })}
-            {auctions.length > 10 && (
-              <p className="text-center text-[10px] font-medium text-neutral-400">
-                +{auctions.length - 10} more auctions
-              </p>
-            )}
-          </div>
-        </div>
-
-        {recentProducts.length > 0 && (
-          <div className="rounded-2xl border border-border/60 bg-white shadow-[0_4px_16px_rgba(0,43,92,0.04)] p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="font-display text-sm font-bold text-awash-blue">Recent Products ({products.length})</h2>
-              <span className="text-[10px] font-semibold text-neutral-400">{CURRENCY} {formatETB(totalProductValue)} total</span>
-            </div>
-            <div className="space-y-2">
-              {recentProducts.map((p: any) => (
-                <div key={p.id} className="flex items-center gap-3 rounded-xl bg-neutral-50 px-3 py-2">
-                  <div className="flex size-8 items-center justify-center rounded-lg bg-white">
-                    {p.image_urls?.[0] ? (
-                      <img src={p.image_urls[0]} alt="" className="size-6 rounded object-contain" />
-                    ) : (
-                      <Package className="size-4 text-neutral-300" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-awash-blue truncate">{p.name}</p>
-                    <p className="text-[10px] font-medium text-neutral-400">{p.brand || "No brand"}</p>
-                  </div>
-                  <span className="text-xs font-bold text-awash-gold-dark">{CURRENCY} {formatETB(p.current_market_price)}</span>
+              )}
+              {(stats?.daily_bid_trend || []).map((d, i) => (
+                <div key={d.day} className="flex flex-1 flex-col items-center gap-2">
+                  <motion.div
+                    initial={{ height: 0 }}
+                    animate={{ height: `${(d.count / maxTrend) * 100}%` }}
+                    transition={{ duration: 0.6, delay: i * 0.08, ease: [0.16, 1, 0.3, 1] }}
+                    className="w-full max-w-[42px] rounded-t-lg bg-gradient-to-t from-awash-blue/40 to-awash-blue shadow-[0_4px_12px_rgba(0,43,92,0.15)]"
+                    style={{ minHeight: 4 }}
+                  >
+                    <span className="block pt-1 text-center text-[9px] font-bold text-white">{d.count}</span>
+                  </motion.div>
+                  <span className="text-[9px] font-semibold text-neutral-400">
+                    {new Date(d.day).toLocaleDateString("en", { weekday: "short" }).charAt(0)}
+                  </span>
                 </div>
               ))}
             </div>
           </div>
-        )}
 
-        <div className="grid grid-cols-2 gap-3">
-          <CTAButton variant="navy" onClick={() => go("admin-auctions")}>Manage Auctions</CTAButton>
-          <CTAButton variant="primary" onClick={() => go("admin-products")}>Manage Products</CTAButton>
+          {/* Top bidders */}
+          <div className="rounded-2xl border border-border/60 bg-white p-5 shadow-[0_4px_20px_rgba(0,43,92,0.04)]">
+            <div className="flex items-center gap-2">
+              <Crown className="size-4 text-primary" />
+              <h2 className="font-display text-sm font-bold text-awash-blue">Top Bidders</h2>
+            </div>
+            <div className="mt-4 space-y-2">
+              {(stats?.top_bidders || []).slice(0, 5).map((b, i) => (
+                <div key={i} className="flex items-center gap-3 rounded-xl bg-neutral-50 px-3 py-2.5">
+                  <div className={`flex size-8 items-center justify-center rounded-full text-xs font-bold ${
+                    i === 0 ? "bg-primary/20 text-primary" : "bg-awash-blue/10 text-awash-blue"
+                  }`}>
+                    {i + 1}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-bold text-awash-blue">{b.full_name || b.phone_number}</p>
+                    <p className="text-[10px] font-medium text-neutral-400">{b.bid_count} bids</p>
+                  </div>
+                </div>
+              ))}
+              {(stats?.top_bidders || []).length === 0 && !loading && (
+                <p className="py-6 text-center text-xs font-medium text-neutral-400">No bids yet</p>
+              )}
+            </div>
+          </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <CTAButton variant="outline" onClick={() => go("admin-users")}>Manage Users</CTAButton>
-          <CTAButton variant="outline" onClick={() => go("home")}>Back to App</CTAButton>
+        {/* Active auctions + finances */}
+        <div className="grid gap-4 lg:grid-cols-3">
+          <div className="rounded-2xl border border-border/60 bg-white p-5 shadow-[0_4px_20px_rgba(0,43,92,0.04)] lg:col-span-2">
+            <div className="flex items-center justify-between">
+              <h2 className="font-display text-sm font-bold text-awash-blue">Active Auctions</h2>
+              <button onClick={() => go("admin-monitor")} className="flex items-center gap-1 text-[11px] font-bold text-primary hover:text-awash-gold-dark">
+                Monitor Live <ArrowUpRight className="size-3" />
+              </button>
+            </div>
+            <div className="mt-3 space-y-2">
+              {activeAuctions.slice(0, 5).map((a) => (
+                <div key={a.id} className="flex items-center justify-between rounded-xl bg-neutral-50 px-3 py-2.5">
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-semibold text-awash-blue">{a.name}</p>
+                    <p className="text-[10px] font-medium text-neutral-400">{a.totalBids || a.bidders} bids · {CURRENCY} {formatETB(a.marketPrice)}</p>
+                  </div>
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                    a.status === "ending-soon" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"
+                  }`}>
+                    {a.status === "ending-soon" ? "Ending" : "Live"}
+                  </span>
+                </div>
+              ))}
+              {activeAuctions.length === 0 && (
+                <p className="py-6 text-center text-xs font-medium text-neutral-400">No active auctions</p>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-border/60 bg-white p-5 shadow-[0_4px_20px_rgba(0,43,92,0.04)]">
+            <h2 className="font-display text-sm font-bold text-awash-blue">Finances</h2>
+            <div className="mt-4 space-y-3">
+              <FinanceRow icon={<DollarSign className="size-3.5" />} label="Total Revenue" value={stats?.finances.revenue_total ?? 0} accent="text-emerald-600" />
+              <FinanceRow icon={<Clock className="size-3.5" />} label="Today's Revenue" value={stats?.finances.revenue_today ?? 0} accent="text-amber-600" />
+              <FinanceRow icon={<Package className="size-3.5" />} label="Deposits" value={stats?.finances.deposits_total ?? 0} accent="text-awash-blue" />
+              <FinanceRow icon={<Users className="size-3.5" />} label="Wallet Balances" value={stats?.finances.wallet_total ?? 0} accent="text-primary" />
+            </div>
+          </div>
+        </div>
+
+        {/* Quick actions */}
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {[
+            { label: "Monitor Live", icon: Radio, view: "admin-monitor" as const, color: "from-emerald-600 to-emerald-700" },
+            { label: "Manage Auctions", icon: Gavel, view: "admin-auctions" as const, color: "from-awash-blue to-awash-blue-dark" },
+            { label: "Manage Products", icon: Package, view: "admin-products" as const, color: "from-primary to-awash-gold-dark" },
+            { label: "Manage Users", icon: Users, view: "admin-users" as const, color: "from-neutral-700 to-neutral-900" },
+          ].map((q) => (
+            <button
+              key={q.label}
+              onClick={() => go(q.view)}
+              className={`group relative overflow-hidden rounded-2xl bg-gradient-to-br ${q.color} p-4 text-left shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl`}
+            >
+              <q.icon className="size-5 text-white/80" />
+              <p className="mt-2 text-xs font-bold text-white">{q.label}</p>
+              <ArrowUpRight className="absolute right-3 top-3 size-4 text-white/40 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+            </button>
+          ))}
         </div>
       </div>
+    </AdminLayout>
+  )
+}
+
+function FinanceRow({ icon, label, value, accent }: { icon: React.ReactNode; label: string; value: number; accent: string }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="flex items-center gap-2 text-xs font-medium text-neutral-500">
+        <span className={accent}>{icon}</span>
+        {label}
+      </span>
+      <span className="font-display text-sm font-bold tabular-nums text-awash-blue">{CURRENCY} {formatETB(value)}</span>
     </div>
   )
 }

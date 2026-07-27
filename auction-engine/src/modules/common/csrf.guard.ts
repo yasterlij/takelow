@@ -4,10 +4,21 @@ import {
   ExecutionContext,
   ForbiddenException,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import * as crypto from "crypto";
 
 @Injectable()
 export class CsrfGuard implements CanActivate {
+  private readonly csrfSecret: string;
+
+  constructor(private configService: ConfigService) {
+    const secret = this.configService.get<string>("app.internalApiKey");
+    if (!secret) {
+      throw new Error("CSRF secret is not configured (set INTERNAL_API_KEY)");
+    }
+    this.csrfSecret = secret;
+  }
+
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest();
 
@@ -23,7 +34,7 @@ export class CsrfGuard implements CanActivate {
     }
 
     const expected = crypto
-      .createHmac("sha256", process.env.CSRF_SECRET || "takelow-csrf-secret")
+      .createHmac("sha256", this.csrfSecret)
       .update(cookieToken)
       .digest("hex");
 

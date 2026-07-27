@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react"
 import { Shield, User, Search, X, Users as UsersIcon, TrendingUp, Loader2, AlertCircle, ArrowUpCircle, ArrowDownCircle, ChevronRight, Phone, Wallet, Edit3, Check, Plus } from "lucide-react"
 import { useApp } from "../AppContext"
+import { AdminLayout } from "../components/AdminLayout"
 import { Badge, Card, CTAButton } from "../components/AuctionUI"
 import { api, type ApiUser } from "../api"
 import { CURRENCY, formatETB } from "../mockDataV0"
@@ -160,13 +161,9 @@ export function AdminUsersScreen() {
   useEffect(() => { setPage(1) }, [search])
 
   return (
-    <div className="flex flex-1 flex-col overflow-y-auto">
-      <div className="bg-gradient-to-r from-awash-blue to-awash-blue-dark px-5 pb-4 pt-12">
-        <button onClick={() => go("auctions")} className="mb-2 text-xs font-semibold text-white/60 hover:text-white transition-colors">← Auctions</button>
-        <h1 className="font-display text-xl font-extrabold text-white">Manage Users</h1>
-      </div>
-      <div className="flex-1 px-5 pb-8 pt-4">
-        <div className="relative mb-4">
+    <AdminLayout title="Manage Users" subtitle={`${users.length} users`}>
+      <div className="space-y-4">
+        <div className="relative">
           <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
           <input
             value={search}
@@ -273,7 +270,6 @@ export function AdminUsersScreen() {
             </p>
           </div>
         )}
-      </div>
 
       {selectedUser && (
         <UserDetailModal
@@ -283,6 +279,7 @@ export function AdminUsersScreen() {
           onNameChange={handleNameChange}
         />
       )}
-    </div>
+      </div>
+    </AdminLayout>
   )
 }
