@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState } from "react"
+import { useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { useApp, AppProvider } from "./AppContext"
 import { LoginScreen } from "./screens/LoginScreen"
@@ -17,7 +17,7 @@ import { WinnerScreen } from "./screens/WinnerScreen"
 import { PayWinningScreen } from "./screens/PayWinningScreen"
 import { PaymentConfirmedScreen } from "./screens/PaymentConfirmedScreen"
 import { PaymentResultScreen } from "./screens/PaymentResultScreen"
-import { PaymentVerifyingScreen } from "./screens/PaymentVerifyingScreen"
+
 import { SikinaPayCheckoutScreen } from "./screens/SikinaPayCheckoutScreen"
 import { DeliveryScreen } from "./screens/DeliveryScreen"
 import { DepositScreen } from "./screens/DepositScreen"
@@ -33,7 +33,7 @@ import { AwashMark, BottomTabBar } from "./components/AuctionUI"
 import { ErrorBoundary } from "./components/ErrorBoundary"
 import { ToastContainer } from "./components/Toast"
 import { ShimmerProvider } from "./components/SkeletonLoader"
-import { Gavel, Wallet, PiggyBank, TicketCheck, Shield, LogOut, Trophy, Menu, X } from "lucide-react"
+import { Gavel, Wallet, TicketCheck, Shield, LogOut, Trophy, Menu, X } from "lucide-react"
 
 function ScreenRouter() {
   const { view, user } = useApp()
@@ -59,7 +59,6 @@ function ScreenRouter() {
     case "pay-winning": screen = <PayWinningScreen />; break
     case "payment-confirmed": screen = <PaymentConfirmedScreen />; break
     case "delivery": screen = <DeliveryScreen />; break
-    case "payment-verifying": screen = <PaymentVerifyingScreen />; break
     case "payment-success": screen = <PaymentResultScreen />; break
     case "sikina-pay-checkout": screen = <SikinaPayCheckoutScreen />; break
     case "deposit": screen = <DepositScreen />; break
@@ -79,7 +78,7 @@ function ScreenRouter() {
     return <AnimatePresence mode="wait"><motion.div key={view} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>{screen}</motion.div></AnimatePresence>
   }
 
-  return <AnimatePresence mode="wait"><motion.div key={view} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }} className="flex flex-1 flex-col">{screen}</motion.div></AnimatePresence>
+  return <AnimatePresence mode="wait"><motion.div key={view} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }} className="flex flex-1 flex-col min-h-0">{screen}</motion.div></AnimatePresence>
 }
 
 function Navbar() {
@@ -198,37 +197,6 @@ function Navbar() {
   )
 }
 
-function RedirectHandler() {
-  const { go, setSelectedIdOnly } = useApp()
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const path = window.location.pathname
-    const clientRef = params.get("clientReferenceId") || params.get("client_reference_id")
-    const type = params.get("type") || params.get("payment")
-
-    if (path.includes("/payment/success") || type === "success") {
-      if (window.opener) {
-        window.opener.postMessage({ type: "PAYMENT_SUCCESS", clientReferenceId: clientRef }, window.location.origin)
-        window.close()
-        return
-      }
-      if (clientRef) setSelectedIdOnly(clientRef)
-      go("payment-success")
-      window.history.replaceState({}, "", window.location.pathname)
-    } else if (path.includes("/payment/failed") || type === "failed") {
-      if (window.opener) {
-        window.opener.postMessage({ type: "PAYMENT_FAILED", clientReferenceId: clientRef }, window.location.origin)
-        window.close()
-        return
-      }
-      if (clientRef) setSelectedIdOnly(clientRef)
-      go("payment-failed")
-      window.history.replaceState({}, "", window.location.pathname)
-    }
-  }, [go, setSelectedIdOnly])
-  return null
-}
-
 function BottomNav() {
   const { go, view, user } = useApp()
   if (!user) return null
@@ -260,22 +228,7 @@ function BottomNav() {
 }
 
 function AppContent() {
-  const { go, setSelectedIdOnly, view, user } = useApp()
-
-  const handlePaymentMessage = useCallback((event: MessageEvent) => {
-    if (event.data?.type === "PAYMENT_SUCCESS") {
-      if (event.data.clientReferenceId) setSelectedIdOnly(event.data.clientReferenceId)
-      go("payment-success")
-    } else if (event.data?.type === "PAYMENT_FAILED") {
-      if (event.data.clientReferenceId) setSelectedIdOnly(event.data.clientReferenceId)
-      go("payment-failed")
-    }
-  }, [go, setSelectedIdOnly])
-
-  useEffect(() => {
-    window.addEventListener("message", handlePaymentMessage)
-    return () => window.removeEventListener("message", handlePaymentMessage)
-  }, [handlePaymentMessage])
+  const { view, user } = useApp()
 
   const adminViews = ["admin-dashboard", "admin-auctions", "admin-products", "admin-users", "admin-transactions", "admin-audit", "admin-monitor", "admin-auction-monitor"]
   const isFullScreen = adminViews.includes(view) || view === "login" || view === "register"
@@ -283,7 +236,6 @@ function AppContent() {
   if (isFullScreen) {
     return (
       <div className="flex min-h-screen flex-col">
-        <RedirectHandler />
         <ScreenRouter />
         <ToastContainer />
       </div>
@@ -292,9 +244,8 @@ function AppContent() {
 
   return (
     <div className="flex min-h-screen flex-col bg-dots">
-      <RedirectHandler />
       <Navbar />
-      <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 sm:px-6 py-4 sm:py-6 pb-[88px] sm:pb-6">
+      <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 sm:px-6 py-4 sm:py-6 pb-[88px] sm:pb-6 min-h-0">
         <ScreenRouter />
       </main>
       <BottomNav />

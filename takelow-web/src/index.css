@@ -327,6 +327,42 @@ body {
   background: rgba(0, 43, 92, 0.2);
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
+.scroll-area {
+  overflow-y: auto;
+  min-height: 0;
+  scrollbar-gutter: stable;
+}
+
+.scroll-indicator {
+  position: relative;
+}
+
+.scroll-indicator::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 32px;
+  background: linear-gradient(to top, rgba(250,250,250,1), transparent);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.scroll-indicator.is-scrolled::after {
+  opacity: 1;
+}
+
+@keyframes scroll-fade {
+  0%, 100% { opacity: 0.3; transform: translateY(0); }
+  50% { opacity: 1; transform: translateY(4px); }
+}
+
 /* ─── Animations ───────────────────────────────────────────── */
 
 @keyframes float {

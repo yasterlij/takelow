@@ -23,7 +23,7 @@ export class BullMqWorker extends WorkerHost {
   }
 
   async process(job: Job<any, any, string>): Promise<any> {
-    const { auction_id, amount, user_id, bid_time } = job.data;
+    const { auction_id, encrypted_amount, user_id, bid_time, ticket_number } = job.data;
 
     const bufferKey = `batch:${auction_id}`;
     if (!this.batchBuffer.has(bufferKey)) {
@@ -31,7 +31,7 @@ export class BullMqWorker extends WorkerHost {
     }
 
     const batch = this.batchBuffer.get(bufferKey)!;
-    batch.push({ auction_id, amount: parseFloat(amount), user_id, bid_time });
+    batch.push({ auction_id, amount: 0, encrypted_amount: encrypted_amount || "", user_id, bid_time, ticket_number: ticket_number || "" });
 
     if (batch.length >= BATCH_SIZE) {
       await this.flushBatch(bufferKey);
@@ -52,39 +52,25 @@ export class BullMqWorker extends WorkerHost {
     await queryRunner.startTransaction();
 
     try {
-      const existing = await queryRunner.manager.query(
-        `SELECT amount, user_id FROM bids WHERE auction_id = $1 AND (amount, user_id, bid_time) IN (${batch.map((_, i) => `($${i * 3 + 2}, $${i * 3 + 3}, $${i * 3 + 4})`).join(", ")})`,
-        [auctionId, ...batch.flatMap((b) => [b.amount, b.user_id, b.bid_time])],
-      );
-      const existingSet = new Set(
-        existing.map((r: any) => `${r.amount}:${r.user_id}`),
-      );
-
-      const newBids = batch.filter(
-        (b) => !existingSet.has(`${b.amount}:${b.user_id}`),
-      );
-      if (newBids.length === 0) {
-        this.batchBuffer.delete(bufferKey);
-        return;
-      }
-
-      const placeholders = newBids
+      const placeholders = batch
         .map(
           (_, i) =>
-            `($${i * 4 + 1}, $${i * 4 + 2}, $${i * 4 + 3}, $${i * 4 + 4})`,
+            `($${i * 6 + 1}, $${i * 6 + 2}, $${i * 6 + 3}, $${i * 6 + 4}, $${i * 6 + 5}, $${i * 6 + 6})`,
         )
         .join(", ");
 
       const values: any[] = [];
-      newBids.forEach((b) => {
+      batch.forEach((b) => {
         values.push(b.auction_id);
         values.push(b.amount);
         values.push(b.user_id);
         values.push(b.bid_time || new Date().toISOString());
+        values.push(b.ticket_number || "");
+        values.push(b.encrypted_amount || "");
       });
 
       await queryRunner.manager.query(
-        `INSERT INTO bids (auction_id, amount, user_id, bid_time) VALUES ${placeholders} ON CONFLICT DO NOTHING`,
+        `INSERT INTO bids (auction_id, amount, user_id, bid_time, ticket_number, encrypted_amount) VALUES ${placeholders} ON CONFLICT DO NOTHING`,
         values,
       );
 

@@ -29,4 +29,10 @@ export class Bid {
 
   @Column({ type: "boolean", default: true })
   service_fee_paid: boolean;
+
+  @Column({ type: "varchar", default: "" })
+  ticket_number: string;
+
+  @Column({ type: "text", default: "" })
+  encrypted_amount: string;
 }

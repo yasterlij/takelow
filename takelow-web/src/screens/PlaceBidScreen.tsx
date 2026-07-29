@@ -1,6 +1,6 @@
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Sparkles, TrendingDown, CheckCircle2, Loader2, AlertCircle, Target } from "lucide-react"
+import { Sparkles, TrendingDown, CheckCircle2, Loader2, AlertCircle, Target, Minus, Plus } from "lucide-react"
 import { useApp } from "../AppContext"
 import { AppBar, CTAButton, Card } from "../components/AuctionUI"
 import { useForm } from "../hooks/useForm"
@@ -14,7 +14,17 @@ export function PlaceBidScreen() {
   const [loading, setLoading] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
+  const STEP = 0.01
+
   const form = useForm<PlaceBidValues>(placeBidSchema, { amount: 0 })
+
+  const adjustAmount = useCallback((delta: number) => {
+    const current = form.values.amount
+    const next = Math.max(1, +(current + delta).toFixed(2))
+    setBidStr(next.toFixed(2))
+    form.handleChange("amount", next)
+    setSubmitError(null)
+  }, [form])
 
   if (!auction) return null
 
@@ -34,9 +44,9 @@ export function PlaceBidScreen() {
   const isUrgent = bidProgress > 0.8
 
   return (
-    <div className="flex flex-1 flex-col overflow-y-auto">
+    <div className="relative flex flex-1 flex-col overflow-y-auto">
       <AppBar title="Place Your Bid" onBack={() => go("pay-fee")} />
-      <div className="flex-1 px-5 pb-6 pt-5">
+      <div className="flex-1 px-5 pb-20 lg:pb-6 pt-5">
         <motion.div
           initial={{ opacity: 0, x: -12 }}
           animate={{ opacity: 1, x: 0 }}
@@ -81,35 +91,56 @@ export function PlaceBidScreen() {
         </div>
 
         <Card className="mt-5 p-5">
-          <div className="flex items-end justify-center gap-2">
-             <input
-               value={bidStr}
-               onChange={(e) => {
-                 const raw = e.target.value
-                 const clean = raw
-                  .replace(/[^0-9.]/g, "")
-                  .replace(/(\..*)\./g, "$1")
-                  .replace(/^(\d*\.?\d{0,2}).*/, "$1")
-                  .slice(0, 8)
-                 setBidStr(clean)
-                 form.handleChange("amount", clean ? Number(clean) : 0)
-                 setSubmitError(null)
-               }}
-               onBlur={() => {
-                 const num = form.values.amount
-                 setBidStr(num > 0 ? num.toFixed(2) : "")
-                 form.handleBlur("amount")
-               }}
-               onKeyDown={(e) => e.key === "Enter" && form.handleSubmit(onSubmit)}
-              aria-label="Bid amount"
-              placeholder="0.00"
-              className={`w-40 rounded-xl border-2 bg-secondary px-3 py-3 text-center font-display text-4xl font-extrabold text-navy outline-none transition-all focus:ring-2 tabular-nums ${
-                form.errors.amount && form.touched.amount
-                  ? "border-destructive focus:border-destructive focus:ring-destructive/20"
-                  : "border-border focus:border-primary focus:ring-primary/20"
-              }`}
-            />
-            <span className="pb-4 text-sm font-bold text-muted-foreground">{CURRENCY}</span>
+          <div className="flex items-end justify-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => adjustAmount(-STEP)}
+              className="flex size-11 shrink-0 items-center justify-center rounded-xl border-2 border-border bg-secondary text-navy transition-all active:scale-90 active:border-primary active:bg-primary/10 hover:border-primary/50"
+              aria-label="Decrease bid amount"
+            >
+              <Minus className="size-5" />
+            </button>
+
+            <div className="relative">
+              <input
+                value={bidStr}
+                onChange={(e) => {
+                  const raw = e.target.value
+                  const clean = raw
+                   .replace(/[^0-9.]/g, "")
+                   .replace(/(\..*)\./g, "$1")
+                   .replace(/^(\d*\.?\d{0,2}).*/, "$1")
+                   .slice(0, 8)
+                  setBidStr(clean)
+                  form.handleChange("amount", clean ? +clean : 0)
+                  setSubmitError(null)
+                }}
+                onBlur={() => {
+                  const num = form.values.amount
+                  setBidStr(num > 0 ? num.toFixed(2) : "")
+                  form.handleBlur("amount")
+                }}
+                onKeyDown={(e) => e.key === "Enter" && form.handleSubmit(onSubmit)}
+               aria-label="Bid amount"
+               placeholder="0.00"
+               className={`w-36 rounded-xl border-2 bg-secondary px-3 py-3 text-center font-display text-4xl font-extrabold text-navy outline-none transition-all focus:ring-2 tabular-nums ${
+                 form.errors.amount && form.touched.amount
+                   ? "border-destructive focus:border-destructive focus:ring-destructive/20"
+                   : "border-border focus:border-primary focus:ring-primary/20"
+               }`}
+              />
+              <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 text-[10px] font-bold text-muted-foreground">{CURRENCY}</span>
+              <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-amber-100 px-1.5 py-[1px] text-[9px] font-bold text-amber-700">Min 1.00</span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => adjustAmount(STEP)}
+              className="flex size-11 shrink-0 items-center justify-center rounded-xl border-2 border-border bg-secondary text-navy transition-all active:scale-90 active:border-primary active:bg-primary/10 hover:border-primary/50"
+              aria-label="Increase bid amount"
+            >
+              <Plus className="size-5" />
+            </button>
           </div>
 
           <AnimatePresence>

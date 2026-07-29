@@ -10,6 +10,7 @@ import { AuctionGateway } from "./gateway/auction.gateway";
 import { BiddingWindowInterceptor } from "../common/bidding-window.interceptor";
 import { ThrottleGuard } from "../common/throttle.guard";
 import { NonceGuard } from "../common/nonce.guard";
+import { BidEncryptionService } from "../common/bid-encryption.service";
 import { WinnerModule } from "../winner/winner.module";
 import { PaymentTransaction } from "../payment/entities/payment-transaction.entity";
 
@@ -26,7 +27,8 @@ import { PaymentTransaction } from "../payment/entities/payment-transaction.enti
     BiddingWindowInterceptor,
     ThrottleGuard,
     NonceGuard,
+    BidEncryptionService,
   ],
-  exports: [BiddingService, AuctionGateway],
+  exports: [BiddingService, AuctionGateway, BidEncryptionService],
 })
 export class BiddingModule {}

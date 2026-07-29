@@ -25,10 +25,10 @@ export function PayFeeScreen() {
   }
 
   return (
-    <div className="flex flex-1 flex-col overflow-y-auto">
+    <div className="relative flex flex-1 flex-col overflow-y-auto">
       
       <AppBar title="Pay Bid Fee" onBack={() => go("product")} />
-      <div className="flex-1 px-5 pb-6 pt-5">
+      <div className="flex-1 px-5 pb-20 lg:pb-6 pt-5">
         <p className="text-sm font-medium text-muted-foreground">
           Pay the non-refundable participation fee to enter this auction.
         </p>

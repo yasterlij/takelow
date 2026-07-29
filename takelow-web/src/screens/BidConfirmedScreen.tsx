@@ -67,24 +67,17 @@ export function BidConfirmedScreen() {
           Keep watching — you might be the lowest unique bidder!
         </p>
       </div>
-      <div className="border-t border-border bg-card p-4">
-        {isAdmin ? (
-          <div className="flex flex-col gap-2">
-            <button
-              onClick={() => go("auctions")}
-              className="btn relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl px-5 py-3 text-sm font-bold shadow-lg transition-all active:scale-[0.98] bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-amber-500/30 hover:shadow-amber-500/40"
-            >
-              <Home className="size-[18px]" /> Back to Auctions
-            </button>
+      <div className="border-t border-border bg-card/95 p-4 backdrop-blur">
+        <div className="flex flex-col gap-2">
+          <CTAButton variant="primary" onClick={() => go("auctions")}>
+            <Home className="size-[18px]" /> Back to Auctions
+          </CTAButton>
+          {isAdmin && (
             <CTAButton variant="navy" onClick={() => go("monitor")}>
               <Eye className="size-[18px]" /> Monitor Auction
             </CTAButton>
-          </div>
-        ) : (
-          <CTAButton variant="outline" onClick={() => go("auctions")}>
-            <Home className="size-[18px]" /> Back to Auctions
-          </CTAButton>
-        )}
+          )}
+        </div>
       </div>
     </div>
   )

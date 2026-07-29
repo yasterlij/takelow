@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "seed": "curl -X POST https://YOUR_VERCEL_URL.vercel.app/api/seed -H 'x-setup-key: your-setup-key'"
   },
   "dependencies": {
     "axios": "^1.6.2",
@@ -20,6 +21,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.19.43",
+    "@vercel/node": "^5.1.14",
     "@types/react": "^18.2.45",
     "@types/react-dom": "^18.2.18",
     "@vitejs/plugin-react": "^4.2.1",

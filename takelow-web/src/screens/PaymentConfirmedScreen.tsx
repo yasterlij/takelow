@@ -17,14 +17,14 @@ export function PaymentConfirmedScreen() {
   if (!auction) return null
 
   return (
-    <div className="flex flex-1 flex-col overflow-y-auto">
+    <div className="relative flex flex-1 flex-col overflow-y-auto">
       <div className="flex items-center gap-3 border-b border-border bg-white/80 px-4 py-3 backdrop-blur-md">
         <button onClick={() => go("auctions")} className="flex size-8 items-center justify-center rounded-full text-neutral-600 transition-colors hover:bg-neutral-100">
           <ArrowLeft className="size-5" />
         </button>
         <h1 className="font-display text-base font-bold text-awash-blue">Payment Confirmed</h1>
       </div>
-      <div className="flex flex-1 flex-col items-center px-6 pb-6 pt-10 text-center">
+      <div className="flex flex-1 flex-col items-center px-6 pb-20 lg:pb-6 pt-10 text-center">
         <div className="relative">
           <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/30" />
           <span className="relative flex size-20 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-500/30">

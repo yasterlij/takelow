@@ -82,6 +82,8 @@ services:
       AWASH_SECRET_KEY: ${AWASH_SECRET_KEY:-}
       AWASH_WEBHOOK_SECRET: ${AWASH_WEBHOOK_SECRET:-}
       AWASH_BASE_URL: ${AWASH_BASE_URL:-https://sandbox.awashbank.com}
+      BID_ENCRYPTION_KEY: ${BID_ENCRYPTION_KEY:-}
+      UPLOAD_BASE_URL: http://localhost:3002
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost}
       IDENTITY_SERVICE_URL: http://identity-service:3000
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:3000,http://localhost}
@@ -101,6 +103,7 @@ services:
     environment:
       DATABASE_URL: postgresql://admin:${POSTGRES_PASSWORD:-secret}@postgres-primary:5432/takelow_db
       JWT_SECRET: ${JWT_SECRET:-}
+      BID_ENCRYPTION_KEY: ${BID_ENCRYPTION_KEY:-}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:3000,http://localhost}
     ports:
       - "3003:3000"

@@ -1,6 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Linking } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { api, setApiToken, setRefreshToken, getApiToken, getRefreshToken, getUserFriendlyMessage, onSessionExpired } from './api'
 import { useToast } from './components/Toast'
@@ -11,7 +10,7 @@ import { type Auction } from './mockDataV0'
 export type View =
   | 'login' | 'register' | 'home' | 'auctions' | 'my-bids' | 'product'
   | 'pay-fee' | 'place-bid' | 'bid-confirmed' | 'monitor' | 'closed'
-  | 'winner' | 'pay-winning' | 'payment-confirmed' | 'payment-verifying' | 'delivery'
+  | 'winner' | 'pay-winning' | 'payment-confirmed' | 'delivery'
   | 'admin-dashboard' | 'admin-auctions' | 'admin-products' | 'admin-users'
   | 'deposit'
   | 'payment-success' | 'payment-failed'
@@ -101,7 +100,7 @@ function mapAuction(apiAuction: any): Auction {
     highlights: [],
     minBid: apiAuction.min_bid ?? undefined,
     maxBid: apiAuction.max_bid ?? undefined,
-    winners: apiAuction.winners ?? undefined,
+    winners: apiAuction.winners?.map((w: any) => ({ ...w, name: w.name || w.user_name || null })) ?? undefined,
     winnersCount: apiAuction.winnersCount ?? apiAuction.winners?.length ?? undefined,
     winning_bid_amount: apiAuction.winning_bid_amount ?? null,
     payment_status: apiAuction.payment_status ?? null,
@@ -312,14 +311,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setAuthError(null)
       const pm = method || paymentMethod
       const { payment_url } = await api.createPaymentLink(selectedId, pm, customerPhone)
-      if (pm === 'SIKINAPAY') {
-        setSikinaPayContext('winning')
-        setSikinaPayUrl(payment_url)
-        setView('sikina-pay-checkout')
-      } else {
-        Linking.openURL(payment_url)
-        setView('payment-verifying')
-      }
+      setSikinaPayContext('winning')
+      setSikinaPayUrl(payment_url)
+      setView('sikina-pay-checkout')
       toast.show(`Payment link opened via ${pm}`, 'success')
     } catch (e: any) {
       toast.show(getUserFriendlyMessage(e), 'error')

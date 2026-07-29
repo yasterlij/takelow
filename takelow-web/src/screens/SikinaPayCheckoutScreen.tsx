@@ -1,14 +1,13 @@
 import { useEffect, useRef, useState, useCallback } from "react"
-import { ExternalLink, X, Check, ArrowLeft, RefreshCw } from "lucide-react"
+import { X, Check, ArrowLeft, ExternalLink, RefreshCw } from "lucide-react"
 import { useApp } from "../AppContext"
-import { api } from "../api"
+import { api, openSikinaPopup, closeSikinaPopup } from "../api"
 import { CURRENCY, formatETB } from "../mockDataV0"
 
 export function SikinaPayCheckoutScreen() {
-  const { go, selectedId, sikinaPayUrl, setSikinaPayUrl, paymentContext, setFeePaid, userBid, getAuction } = useApp()
-  const auction = getAuction(selectedId)
+  const { go, selectedId, sikinaPayUrl, setSikinaPayUrl, paymentContext, setFeePaid, userBid } = useApp()
   const [status, setStatus] = useState<"loading" | "paid" | "failed">("loading")
-  const popupRef = useRef<Window | null>(null)
+  const [popupBlocked, setPopupBlocked] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -17,14 +16,8 @@ export function SikinaPayCheckoutScreen() {
     if (timeoutRef.current) clearTimeout(timeoutRef.current)
   }
 
-  const openPaymentPage = () => {
-    if (!sikinaPayUrl) return
-    const w = window.open(sikinaPayUrl, "sikina-pay", "width=500,height=800,scrollbars=yes")
-    if (w) {
-      popupRef.current = w
-    } else {
-      window.location.href = sikinaPayUrl
-    }
+  const closePopup = () => {
+    closeSikinaPopup()
   }
 
   const checkStatus = useCallback(async (): Promise<boolean> => {
@@ -34,14 +27,14 @@ export function SikinaPayCheckoutScreen() {
         : await api.getPaymentLinkStatus(selectedId!)
       if (res.status === "SUCCESSFUL") {
         cleanup()
+        closePopup()
         setStatus("paid")
-        popupRef.current?.close()
         return true
       }
       if (["FAILED", "CANCELLED", "EXPIRED"].includes(res.status)) {
         cleanup()
+        closePopup()
         setStatus("failed")
-        popupRef.current?.close()
         return true
       }
     } catch {
@@ -52,39 +45,41 @@ export function SikinaPayCheckoutScreen() {
 
   useEffect(() => {
     if (!selectedId || !sikinaPayUrl) return
-    openPaymentPage()
 
-    let consecutiveErrors = 0
+    const popup = openSikinaPopup(sikinaPayUrl)
+    if (!popup || popup.closed) {
+      setPopupBlocked(true)
+    }
 
     pollRef.current = setInterval(async () => {
       const done = await checkStatus()
       if (done) return
-
-      if (popupRef.current?.closed) {
-        consecutiveErrors++
-        if (consecutiveErrors >= 5) {
-          cleanup()
-          setStatus("failed")
-        }
-      } else {
-        consecutiveErrors = 0
-      }
     }, 2000)
 
     timeoutRef.current = setTimeout(() => {
       cleanup()
+      closePopup()
       setStatus("failed")
-    }, 300000)
+    }, 120000)
 
     return () => {
       cleanup()
-      popupRef.current?.close()
+      closePopup()
     }
   }, [selectedId, sikinaPayUrl, paymentContext, checkStatus])
 
+  const handleOpenPopup = () => {
+    const popup = openSikinaPopup(sikinaPayUrl!)
+    if (!popup || popup.closed) {
+      setPopupBlocked(true)
+    } else {
+      setPopupBlocked(false)
+    }
+  }
+
   const handleBack = () => {
     cleanup()
-    popupRef.current?.close()
+    closePopup()
     setSikinaPayUrl(null)
     go(paymentContext === "bid-fee" ? "pay-fee" : "pay-winning")
   }
@@ -102,6 +97,7 @@ export function SikinaPayCheckoutScreen() {
 
   const handleConfirmManually = async () => {
     cleanup()
+    closePopup()
     setSikinaPayUrl(null)
     if (paymentContext === "bid-fee") {
       try {
@@ -123,7 +119,7 @@ export function SikinaPayCheckoutScreen() {
 
   const handleTryAgain = () => {
     cleanup()
-    popupRef.current?.close()
+    closePopup()
     setSikinaPayUrl(null)
     go(paymentContext === "bid-fee" ? "pay-fee" : "pay-winning")
   }
@@ -188,27 +184,50 @@ export function SikinaPayCheckoutScreen() {
         </h1>
       </div>
 
-      <div className="flex flex-1 flex-col items-center justify-center gap-6 px-8 py-10 text-center">
-        <span className="flex size-20 items-center justify-center rounded-full bg-awash-blue/10 text-awash-blue">
-          <ExternalLink className="size-10" />
-        </span>
-        <div>
-          <h2 className="font-display text-xl font-extrabold text-navy">Complete Payment on SikinaPay</h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            A secure payment page has been opened in a new window. Complete your payment there, then return here.
-          </p>
+      <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
+        <div className="mb-6 flex size-20 items-center justify-center rounded-2xl bg-gradient-to-br from-awash-blue/10 to-emerald-500/10">
+          <RefreshCw className="size-10 animate-spin text-awash-blue" />
         </div>
-        <button
-          onClick={openPaymentPage}
-          className="flex items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 transition-all hover:brightness-110"
-        >
-          <ExternalLink className="size-4" />
-          Open Payment Page
-        </button>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+
+        <h2 className="font-display text-xl font-bold text-navy">Waiting for Payment</h2>
+        <p className="mt-2 max-w-xs text-sm text-muted-foreground">
+          {popupBlocked
+            ? "Click the button below to open the SikinaPay payment page."
+            : "Complete your payment in the opened SikinaPay window."}
+        </p>
+
+        <div className="mt-8 flex flex-col items-center gap-3">
+          <button
+            onClick={handleOpenPopup}
+            className="flex items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 transition-all hover:brightness-110"
+          >
+            <ExternalLink className="size-4" />
+            {popupBlocked ? "Open Payment Page" : "Reopen Payment Window"}
+          </button>
+
+          <a
+            href={sikinaPayUrl ?? "#"}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-xs font-semibold text-muted-foreground underline underline-offset-2 hover:text-awash-blue"
+          >
+            Open in new tab
+          </a>
+        </div>
+
+        <div className="mt-10 flex items-center gap-2 rounded-xl border border-border bg-muted/50 px-4 py-2.5 text-xs text-muted-foreground">
           <RefreshCw className="size-3 animate-spin" />
-          Waiting for payment confirmation...
+          Checking payment status every 2 seconds...
         </div>
+      </div>
+
+      <div className="flex items-center justify-center border-t border-border bg-white/80 px-4 py-3 backdrop-blur-sm">
+        <button
+          onClick={handleConfirmManually}
+          className="text-sm font-semibold text-awash-blue underline underline-offset-2"
+        >
+          Already Paid? Confirm
+        </button>
       </div>
     </div>
   )

@@ -1,7 +1,7 @@
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) || "/api/v1"
-const IDENTITY_API = API_BASE
-const ENGINE_API = (import.meta.env.VITE_ENGINE_API_BASE_URL as string | undefined) || "http://localhost:3002/api/v1"
-const QUERY_API = API_BASE
+const IDENTITY_API = (import.meta.env.VITE_IDENTITY_API_BASE_URL as string | undefined) || API_BASE
+const ENGINE_API = (import.meta.env.VITE_ENGINE_API_BASE_URL as string | undefined) || API_BASE
+const QUERY_API = (import.meta.env.VITE_QUERY_API_BASE_URL as string | undefined) || API_BASE
 
 let _token: string | null = null
 let _refreshToken: string | null = null
@@ -190,10 +190,14 @@ export type ApiAuction = {
 export type ApiBid = {
   id: string
   user_id: string
+  user_name?: string | null
   auction_id: string
   amount: number
+  encrypted_amount?: string | null
+  amount_encrypted?: boolean
   bid_time: string
   service_fee_paid: boolean
+  ticket_number?: string
 }
 
 export type ApiWinnerResult = {
@@ -330,7 +334,7 @@ export const api = {
     if (customerPhone) params.set('customer_phone', customerPhone)
     const qs = params.toString()
     if (qs) path += `?${qs}`
-    return request<{ payment_url: string; transaction_id: string; gateway: string }>('POST', path, undefined, ENGINE_API)
+    return request<{ payment_url: string; proxy_url: string; transaction_id: string; gateway: string }>('POST', path, undefined, ENGINE_API)
   },
   getPaymentLinkStatus(auctionId: string) {
     return request<{ status: string; payment_url: string | null; gateway?: string }>('GET', `/payments/${auctionId}/status`, undefined, ENGINE_API)
@@ -340,7 +344,7 @@ export const api = {
   },
     createBidFeePaymentLink(auctionId: string, paymentMethod?: 'SIKINAPAY' | 'AWASH') {
       const path = paymentMethod ? `/payments/bid-fee/${auctionId}/link?payment_method=${paymentMethod}` : `/payments/bid-fee/${auctionId}/link`
-      return request<{ payment_url: string; transaction_id: string }>('POST', path, undefined, ENGINE_API)
+      return request<{ payment_url: string; proxy_url: string; transaction_id: string }>('POST', path, undefined, ENGINE_API)
     },
   getBidFeePaymentStatus(auctionId: string) {
     return request<{ status: string; payment_url: string | null }>('GET', `/payments/bid-fee/${auctionId}/status`, undefined, ENGINE_API)
@@ -440,4 +444,24 @@ export const api = {
   markAllNotificationsRead() {
     return request<{ read: boolean }>('POST', '/notify/inbox/read-all', undefined, IDENTITY_API)
   },
+}
+
+let _sikinaPopup: Window | null = null
+
+export function openSikinaPopup(url: string): Window | null {
+  if (_sikinaPopup && !_sikinaPopup.closed) {
+    _sikinaPopup.focus()
+    return _sikinaPopup
+  }
+  _sikinaPopup = window.open(url, 'sikina-pay', 'width=450,height=750,scrollbars=yes,resizable=yes')
+  return _sikinaPopup
+}
+
+export function closeSikinaPopup(): void {
+  if (_sikinaPopup && !_sikinaPopup.closed) _sikinaPopup.close()
+  _sikinaPopup = null
+}
+
+export function isSikinaPopupOpen(): boolean {
+  return !!(_sikinaPopup && !_sikinaPopup.closed)
 }

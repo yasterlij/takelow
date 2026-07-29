@@ -15,7 +15,7 @@ import { toast } from "../store/toast.store"
 import { CURRENCY, formatETB } from "../mockDataV0"
 import type { Auction } from "../mockDataV0"
 
-type BidRow = { id: string; amount: number; user_id: string; bid_time: string; ticket_number?: string }
+type BidRow = { id: string; amount: number; user_id: string; user_name?: string | null; bid_time: string; ticket_number?: string; amount_encrypted?: boolean }
 
 export function AdminAuctionMonitorScreen() {
   const { go, selectedId, getAuction, closeAuction, refreshAuctions, selectAuctionForMonitor } = useApp()
@@ -284,15 +284,19 @@ export function AdminAuctionMonitorScreen() {
             <button onClick={handleViewBids} className="text-[11px] font-bold text-primary hover:text-awash-gold-dark">View all</button>
           </div>
           <div className="mt-3 space-y-2">
-            {bids.slice(0, 5).map((b, i) => (
+            {bids.slice(0, 5).map((b, i) => {
+            const coded = `User ${b.user_id?.slice(0, 8) || "—"}`
+            const display = b.user_name ? `${b.user_name} (${coded})` : coded
+            return (
               <div key={b.id || i} className="flex items-center justify-between rounded-xl bg-neutral-50 px-3 py-2">
                 <span className="flex items-center gap-2 text-xs font-semibold text-neutral-500">
                   <span className="flex size-5 items-center justify-center rounded-full bg-awash-blue/10 text-[9px] font-bold text-awash-blue/60">{i + 1}</span>
-                  User {b.user_id?.slice(0, 8) || "—"}
+                  {display}
                 </span>
-                <span className="font-display text-sm font-bold text-awash-blue">{CURRENCY} {formatETB(b.amount)}</span>
+                <span className="font-display text-sm font-bold text-awash-blue">{b.amount_encrypted ? `${CURRENCY} ••••` : `${CURRENCY} ${formatETB(b.amount)}`}</span>
               </div>
-            ))}
+            )
+          })}
             {bids.length === 0 && (
               <p className="py-4 text-center text-xs font-medium text-neutral-400">No bids yet. Click "View All Bids" to refresh.</p>
             )}
@@ -314,13 +318,17 @@ export function AdminAuctionMonitorScreen() {
               {
                 key: "user",
                 header: "User",
-                render: (b: BidRow) => <span className="text-xs font-semibold text-neutral-600">User {b.user_id?.slice(0, 8) || "—"}</span>,
+                render: (b: BidRow) => {
+                  const coded = `User ${b.user_id?.slice(0, 8) || "—"}`
+                  const display = b.user_name ? `${b.user_name} (${coded})` : coded
+                  return <span className="text-xs font-semibold text-neutral-600">{display}</span>
+                },
               },
               {
                 key: "amount",
                 header: "Amount",
                 align: "right" as const,
-                render: (b: BidRow) => <span className="font-display text-sm font-bold text-awash-blue">{CURRENCY} {formatETB(b.amount)}</span>,
+                render: (b: BidRow) => <span className="font-display text-sm font-bold text-awash-blue">{b.amount_encrypted ? `${CURRENCY} ••••` : `${CURRENCY} ${formatETB(b.amount)}`}</span>,
               },
               {
                 key: "ticket",
@@ -375,7 +383,7 @@ export function AdminAuctionMonitorScreen() {
                 </motion.div>
                 <h3 className="mt-4 font-display text-lg font-extrabold text-awash-blue">Winner Found!</h3>
                 <p className="mt-1 text-sm font-medium text-neutral-500">
-                  {winner.winner_name || `User ${winner.winner_user_id.slice(0, 8)}`}
+                  {winner.winner_name ? `${winner.winner_name} (User ${winner.winner_user_id.slice(0, 8)})` : `User ${winner.winner_user_id.slice(0, 8)}`}
                   {winner.winner_phone && ` · ${winner.winner_phone}`}
                 </p>
                 <div className="mt-4 flex items-center gap-6">

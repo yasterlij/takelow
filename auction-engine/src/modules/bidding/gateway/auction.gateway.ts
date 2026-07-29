@@ -66,7 +66,6 @@ export class AuctionGateway
 
   broadcastAuctionUpdate(payload: {
     auction_id: string;
-    new_bid_amount: number;
     total_bids: number;
     timestamp: string;
   }): void {

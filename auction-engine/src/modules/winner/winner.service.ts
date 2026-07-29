@@ -6,6 +6,7 @@ import { InjectRedis } from "../common/redis.decorator";
 import { Bid } from "../bidding/entities/bid.entity";
 import { Auction } from "./entities/auction.entity";
 import { Winner, WinnerPaymentStatus } from "./entities/winner.entity";
+import { BidEncryptionService } from "../common/bid-encryption.service";
 
 @Injectable()
 export class WinnerService {
@@ -16,6 +17,7 @@ export class WinnerService {
     @InjectRepository(Bid) private bidRepository: Repository<Bid>,
     @InjectRepository(Auction) private auctionRepository: Repository<Auction>,
     @InjectRepository(Winner) private winnerRepository: Repository<Winner>,
+    private readonly bidEncryptionService: BidEncryptionService,
   ) {}
 
   async calculateWinners(auctionId: string): Promise<{
@@ -170,9 +172,17 @@ export class WinnerService {
     const frequency = new Map<number, number>();
     const earliestPerAmount = new Map<number, string>();
     for (const bid of bids) {
-      frequency.set(bid.amount, (frequency.get(bid.amount) || 0) + 1);
-      if (!earliestPerAmount.has(bid.amount)) {
-        earliestPerAmount.set(bid.amount, bid.user_id);
+      let realAmount = bid.amount;
+      if (realAmount === 0 && bid.encrypted_amount) {
+        try {
+          realAmount = this.bidEncryptionService.decrypt(bid.encrypted_amount);
+        } catch {
+          continue;
+        }
+      }
+      frequency.set(realAmount, (frequency.get(realAmount) || 0) + 1);
+      if (!earliestPerAmount.has(realAmount)) {
+        earliestPerAmount.set(realAmount, bid.user_id);
       }
     }
 
@@ -207,17 +217,26 @@ export class WinnerService {
     amounts: number[],
   ): Promise<Map<number, string>> {
     if (amounts.length === 0) return new Map();
-    const bids = await this.bidRepository
-      .createQueryBuilder("bid")
-      .select(["DISTINCT ON (bid.amount) bid.amount", "bid.user_id"])
-      .where("bid.auction_id = :auctionId", { auctionId })
-      .andWhere("bid.amount IN (:...amounts)", { amounts })
-      .orderBy("bid.amount", "ASC")
-      .addOrderBy("bid.bid_time", "ASC")
-      .getRawMany();
+    const amountSet = new Set(amounts);
+    const bids = await this.bidRepository.find({
+      where: { auction_id: auctionId },
+      order: { bid_time: "ASC" },
+    });
     const result = new Map<number, string>();
+    const seen = new Set<number>();
     for (const bid of bids) {
-      result.set(Number(bid.amount), bid.user_id);
+      let realAmount = bid.amount;
+      if (realAmount === 0 && bid.encrypted_amount) {
+        try {
+          realAmount = this.bidEncryptionService.decrypt(bid.encrypted_amount);
+        } catch {
+          continue;
+        }
+      }
+      if (amountSet.has(realAmount) && !seen.has(realAmount)) {
+        seen.add(realAmount);
+        result.set(realAmount, bid.user_id);
+      }
     }
     return result;
   }

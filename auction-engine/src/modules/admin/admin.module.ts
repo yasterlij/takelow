@@ -8,6 +8,7 @@ import { Winner } from "../winner/entities/winner.entity";
 import { Product } from "./entities/product.entity";
 import { Bid } from "../bidding/entities/bid.entity";
 import { WinnerModule } from "../winner/winner.module";
+import { BidEncryptionService } from "../common/bid-encryption.service";
 
 @Module({
   imports: [
@@ -15,6 +16,6 @@ import { WinnerModule } from "../winner/winner.module";
     WinnerModule,
   ],
   controllers: [AuctionManageController],
-  providers: [AuctionManageService, ImageService],
+  providers: [AuctionManageService, ImageService, BidEncryptionService],
 })
 export class AdminModule {}

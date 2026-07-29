@@ -42,11 +42,14 @@ export function WinnerScreen() {
 
   const savings = winner?.winning_bid_amount != null ? (auction.marketPrice - winner.winning_bid_amount) : 0
   const savingsPct = auction.marketPrice > 0 ? Math.round((savings / auction.marketPrice) * 100) : 0
-  const winnerName = winner?.winner_name || (winner?.winner_user_id ? `User ${winner.winner_user_id.slice(0, 8)}` : null)
+  const winnerName = winner?.winner_name && winner?.winner_user_id
+    ? `${winner.winner_name} (User ${winner.winner_user_id.slice(0, 8)})`
+    : (winner?.winner_user_id ? `User ${winner.winner_user_id.slice(0, 8)}` : null)
   const winnerPhone = winner?.winner_phone || null
   const maskPhone = (p: string | null) => p ? p.slice(0, 4) + "****" + p.slice(-2) : null
   const deadline = winner?.payment_deadline ? new Date(winner.payment_deadline) : null
   const deadlineHrs = deadline ? Math.max(0, Math.round((deadline.getTime() - Date.now()) / 3600000)) : null
+  const allWinners = 'all_winners' in (winner || {}) ? (winner as any).all_winners as any[] : undefined
 
   const allBids = 'bids' in (winner || {}) ? (winner as any).bids as any[] : []
   const amountCount = new Map<number, number>()
@@ -176,7 +179,7 @@ export function WinnerScreen() {
                           <View style={{ flex: 1 }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                               <Text style={{ fontSize: 11, color: colors.mutedForeground }} numberOfLines={1}>
-                                {w.name || w.user_id.slice(0, 8)}
+                                {w.name ? `${w.name} (User ${w.user_id.slice(0, 8)})` : `User ${w.user_id.slice(0, 8)}`}
                               </Text>
                               {w.phone && (
                                 <Text style={{ fontSize: 9, color: colors.mutedForeground + '99' }}>{maskPhone(w.phone)}</Text>
@@ -280,7 +283,7 @@ export function WinnerScreen() {
                       }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1 }}>
                           <Text style={{ fontSize: 12, fontWeight: '700', color: colors.emerald800 }} numberOfLines={1}>
-                            {winnerBid.user_id.slice(0, 8)}...
+                            {(winnerBid.name || winnerBid.user_name) ? `${winnerBid.name || winnerBid.user_name} (User ${winnerBid.user_id.slice(0, 8)})` : `User ${winnerBid.user_id.slice(0, 8)}`}
                           </Text>
                           {winnerBid.user_id === user?.id && (
                             <View style={{ borderRadius: 4, backgroundColor: colors.primary + '22', paddingHorizontal: 4, paddingVertical: 1 }}>
@@ -359,7 +362,7 @@ export function WinnerScreen() {
         </View>
       </View>
       <View style={s.bottomCta}>
-        {winner?.winner_user_id && (isAdmin || winner.winner_user_id === user?.id) ? (
+        {winner?.winner_user_id && allWinners?.some((w: any) => w.user_id === user?.id) ? (
           <CTAButton onPress={() => go('pay-winning')}>
             <CreditCard size={18} /> {winner.payment_status === 'PAID' ? 'View Receipt' : 'Process Payment'}
           </CTAButton>

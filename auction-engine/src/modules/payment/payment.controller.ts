@@ -5,10 +5,13 @@ import {
   Param,
   UseGuards,
   Req,
+  Res,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
   Query,
   Logger,
+  HttpStatus,
 } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { InjectRepository } from "@nestjs/typeorm";
@@ -72,6 +75,7 @@ export class PaymentController {
     );
     return {
       payment_url: result.paymentUrl,
+      proxy_url: result.proxyUrl,
       transaction_id: result.transactionId,
       gateway: method,
     };
@@ -138,6 +142,7 @@ export class PaymentController {
     );
     return {
       payment_url: result.paymentUrl,
+      proxy_url: result.proxyUrl,
       transaction_id: result.transactionId,
     };
   }
@@ -231,5 +236,40 @@ export class PaymentController {
       Number(auction.winning_bid_amount),
     );
     return { paid: true };
+  }
+
+  @Get("proxy/:transactionId")
+  async proxyPaymentPage(
+    @Param("transactionId") transactionId: string,
+    @Query("token") token: string,
+    @Res() res: any,
+  ) {
+    if (!token) throw new BadRequestException("Missing proxy token");
+    if (!this.paymentService.validateProxyToken(transactionId, token)) {
+      throw new ForbiddenException("Invalid or expired proxy token");
+    }
+
+    const transaction = await this.paymentService.findTransactionById(
+      transactionId,
+    );
+    if (!transaction) throw new NotFoundException("Transaction not found");
+
+    const paymentUrl =
+      transaction.sikina_payment_url || transaction.awash_payment_url;
+    if (!paymentUrl) throw new NotFoundException("Payment URL not found");
+
+    try {
+      const { body, contentType } =
+        await this.paymentService.fetchAndProxyPaymentPage(paymentUrl);
+
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("X-Frame-Options", "ALLOWALL");
+      res.removeHeader("Content-Security-Policy");
+      res.removeHeader("Cross-Origin-Resource-Policy");
+      return res.status(HttpStatus.OK).send(body);
+    } catch (e) {
+      this.logger.error(`Payment proxy failed: ${e.message}`);
+      throw new BadRequestException("Failed to load payment page");
+    }
   }
 }

@@ -5,6 +5,7 @@ import { Repository, LessThan, IsNull, Not } from "typeorm";
 import { Cron, CronExpression } from "@nestjs/schedule";
 import { InjectRedis } from "../common/redis.decorator";
 import { Redis } from "ioredis";
+import * as crypto from "node:crypto";
 import {
   Auction,
   AuctionStatus as AS,
@@ -30,6 +31,7 @@ export class PaymentService {
   private readonly bidFee: number;
   private readonly successRedirectUrl: string;
   private readonly failedRedirectUrl: string;
+  private readonly proxySecret: string;
 
   constructor(
     @InjectRepository(Auction)
@@ -53,6 +55,61 @@ export class PaymentService {
     this.failedRedirectUrl =
       this.configService.get<string>("app.sikinaFailedRedirectUrl")! ||
       `${this.configService.get<string>("app.appBaseUrl")!}/payment/failed`;
+    this.proxySecret =
+      this.configService.get<string>("app.jwtSecret")! ||
+      "default-proxy-secret";
+  }
+
+  generateProxyUrl(transactionId: string): string {
+    const expiresAt = Math.floor(Date.now() / 1000) + 600;
+    const payload = `${transactionId}:${expiresAt}`;
+    const hmac = crypto
+      .createHmac("sha256", this.proxySecret)
+      .update(payload)
+      .digest("hex");
+    const token = Buffer.from(`${hmac}.${expiresAt}`).toString("base64url");
+    return `/api/v1/payments/proxy/${transactionId}?token=${token}`;
+  }
+
+  validateProxyToken(transactionId: string, token: string): boolean {
+    try {
+      const decoded = Buffer.from(token, "base64url").toString();
+      const [hmac, expiresAtStr] = decoded.split(".");
+      const expiresAt = parseInt(expiresAtStr, 10);
+      if (Math.floor(Date.now() / 1000) > expiresAt) return false;
+      const payload = `${transactionId}:${expiresAtStr}`;
+      const expected = crypto
+        .createHmac("sha256", this.proxySecret)
+        .update(payload)
+        .digest("hex");
+      return crypto.timingSafeEqual(
+        Buffer.from(hmac, "hex"),
+        Buffer.from(expected, "hex"),
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  async fetchAndProxyPaymentPage(
+    paymentUrl: string,
+  ): Promise<{ body: string; contentType: string }> {
+    const res = await fetch(paymentUrl, {
+      redirect: "follow",
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        Accept:
+          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+      },
+    });
+
+    const body = await res.text();
+    const contentType =
+      res.headers.get("content-type") || "text/html;charset=UTF-8";
+
+    return { body, contentType };
   }
 
   async createPaymentLink(
@@ -62,7 +119,7 @@ export class PaymentService {
     description: string,
     paymentMethod: "SIKINAPAY" | "AWASH" = "SIKINAPAY",
     customerPhone?: string,
-  ): Promise<{ paymentUrl: string; transactionId: string }> {
+  ): Promise<{ paymentUrl: string; proxyUrl: string; transactionId: string }> {
     const shortAuctionId = auctionId.split("-")[0];
     const clientReferenceId = `pay-${shortAuctionId}-${Date.now()}`;
 
@@ -76,7 +133,8 @@ export class PaymentService {
     if (existing?.sikina_payment_url || existing?.awash_payment_url) {
       const paymentUrl =
         existing.sikina_payment_url || existing.awash_payment_url!;
-      return { paymentUrl: paymentUrl!, transactionId: existing.id };
+      const proxyUrl = this.generateProxyUrl(existing.id);
+      return { paymentUrl: paymentUrl!, proxyUrl, transactionId: existing.id };
     }
 
     let paymentUrl: string;
@@ -147,7 +205,8 @@ export class PaymentService {
       `Payment link created for auction ${auctionId}, user ${userId} via ${gateway}: ${paymentUrl}`,
     );
 
-    return { paymentUrl, transactionId: saved.id };
+    const proxyUrl = this.generateProxyUrl(saved.id);
+    return { paymentUrl, proxyUrl, transactionId: saved.id };
   }
 
   async findTransaction(
@@ -160,12 +219,20 @@ export class PaymentService {
     });
   }
 
+  async findTransactionById(
+    transactionId: string,
+  ): Promise<PaymentTransaction | null> {
+    return this.paymentTransactionRepository.findOne({
+      where: { id: transactionId },
+    });
+  }
+
   async createBidFeePaymentLink(
     auctionId: string,
     userId: string,
     amount: number,
     paymentMethod: "SIKINAPAY" | "AWASH" = "SIKINAPAY",
-  ): Promise<{ paymentUrl: string; transactionId: string }> {
+  ): Promise<{ paymentUrl: string; proxyUrl: string; transactionId: string }> {
     const shortAuctionId = auctionId.split("-")[0];
     const clientReferenceId = `fee-${shortAuctionId}-${userId.split("-")[0]}-${Date.now()}`;
     const description = `Bid fee for auction ${auctionId}`;
@@ -178,17 +245,11 @@ export class PaymentService {
         status: PaymentTransactionStatus.PENDING,
       },
     });
-    if (existing?.sikina_payment_url) {
-      return {
-        paymentUrl: existing.sikina_payment_url,
-        transactionId: existing.id,
-      };
-    }
-    if (existing?.awash_payment_url) {
-      return {
-        paymentUrl: existing.awash_payment_url,
-        transactionId: existing.id,
-      };
+    if (existing?.sikina_payment_url || existing?.awash_payment_url) {
+      const paymentUrl =
+        existing.sikina_payment_url || existing.awash_payment_url!;
+      const proxyUrl = this.generateProxyUrl(existing.id);
+      return { paymentUrl: paymentUrl!, proxyUrl, transactionId: existing.id };
     }
 
     let paymentUrl: string;
@@ -243,7 +304,8 @@ export class PaymentService {
       `Bid fee payment link created for auction ${auctionId}, user ${userId} via ${gateway}: ${paymentUrl}`,
     );
 
-    return { paymentUrl, transactionId: saved.id };
+    const proxyUrl = this.generateProxyUrl(saved.id);
+    return { paymentUrl, proxyUrl, transactionId: saved.id };
   }
 
   private async deductFromWallet(

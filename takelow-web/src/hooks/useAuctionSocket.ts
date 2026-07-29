@@ -5,7 +5,6 @@ import { getApiToken } from "../api"
 
 export type SocketUpdatePayload = {
   auction_id: string
-  new_bid_amount: number
   total_bids: number
   timestamp: string
 }

@@ -37,10 +37,10 @@ export function MonitorScreen() {
   const bidProgress = auction.maxBid ? Math.min(bidCount / auction.maxBid, 1) : 0
 
   return (
-    <div className="flex flex-1 flex-col overflow-y-auto">
+    <div className="relative flex flex-1 flex-col overflow-y-auto">
       
       <AppBar title="Auction in Progress" onBack={() => go("bid-confirmed")} />
-      <div className="flex-1 px-5 pb-6 pt-5">
+      <div className="flex-1 px-5 pb-20 lg:pb-6 pt-5">
         <div className="flex items-center justify-center">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700 animate-pulse">
             <Radio className="size-3.5" /> LIVE

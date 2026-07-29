@@ -20,6 +20,7 @@ import { BiddingWindowInterceptor } from "../common/bidding-window.interceptor";
 import { ThrottleGuard } from "../common/throttle.guard";
 import { NonceGuard } from "../common/nonce.guard";
 import { WinnerService } from "../winner/winner.service";
+import { BidEncryptionService } from "../common/bid-encryption.service";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { Auction, AuctionStatus } from "../winner/entities/auction.entity";
@@ -33,6 +34,7 @@ export class BiddingController {
   constructor(
     private biddingService: BiddingService,
     private winnerService: WinnerService,
+    private bidEncryptionService: BidEncryptionService,
     @InjectRepository(Auction)
     private auctionRepository: Repository<Auction>,
     @InjectRepository(Bid)
@@ -54,14 +56,15 @@ export class BiddingController {
     const user = req.user;
     const auction = req.auction;
 
+    const ticketNumber = `BID_${crypto.randomBytes(6).toString("hex")}`;
+
     const result = await this.biddingService.placeBid(
       auctionId,
       user.id,
       amount,
       auction.end_time,
+      ticketNumber,
     );
-
-    const ticketNumber = `BID_${crypto.randomBytes(6).toString("hex")}`;
 
     this.sendBidSms(user, auction, amount, ticketNumber).catch((e: any) => this.logger.warn(`Failed to send bid SMS: ${e.message}`));
 
@@ -80,6 +83,8 @@ export class BiddingController {
       relations: ["product"],
     });
     if (!auction) throw new NotFoundException("Auction not found");
+
+    const isActive = auction.status === AuctionStatus.ACTIVE;
 
     const stats = await this.winnerService.getAuctionStats(auctionId);
     const { winners } = await this.winnerService.calculateWinners(auctionId);
@@ -100,7 +105,7 @@ export class BiddingController {
           const info = await this.resolveWinnerUserInfo(w.user_id || w.userId);
           return {
             user_id: w.user_id || w.userId,
-            amount: w.amount,
+            amount: isActive ? 0 : w.amount,
             rank: w.rank,
             payment_status: w.payment_status,
             payment_deadline: w.payment_deadline,
@@ -122,15 +127,17 @@ export class BiddingController {
       winner_user_id: auction.winner_user_id,
       winner_name: primaryWinnerInfo?.name || null,
       winner_phone: primaryWinnerInfo?.phone || null,
-      winning_bid_amount: auction.winning_bid_amount,
+      winning_bid_amount: isActive ? null : auction.winning_bid_amount,
       total_bids: stats.totalBids,
       unique_bidders: stats.uniqueBidders,
-      lowest_unique_bid: stats.lowestUniqueBid,
+      lowest_unique_bid: isActive ? null : stats.lowestUniqueBid,
       all_winners: allWinners,
       winners_count: allWinners.length,
       my_bid: userBid
         ? {
-            amount: userBid.amount,
+            amount: isActive ? 0 : this.resolveBidAmount(userBid),
+            encrypted_amount: isActive ? userBid.encrypted_amount : null,
+            amount_encrypted: isActive,
             bid_time: userBid.bid_time,
             service_fee_paid: userBid.service_fee_paid,
           }
@@ -185,6 +192,15 @@ export class BiddingController {
         `Failed to resolve winner info for ${userId}: ${e.message}`,
       );
       return null;
+    }
+  }
+
+  private resolveBidAmount(bid: Bid): number {
+    if (bid.amount !== 0 || !bid.encrypted_amount) return bid.amount;
+    try {
+      return this.bidEncryptionService.decrypt(bid.encrypted_amount);
+    } catch {
+      return 0;
     }
   }
 }

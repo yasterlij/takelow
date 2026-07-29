@@ -29,9 +29,9 @@ export function PayWinningScreen() {
   }
 
   return (
-    <div className="flex flex-1 flex-col overflow-y-auto">
+    <div className="relative flex flex-1 flex-col overflow-y-auto">
       <AppBar title="Pay Winning Amount" onBack={() => go("winner")} />
-      <div className="flex-1 px-5 pb-6 pt-5">
+      <div className="flex-1 px-5 pb-20 lg:pb-6 pt-5">
         <div className={`flex items-center gap-2 rounded-xl p-3 ${urgent ? "bg-red-50 border border-red-200" : "bg-accent"}`}>
           <Clock className={`size-[18px] flex-shrink-0 ${urgent ? "text-red-500" : "text-primary"}`} />
           <p className={`text-xs font-semibold ${urgent ? "text-red-700" : "text-navy/80"}`}>

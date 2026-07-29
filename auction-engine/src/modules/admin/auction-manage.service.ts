@@ -19,6 +19,7 @@ import { AuctionClosureService } from "../winner/auction-closure.service";
 import { WinnerService } from "../winner/winner.service";
 import { Bid } from "../bidding/entities/bid.entity";
 import { ImageService } from "./image.service";
+import { BidEncryptionService } from "../common/bid-encryption.service";
 
 @Injectable()
 export class AuctionManageService {
@@ -36,6 +37,7 @@ export class AuctionManageService {
     private closureService: AuctionClosureService,
     private winnerService: WinnerService,
     private imageService: ImageService,
+    private bidEncryptionService: BidEncryptionService,
   ) {}
 
   async listProducts(page = 1, limit = 20, search?: string) {
@@ -326,22 +328,59 @@ export class AuctionManageService {
       lowest_unique_bid: stats.lowestUniqueBid,
       all_winners: allWinners,
       winners_count: allWinners.length,
-      bids,
+      bids: bids.map((b) => ({ ...b, amount: this.resolveBidAmount(b) })),
       created_at: auction.created_at,
       payment_status: auction.payment_status,
       payment_deadline: auction.payment_deadline,
     };
   }
 
+  private resolveBidAmount(bid: Bid): number {
+    if (bid.amount !== 0 || !bid.encrypted_amount) return bid.amount;
+    try {
+      return this.bidEncryptionService.decrypt(bid.encrypted_amount);
+    } catch {
+      return 0;
+    }
+  }
+
   async getAuctionBids(auctionId: string) {
     const auction = await this.auctionRepository.findOne({
       where: { id: auctionId },
+      select: ["id", "status"],
     });
     if (!auction) throw new NotFoundException("Auction not found");
-    return this.bidRepository.find({
+    const bids = await this.bidRepository.find({
       where: { auction_id: auctionId },
       order: { bid_time: "ASC" },
     });
+    const isActive = auction.status === AuctionStatus.ACTIVE;
+    const enriched = await Promise.all(
+      bids.map(async (b) => {
+        const info = await this.resolveWinnerUserInfo(b.user_id);
+        let realAmount = b.amount;
+        if (!isActive && b.encrypted_amount) {
+          try {
+            realAmount = this.bidEncryptionService.decrypt(b.encrypted_amount);
+          } catch {
+            realAmount = 0;
+          }
+        }
+        return {
+          id: b.id,
+          user_id: b.user_id,
+          user_name: info?.name || null,
+          auction_id: b.auction_id,
+          amount: isActive ? 0 : realAmount,
+          encrypted_amount: isActive ? b.encrypted_amount : null,
+          amount_encrypted: isActive,
+          bid_time: b.bid_time,
+          service_fee_paid: b.service_fee_paid,
+          ticket_number: b.ticket_number,
+        };
+      }),
+    );
+    return enriched;
   }
 
   async exportAuctionsCsv(status?: AuctionStatus) {

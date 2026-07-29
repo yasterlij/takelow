@@ -1,8 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThan } from 'typeorm';
+import { Repository, MoreThan, In } from 'typeorm';
 import { Auction, AuctionStatus } from './entities/auction.entity';
 import { Bid } from './entities/bid.entity';
+import { BidEncryptionService } from '../common/bid-encryption.service';
 
 interface WinnerRow {
   user_id: string;
@@ -10,6 +11,7 @@ interface WinnerRow {
   rank: number;
   payment_status: string;
   payment_deadline: Date;
+  user_name: string | null;
 }
 
 @Injectable()
@@ -19,6 +21,7 @@ export class AuctionsService {
     private auctionRepository: Repository<Auction>,
     @InjectRepository(Bid)
     private bidRepository: Repository<Bid>,
+    private bidEncryptionService: BidEncryptionService,
   ) {}
 
   async getActiveAuctions(): Promise<any[]> {
@@ -125,8 +128,9 @@ export class AuctionsService {
     if (auctionIds.length > 0) {
       try {
         const winnerRows: any[] = await this.auctionRepository.query(
-          `SELECT w.auction_id, w.user_id, w.amount, w.rank, w.payment_status, w.payment_deadline
+          `SELECT w.auction_id, w.user_id, w.amount, w.rank, w.payment_status, w.payment_deadline, u.full_name AS user_name
            FROM winners w
+           LEFT JOIN users u ON u.id = w.user_id
            WHERE w.auction_id = ANY($1)
            ORDER BY w.rank ASC`,
           [auctionIds],
@@ -141,6 +145,7 @@ export class AuctionsService {
             rank: row.rank,
             payment_status: row.payment_status,
             payment_deadline: row.payment_deadline,
+            user_name: row.user_name || null,
           });
         }
       } catch {
@@ -172,6 +177,7 @@ export class AuctionsService {
         winning_bid_amount: auction.winning_bid_amount,
         winners: auctionWinners.map((w) => ({
           user_id: w.user_id,
+          user_name: w.user_name,
           amount: w.amount,
           rank: w.rank,
           payment_status: w.payment_status,
@@ -184,20 +190,78 @@ export class AuctionsService {
     });
   }
 
-  async getBidHistory(auctionId: string): Promise<Bid[]> {
-    return this.bidRepository.find({
+  async getBidHistory(auctionId: string): Promise<any[]> {
+    const auction = await this.auctionRepository.findOne({
+      where: { id: auctionId },
+      select: ['id', 'status'],
+    });
+    const isActive = auction?.status === AuctionStatus.ACTIVE;
+    const bids = await this.bidRepository.find({
       where: { auction_id: auctionId },
       order: { bid_time: 'DESC' },
       take: 200,
     });
+    return Promise.all(bids.map(async (b) => {
+      let realAmount = b.amount;
+      if (!isActive && b.encrypted_amount) {
+        try {
+          realAmount = this.bidEncryptionService.decrypt(b.encrypted_amount);
+        } catch {
+          realAmount = 0;
+        }
+      }
+      return {
+        id: b.id,
+        user_id: b.user_id,
+        auction_id: b.auction_id,
+        amount: isActive ? 0 : realAmount,
+        encrypted_amount: isActive ? b.encrypted_amount : null,
+        amount_encrypted: isActive,
+        bid_time: b.bid_time,
+        service_fee_paid: b.service_fee_paid,
+        ticket_number: b.ticket_number,
+      };
+    }));
   }
 
-  async getUserBidHistory(userId: string): Promise<Bid[]> {
-    return this.bidRepository.find({
+  async getUserBidHistory(userId: string): Promise<any[]> {
+    const bids = await this.bidRepository.find({
       where: { user_id: userId },
       order: { bid_time: 'DESC' },
       take: 100,
     });
+
+    if (bids.length === 0) return [];
+
+    const auctionIds = [...new Set(bids.map((b) => b.auction_id))];
+    const auctions = await this.auctionRepository.find({
+      where: { id: In(auctionIds) },
+      select: ['id', 'status'],
+    });
+    const auctionStatusMap = new Map(auctions.map((a) => [a.id, a.status]));
+
+    return Promise.all(bids.map(async (b) => {
+      const isActive = auctionStatusMap.get(b.auction_id) === AuctionStatus.ACTIVE;
+      let realAmount = b.amount;
+      if (!isActive && b.encrypted_amount) {
+        try {
+          realAmount = this.bidEncryptionService.decrypt(b.encrypted_amount);
+        } catch {
+          realAmount = 0;
+        }
+      }
+      return {
+        id: b.id,
+        user_id: b.user_id,
+        auction_id: b.auction_id,
+        amount: isActive ? 0 : realAmount,
+        encrypted_amount: isActive ? b.encrypted_amount : null,
+        amount_encrypted: isActive,
+        bid_time: b.bid_time,
+        service_fee_paid: b.service_fee_paid,
+        ticket_number: b.ticket_number,
+      };
+    }));
   }
 
   async getUserWonAuctions(userId: string): Promise<any[]> {
@@ -216,8 +280,9 @@ export class AuctionsService {
     if (auctionIds.length > 0) {
       try {
         const winnerRows: any[] = await this.auctionRepository.query(
-          `SELECT w.auction_id, w.user_id, w.amount, w.rank, w.payment_status, w.payment_deadline
+          `SELECT w.auction_id, w.user_id, w.amount, w.rank, w.payment_status, w.payment_deadline, u.full_name AS user_name
            FROM winners w
+           LEFT JOIN users u ON u.id = w.user_id
            WHERE w.auction_id = ANY($1) AND w.user_id = $2
            ORDER BY w.rank ASC`,
           [auctionIds, userId],
@@ -232,6 +297,7 @@ export class AuctionsService {
             rank: row.rank,
             payment_status: row.payment_status,
             payment_deadline: row.payment_deadline,
+            user_name: row.user_name || null,
           });
         }
       } catch { /* ignore */ }

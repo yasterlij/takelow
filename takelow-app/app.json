@@ -15,8 +15,6 @@
     "android": {
       "package": "com.takelow.app"
     },
-    "plugins": [
-      "expo-web-browser"
-    ]
+    "plugins": []
   }
 }

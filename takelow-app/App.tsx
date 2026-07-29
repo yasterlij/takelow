@@ -17,7 +17,6 @@ import { ClosedScreen } from './src/screens/ClosedScreen'
 import { WinnerScreen } from './src/screens/WinnerScreen'
 import { PayWinningScreen } from './src/screens/PayWinningScreen'
 import { PaymentConfirmedScreen } from './src/screens/PaymentConfirmedScreen'
-import { PaymentVerifyingScreen } from './src/screens/PaymentVerifyingScreen'
 import { PaymentResultScreen } from './src/screens/PaymentResultScreen'
 import { SikinaPayCheckout } from './src/screens/SikinaPayCheckout'
 import { DeliveryScreen } from './src/screens/DeliveryScreen'
@@ -66,7 +65,6 @@ function ScreenRouter() {
       case 'closed': return <ClosedScreen />
       case 'winner': return <WinnerScreen />
       case 'pay-winning': return <PayWinningScreen />
-      case 'payment-verifying': return <PaymentVerifyingScreen />
       case 'payment-confirmed': return <PaymentConfirmedScreen />
       case 'payment-success': return <PaymentResultScreen />
       case 'payment-failed': return <PaymentResultScreen />

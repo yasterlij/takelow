@@ -207,10 +207,12 @@ export type ApiAuction = {
 export type ApiBid = {
   id: string
   user_id: string
+  user_name?: string | null
   auction_id: string
   amount: number
   bid_time: string
   service_fee_paid: boolean
+  ticket_number?: string
 }
 
 export type ApiWinnerResult = {

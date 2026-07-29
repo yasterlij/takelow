@@ -154,7 +154,7 @@ export function AdminAuctionsScreen() {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [viewBidsId, setViewBidsId] = useState<string | null>(null)
-  const [bidsByAuction, setBidsByAuction] = useState<Record<string, { amount: number; user_id?: string; bid_time?: string; ticket_number?: string }[]>>({})
+  const [bidsByAuction, setBidsByAuction] = useState<Record<string, { amount: number; user_id?: string; user_name?: string | null; bid_time?: string; ticket_number?: string }[]>>({})
   const [bidsLoading, setBidsLoading] = useState(false)
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
@@ -163,7 +163,7 @@ export function AdminAuctionsScreen() {
   const [imgPreviewErr, setImgPreviewErr] = useState(false)
   const [lightboxImg, setLightboxImg] = useState<string | null>(null)
   const [drawingWinner, setDrawingWinner] = useState<string | null>(null)
-  const [winnerResult, setWinnerResult] = useState<{ auctionId: string; winnerName?: string; amount?: number | null } | null>(null)
+  const [winnerResult, setWinnerResult] = useState<{ auctionId: string; winnerName?: string; winnerUserId?: string | null; amount?: number | null } | null>(null)
 
   useEffect(() => {
     if (!viewBidsId) return
@@ -244,9 +244,9 @@ export function AdminAuctionsScreen() {
     setWinnerResult(null)
     try {
       const result = await api.drawWinner(id)
-      setWinnerResult({ auctionId: id, winnerName: result.winner_name, amount: result.winning_bid_amount })
+      setWinnerResult({ auctionId: id, winnerName: result.winner_name, winnerUserId: result.winner_user_id, amount: result.winning_bid_amount })
     } catch {
-      setWinnerResult({ auctionId: id, winnerName: undefined, amount: undefined })
+      setWinnerResult({ auctionId: id, winnerName: undefined, winnerUserId: null, amount: undefined })
     }
     setDrawingWinner(null)
   }
@@ -377,7 +377,8 @@ export function AdminAuctionsScreen() {
           <div className="flex flex-col gap-2">
             {filtered.map((a: Auction) => {
               const bids = viewBidsId === a.id ? (bidsByAuction[a.id] ?? []) : []
-              const bidAmounts = bids.map((b) => b.amount)
+              const isEncrypted = bids.some((b: any) => b.amount_encrypted)
+              const bidAmounts = isEncrypted ? [] : bids.map((b) => b.amount)
               const avgBid = bidAmounts.length > 0 ? Math.round(bidAmounts.reduce((s, v) => s + v, 0) / bidAmounts.length) : 0
               const isClosed = a.status === "closed"
               return (
@@ -436,7 +437,7 @@ export function AdminAuctionsScreen() {
                       </div>
                       <p className="mt-1 text-xs font-medium text-emerald-700">
                         {winnerResult.winnerName
-                          ? `Winner: ${winnerResult.winnerName} — ${winnerResult.amount ? `${CURRENCY} ${formatETB(winnerResult.amount)}` : ""}`
+                          ? `Winner: ${winnerResult.winnerName}${winnerResult.winnerUserId ? ` (User ${winnerResult.winnerUserId.slice(0, 8)})` : ""}${winnerResult.amount ? ` — ${CURRENCY} ${formatETB(winnerResult.amount)}` : ""}`
                           : "No unique winner found for this auction."}
                       </p>
                     </div>
@@ -468,15 +469,19 @@ export function AdminAuctionsScreen() {
                         <p className="py-2 text-center text-[10px] text-neutral-400">No bids placed yet</p>
                       ) : (
                         <div className="mt-2 flex flex-col gap-1">
-                          {bids.map((b, i) => (
+                              {bids.map((b, i) => {
+                                const coded = b.user_id ? `User ${b.user_id.slice(0, 8)}` : "Anonymous"
+                                const display = b.user_name ? `${b.user_name} (${coded})` : coded
+                                return (
                             <div key={i} className="flex items-center justify-between rounded-lg bg-white/60 px-3 py-1.5">
                               <span className="flex items-center gap-2 text-[10px] font-medium text-neutral-400">
                                 <span className="flex size-4 items-center justify-center rounded-full bg-awash-blue/10 text-[8px] font-bold text-awash-blue/60">{i + 1}</span>
-                                {b.user_id ? `User ${b.user_id.slice(0, 8)}` : "Anonymous"}
+                                {display}
                               </span>
-                              <span className="text-[11px] font-bold text-awash-blue">{CURRENCY} {formatETB(b.amount)}</span>
+                              <span className="text-[11px] font-bold text-awash-blue">{(b as any).amount_encrypted ? `${CURRENCY} ••••` : `${CURRENCY} ${formatETB(b.amount)}`}</span>
                             </div>
-                          ))}
+                                )
+                              })}
                         </div>
                       )}
                     </div>

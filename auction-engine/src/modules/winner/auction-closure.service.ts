@@ -11,6 +11,7 @@ import { Winner, WinnerPaymentStatus } from "./entities/winner.entity";
 import { WinnerService } from "./winner.service";
 import { Bid } from "../bidding/entities/bid.entity";
 import { BullMqWorker } from "../worker/bullmq.worker";
+import { BidEncryptionService } from "../common/bid-encryption.service";
 
 const MAX_RETRIES = 5;
 const RETRY_DELAY_MS = 300;
@@ -29,6 +30,7 @@ export class AuctionClosureService {
     private winnerRepository: Repository<Winner>,
     private winnerService: WinnerService,
     private bullMqWorker: BullMqWorker,
+    private bidEncryptionService: BidEncryptionService,
   ) {}
 
   @Cron(CronExpression.EVERY_10_SECONDS)
@@ -111,7 +113,10 @@ export class AuctionClosureService {
           );
 
           auction.winner_user_id = winningBids[0].user_id;
-          auction.winning_bid_amount = winningBids[0].amount;
+          const winAmount = winningBids[0].amount === 0 && winningBids[0].encrypted_amount
+            ? this.bidEncryptionService.decrypt(winningBids[0].encrypted_amount)
+            : winningBids[0].amount;
+          auction.winning_bid_amount = winAmount;
           auction.status = AS.CLOSED;
           auction.payment_status = PaymentStatus.PENDING;
           auction.payment_deadline = paymentDeadline;
@@ -167,11 +172,19 @@ export class AuctionClosureService {
     userId: string,
   ): Promise<Bid | null> {
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-      const bid = await queryRunner.manager.findOne(Bid, {
-        where: { auction_id: auctionId, amount, user_id: userId },
+      const bids = await queryRunner.manager.find(Bid, {
+        where: { auction_id: auctionId, user_id: userId },
         order: { bid_time: "ASC" },
       });
-      if (bid) return bid;
+      const match = bids.find((b: Bid) => {
+        if (b.amount !== 0 || !b.encrypted_amount) return b.amount === amount;
+        try {
+          return this.bidEncryptionService.decrypt(b.encrypted_amount) === amount;
+        } catch {
+          return false;
+        }
+      });
+      if (match) return match;
 
       if (attempt < MAX_RETRIES - 1) {
         this.logger.debug(

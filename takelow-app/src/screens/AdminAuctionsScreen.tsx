@@ -493,7 +493,7 @@ const [category, setCategory] = useState('Computer')
                               <Text style={{ fontSize: 8, fontWeight: '700', color: colors.navy + '99' }}>{i + 1}</Text>
                             </View>
                             <Text style={{ fontSize: 10, fontWeight: '500', color: colors.mutedForeground }}>
-                              {b.userName || b.userId?.slice(0, 8) || 'Anonymous'}
+                              {b.userName ? `${b.userName} (User ${(b.userId || '').slice(0, 8)})` : b.userId ? `User ${b.userId.slice(0, 8)}` : 'Anonymous'}
                             </Text>
                           </View>
                           <Text style={{ fontSize: 11, fontWeight: '700', color: colors.navy }}>{CURRENCY} {formatETB(b.amount)}</Text>

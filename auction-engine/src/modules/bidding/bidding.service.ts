@@ -20,6 +20,7 @@ import {
   PaymentTransactionStatus,
   PaymentType,
 } from "../payment/entities/payment-transaction.entity";
+import { BidEncryptionService } from "../common/bid-encryption.service";
 
 const LOCK_TTL = 5000;
 
@@ -38,6 +39,7 @@ export class BiddingService {
     @InjectRepository(PaymentTransaction)
     private readonly paymentTransactionRepository: Repository<PaymentTransaction>,
     private readonly closureService: AuctionClosureService,
+    private readonly bidEncryptionService: BidEncryptionService,
   ) {}
 
   async placeBid(
@@ -45,6 +47,7 @@ export class BiddingService {
     userId: string,
     amount: number,
     endTime: Date,
+    ticketNumber: string,
   ): Promise<{
     newTotalBids: number;
 
@@ -79,11 +82,14 @@ export class BiddingService {
         );
       }
 
+      const encryptedAmount = this.bidEncryptionService.encrypt(amount);
+
       await this.bidQueue.add("bid", {
         auction_id: auctionId,
-        amount: String(amount),
+        encrypted_amount: encryptedAmount,
         user_id: userId,
         bid_time: new Date().toISOString(),
+        ticket_number: ticketNumber,
       });
 
       await this.trackBidInRedis(auctionId, userId, amount);
@@ -99,7 +105,6 @@ export class BiddingService {
 
       this.auctionGateway.broadcastAuctionUpdate({
         auction_id: auctionId,
-        new_bid_amount: amount,
         total_bids: totalBids,
         timestamp: new Date().toISOString(),
       });
@@ -148,11 +153,19 @@ export class BiddingService {
       String(amount),
     );
     if (freq && Number(freq) > 1) {
-      const prevBidders = await this.bidRepository.find({
-        where: { auction_id: auctionId, amount },
-        select: ["user_id"],
+      const prevBids = await this.bidRepository.find({
+        where: { auction_id: auctionId },
+        select: ["user_id", "encrypted_amount", "amount"],
         order: { bid_time: "DESC" },
         take: 20,
+      });
+      const prevBidders = prevBids.filter((b) => {
+        if (b.amount !== 0 || !b.encrypted_amount) return b.amount === amount;
+        try {
+          return this.bidEncryptionService.decrypt(b.encrypted_amount) === amount;
+        } catch {
+          return false;
+        }
       });
       const notified = new Set<string>();
       for (const bid of prevBidders) {

@@ -70,7 +70,8 @@ function HeroSlide({ item, onJoin }: { item: any; onJoin: () => void }) {
 
 function WinnerSlide({ auction, index }: { auction: any; index: number }) {
   const winnerInfo = auction.winners?.[0]
-  const winnerName = winnerInfo?.name || (winnerInfo?.user_id ? `User ${winnerInfo.user_id.slice(0, 8)}` : `Winner #${index + 1}`)
+  const coded = winnerInfo?.user_id ? `User ${winnerInfo.user_id.slice(0, 8)}` : `Winner #${index + 1}`
+  const winnerName = winnerInfo?.name ? `${winnerInfo.name} (${coded})` : coded
   const bidAmount = auction.winning_bid_amount ?? winnerInfo?.amount ?? 0
   const maskPhone = (p: string | null) => p ? p.slice(0, 4) + '****' + p.slice(-2) : null
   return (

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { View, Text, ActivityIndicator, TouchableOpacity } from 'react-native'
-import * as WebBrowser from 'expo-web-browser'
-import { X, Check } from 'lucide-react-native'
+import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native'
+import { WebView } from 'react-native-webview'
+import { X, Check, ArrowLeft } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { api } from '../api'
 import { colors } from '../theme'
@@ -12,6 +12,7 @@ const POLL_TIMEOUT = 120000
 export function SikinaPayCheckout() {
   const { go, selectedId, sikinaPayUrl, setSikinaPayUrl, sikinaPayContext, setFeePaid } = useApp()
   const [status, setStatus] = useState<'loading' | 'paid' | 'failed'>('loading')
+  const [webviewLoading, setWebviewLoading] = useState(true)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -25,14 +26,6 @@ export function SikinaPayCheckout() {
     setSikinaPayUrl(null)
     go(sikinaPayContext === 'bid-fee' ? 'pay-fee' : 'pay-winning')
   }
-
-  useEffect(() => {
-    if (!sikinaPayUrl) return
-    WebBrowser.openBrowserAsync(sikinaPayUrl, {
-      toolbarColor: colors.awashBlue,
-      controlsColor: colors.neutralWhite,
-    }).catch(() => {})
-  }, [sikinaPayUrl])
 
   useEffect(() => {
     if (!selectedId) return
@@ -151,24 +144,105 @@ export function SikinaPayCheckout() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 }}>
-      <ActivityIndicator size="large" color={colors.primary} />
-      <Text style={{ marginTop: 16, fontSize: 14, fontWeight: '500', color: colors.mutedForeground, textAlign: 'center' }}>
-        Processing your payment...
-      </Text>
-      <Text style={{ marginTop: 8, fontSize: 12, fontWeight: '500', color: colors.mutedForeground + '99', textAlign: 'center' }}>
-        A secure browser has opened within the app to complete your payment.
-      </Text>
-      <Text style={{ marginTop: 4, fontSize: 12, fontWeight: '500', color: colors.mutedForeground + '66', textAlign: 'center' }}>
-        Once complete, return here to confirm.
-      </Text>
-      <TouchableOpacity
-        onPress={handleClose}
-        style={{ marginTop: 32, paddingVertical: 12, paddingHorizontal: 24 }}
-        activeOpacity={0.8}
-      >
-        <Text style={{ fontSize: 14, fontWeight: '600', color: colors.mutedForeground }}>Cancel</Text>
-      </TouchableOpacity>
+    <View style={s.container}>
+      <View style={s.header}>
+        <TouchableOpacity onPress={handleClose} style={s.backBtn} activeOpacity={0.7}>
+          <ArrowLeft size={20} color={colors.neutralGray600} />
+        </TouchableOpacity>
+        <Text style={s.headerTitle}>
+          {sikinaPayContext === 'bid-fee' ? 'Pay Bid Fee' : 'Pay Winning Amount'}
+        </Text>
+      </View>
+
+      <View style={s.webviewContainer}>
+        {webviewLoading && (
+          <View style={s.loadingOverlay}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={s.loadingText}>Loading payment page...</Text>
+          </View>
+        )}
+        {sikinaPayUrl && (
+          <WebView
+            source={{ uri: sikinaPayUrl }}
+            style={s.webview}
+            onLoad={() => setWebviewLoading(false)}
+            onError={() => setWebviewLoading(false)}
+            javaScriptEnabled
+            domStorageEnabled
+            startInLoadingState
+          />
+        )}
+      </View>
+
+      <View style={s.footer}>
+        <ActivityIndicator size="small" color={colors.primary} />
+        <Text style={s.footerText}>Waiting for payment confirmation...</Text>
+      </View>
     </View>
   )
 }
+
+const s = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    backgroundColor: 'rgba(255,255,255,0.8)',
+  },
+  backBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.awashBlue,
+    fontFamily: 'Inter_700Bold',
+  },
+  webviewContainer: {
+    flex: 1,
+    position: 'relative',
+  },
+  webview: {
+    flex: 1,
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFill,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    zIndex: 10,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.mutedForeground,
+  },
+  footer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    backgroundColor: 'rgba(255,255,255,0.8)',
+  },
+  footerText: {
+    fontSize: 12,
+    color: colors.mutedForeground,
+    fontWeight: '500',
+  },
+})

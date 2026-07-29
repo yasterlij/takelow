@@ -8,6 +8,7 @@ import { Auction } from "./entities/auction.entity";
 import { Winner } from "./entities/winner.entity";
 import { Bid } from "../bidding/entities/bid.entity";
 import { WorkerModule } from "../worker/worker.module";
+import { BidEncryptionService } from "../common/bid-encryption.service";
 
 @Module({
   imports: [
@@ -15,7 +16,7 @@ import { WorkerModule } from "../worker/worker.module";
     TypeOrmModule.forFeature([Auction, Bid, Winner]),
     WorkerModule,
   ],
-  providers: [WinnerService, AuctionClosureService, AuctionNotificationService],
+  providers: [WinnerService, AuctionClosureService, AuctionNotificationService, BidEncryptionService],
   exports: [WinnerService, AuctionClosureService],
 })
 export class WinnerModule {}

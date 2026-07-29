@@ -31,7 +31,7 @@ export function RegisterScreen() {
   const showStrength = form.values.password.length > 0
 
   return (
-    <div className="relative flex min-h-screen flex-col overflow-hidden bg-gradient-to-br from-awash-blue via-awash-blue-dark to-[#001224] px-6">
+    <div className="relative flex min-h-screen flex-col overflow-y-auto bg-gradient-to-br from-awash-blue via-awash-blue-dark to-[#001224] px-6">
       <motion.div
         animate={{ y: [0, 40, 0], rotate: [0, -8, 0] }}
         transition={{ duration: 13, repeat: Infinity, ease: "easeInOut" }}

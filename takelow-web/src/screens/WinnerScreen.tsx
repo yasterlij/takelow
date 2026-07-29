@@ -31,7 +31,9 @@ export function WinnerScreen() {
 
   const savings = winner?.winning_bid_amount != null ? (auction.marketPrice - winner.winning_bid_amount) : 0
   const savingsPct = auction.marketPrice > 0 ? Math.round((savings / auction.marketPrice) * 100) : 0
-  const winnerName = winner?.winner_name || (winner?.winner_user_id ? `User ${winner.winner_user_id.slice(0, 8)}` : null)
+  const winnerName = winner?.winner_name && winner?.winner_user_id
+    ? `${winner.winner_name} (User ${winner.winner_user_id.slice(0, 8)})`
+    : (winner?.winner_user_id ? `User ${winner.winner_user_id.slice(0, 8)}` : null)
   const winnerPhone = winner?.winner_phone || null
   const maskPhone = (p: string | null) => p ? p.slice(0, 4) + '****' + p.slice(-2) : null
   const deadline = ((winner as any)?.payment_deadline) ? new Date((winner as any).payment_deadline) : null
@@ -178,7 +180,7 @@ export function WinnerScreen() {
                         </span>
                         <div>
                           <p className={`text-sm font-semibold ${isCurrentUser ? "text-primary" : "text-foreground"}`}>
-                            {w.name || w.user_id.slice(0, 8)}{w.phone && <span className="ml-2 text-xs text-neutral-300">{maskPhone(w.phone)}</span>}
+                            {w.name ? `${w.name} (User ${w.user_id.slice(0, 8)})` : `User ${w.user_id.slice(0, 8)}`}{w.phone && <span className="ml-2 text-xs text-neutral-300">{maskPhone(w.phone)}</span>}
                             {isCurrentUser && <span className="ml-1.5 text-[10px] font-bold text-primary">(You)</span>}
                           </p>
                           <div className="flex items-center gap-2 text-xs text-neutral-400">
@@ -305,7 +307,7 @@ export function WinnerScreen() {
 
           {/* ── Action ── */}
           <div className="mt-6 w-full max-w-md space-y-2">
-            {winner.winner_user_id && (isAdmin || isUserWinner) ? (
+            {winner.winner_user_id && isUserWinner ? (
               winner.payment_status === "PAID" ? (
                 <button onClick={() => go("home")}
                   className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 text-sm font-bold tracking-wide text-white shadow-sm shadow-emerald-600/30 transition-all hover:bg-emerald-700 active:scale-[0.98]">

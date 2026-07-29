@@ -16,10 +16,10 @@ export function DeliveryScreen() {
   if (!auction) return null
 
   return (
-    <div className="flex flex-1 flex-col overflow-y-auto">
+    <div className="relative flex flex-1 flex-col overflow-y-auto">
       
       <AppBar title="Track Delivery" onBack={() => go("winner")} />
-      <div className="flex-1 px-5 pb-6 pt-5">
+      <div className="flex-1 px-5 pb-20 lg:pb-6 pt-5">
         <Card className="flex items-center gap-4 border-primary/30 bg-accent p-4">
           <span className="flex size-14 flex-shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
             <Bike className="size-7" />
