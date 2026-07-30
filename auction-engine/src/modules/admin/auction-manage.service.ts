@@ -237,6 +237,15 @@ export class AuctionManageService {
     });
   }
 
+  async forceCloseAuction(id: string, actorId?: string) {
+    const auction = await this.auctionRepository.findOne({ where: { id } });
+    if (!auction) throw new NotFoundException("Auction not found");
+    if (auction.status !== AuctionStatus.ACTIVE) {
+      throw new BadRequestException("Auction is not active");
+    }
+    return this.closureService.forceCloseSingleAuction(id, actorId || "admin");
+  }
+
   private async resolveWinnerUserInfo(
     userId: string | null,
   ): Promise<{ name: string | null; phone: string | null } | null> {

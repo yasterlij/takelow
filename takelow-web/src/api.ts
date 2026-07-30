@@ -318,6 +318,9 @@ export const api = {
   closeAuction(id: string) {
     return request<ApiAuction>('POST', `/admin/auctions/${id}/close`, undefined, ENGINE_API)
   },
+  forceCloseAuction(id: string) {
+    return request<ApiAuction>('POST', `/admin/auctions/${id}/force-close`, undefined, ENGINE_API)
+  },
   deleteAuction(id: string) {
     return request<{ deleted: boolean; id: string }>('DELETE', `/admin/auctions/${id}`, undefined, ENGINE_API)
   },

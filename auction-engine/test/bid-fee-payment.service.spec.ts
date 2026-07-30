@@ -10,6 +10,7 @@ import { Auction } from '../src/modules/winner/entities/auction.entity';
 import { Bid } from '../src/modules/bidding/entities/bid.entity';
 import { Winner } from '../src/modules/winner/entities/winner.entity';
 import { WinnerService } from '../src/modules/winner/winner.service';
+import { BidEncryptionService } from '../src/modules/common/bid-encryption.service';
 
 function createMockRepo() {
   return {
@@ -73,6 +74,7 @@ describe('PaymentService - Bid Fee Payment', () => {
         { provide: SikinaService, useValue: mockSikinaService },
         { provide: AwashService, useValue: mockAwashService },
         { provide: ConfigService, useValue: mockConfigService },
+        { provide: BidEncryptionService, useValue: { encrypt: jest.fn((a) => String(a)), decrypt: jest.fn((e) => parseFloat(e)) } },
         {
           provide: REDIS_CLIENT,
           useValue: {
@@ -123,6 +125,7 @@ describe('PaymentService - Bid Fee Payment', () => {
 
       expect(result).toEqual({
         paymentUrl: mockSikinaResponse.paymentUrl,
+        proxyUrl: expect.any(String),
         transactionId: 'txn-123',
       });
 
@@ -160,6 +163,7 @@ describe('PaymentService - Bid Fee Payment', () => {
 
       expect(result).toEqual({
         paymentUrl: existingTransaction.sikina_payment_url,
+        proxyUrl: expect.any(String),
         transactionId: existingTransaction.id,
       });
 

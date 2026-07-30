@@ -18,7 +18,7 @@ import type { Auction } from "../mockDataV0"
 type BidRow = { id: string; amount: number; user_id: string; user_name?: string | null; bid_time: string; ticket_number?: string; amount_encrypted?: boolean }
 
 export function AdminAuctionMonitorScreen() {
-  const { go, selectedId, getAuction, closeAuction, refreshAuctions, selectAuctionForMonitor } = useApp()
+  const { go, selectedId, getAuction, closeAuction, forceCloseAuction, refreshAuctions, selectAuctionForMonitor } = useApp()
   const auction = getAuction(selectedId)
 
   const [liveAuction, setLiveAuction] = useState<Auction | undefined>(auction)
@@ -27,6 +27,9 @@ export function AdminAuctionMonitorScreen() {
   const [showBids, setShowBids] = useState(false)
   const [showCloseConfirm, setShowCloseConfirm] = useState(false)
   const [closing, setClosing] = useState(false)
+  const [showForceCloseConfirm, setShowForceCloseConfirm] = useState(false)
+  const [forceClosing, setForceClosing] = useState(false)
+  const [forceCloseWarning, setForceCloseWarning] = useState("")
   const [winner, setWinner] = useState<ApiWinnerResult | null>(null)
   const [winnerLoading, setWinnerLoading] = useState(false)
   const [showWinner, setShowWinner] = useState(false)
@@ -75,17 +78,40 @@ export function AdminAuctionMonitorScreen() {
     if (!selectedId) return
     setClosing(true)
     try {
-      await closeAuction(selectedId)
+      await api.closeAuction(selectedId)
       await refreshAuctions()
-      // After closing, try to draw winner
       const result = await api.drawWinner(selectedId)
       setWinner(result)
       setShowWinner(true)
+      toast("Auction closed successfully", "success")
     } catch (e: any) {
-      toast(e?.message || "Failed to close auction", "error")
+      const msg = e?.message || e?.response?.data?.message || ""
+      if (msg.includes("No unique bids") || msg.includes("no unique winner")) {
+        setForceCloseWarning(msg)
+        setShowForceCloseConfirm(true)
+      } else {
+        toast(msg || "Failed to close auction", "error")
+      }
     } finally {
       setClosing(false)
       setShowCloseConfirm(false)
+    }
+  }
+
+  const handleForceClose = async () => {
+    if (!selectedId) return
+    setForceClosing(true)
+    try {
+      await api.forceCloseAuction(selectedId)
+      await refreshAuctions()
+      setWinner({ id: selectedId, product: null, status: "CLOSED", start_time: "", end_time: "", winning_bid_amount: null, winner_user_id: null, winner_name: undefined, winner_phone: undefined, total_bids: bids.length, lowest_unique_bid: null, bids: [], created_at: "" })
+      setShowWinner(true)
+      toast("Auction force-closed without winner", "success")
+    } catch (e: any) {
+      toast(e?.message || "Failed to force-close auction", "error")
+    } finally {
+      setForceClosing(false)
+      setShowForceCloseConfirm(false)
     }
   }
 
@@ -367,6 +393,17 @@ export function AdminAuctionMonitorScreen() {
         destructive
       />
 
+      {/* Force-close confirmation (no unique bids) */}
+      <ConfirmDialog
+        open={showForceCloseConfirm}
+        onClose={() => setShowForceCloseConfirm(false)}
+        onConfirm={handleForceClose}
+        title="No Unique Bids Found"
+        message={forceCloseWarning || `"${liveAuction.name}" has no unique bids. Force-close without a winner?`}
+        confirmLabel={forceClosing ? "Force-Closing..." : "Force Close Without Winner"}
+        destructive
+      />
+
       {/* Winner result modal */}
       <Modal open={showWinner} onClose={() => setShowWinner(false)} title="Winner Result" size="md">
         {winner ? (
@@ -383,8 +420,11 @@ export function AdminAuctionMonitorScreen() {
                 </motion.div>
                 <h3 className="mt-4 font-display text-lg font-extrabold text-awash-blue">Winner Found!</h3>
                 <p className="mt-1 text-sm font-medium text-neutral-500">
-                  {winner.winner_name ? `${winner.winner_name} (User ${winner.winner_user_id.slice(0, 8)})` : `User ${winner.winner_user_id.slice(0, 8)}`}
-                  {winner.winner_phone && ` · ${winner.winner_phone}`}
+                  {(() => {
+                    const fn = winner.winner_name ? winner.winner_name.split(" ")[0] : null
+                    const mp = winner.winner_phone ? winner.winner_phone.slice(0, 4) + 'XXXX' + winner.winner_phone.slice(-2) : null
+                    return fn && mp ? `${fn} ${mp}` : (fn || mp || 'Winner')
+                  })()}
                 </p>
                 <div className="mt-4 flex items-center gap-6">
                   <div className="text-center">
@@ -410,7 +450,7 @@ export function AdminAuctionMonitorScreen() {
                 </div>
                 <h3 className="mt-4 font-display text-lg font-extrabold text-neutral-500">No Winner</h3>
                 <p className="mt-1 text-sm font-medium text-neutral-400">
-                  No unique bid was found. The auction has been marked as expired.
+                  No unique bid was found. The auction has been closed without a winner.
                 </p>
               </div>
             )}

@@ -12,6 +12,7 @@ interface WinnerRow {
   payment_status: string;
   payment_deadline: Date;
   user_name: string | null;
+  phone: string | null;
 }
 
 @Injectable()
@@ -127,12 +128,12 @@ export class AuctionsService {
     let winnersByAuction: Map<string, WinnerRow[]> = new Map();
     if (auctionIds.length > 0) {
       try {
-        const winnerRows: any[] = await this.auctionRepository.query(
-          `SELECT w.auction_id, w.user_id, w.amount, w.rank, w.payment_status, w.payment_deadline, u.full_name AS user_name
-           FROM winners w
-           LEFT JOIN users u ON u.id = w.user_id
-           WHERE w.auction_id = ANY($1)
-           ORDER BY w.rank ASC`,
+          const winnerRows: any[] = await this.auctionRepository.query(
+           `SELECT w.auction_id, w.user_id, w.amount, w.rank, w.payment_status, w.payment_deadline, u.full_name AS user_name, u.phone_number AS phone
+            FROM winners w
+            LEFT JOIN users u ON u.id = w.user_id
+            WHERE w.auction_id = ANY($1)
+            ORDER BY w.rank ASC`,
           [auctionIds],
         );
         for (const row of winnerRows) {
@@ -146,6 +147,7 @@ export class AuctionsService {
             payment_status: row.payment_status,
             payment_deadline: row.payment_deadline,
             user_name: row.user_name || null,
+            phone: row.phone || null,
           });
         }
       } catch {
@@ -178,6 +180,7 @@ export class AuctionsService {
         winners: auctionWinners.map((w) => ({
           user_id: w.user_id,
           user_name: w.user_name,
+          phone: w.phone,
           amount: w.amount,
           rank: w.rank,
           payment_status: w.payment_status,
@@ -280,7 +283,7 @@ export class AuctionsService {
     if (auctionIds.length > 0) {
       try {
         const winnerRows: any[] = await this.auctionRepository.query(
-          `SELECT w.auction_id, w.user_id, w.amount, w.rank, w.payment_status, w.payment_deadline, u.full_name AS user_name
+          `SELECT w.auction_id, w.user_id, w.amount, w.rank, w.payment_status, w.payment_deadline, u.full_name AS user_name, u.phone_number AS phone
            FROM winners w
            LEFT JOIN users u ON u.id = w.user_id
            WHERE w.auction_id = ANY($1) AND w.user_id = $2
@@ -298,6 +301,7 @@ export class AuctionsService {
             payment_status: row.payment_status,
             payment_deadline: row.payment_deadline,
             user_name: row.user_name || null,
+            phone: row.phone || null,
           });
         }
       } catch { /* ignore */ }

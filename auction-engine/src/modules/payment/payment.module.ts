@@ -12,6 +12,7 @@ import { Winner } from "../winner/entities/winner.entity";
 import { Bid } from "../bidding/entities/bid.entity";
 import { PaymentTransaction } from "./entities/payment-transaction.entity";
 import { WinnerModule } from "../winner/winner.module";
+import { BidEncryptionService } from "../common/bid-encryption.service";
 
 @Module({
   imports: [
@@ -24,7 +25,7 @@ import { WinnerModule } from "../winner/winner.module";
     SikinaWebhookController,
     AwashWebhookController,
   ],
-  providers: [PaymentService, SikinaService, AwashService],
+  providers: [PaymentService, SikinaService, AwashService, BidEncryptionService],
   exports: [PaymentService, SikinaService, AwashService],
 })
 export class PaymentModule {}

@@ -49,6 +49,9 @@ export class Auction {
   @Column({ type: "int", default: 1 })
   num_winners: number;
 
+  @Column({ type: "int", default: 0 })
+  extensions: number;
+
   @Index(["status", "end_time"])
   @Index(["status", "payment_status", "winner_user_id"])
   @Column({

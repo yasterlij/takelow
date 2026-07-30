@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, BadRequestException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, LessThan } from "typeorm";
 import { Cron, CronExpression } from "@nestjs/schedule";
@@ -81,6 +81,19 @@ export class AuctionClosureService {
       return;
     }
 
+    if (totalBids > 0 && winners.length === 0) {
+      auction.extensions = (auction.extensions || 0) + 1;
+      auction.end_time = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      await this.auctionRepository.save(auction);
+      this.logger.log(
+        `Auction ${auction.id}: No unique bids among ${totalBids} bids (extension #${auction.extensions}), extended 24h for fair play`,
+      );
+      this.sendFairPlayNotification(auction.id).catch(
+        (e) => this.logger.warn(`Failed to send fair play notification: ${e.message}`),
+      );
+      return;
+    }
+
     const queryRunner =
       this.auctionRepository.manager.connection.createQueryRunner();
     await queryRunner.connect();
@@ -90,6 +103,8 @@ export class AuctionClosureService {
       if (totalBids === 0) {
         auction.status = AS.EXPIRED;
         this.logger.log(`Auction ${auction.id}: No bids, expired`);
+        await queryRunner.manager.save(auction);
+        await queryRunner.commitTransaction();
       } else if (winners.length > 0) {
         const winningBids: Bid[] = [];
         for (const w of winners) {
@@ -107,15 +122,17 @@ export class AuctionClosureService {
           this.logger.warn(
             `Auction ${auction.id}: No winning bids found in DB, expired`,
           );
+          await queryRunner.manager.save(auction);
+          await queryRunner.commitTransaction();
         } else {
           const paymentDeadline = new Date(
             Date.now() + PAYMENT_DEADLINE_HOURS * 60 * 60 * 1000,
           );
 
           auction.winner_user_id = winningBids[0].user_id;
-          const winAmount = winningBids[0].amount === 0 && winningBids[0].encrypted_amount
-            ? this.bidEncryptionService.decrypt(winningBids[0].encrypted_amount)
-            : winningBids[0].amount;
+          const winAmount = Number(winningBids[0].amount) === 0 && winningBids[0].encrypted_amount
+            ? Number(this.bidEncryptionService.decrypt(winningBids[0].encrypted_amount))
+            : Number(winningBids[0].amount);
           auction.winning_bid_amount = winAmount;
           auction.status = AS.CLOSED;
           auction.payment_status = PaymentStatus.PENDING;
@@ -165,6 +182,176 @@ export class AuctionClosureService {
     await this.winnerService.cleanupAuctionKeys(auction.id);
   }
 
+  async closeSingleAuction(
+    auctionId: string,
+    actorId?: string,
+  ): Promise<Auction> {
+    const auction = await this.auctionRepository.findOne({
+      where: { id: auctionId },
+    });
+    if (!auction) throw new Error(`Auction ${auctionId} not found`);
+    if (auction.status !== AS.ACTIVE)
+      throw new Error(
+        `Auction ${auctionId} is not active (status: ${auction.status})`,
+      );
+
+    await this.bullMqWorker.flushAuction(auction.id);
+
+    const totalBids = await this.bidRepository.count({
+      where: { auction_id: auctionId },
+    });
+    const hasUnique = await this.winnerService.hasUniqueBids(auctionId);
+    if (!hasUnique) {
+      throw new BadRequestException(
+        `No unique bids among ${totalBids} bids. Auction cannot close without a unique winner unless forced.`,
+      );
+    }
+
+    auction.end_time = new Date();
+    await this.auctionRepository.save(auction);
+
+    await this.closeAuction(auction);
+
+    if (actorId) {
+      const closedAuction = await this.auctionRepository.findOne({
+        where: { id: auctionId },
+        relations: ["product"],
+      });
+      const winners = await this.winnerRepository.find({
+        where: { auction_id: auctionId },
+        order: { rank: "ASC" },
+      });
+      await this.logClosureEvent(
+        auctionId,
+        "ADMIN_CLOSE",
+        winners.map((w) => ({ amount: w.amount, userId: w.user_id })),
+      );
+      return closedAuction as Auction;
+    }
+
+    return this.auctionRepository.findOne({
+      where: { id: auctionId },
+      relations: ["product"],
+    }) as Promise<Auction>;
+  }
+
+  async forceCloseSingleAuction(
+    auctionId: string,
+    actorId?: string,
+  ): Promise<Auction> {
+    const auction = await this.auctionRepository.findOne({
+      where: { id: auctionId },
+      relations: ["product"],
+    });
+    if (!auction) throw new Error(`Auction ${auctionId} not found`);
+    if (auction.status !== AS.ACTIVE)
+      throw new Error(
+        `Auction ${auctionId} is not active (status: ${auction.status})`,
+      );
+
+    await this.bullMqWorker.flushAuction(auction.id);
+
+    auction.end_time = new Date();
+    auction.status = AS.CLOSED;
+    auction.winner_user_id = null as any;
+    auction.winning_bid_amount = null as any;
+    await this.auctionRepository.save(auction);
+
+    await this.winnerService.cleanupAuctionKeys(auction.id);
+
+    this.logger.log(
+      `Auction ${auctionId}: Force closed by admin with no unique bids`,
+    );
+
+    this.sendForcedClosureNotification(auction.id).catch(
+      (e) => this.logger.warn(`Failed to send forced closure notification: ${e.message}`),
+    );
+
+    if (actorId) {
+      await this.logClosureEvent(auctionId, "ADMIN_FORCE_CLOSE", []);
+    }
+
+    return this.auctionRepository.findOne({
+      where: { id: auctionId },
+      relations: ["product"],
+    }) as Promise<Auction>;
+  }
+
+  private async sendFairPlayNotification(auctionId: string): Promise<void> {
+    const auction = await this.auctionRepository.findOne({
+      where: { id: auctionId },
+      relations: ["product"],
+    });
+    if (!auction) return;
+
+    const productName = auction.product?.name || auctionId;
+    const totalBids = await this.bidRepository.count({
+      where: { auction_id: auctionId },
+    });
+
+    try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      const internalApiKey = process.env.INTERNAL_API_KEY || "";
+      if (internalApiKey) headers["x-internal-api-key"] = internalApiKey;
+      await fetch(
+        "http://identity-service:3000/api/v1/notify/auction-fair-play-extended",
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            auction_id: auctionId,
+            product_name: productName,
+            total_bids: totalBids,
+            extensions: auction.extensions,
+          }),
+        },
+      );
+    } catch (e) {
+      this.logger.warn(
+        `Failed to send fair play extension notification: ${e.message}`,
+      );
+    }
+  }
+
+  private async sendForcedClosureNotification(auctionId: string): Promise<void> {
+    const auction = await this.auctionRepository.findOne({
+      where: { id: auctionId },
+      relations: ["product"],
+    });
+    if (!auction) return;
+
+    const productName = auction.product?.name || auctionId;
+    const totalBids = await this.bidRepository.count({
+      where: { auction_id: auctionId },
+    });
+
+    try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      const internalApiKey = process.env.INTERNAL_API_KEY || "";
+      if (internalApiKey) headers["x-internal-api-key"] = internalApiKey;
+      await fetch(
+        "http://identity-service:3000/api/v1/notify/auction-forced-closure",
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            auction_id: auctionId,
+            product_name: productName,
+            total_bids: totalBids,
+          }),
+        },
+      );
+    } catch (e) {
+      this.logger.warn(
+        `Failed to send forced closure notification: ${e.message}`,
+      );
+    }
+  }
+
   private async findWinBidWithRetry(
     queryRunner: any,
     auctionId: string,
@@ -177,7 +364,7 @@ export class AuctionClosureService {
         order: { bid_time: "ASC" },
       });
       const match = bids.find((b: Bid) => {
-        if (b.amount !== 0 || !b.encrypted_amount) return b.amount === amount;
+        if (b.amount !== 0 || !b.encrypted_amount) return Number(b.amount) === amount;
         try {
           return this.bidEncryptionService.decrypt(b.encrypted_amount) === amount;
         } catch {
@@ -306,46 +493,5 @@ export class AuctionClosureService {
         `Failed to log closure event for auction ${auctionId}: ${e.message}`,
       );
     }
-  }
-
-  async closeSingleAuction(
-    auctionId: string,
-    actorId?: string,
-  ): Promise<Auction> {
-    const auction = await this.auctionRepository.findOne({
-      where: { id: auctionId },
-    });
-    if (!auction) throw new Error(`Auction ${auctionId} not found`);
-    if (auction.status !== AS.ACTIVE)
-      throw new Error(
-        `Auction ${auctionId} is not active (status: ${auction.status})`,
-      );
-
-    auction.end_time = new Date();
-    await this.auctionRepository.save(auction);
-
-    await this.closeAuction(auction);
-
-    if (actorId) {
-      const closedAuction = await this.auctionRepository.findOne({
-        where: { id: auctionId },
-        relations: ["product"],
-      });
-      const winners = await this.winnerRepository.find({
-        where: { auction_id: auctionId },
-        order: { rank: "ASC" },
-      });
-      await this.logClosureEvent(
-        auctionId,
-        "ADMIN_CLOSE",
-        winners.map((w) => ({ amount: w.amount, userId: w.user_id })),
-      );
-      return closedAuction as Auction;
-    }
-
-    return this.auctionRepository.findOne({
-      where: { id: auctionId },
-      relations: ["product"],
-    }) as Promise<Auction>;
   }
 }

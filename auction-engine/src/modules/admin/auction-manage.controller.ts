@@ -131,6 +131,11 @@ export class AuctionManageController {
     return this.service.closeAuctionEarly(id, req.user?.id);
   }
 
+  @Post("auctions/:id/force-close")
+  async forceCloseAuction(@Param("id") id: string, @Req() req: any) {
+    return this.service.forceCloseAuction(id, req.user?.id);
+  }
+
   @Get("auctions/:id/winner")
   async drawWinner(@Param("id") id: string) {
     return this.service.drawWinner(id);

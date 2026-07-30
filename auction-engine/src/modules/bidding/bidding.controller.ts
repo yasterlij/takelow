@@ -196,11 +196,12 @@ export class BiddingController {
   }
 
   private resolveBidAmount(bid: Bid): number {
-    if (bid.amount !== 0 || !bid.encrypted_amount) return bid.amount;
+    if (bid.amount !== 0 || !bid.encrypted_amount) return Number(bid.amount);
     try {
-      return this.bidEncryptionService.decrypt(bid.encrypted_amount);
+      return Number(this.bidEncryptionService.decrypt(bid.encrypted_amount));
     } catch {
       return 0;
     }
   }
+
 }

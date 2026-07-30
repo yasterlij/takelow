@@ -35,7 +35,7 @@ export class BidEncryptionService {
     const encrypted = Buffer.from(dataB64, "base64");
     const decipher = crypto.createDecipheriv(ALGORITHM, this.key, iv);
     decipher.setAuthTag(tag);
-    const decrypted = decipher.update(encrypted);
-    return parseFloat(decipher.final().toString());
+    const decrypted = decipher.update(encrypted).toString();
+    return parseFloat(decrypted + decipher.final().toString());
   }
 }

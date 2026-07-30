@@ -6,6 +6,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Bid } from '../src/modules/bidding/entities/bid.entity';
 import { Auction } from '../src/modules/winner/entities/auction.entity';
 import { Winner } from '../src/modules/winner/entities/winner.entity';
+import { BidEncryptionService } from '../src/modules/common/bid-encryption.service';
 
 function createMockRedis(): Partial<Record<keyof Redis, jest.Mock>> {
   return {
@@ -55,6 +56,7 @@ describe('WinnerService (Section 11.1 - Test Case 1 & 2)', () => {
         { provide: getRepositoryToken(Bid), useValue: mockBidRepo },
         { provide: getRepositoryToken(Auction), useValue: mockAuctionRepo },
         { provide: getRepositoryToken(Winner), useValue: mockWinnerRepo },
+        { provide: BidEncryptionService, useValue: { encrypt: jest.fn((a) => String(a)), decrypt: jest.fn((e) => parseFloat(e)) } },
       ],
     }).compile();
 

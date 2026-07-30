@@ -43,6 +43,9 @@ export class PaymentTransaction {
   @Column({ type: "decimal", precision: 12, scale: 2 })
   amount: number;
 
+  @Column({ type: "varchar", length: 512, default: "" })
+  encrypted_amount: string;
+
   @Column({ type: "varchar", length: 128, unique: true })
   client_reference_id: string;
 

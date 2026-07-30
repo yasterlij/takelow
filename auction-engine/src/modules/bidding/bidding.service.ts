@@ -84,13 +84,16 @@ export class BiddingService {
 
       const encryptedAmount = this.bidEncryptionService.encrypt(amount);
 
-      await this.bidQueue.add("bid", {
-        auction_id: auctionId,
-        encrypted_amount: encryptedAmount,
-        user_id: userId,
-        bid_time: new Date().toISOString(),
-        ticket_number: ticketNumber,
-      });
+      await this.bidRepository.save(
+        this.bidRepository.create({
+          auction_id: auctionId,
+          user_id: userId,
+          amount,
+          bid_time: new Date(),
+          encrypted_amount: encryptedAmount,
+          ticket_number: ticketNumber,
+        }),
+      );
 
       await this.trackBidInRedis(auctionId, userId, amount);
 
@@ -160,7 +163,7 @@ export class BiddingService {
         take: 20,
       });
       const prevBidders = prevBids.filter((b) => {
-        if (b.amount !== 0 || !b.encrypted_amount) return b.amount === amount;
+        if (b.amount !== 0 || !b.encrypted_amount) return Number(b.amount) === amount;
         try {
           return this.bidEncryptionService.decrypt(b.encrypted_amount) === amount;
         } catch {

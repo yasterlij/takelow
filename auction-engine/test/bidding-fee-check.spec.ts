@@ -11,6 +11,7 @@ import { AuctionGateway } from '../src/modules/bidding/gateway/auction.gateway';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { REDIS_CLIENT } from '../src/modules/common/redis.decorator';
+import { BidEncryptionService } from '../src/modules/common/bid-encryption.service';
 
 function createMockRedis(): Partial<Record<keyof Redis, jest.Mock>> {
   return {
@@ -42,6 +43,8 @@ function createMockRepo() {
   return {
     findOne: jest.fn(),
     find: jest.fn(),
+    create: jest.fn((x: any) => x),
+    save: jest.fn((x: any) => x),
   };
 }
 
@@ -83,6 +86,7 @@ describe('BiddingService - Bid Fee Payment Check', () => {
         { provide: AuctionClosureService, useValue: mockClosureService },
         { provide: AuctionGateway, useValue: mockAuctionGateway },
         { provide: 'BullQueue_incoming-bids', useValue: mockBidQueue },
+        { provide: BidEncryptionService, useValue: { encrypt: jest.fn((a) => String(a)), decrypt: jest.fn((e) => parseFloat(e)) } },
       ],
     }).compile();
 
@@ -110,7 +114,7 @@ describe('BiddingService - Bid Fee Payment Check', () => {
       };
       mockPaymentTransactionRepo.findOne.mockResolvedValue(mockTransaction);
 
-      const result = await service.placeBid(auctionId, userId, amount, endTime);
+      const result = await service.placeBid(auctionId, userId, amount, endTime, "test-ticket");
 
       expect(result).toBeDefined();
       expect(result.newTotalBids).toBe(5);
@@ -128,11 +132,11 @@ describe('BiddingService - Bid Fee Payment Check', () => {
       mockPaymentTransactionRepo.findOne.mockResolvedValue(null);
 
       await expect(
-        service.placeBid(auctionId, userId, amount, endTime)
+        service.placeBid(auctionId, userId, amount, endTime, "test-ticket")
       ).rejects.toThrow(BadRequestException);
 
       await expect(
-        service.placeBid(auctionId, userId, amount, endTime)
+        service.placeBid(auctionId, userId, amount, endTime, "test-ticket")
       ).rejects.toThrow('Bid fee not paid. Please pay the bid fee via SikinaPay before placing a bid.');
     });
 
@@ -153,7 +157,7 @@ describe('BiddingService - Bid Fee Payment Check', () => {
       });
 
       await expect(
-        service.placeBid(auctionId, userId, amount, endTime)
+        service.placeBid(auctionId, userId, amount, endTime, "test-ticket")
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -174,7 +178,7 @@ describe('BiddingService - Bid Fee Payment Check', () => {
       });
 
       await expect(
-        service.placeBid(auctionId, userId, amount, endTime)
+        service.placeBid(auctionId, userId, amount, endTime, "test-ticket")
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -185,11 +189,11 @@ describe('BiddingService - Bid Fee Payment Check', () => {
       });
 
       await expect(
-        service.placeBid(auctionId, userId, amount, closedEndTime)
+        service.placeBid(auctionId, userId, amount, closedEndTime, "test-ticket")
       ).rejects.toThrow(ForbiddenException);
 
       await expect(
-        service.placeBid(auctionId, userId, amount, closedEndTime)
+        service.placeBid(auctionId, userId, amount, closedEndTime, "test-ticket")
       ).rejects.toThrow('Auction has closed');
     });
 
@@ -197,11 +201,11 @@ describe('BiddingService - Bid Fee Payment Check', () => {
       (mockRedis.set as jest.Mock).mockResolvedValue(null);
 
       await expect(
-        service.placeBid(auctionId, userId, amount, endTime)
+        service.placeBid(auctionId, userId, amount, endTime, "test-ticket")
       ).rejects.toThrow(ForbiddenException);
 
       await expect(
-        service.placeBid(auctionId, userId, amount, endTime)
+        service.placeBid(auctionId, userId, amount, endTime, "test-ticket")
       ).rejects.toThrow('Auction is temporarily locked. Please retry.');
     });
 
@@ -209,7 +213,7 @@ describe('BiddingService - Bid Fee Payment Check', () => {
       (mockRedis.set as jest.Mock).mockResolvedValue(null);
 
       await expect(
-        service.placeBid(auctionId, userId, amount, endTime)
+        service.placeBid(auctionId, userId, amount, endTime, "test-ticket")
       ).rejects.toThrow();
 
       expect(mockPaymentTransactionRepo.findOne).not.toHaveBeenCalled();
@@ -220,7 +224,7 @@ describe('BiddingService - Bid Fee Payment Check', () => {
         status: PaymentTransactionStatus.SUCCESSFUL,
       });
 
-      await service.placeBid(auctionId, userId, amount, endTime);
+      await service.placeBid(auctionId, userId, amount, endTime, "test-ticket");
 
       expect(mockRedis.del).toHaveBeenCalledWith(`takelow:auction:${auctionId}:lock`);
     });
@@ -229,7 +233,7 @@ describe('BiddingService - Bid Fee Payment Check', () => {
       mockPaymentTransactionRepo.findOne.mockResolvedValue(null);
 
       await expect(
-        service.placeBid(auctionId, userId, amount, endTime)
+        service.placeBid(auctionId, userId, amount, endTime, "test-ticket")
       ).rejects.toThrow();
 
       expect(mockRedis.del).toHaveBeenCalledWith(`takelow:auction:${auctionId}:lock`);

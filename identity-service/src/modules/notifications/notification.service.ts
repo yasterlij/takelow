@@ -257,4 +257,38 @@ export class NotificationService {
     const payload: PushPayload = { title, body, data: data || {} };
     await Promise.allSettled(users.map((u) => this.sendPush(u.id, payload)));
   }
+
+  async sendForcedClosure(productName: string, auctionId: string, totalBids: number): Promise<void> {
+    const title = 'Auction Closed — No Unique Bids';
+    const body = `Auction "${productName}" was closed by admin with no unique bids among ${totalBids} total bids.`;
+
+    await this.sendToRole('user', title, body, { auction_id: auctionId, type: 'forced_closure' });
+
+    await this.persistNotification({
+      user_id: '',
+      auction_id: auctionId,
+      type: 'forced_closure',
+      channel: NotificationChannel.INAPP,
+      title,
+      body: `Auction closed by admin with no unique bids.`,
+      metadata: { auction_id: auctionId, total_bids: totalBids },
+    });
+  }
+
+  async sendFairPlayExtension(productName: string, auctionId: string, totalBids: number, extensions: number): Promise<void> {
+    const title = 'Auction Extended for Fair Play';
+    const body = `No unique bids among ${totalBids} bids for "${productName}". Auction extended by 24 hours (extension #${extensions}) for fair play. Place your bid now!`;
+
+    await this.sendToRole('user', title, body, { auction_id: auctionId, type: 'fair_play_extension', extensions: String(extensions) });
+
+    await this.persistNotification({
+      user_id: '',
+      auction_id: auctionId,
+      type: 'fair_play_extension',
+      channel: NotificationChannel.INAPP,
+      title,
+      body: `No unique bids among ${totalBids} bids. Auction extended by 24 hours for fair play.`,
+      metadata: { auction_id: auctionId, total_bids: totalBids, extensions },
+    });
+  }
 }

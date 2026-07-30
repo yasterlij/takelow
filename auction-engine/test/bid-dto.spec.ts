@@ -16,11 +16,18 @@ describe('BidDto Validation (Section 11.1 - Test Case 3)', () => {
     expect(errors.length).toBe(0);
   });
 
-  it('should accept decimal 0.01 (minimum)', async () => {
+  it('should accept 1.00 (minimum)', async () => {
+    const dto = new BidDto();
+    dto.amount = 1.00;
+    const errors = await validate(dto);
+    expect(errors.length).toBe(0);
+  });
+
+  it('should reject values below 1.00', async () => {
     const dto = new BidDto();
     dto.amount = 0.01;
     const errors = await validate(dto);
-    expect(errors.length).toBe(0);
+    expect(errors.length).toBeGreaterThan(0);
   });
 
   it('should reject negative values', async () => {

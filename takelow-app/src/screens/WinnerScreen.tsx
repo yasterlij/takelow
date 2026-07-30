@@ -42,11 +42,11 @@ export function WinnerScreen() {
 
   const savings = winner?.winning_bid_amount != null ? (auction.marketPrice - winner.winning_bid_amount) : 0
   const savingsPct = auction.marketPrice > 0 ? Math.round((savings / auction.marketPrice) * 100) : 0
-  const winnerName = winner?.winner_name && winner?.winner_user_id
-    ? `${winner.winner_name} (User ${winner.winner_user_id.slice(0, 8)})`
-    : (winner?.winner_user_id ? `User ${winner.winner_user_id.slice(0, 8)}` : null)
   const winnerPhone = winner?.winner_phone || null
-  const maskPhone = (p: string | null) => p ? p.slice(0, 4) + "****" + p.slice(-2) : null
+  const maskPhone = (p: string | null) => p ? p.slice(0, 4) + 'XXXX' + p.slice(-2) : null
+  const maskedPhone = winnerPhone ? maskPhone(winnerPhone) : null
+  const firstName = winner?.winner_name ? winner.winner_name.split(" ")[0] : null
+  const winnerName = firstName && maskedPhone ? `${firstName} ${maskedPhone}` : (firstName || maskedPhone || null)
   const deadline = winner?.payment_deadline ? new Date(winner.payment_deadline) : null
   const deadlineHrs = deadline ? Math.max(0, Math.round((deadline.getTime() - Date.now()) / 3600000)) : null
   const allWinners = 'all_winners' in (winner || {}) ? (winner as any).all_winners as any[] : undefined
@@ -130,7 +130,6 @@ export function WinnerScreen() {
                     <Text style={{ fontSize: 12, color: colors.mutedForeground }}>Winner</Text>
                     <Text style={{ fontSize: 12, fontWeight: '700', color: colors.navy, textAlign: 'right' }}>
                       {winnerName || 'Unknown'}
-                      {winnerPhone && <Text style={{ fontWeight: '500', color: colors.mutedForeground }}>{'\n'}{maskPhone(winnerPhone)}</Text>}
                     </Text>
                   </View>
                   {winner.lowest_unique_bid != null && (
@@ -179,11 +178,12 @@ export function WinnerScreen() {
                           <View style={{ flex: 1 }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                               <Text style={{ fontSize: 11, color: colors.mutedForeground }} numberOfLines={1}>
-                                {w.name ? `${w.name} (User ${w.user_id.slice(0, 8)})` : `User ${w.user_id.slice(0, 8)}`}
+                                {(() => {
+                                  const fn = w.name ? w.name.split(" ")[0] : null
+                                  const mp = w.phone ? maskPhone(w.phone) : null
+                                  return fn && mp ? `${fn} ${mp}` : (fn || mp || `Winner #${i + 1}`)
+                                })()}
                               </Text>
-                              {w.phone && (
-                                <Text style={{ fontSize: 9, color: colors.mutedForeground + '99' }}>{maskPhone(w.phone)}</Text>
-                              )}
                               {isCurrentUser && (
                                 <View style={{ borderRadius: 4, backgroundColor: colors.primary + '22', paddingHorizontal: 4, paddingVertical: 1 }}>
                                   <Text style={{ fontSize: 8, fontWeight: '700', color: colors.primary }}>You</Text>
@@ -283,7 +283,7 @@ export function WinnerScreen() {
                       }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1 }}>
                           <Text style={{ fontSize: 12, fontWeight: '700', color: colors.emerald800 }} numberOfLines={1}>
-                            {(winnerBid.name || winnerBid.user_name) ? `${winnerBid.name || winnerBid.user_name} (User ${winnerBid.user_id.slice(0, 8)})` : `User ${winnerBid.user_id.slice(0, 8)}`}
+                            {winnerBid.user_name || winnerBid.user_id.slice(0, 8)}
                           </Text>
                           {winnerBid.user_id === user?.id && (
                             <View style={{ borderRadius: 4, backgroundColor: colors.primary + '22', paddingHorizontal: 4, paddingVertical: 1 }}>

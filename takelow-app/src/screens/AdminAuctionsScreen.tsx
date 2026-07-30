@@ -4,6 +4,7 @@ import DateTimePicker, { type DateTimePickerEvent } from '@react-native-communit
 import * as ImagePicker from 'expo-image-picker'
 import { Plus, X, Pencil, XCircle, Trash2, Eye, Calendar, ImageIcon, Search, Filter, Upload, BarChart3, TrendingDown, ArrowUpRight, Camera, Trophy } from 'lucide-react-native'
 import { useApp } from '../AppContext'
+import { api } from '../api'
 import { AppBar, CTAButton, Badge, Card } from '../components/AuctionUI'
 import { CURRENCY, formatETB } from '../mockDataV0'
 import { colors } from '../theme'
@@ -159,7 +160,10 @@ function fmtDate(d: Date): string {
 }
 
 export function AdminAuctionsScreen() {
-  const { go, auctions, addAuction, updateAuction, deleteAuction, closeAuction, allBids } = useApp()
+  const { go, auctions, addAuction, updateAuction, deleteAuction, closeAuction, refreshAuctions, allBids } = useApp()
+  const [showForceCloseConfirm, setShowForceCloseConfirm] = useState<string | null>(null)
+  const [forceClosing, setForceClosing] = useState(false)
+  const [forceCloseWarning, setForceCloseWarning] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [viewBidsId, setViewBidsId] = useState<string | null>(null)
@@ -270,11 +274,35 @@ const [category, setCategory] = useState('Computer')
     resetForm()
   }
 
-  const handleClose = (id: string) => {
-    Alert.alert('Close Auction', 'Are you sure?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Close', style: 'destructive', onPress: () => closeAuction(id) },
-    ])
+  const handleClose = async (id: string) => {
+    try {
+      await api.closeAuction(id)
+      await refreshAuctions()
+    } catch (e: any) {
+      const msg = e?.message || ''
+      if (msg.toLowerCase().includes('no unique bids') || msg.toLowerCase().includes('no unique winners') || msg.toLowerCase().includes('no bids found')) {
+        setForceCloseWarning(msg)
+        setShowForceCloseConfirm(id)
+      } else {
+        Alert.alert('Error', msg)
+      }
+    }
+  }
+
+  const handleForceClose = async () => {
+    if (!showForceCloseConfirm) return
+    setForceClosing(true)
+    try {
+      await api.forceCloseAuction(showForceCloseConfirm)
+      Alert.alert('Success', 'Auction has been force-closed successfully')
+      refreshAuctions()
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Failed to force-close auction')
+    } finally {
+      setForceClosing(false)
+      setShowForceCloseConfirm(null)
+      setForceCloseWarning('')
+    }
   }
 
   const handleDelete = (id: string) => {
@@ -507,6 +535,29 @@ const [category, setCategory] = useState('Computer')
           })
         )}
       </ScrollView>
+
+      <Modal visible={!!showForceCloseConfirm} transparent animationType="fade" onRequestClose={() => setShowForceCloseConfirm(null)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 24 }}>
+          <View style={{ borderRadius: 20, backgroundColor: colors.card, padding: 24 }}>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: colors.destructive, marginBottom: 8 }}>Force Close Auction</Text>
+            <Text style={{ fontSize: 13, fontWeight: '500', color: colors.mutedForeground, marginBottom: 16 }}>
+              {forceCloseWarning || 'This auction cannot be closed normally. Force closing will end the auction without declaring a winner. This action cannot be undone.'}
+            </Text>
+            {forceClosing ? (
+              <ActivityIndicator size="small" color={colors.destructive} />
+            ) : (
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <TouchableOpacity onPress={() => setShowForceCloseConfirm(null)} style={{ flex: 1, borderRadius: 12, borderWidth: 1, borderColor: colors.border, paddingVertical: 12, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: colors.mutedForeground }}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleForceClose} style={{ flex: 1, borderRadius: 12, backgroundColor: colors.destructive, paddingVertical: 12, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>Force Close</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={showLightbox} transparent animationType="fade" onRequestClose={() => setShowLightbox(false)}>
         <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' }} activeOpacity={1} onPress={() => setShowLightbox(false)}>

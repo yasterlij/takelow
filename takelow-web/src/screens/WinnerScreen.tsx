@@ -31,11 +31,11 @@ export function WinnerScreen() {
 
   const savings = winner?.winning_bid_amount != null ? (auction.marketPrice - winner.winning_bid_amount) : 0
   const savingsPct = auction.marketPrice > 0 ? Math.round((savings / auction.marketPrice) * 100) : 0
-  const winnerName = winner?.winner_name && winner?.winner_user_id
-    ? `${winner.winner_name} (User ${winner.winner_user_id.slice(0, 8)})`
-    : (winner?.winner_user_id ? `User ${winner.winner_user_id.slice(0, 8)}` : null)
   const winnerPhone = winner?.winner_phone || null
-  const maskPhone = (p: string | null) => p ? p.slice(0, 4) + '****' + p.slice(-2) : null
+  const maskPhone = (p: string | null) => p ? p.slice(0, 4) + 'XXXX' + p.slice(-2) : null
+  const maskedPhone = winnerPhone ? maskPhone(winnerPhone) : null
+  const firstName = winner?.winner_name ? winner.winner_name.split(" ")[0] : null
+  const winnerName = firstName && maskedPhone ? `${firstName} ${maskedPhone}` : (firstName || maskedPhone || null)
   const deadline = ((winner as any)?.payment_deadline) ? new Date((winner as any).payment_deadline) : null
   const deadlineHrs = deadline ? Math.max(0, Math.round((deadline.getTime() - Date.now()) / 3600000)) : null
   const allWinners = (winner as any)?.all_winners as ApiWinnerInfo[] | undefined
@@ -118,7 +118,7 @@ export function WinnerScreen() {
                 <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
                   <div><span className="text-neutral-400">Total Bids</span><p className="font-semibold text-foreground">{winner.total_bids}</p></div>
                   <div><span className="text-neutral-400">Unique Bidders</span><p className="font-semibold text-foreground">{winner.unique_bidders}</p></div>
-                  <div><span className="text-neutral-400">Primary Winner</span><p className="font-bold text-foreground">{winnerName || "Unknown"}{winnerPhone && <span className="ml-2 font-normal text-neutral-500">{maskPhone(winnerPhone)}</span>}</p></div>
+                  <div><span className="text-neutral-400">Primary Winner</span><p className="font-bold text-foreground">{winnerName || "Unknown"}</p></div>
                   {winner.lowest_unique_bid != null && (
                     <div><span className="text-neutral-400">Lowest Unique Bid</span><p className="font-bold text-emerald-600">{CURRENCY} {formatETB(winner.lowest_unique_bid)}</p></div>
                   )}
@@ -180,7 +180,11 @@ export function WinnerScreen() {
                         </span>
                         <div>
                           <p className={`text-sm font-semibold ${isCurrentUser ? "text-primary" : "text-foreground"}`}>
-                            {w.name ? `${w.name} (User ${w.user_id.slice(0, 8)})` : `User ${w.user_id.slice(0, 8)}`}{w.phone && <span className="ml-2 text-xs text-neutral-300">{maskPhone(w.phone)}</span>}
+                            {(() => {
+                              const fn = w.name ? w.name.split(" ")[0] : null
+                              const mp = w.phone ? maskPhone(w.phone) : null
+                              return fn && mp ? `${fn} ${mp}` : (fn || mp || `Winner #${i + 1}`)
+                            })()}
                             {isCurrentUser && <span className="ml-1.5 text-[10px] font-bold text-primary">(You)</span>}
                           </p>
                           <div className="flex items-center gap-2 text-xs text-neutral-400">
@@ -258,7 +262,7 @@ export function WinnerScreen() {
                   <div className="flex items-center justify-between rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2.5 mb-3">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-xs font-semibold text-emerald-800 truncate">
-                        {winnerBid.user_id.slice(0, 8)}...
+                        {winnerBid.user_name || winnerBid.user_id.slice(0, 8)}
                       </span>
                       {winnerBid.user_id === user?.id && <span className="text-[10px] font-bold text-primary shrink-0">You</span>}
                     </div>

@@ -69,6 +69,7 @@ type AppState = {
   updateAuction: (id: string, data: Partial<Pick<Auction, "name" | "category" | "marketPrice" | "description" | "highlights" | "images">> & { startTime?: string; endTime?: string; minBid?: number; maxBid?: number }) => Promise<void>
   deleteAuction: (id: string) => Promise<void>
   closeAuction: (id: string) => Promise<void>
+  forceCloseAuction: (id: string) => Promise<void>
   refreshAuctions: () => Promise<void>
   refreshWallet: () => Promise<void>
   getAuction: (id: string | null | undefined) => Auction | undefined
@@ -460,6 +461,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [refreshAuctions, user, toast])
 
+  const forceCloseAuction = useCallback(async (id: string) => {
+    if (user?.role !== 'admin') return
+    try {
+      await api.forceCloseAuction(id)
+      await refreshAuctions()
+      toast.show('Auction force-closed successfully', 'success')
+    } catch (e: any) {
+      toast.show(getUserFriendlyMessage(e), 'error')
+    }
+  }, [refreshAuctions, user, toast])
+
   const updateAuction = useCallback(async (id: string, data: any) => {
     if (user?.role !== 'admin') return
     try {
@@ -530,12 +542,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       view, selectedId, userBid, bidTicketNumber, feePaid, walletBalance, paymentMethod, sikinaPayUrl, setSikinaPayUrl, sikinaPayContext, setFeePaid, myBids, user, users, allBids,
       auctions, auctionsLoading, authError,
       go, selectAuction, payFee, submitBid, payWinning, setPaymentMethod, checkPaymentStatus, reset,
-      login, register, logout, addAuction, updateAuction, deleteAuction, closeAuction, refreshAuctions, refreshWallet, getAuction, fetchAuctionById,
+      login, register, logout, addAuction, updateAuction, deleteAuction, closeAuction, forceCloseAuction, refreshAuctions, refreshWallet, getAuction, fetchAuctionById,
     }),
     [view, selectedId, userBid, bidTicketNumber, feePaid, walletBalance, paymentMethod, sikinaPayUrl, sikinaPayContext, setFeePaid, myBids, user, users, allBids,
      auctions, auctionsLoading, authError,
      go, selectAuction, payFee, submitBid, payWinning, setPaymentMethod, checkPaymentStatus, reset,
-     login, register, logout, addAuction, updateAuction, deleteAuction, closeAuction, refreshAuctions, refreshWallet, getAuction, fetchAuctionById],
+     login, register, logout, addAuction, updateAuction, deleteAuction, closeAuction, forceCloseAuction, refreshAuctions, refreshWallet, getAuction, fetchAuctionById],
   )
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>

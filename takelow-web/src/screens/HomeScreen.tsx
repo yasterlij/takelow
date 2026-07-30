@@ -5,15 +5,8 @@ import { CURRENCY, formatETB, formatCountdown } from "../mockDataV0"
 import { useCountdown } from "../components/Countdown"
 
 
-function maskEthiopianPhone(phone: string): string {
-  const digits = phone.replace(/\D/g, "")
-  if (digits.startsWith("251") && digits.length >= 12) {
-    return `+251-${digits.slice(3, 6)}-XXX-XXX`
-  }
-  if (digits.startsWith("0") && digits.length >= 10) {
-    return `+251-${digits.slice(1, 4)}-XXX-XXX`
-  }
-  return phone.length > 8 ? `${phone.slice(0, 4)}-XXX-XXX` : phone
+function maskPhone(p: string | null): string | null {
+  return p ? p.slice(0, 4) + "XXXX" + p.slice(-2) : null
 }
 
 function useCountdownInternal(seconds: number) {
@@ -113,10 +106,9 @@ function ActiveAuctionCard({ auction, onSelect }: { auction: any; onSelect: () =
 
 function WinnerShowcaseSlide({ auction, index }: { auction: any; index: number }) {
   const winnerInfo = auction.winners?.[0]
-  const coded = winnerInfo?.user_id ? `User ${winnerInfo.user_id.slice(0, 8)}` : `Winner #${index + 1}`
-  const winnerName = winnerInfo?.name ? `${winnerInfo.name} (${coded})` : coded
+  const maskedPhone = winnerInfo?.phone ? maskPhone(winnerInfo.phone) : null
+  const firstName = winnerInfo?.name ? winnerInfo.name.split(" ")[0] : null
   const bidAmount = auction.winning_bid_amount ?? winnerInfo?.amount ?? 0
-  const maskedPhone = winnerInfo?.phone ? maskEthiopianPhone(winnerInfo.phone) : null
   return (
     <div className="group relative flex w-[280px] flex-shrink-0 snap-start flex-col overflow-hidden rounded-2xl bg-white shadow-lg transition-all duration-500 hover:-translate-y-1 hover:shadow-[0_20px_60px_rgba(200,166,66,0.2)] border border-primary/10 hover:border-primary/30 border-glow">
       {/* Confetti particles on hover */}
@@ -154,13 +146,11 @@ function WinnerShowcaseSlide({ auction, index }: { auction: any; index: number }
       <div className="flex flex-col gap-2 p-4 pt-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
-            <p className="truncate font-display text-base font-extrabold text-gradient-gold">{winnerName}</p>
-            {maskedPhone && (
-              <p className="mt-0.5 flex items-center gap-1.5 text-[11px] font-semibold text-neutral-500 tracking-wide">
-                <svg className="size-3 text-neutral-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-                {maskedPhone}
-              </p>
-            )}
+            <p className="truncate font-display text-base font-extrabold text-gradient-gold">
+              {firstName}
+              {firstName && maskedPhone && <span className="text-[10px] font-medium text-neutral-400 ml-1.5">{maskedPhone}</span>}
+              {!firstName && (maskedPhone || `Winner #${index + 1}`)}
+            </p>
           </div>
           <span className="shrink-0 rounded-full bg-gradient-to-r from-emerald-50 to-emerald-100/80 px-2.5 py-1 text-[10px] font-bold text-emerald-700 border border-emerald-200/50">
             {CURRENCY} {formatETB(bidAmount)}

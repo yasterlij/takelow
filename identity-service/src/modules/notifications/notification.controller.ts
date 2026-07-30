@@ -169,6 +169,37 @@ export class NotificationController {
   }
 
   @UseGuards(InternalAuthGuard)
+  @Post('auction-fair-play-extended')
+  @HttpCode(200)
+  async notifyFairPlayExtended(
+    @Body('auction_id') auctionId: string,
+    @Body('product_name') productName: string,
+    @Body('total_bids') totalBids: number,
+    @Body('extensions') extensions: number,
+  ) {
+    if (!auctionId || !productName) {
+      throw new BadRequestException('Missing required fields: auction_id, product_name');
+    }
+    await this.notificationService.sendFairPlayExtension(productName, auctionId, totalBids ?? 0, extensions ?? 0);
+    return { notified: true };
+  }
+
+  @UseGuards(InternalAuthGuard)
+  @Post('auction-forced-closure')
+  @HttpCode(200)
+  async notifyForcedClosure(
+    @Body('auction_id') auctionId: string,
+    @Body('product_name') productName: string,
+    @Body('total_bids') totalBids: number,
+  ) {
+    if (!auctionId || !productName) {
+      throw new BadRequestException('Missing required fields: auction_id, product_name');
+    }
+    await this.notificationService.sendForcedClosure(productName, auctionId, totalBids ?? 0);
+    return { notified: true };
+  }
+
+  @UseGuards(InternalAuthGuard)
   @Post('ending-soon')
   @HttpCode(200)
   async notifyEndingSoon(

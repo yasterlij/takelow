@@ -22,6 +22,7 @@ import {
   PaymentType,
   PaymentGateway,
 } from "./entities/payment-transaction.entity";
+import { BidEncryptionService } from "../common/bid-encryption.service";
 
 const PAYMENT_DEADLINE_HOURS = 24;
 
@@ -46,6 +47,7 @@ export class PaymentService {
     private sikinaService: SikinaService,
     private awashService: AwashService,
     private configService: ConfigService,
+    private bidEncryptionService: BidEncryptionService,
     @InjectRedis() private readonly redis: Redis,
   ) {
     this.bidFee = this.configService.get<number>("app.bidFee")!;
@@ -184,10 +186,13 @@ export class PaymentService {
       }
     }
 
+    const encryptedAmount = this.bidEncryptionService.encrypt(amount);
+
     const transaction = this.paymentTransactionRepository.create({
       auction_id: auctionId,
       user_id: userId,
-      amount,
+      amount: 0,
+      encrypted_amount: encryptedAmount,
       client_reference_id: clientReferenceId,
       payment_type: PaymentType.WINNING_BID,
       status: PaymentTransactionStatus.PENDING,
@@ -394,10 +399,13 @@ export class PaymentService {
     const shortAuctionId = auctionId.split("-")[0];
     const clientReferenceId = `win-${shortAuctionId}-${userId.split("-")[0]}-${Date.now()}`;
 
+    const encryptedAmount = this.bidEncryptionService.encrypt(amount);
+
     const transaction = this.paymentTransactionRepository.create({
       auction_id: auctionId,
       user_id: userId,
-      amount,
+      amount: 0,
+      encrypted_amount: encryptedAmount,
       client_reference_id: clientReferenceId,
       status: PaymentTransactionStatus.SUCCESSFUL,
       currency: "ETB",
