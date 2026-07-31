@@ -21,6 +21,10 @@ const PAYMENT_DEADLINE_HOURS = 24;
 export class AuctionClosureService {
   private readonly logger = new Logger(AuctionClosureService.name);
 
+  private normalizeAmount(amount: string | number): string {
+    return Number(amount).toFixed(2);
+  }
+
   constructor(
     @InjectRepository(Auction)
     private auctionRepository: Repository<Auction>,
@@ -131,9 +135,9 @@ export class AuctionClosureService {
 
           auction.winner_user_id = winningBids[0].user_id;
           const winAmount = Number(winningBids[0].amount) === 0 && winningBids[0].encrypted_amount
-            ? Number(this.bidEncryptionService.decrypt(winningBids[0].encrypted_amount))
-            : Number(winningBids[0].amount);
-          auction.winning_bid_amount = winAmount;
+            ? this.normalizeAmount(this.bidEncryptionService.decrypt(winningBids[0].encrypted_amount))
+            : this.normalizeAmount(winningBids[0].amount);
+          auction.winning_bid_amount = Number(winAmount);
           auction.status = AS.CLOSED;
           auction.payment_status = PaymentStatus.PENDING;
           auction.payment_deadline = paymentDeadline;
@@ -364,9 +368,9 @@ export class AuctionClosureService {
         order: { bid_time: "ASC" },
       });
       const match = bids.find((b: Bid) => {
-        if (b.amount !== 0 || !b.encrypted_amount) return Number(b.amount) === amount;
+        if (Number(b.amount) !== 0 || !b.encrypted_amount) return this.normalizeAmount(b.amount) === this.normalizeAmount(amount);
         try {
-          return this.bidEncryptionService.decrypt(b.encrypted_amount) === amount;
+          return this.normalizeAmount(this.bidEncryptionService.decrypt(b.encrypted_amount)) === this.normalizeAmount(amount);
         } catch {
           return false;
         }

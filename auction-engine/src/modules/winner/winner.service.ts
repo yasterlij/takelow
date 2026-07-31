@@ -12,6 +12,22 @@ import { BidEncryptionService } from "../common/bid-encryption.service";
 export class WinnerService {
   private readonly logger = new Logger(WinnerService.name);
 
+  private normalizeAmount(amount: string | number): string {
+    return Number(amount).toFixed(2);
+  }
+
+  private readBidAmount(bid: Pick<Bid, "amount" | "encrypted_amount">): string | null {
+    if (Number(bid.amount) !== 0 || !bid.encrypted_amount) {
+      return this.normalizeAmount(bid.amount);
+    }
+
+    try {
+      return this.normalizeAmount(this.bidEncryptionService.decrypt(bid.encrypted_amount));
+    } catch {
+      return null;
+    }
+  }
+
   constructor(
     @InjectRedis() private readonly redis: Redis,
     @InjectRepository(Bid) private bidRepository: Repository<Bid>,
@@ -74,7 +90,7 @@ export class WinnerService {
     const freqKey = `takelow:auction:${auctionId}:frequencies`;
 
     for (const amount of amounts) {
-      const freq = await this.redis.zscore(freqKey, amount);
+      const freq = await this.redis.zscore(freqKey, this.normalizeAmount(amount));
       if (freq && Number(freq) === 1) return true;
     }
 
@@ -89,20 +105,12 @@ export class WinnerService {
 
     if (bids.length === 0) return false;
 
-    const frequency = new Map<number, number>();
-for (const bid of bids) {
-  const bidAmount = Number(bid.amount);
-  if (bidAmount === 0 && bid.encrypted_amount) continue;
-  let realAmount = bidAmount;
-  if (bid.encrypted_amount) {
-    try {
-      realAmount = Number(this.bidEncryptionService.decrypt(bid.encrypted_amount));
-    } catch {
-      continue;
+    const frequency = new Map<string, number>();
+    for (const bid of bids) {
+      const realAmount = this.readBidAmount(bid);
+      if (realAmount === null) continue;
+      frequency.set(realAmount, (frequency.get(realAmount) || 0) + 1);
     }
-  }
-  frequency.set(realAmount, (frequency.get(realAmount) || 0) + 1);
-}
 
     for (const count of frequency.values()) {
       if (count === 1) return true;
@@ -182,7 +190,7 @@ for (const bid of bids) {
       return { found: false, winningAmounts: [], totalBids: 0, winners: [] };
     }
 
-    const totalBids = parseInt(totalBidsStr, 10);
+      const totalBids = parseInt(totalBidsStr, 10);
     if (totalBids === 0) {
       return { found: true, winningAmounts: [], totalBids: 0, winners: [] };
     }
@@ -193,11 +201,11 @@ for (const bid of bids) {
       return { found: true, winningAmounts: [], totalBids, winners: [] };
     }
 
-    const winningAmounts = amounts.map((a) => parseFloat(a));
+    const winningAmounts = amounts.map((a) => Number(this.normalizeAmount(a)));
     const freqKey = `takelow:auction:${auctionId}:frequencies`;
 
     const freqResults = await Promise.all(
-      winningAmounts.map((a) => this.redis.zscore(freqKey, String(a))),
+      amounts.map((a) => this.redis.zscore(freqKey, this.normalizeAmount(a))),
     );
 
     const uniqueAmounts = winningAmounts.filter(
@@ -234,37 +242,29 @@ for (const bid of bids) {
       return { winningAmounts: [], totalBids: 0, winners: [] };
     }
 
-    const frequency = new Map<number, number>();
-    const earliestPerAmount = new Map<number, string>();
-for (const bid of bids) {
-  const bidAmount = Number(bid.amount);
-  if (bidAmount === 0 && bid.encrypted_amount) continue;
-  let realAmount = bidAmount;
-  if (bid.encrypted_amount) {
-    try {
-      realAmount = Number(this.bidEncryptionService.decrypt(bid.encrypted_amount));
-    } catch {
-      continue;
+    const frequency = new Map<string, number>();
+    const earliestPerAmount = new Map<string, string>();
+    for (const bid of bids) {
+      const realAmount = this.readBidAmount(bid);
+      if (realAmount === null) continue;
+      frequency.set(realAmount, (frequency.get(realAmount) || 0) + 1);
+      if (!earliestPerAmount.has(realAmount)) {
+        earliestPerAmount.set(realAmount, bid.user_id);
+      }
     }
-  }
-  frequency.set(realAmount, (frequency.get(realAmount) || 0) + 1);
-  if (!earliestPerAmount.has(realAmount)) {
-    earliestPerAmount.set(realAmount, bid.user_id);
-  }
-}
 
     const uniqueAmounts = Array.from(frequency.entries())
       .filter(([, count]) => count === 1)
       .map(([amount]) => amount)
-      .sort((a, b) => a - b);
+      .sort((a, b) => Number(a) - Number(b));
 
     const selected = uniqueAmounts.slice(0, numWinners);
     const winners = selected.map((amount) => ({
-      amount,
+      amount: Number(amount),
       userId: earliestPerAmount.get(amount) || "",
     }));
 
-    return { winningAmounts: selected, totalBids, winners };
+    return { winningAmounts: selected.map((amount) => Number(amount)), totalBids, winners };
   }
 
   private async findEarliestBidder(
@@ -276,10 +276,11 @@ for (const bid of bids) {
       order: { bid_time: "ASC" },
       select: ["user_id", "amount", "encrypted_amount"],
     });
+    const targetAmount = this.normalizeAmount(amount);
     const match = bids.find((b) => {
-      if (b.amount !== 0 || !b.encrypted_amount) return Number(b.amount) === amount;
+      if (Number(b.amount) !== 0 || !b.encrypted_amount) return this.normalizeAmount(b.amount) === targetAmount;
       try {
-        return Number(this.bidEncryptionService.decrypt(b.encrypted_amount)) === amount;
+        return this.normalizeAmount(this.bidEncryptionService.decrypt(b.encrypted_amount)) === targetAmount;
       } catch {
         return false;
       }
@@ -292,29 +293,21 @@ for (const bid of bids) {
     amounts: number[],
   ): Promise<Map<number, string>> {
     if (amounts.length === 0) return new Map();
-    const amountSet = new Set(amounts);
+    const amountSet = new Set(amounts.map((amount) => this.normalizeAmount(amount)));
     const bids = await this.bidRepository.find({
       where: { auction_id: auctionId },
       order: { bid_time: "ASC" },
     });
     const result = new Map<number, string>();
-    const seen = new Set<number>();
-for (const bid of bids) {
-  const bidAmount = Number(bid.amount);
-  if (bidAmount === 0 && bid.encrypted_amount) continue;
-  let realAmount = bidAmount;
-  if (bid.encrypted_amount) {
-    try {
-      realAmount = Number(this.bidEncryptionService.decrypt(bid.encrypted_amount));
-    } catch {
-      continue;
+    const seen = new Set<string>();
+    for (const bid of bids) {
+      const realAmount = this.readBidAmount(bid);
+      if (realAmount === null) continue;
+      if (amountSet.has(realAmount) && !seen.has(realAmount)) {
+        seen.add(realAmount);
+        result.set(Number(realAmount), bid.user_id);
+      }
     }
-  }
-  if (amountSet.has(realAmount) && !seen.has(realAmount)) {
-    seen.add(realAmount);
-    result.set(realAmount, bid.user_id);
-  }
-}
     return result;
   }
 

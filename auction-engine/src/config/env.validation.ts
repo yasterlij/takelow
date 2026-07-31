@@ -1,17 +1,20 @@
 import { plainToInstance } from "class-transformer";
-import { IsString, IsOptional, IsNumber, validateSync } from "class-validator";
+import { IsString, IsOptional, IsNumber, IsNotEmpty, validateSync } from "class-validator";
 
 class EnvironmentVariables {
   @IsNumber()
   PORT: number = 3000;
 
   @IsString()
+  @IsNotEmpty()
   JWT_SECRET: string;
 
   @IsString()
+  @IsNotEmpty()
   DATABASE_URL: string;
 
   @IsString()
+  @IsNotEmpty()
   REDIS_URL: string;
 
   @IsNumber()
@@ -63,6 +66,7 @@ class EnvironmentVariables {
   AWASH_BASE_URL: string = "https://sandbox.awashbank.com";
 
   @IsString()
+  @IsNotEmpty()
   INTERNAL_API_KEY: string;
 }
 

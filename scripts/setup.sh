@@ -13,7 +13,7 @@ echo ""
 echo "> Logging in as admin..."
 TOKEN=$(curl -s -X POST "$IDENTITY/auth/login/phone" \
   -H 'Content-Type: application/json' \
-  -d '{"phone_number":"0911111111","password":"admin123"}' | \
+  -d '{"phone_number":"0911111111","password":"1234"}' | \
   python3 -c "import json,sys; print(json.load(sys.stdin)['access_token'])")
 
 # 2. Add wallet balance
@@ -26,7 +26,7 @@ curl -s -X POST "$IDENTITY/wallet/deposit" \
 # Also add balance to test user
 USER_TOKEN=$(curl -s -X POST "$IDENTITY/auth/login/phone" \
   -H 'Content-Type: application/json' \
-  -d '{"phone_number":"0913320001","password":"admin123"}' | \
+  -d '{"phone_number":"0913320001","password":"0000"}' | \
   python3 -c "import json,sys; print(json.load(sys.stdin)['access_token'])")
 curl -s -X POST "$IDENTITY/wallet/deposit" \
   -H "Authorization: Bearer $USER_TOKEN" \
@@ -84,7 +84,7 @@ done
 
 echo ""
 echo "=== Done! ==="
-echo "Admin:  0911111111 / admin123  (balance: 100,000 ETB)"
-echo "Test:   0913320001 / admin123  (balance: 10,000 ETB)"
+echo "Admin:  0911111111 / 1234  (balance: 100,000 ETB)"
+echo "Test:   0913320001 / 0000  (balance: 10,000 ETB)"
 echo ""
 echo "Run 'npm run app' to start the mobile app."

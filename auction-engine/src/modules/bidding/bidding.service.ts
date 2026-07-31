@@ -28,6 +28,10 @@ const LOCK_TTL = 5000;
 export class BiddingService {
   private readonly logger = new Logger(BiddingService.name);
 
+  private normalizeAmount(amount: number): string {
+    return amount.toFixed(2);
+  }
+
   constructor(
     @InjectRedis() private readonly redis: Redis,
     private readonly auctionGateway: AuctionGateway,
@@ -151,9 +155,10 @@ export class BiddingService {
     newBidderId: string,
     amount: number,
   ): Promise<void> {
+    const amountKey = this.normalizeAmount(amount);
     const freq = await this.redis.zscore(
       `takelow:auction:${auctionId}:frequencies`,
-      String(amount),
+      amountKey,
     );
     if (freq && Number(freq) > 1) {
       const prevBids = await this.bidRepository.find({
@@ -163,9 +168,9 @@ export class BiddingService {
         take: 20,
       });
       const prevBidders = prevBids.filter((b) => {
-        if (b.amount !== 0 || !b.encrypted_amount) return Number(b.amount) === amount;
+        if (Number(b.amount) !== 0 || !b.encrypted_amount) return this.normalizeAmount(Number(b.amount)) === amountKey;
         try {
-          return this.bidEncryptionService.decrypt(b.encrypted_amount) === amount;
+          return this.normalizeAmount(this.bidEncryptionService.decrypt(b.encrypted_amount)) === amountKey;
         } catch {
           return false;
         }
@@ -240,13 +245,14 @@ export class BiddingService {
     amount: number,
   ): Promise<void> {
     const multi = this.redis.multi();
+    const amountKey = this.normalizeAmount(amount);
 
     multi.sadd(`takelow:auction:${auctionId}:bidders`, userId);
 
     multi.zincrby(
       `takelow:auction:${auctionId}:frequencies`,
       1,
-      String(amount),
+      amountKey,
     );
 
     const freqKey = `takelow:auction:${auctionId}:frequencies`;

@@ -15,8 +15,23 @@ export function useAuctionSocket(
 ) {
   const socketRef = useRef<Socket | null>(null)
   const subscribedRef = useRef<string | null>(null)
+  const selectedIdRef = useRef<string | null>(selectedId)
   const onUpdateRef = useRef(onUpdate)
   onUpdateRef.current = onUpdate
+  selectedIdRef.current = selectedId
+
+  const syncSubscription = (socket: Socket, nextSelectedId: string | null) => {
+    if (subscribedRef.current && subscribedRef.current !== nextSelectedId) {
+      socket.emit("unsubscribe:auction", subscribedRef.current)
+    }
+
+    if (nextSelectedId) {
+      socket.emit("subscribe:auction", nextSelectedId)
+      subscribedRef.current = nextSelectedId
+    } else {
+      subscribedRef.current = null
+    }
+  }
 
   useEffect(() => {
     const token = getApiToken()
@@ -34,6 +49,14 @@ export function useAuctionSocket(
       onUpdateRef.current(payload)
     })
 
+    socket.on("connect", () => {
+      syncSubscription(socket, selectedIdRef.current)
+    })
+
+    if (socket.connected) {
+      syncSubscription(socket, selectedIdRef.current)
+    }
+
     return () => {
       socket.disconnect()
       socketRef.current = null
@@ -45,15 +68,8 @@ export function useAuctionSocket(
     const socket = socketRef.current
     if (!socket || !socket.connected) return
 
-    if (subscribedRef.current && subscribedRef.current !== selectedId) {
-      socket.emit("unsubscribe:auction", subscribedRef.current)
-    }
-
-    if (selectedId) {
-      socket.emit("subscribe:auction", selectedId)
-      subscribedRef.current = selectedId
-    } else {
-      subscribedRef.current = null
+    if (subscribedRef.current !== selectedId) {
+      syncSubscription(socket, selectedId)
     }
   }, [selectedId])
 }

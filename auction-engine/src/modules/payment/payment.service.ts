@@ -191,7 +191,7 @@ export class PaymentService {
     const transaction = this.paymentTransactionRepository.create({
       auction_id: auctionId,
       user_id: userId,
-      amount: 0,
+      amount,
       encrypted_amount: encryptedAmount,
       client_reference_id: clientReferenceId,
       payment_type: PaymentType.WINNING_BID,
@@ -404,7 +404,7 @@ export class PaymentService {
     const transaction = this.paymentTransactionRepository.create({
       auction_id: auctionId,
       user_id: userId,
-      amount: 0,
+      amount,
       encrypted_amount: encryptedAmount,
       client_reference_id: clientReferenceId,
       status: PaymentTransactionStatus.SUCCESSFUL,
@@ -543,6 +543,24 @@ export class PaymentService {
     paymentReferenceId: string,
     webhookPayload: Record<string, any>,
   ): Promise<void> {
+    const result = await this.paymentTransactionRepository.update(
+      {
+        client_reference_id: clientReferenceId,
+        status: Not(PaymentTransactionStatus.SUCCESSFUL),
+      },
+      {
+        status: PaymentTransactionStatus.SUCCESSFUL,
+        webhook_payload: webhookPayload,
+      },
+    );
+
+    if (!result.affected) {
+      this.logger.debug(
+        `Transaction ${clientReferenceId} already successful, skipping`,
+      );
+      return;
+    }
+
     const transaction = await this.paymentTransactionRepository.findOne({
       where: { client_reference_id: clientReferenceId },
     });
@@ -552,20 +570,11 @@ export class PaymentService {
       );
       return;
     }
-    if (transaction.status === PaymentTransactionStatus.SUCCESSFUL) {
-      this.logger.debug(
-        `Transaction ${transaction.id} already successful, skipping`,
-      );
-      return;
-    }
-
-    transaction.status = PaymentTransactionStatus.SUCCESSFUL;
     if (transaction.gateway === PaymentGateway.AWASH) {
       transaction.awash_transaction_id = paymentReferenceId;
     } else {
       transaction.sikina_payment_reference_id = paymentReferenceId;
     }
-    transaction.webhook_payload = webhookPayload;
     await this.paymentTransactionRepository.save(transaction);
 
     if (

@@ -35,4 +35,4 @@ while [ $elapsed -lt $TIMEOUT ]; do
 done
 
 echo "  ⚠ Timed out waiting for services"
-node "$(dirname "$0")/dev-proxy.js"
+exit 1

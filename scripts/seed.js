@@ -3,6 +3,8 @@ const bcrypt = require(require('path').resolve(__dirname, '../identity-service/n
 
 const DB_URL = process.env.DATABASE_URL || 'postgresql://admin:secret@localhost:5432/takelow_db';
 const PROXY = 'http://localhost:3333/api/v1';
+const ADMIN_PHONE = '0911111111';
+const ADMIN_PASSWORD = '1234';
 
 const PRODUCTS = [
   { name: 'iPhone 15 Pro Max', market_price: 1599, brand: 'Apple', description: '256GB Natural Titanium. A17 Pro chip, 48MP camera system, titanium design.', images: ['https://upload.wikimedia.org/wikipedia/commons/a/a7/IPhone_15_pro_max.jpg', 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/IPhone_15_pro_max.jpg/800px-IPhone_15_pro_max.jpg'] },
@@ -70,6 +72,35 @@ function toUuid(seed) {
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-a${h.slice(17, 20)}-${h.slice(20, 32)}`;
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function loginAsAdmin(retries = 5) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(`${PROXY}/auth/login/phone`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone_number: ADMIN_PHONE, password: ADMIN_PASSWORD }),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      if (!data?.access_token) {
+        throw new Error('Missing access_token in login response');
+      }
+      return data.access_token;
+    } catch (e) {
+      if (attempt === retries) throw e;
+      await sleep(1000 * attempt);
+    }
+  }
+  throw new Error('Unable to login as admin');
+}
+
 function seedUsers() {
   console.log('  Seeding users...');
   const userPinHash = bcrypt.hashSync('0000', 10);
@@ -91,12 +122,13 @@ function seedUsers() {
 async function seedViaApi() {
   console.log('  Trying API...');
   const count = { products: 0, auctions: 0 };
+  const adminToken = await loginAsAdmin();
 
   for (const p of PRODUCTS) {
     try {
       const res = await fetch(`${PROXY}/admin/products`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer admin-token' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
         body: JSON.stringify({ name: p.name, current_market_price: p.market_price, brand: p.brand, description: p.description, image_urls: p.images }),
       });
       if (res.ok) { count.products++; process.stdout.write('.'); }
@@ -112,7 +144,7 @@ async function seedViaApi() {
         const days = Math.floor(Math.random() * 5) + 1;
         const res = await fetch(`${PROXY}/admin/auctions`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer admin-token' },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
           body: JSON.stringify({ product_id: items[i].id, start_time: new Date(Date.now() - 86400000 * 3).toISOString(), end_time: new Date(Date.now() + 86400000 * days).toISOString() }),
         });
         if (res.ok) count.auctions++;
