@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react"
+import { motion, AnimatePresence } from "framer-motion"
 import { Shield, User, Search, X, Users as UsersIcon, TrendingUp, Loader2, AlertCircle, ArrowUpCircle, ArrowDownCircle, ChevronRight, Phone, Wallet, Edit3, Check, Plus } from "lucide-react"
 import { useApp } from "../AppContext"
 import { AdminLayout } from "../components/AdminLayout"
@@ -27,8 +28,21 @@ function UserDetailModal({ user, onClose, onRoleChange, onNameChange }: { user: 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-scale-in p-4">
-      <div className="w-full max-w-md rounded-2xl border border-border/60 bg-white shadow-2xl">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.92, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.92, y: 20 }}
+        transition={{ type: "spring", damping: 25, stiffness: 300 }}
+        className="w-full max-w-md rounded-2xl border border-border/60 bg-white/95 backdrop-blur-xl shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between border-b border-border p-4">
           <h2 className="font-display text-base font-bold text-awash-blue">User Details</h2>
           <button onClick={onClose} className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100 transition-colors"><X className="size-4" /></button>
@@ -101,8 +115,8 @@ function UserDetailModal({ user, onClose, onRoleChange, onNameChange }: { user: 
             {isAdmin ? <><ArrowDownCircle className="size-4" /> Demote to User</> : <><ArrowUpCircle className="size-4" /> Promote to Admin</>}
           </button>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   )
 }
 
@@ -162,91 +176,138 @@ export function AdminUsersScreen() {
 
   return (
     <AdminLayout title="Manage Users" subtitle={`${users.length} users`}>
-      <div className="space-y-4">
-        <div className="relative">
+      <motion.div
+        initial="hidden"
+        animate="visible"
+        variants={{
+          visible: { transition: { staggerChildren: 0.05 } },
+        }}
+        className="space-y-4"
+      >
+        <motion.div
+          variants={{ hidden: { opacity: 0, y: -8 }, visible: { opacity: 1, y: 0 } }}
+          className="relative"
+        >
           <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search users by name, phone or ID..."
-            className="w-full rounded-xl border border-border/60 bg-white py-2.5 pl-8 pr-3 text-xs font-medium outline-none placeholder:text-neutral-400/50 focus:border-awash-gold transition-colors"
+            className="w-full rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm py-2.5 pl-8 pr-3 text-xs font-medium outline-none transition-all placeholder:text-neutral-400/50 focus:border-awash-gold focus:bg-white focus:shadow-lg"
           />
           {search && (
-            <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-awash-gold transition-colors">
+            <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 transition-colors hover:text-awash-gold">
               <X className="size-4" />
             </button>
           )}
-        </div>
+        </motion.div>
 
-        <div className="grid grid-cols-3 gap-3 mb-4">
-          <Card className="items-center p-3 text-center">
-            <UsersIcon className="size-5 text-awash-gold" />
-            <p className="mt-1 font-display text-2xl font-extrabold text-awash-blue tabular-nums">{loading ? "..." : users.length}</p>
-            <p className="text-[10px] font-medium text-neutral-400">Users</p>
-          </Card>
-          <Card className="items-center p-3 text-center">
-            <Shield className="size-5 text-awash-gold" />
-            <p className="mt-1 font-display text-2xl font-extrabold text-awash-gold-dark tabular-nums">{adminCount}</p>
-            <p className="text-[10px] font-medium text-neutral-400">Admins</p>
-          </Card>
-          <Card className="items-center p-3 text-center">
-            <TrendingUp className="size-5 text-emerald-600" />
-            <p className="mt-1 font-display text-2xl font-extrabold text-emerald-600 tabular-nums">{totalBids}</p>
-            <p className="text-[10px] font-medium text-neutral-400">Total Bids</p>
-          </Card>
-        </div>
+        <motion.div
+          variants={{
+            hidden: { opacity: 0 },
+            visible: { opacity: 1, transition: { staggerChildren: 0.06 } },
+          }}
+          className="grid grid-cols-3 gap-3 mb-4"
+        >
+          <motion.div variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }}>
+            <Card className="items-center p-3 text-center">
+              <UsersIcon className="size-5 text-awash-gold" />
+              <p className="mt-1 font-display text-2xl font-extrabold text-awash-blue tabular-nums">{loading ? "..." : users.length}</p>
+              <p className="text-[10px] font-medium text-neutral-400">Users</p>
+            </Card>
+          </motion.div>
+          <motion.div variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }}>
+            <Card className="items-center p-3 text-center">
+              <Shield className="size-5 text-awash-gold" />
+              <p className="mt-1 font-display text-2xl font-extrabold text-awash-gold-dark tabular-nums">{adminCount}</p>
+              <p className="text-[10px] font-medium text-neutral-400">Admins</p>
+            </Card>
+          </motion.div>
+          <motion.div variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }}>
+            <Card className="items-center p-3 text-center">
+              <TrendingUp className="size-5 text-emerald-600" />
+              <p className="mt-1 font-display text-2xl font-extrabold text-emerald-600 tabular-nums">{totalBids}</p>
+              <p className="text-[10px] font-medium text-neutral-400">Total Bids</p>
+            </Card>
+          </motion.div>
+        </motion.div>
 
         {loading ? (
-          <div className="flex flex-col items-center gap-3 py-16 text-neutral-400">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex flex-col items-center gap-3 py-16 text-neutral-400"
+          >
             <Loader2 className="size-8 animate-spin opacity-30" />
             <p className="text-sm font-medium">Loading users...</p>
-          </div>
+          </motion.div>
         ) : error ? (
-          <div className="flex flex-col items-center gap-3 py-16 text-neutral-400">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex flex-col items-center gap-3 py-16 text-neutral-400"
+          >
             <AlertCircle className="size-8 opacity-30 text-red-400" />
             <p className="text-sm font-medium text-red-500">{error}</p>
-            <button onClick={fetchUsers} className="text-xs font-semibold text-awash-gold hover:text-awash-gold-dark transition-colors">Retry</button>
-          </div>
+            <button onClick={fetchUsers} className="text-xs font-semibold text-awash-gold transition-colors hover:text-awash-gold-dark">Retry</button>
+          </motion.div>
         ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 py-16 text-neutral-400">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex flex-col items-center gap-3 py-16 text-neutral-400"
+          >
             <Search className="size-8 opacity-30" />
             <p className="text-sm font-medium">{search ? "No users match your search" : "No users found"}</p>
-          </div>
+          </motion.div>
         ) : (
-          <div className="space-y-2">
+          <motion.div
+            variants={{
+              hidden: { opacity: 0 },
+              visible: { opacity: 1, transition: { staggerChildren: 0.03 } },
+            }}
+            className="space-y-2"
+          >
             {paginated.map((u) => {
               const userBids = allBids.filter((b) => b.userId === u.id)
               const uniqueAuctions = new Set(userBids.map((b) => b.auctionId)).size
               const isAdmin = u.role === "admin"
               return (
-                <button
+                <motion.div
                   key={u.id}
-                  onClick={() => setSelectedUser(u)}
-                  className="flex w-full items-center gap-3 rounded-2xl border border-border/60 bg-white p-3 text-left transition-all hover:border-awash-gold/30 hover:shadow-md active:scale-[0.98]"
+                  variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}
                 >
-                  <div className={`flex size-10 shrink-0 items-center justify-center rounded-full ${isAdmin ? "bg-awash-gold/20 text-awash-gold" : "bg-awash-blue/10 text-awash-blue"}`}>
-                    {isAdmin ? <Shield className="size-5" /> : <User className="size-5" />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="truncate text-sm font-bold text-awash-blue">{u.full_name || u.phone_number}</p>
-                      {isAdmin && <Badge tone="orange">Admin</Badge>}
+                  <button
+                    onClick={() => setSelectedUser(u)}
+                    className="flex w-full items-center gap-3 rounded-2xl border border-border/60 bg-white/80 backdrop-blur-sm p-3 text-left shadow-sm transition-all hover:border-awash-gold/30 hover:shadow-md active:scale-[0.98]"
+                  >
+                    <div className={`flex size-10 shrink-0 items-center justify-center rounded-full ${isAdmin ? "bg-awash-gold/20 text-awash-gold" : "bg-awash-blue/10 text-awash-blue"}`}>
+                      {isAdmin ? <Shield className="size-5" /> : <User className="size-5" />}
                     </div>
-                    <p className="mt-0.5 text-xs font-medium text-neutral-400">{u.phone_number} · {userBids.length} bids · {uniqueAuctions} auctions</p>
-                  </div>
-                  <ChevronRight className="size-4 text-neutral-300" />
-                </button>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-sm font-bold text-awash-blue">{u.full_name || u.phone_number}</p>
+                        {isAdmin && <Badge tone="orange">Admin</Badge>}
+                      </div>
+                      <p className="mt-0.5 text-xs font-medium text-neutral-400">{u.phone_number} · {userBids.length} bids · {uniqueAuctions} auctions</p>
+                    </div>
+                    <ChevronRight className="size-4 text-neutral-300" />
+                  </button>
+                </motion.div>
               )
             })}
-          </div>
+          </motion.div>
         )}
 
         {totalPages > 1 && (
-          <div className="mt-4 flex items-center justify-center gap-2">
+          <motion.div
+            variants={{ hidden: { opacity: 0 }, visible: { opacity: 1 } }}
+            className="mt-4 flex items-center justify-center gap-2"
+          >
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page <= 1}
-              className="rounded-lg border border-border/60 px-3 py-1.5 text-xs font-semibold text-awash-blue hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="rounded-lg border border-border/60 px-3 py-1.5 text-xs font-semibold text-awash-blue transition-colors hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95"
             >
               Previous
             </button>
@@ -256,30 +317,35 @@ export function AdminUsersScreen() {
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page >= totalPages}
-              className="rounded-lg border border-border/60 px-3 py-1.5 text-xs font-semibold text-awash-blue hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="rounded-lg border border-border/60 px-3 py-1.5 text-xs font-semibold text-awash-blue transition-colors hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95"
             >
               Next
             </button>
-          </div>
+          </motion.div>
         )}
 
         {users.length > 0 && (
-          <div className="mt-4 rounded-xl border border-border/60 bg-white/50 p-3 text-center">
+          <motion.div
+            variants={{ hidden: { opacity: 0 }, visible: { opacity: 1 } }}
+            className="mt-4 rounded-xl border border-border/60 bg-white/50 backdrop-blur-sm p-3 text-center"
+          >
             <p className="text-xs font-medium text-neutral-400">
               Showing {paginated.length} of {filtered.length} users. Click a user to view details and manage roles.
             </p>
-          </div>
+          </motion.div>
         )}
 
-      {selectedUser && (
-        <UserDetailModal
-          user={selectedUser}
-          onClose={() => setSelectedUser(null)}
-          onRoleChange={handleRoleChange}
-          onNameChange={handleNameChange}
-        />
-      )}
-      </div>
+      <AnimatePresence>
+        {selectedUser && (
+          <UserDetailModal
+            user={selectedUser}
+            onClose={() => setSelectedUser(null)}
+            onRoleChange={handleRoleChange}
+            onNameChange={handleNameChange}
+          />
+        )}
+      </AnimatePresence>
+      </motion.div>
     </AdminLayout>
   )
 }

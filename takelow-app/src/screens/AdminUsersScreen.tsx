@@ -137,7 +137,7 @@ export function AdminUsersScreen() {
       </View>
       <AppBar title="Manage Users" onBack={() => go('auctions')} />
       <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 16 }}>
-        <View style={s.searchRow}>
+        <Card style={s.searchRow}>
           <Search size={16} color={colors.mutedForeground} />
           <TextInput
             value={search}
@@ -152,7 +152,7 @@ export function AdminUsersScreen() {
               <X size={16} color={colors.mutedForeground} />
             </TouchableOpacity>
           ) : null}
-        </View>
+        </Card>
       </View>
       <Card style={{ flexDirection: 'row', marginHorizontal: 16, marginTop: 12, padding: 12 }}>
         <View style={{ flex: 1, alignItems: 'center' }}>
@@ -241,7 +241,7 @@ function StatusBarCustom() {
 }
 
 const s = StyleSheet.create({
-  searchRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, paddingHorizontal: 12, paddingVertical: 10 },
+  searchRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 10 },
   searchInput: { flex: 1, fontSize: 13, fontWeight: '500', color: colors.navy, padding: 0 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, marginBottom: 12 },
   avatar: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },

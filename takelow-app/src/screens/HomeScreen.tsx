@@ -1,9 +1,10 @@
 import React, { useState, useRef, useCallback } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Modal, Pressable, RefreshControl, Dimensions, Image } from 'react-native'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Modal, Pressable, Dimensions, Image, RefreshControl } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Gavel, Wallet, ArrowRight, Eye, EyeOff, Shield, LogOut, Sparkles, Trophy, Timer, Zap } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { AwashMark, Badge } from '../components/AuctionUI'
+import { ImageCarousel } from '../components/ImageCarousel'
 import { colors, CURRENCY } from '../theme'
 import { formatETB, formatCountdown } from '../mockDataV0'
 import { useCountdown } from '../components/Countdown'
@@ -22,48 +23,64 @@ function HeroSlide({ item, onJoin }: { item: any; onJoin: () => void }) {
   const { d, h, m, s } = formatCountdown(t)
   const urgent = item.status === 'ending-soon' || (t > 0 && t < 3600)
   const savings = Math.round((1 - item.bidFee / item.marketPrice) * 100)
+
+  if (!item.images?.length) {
+    return (
+      <View style={{ width: SCREEN_W_ACTUAL * 0.75, height: 220, marginRight: 12, borderRadius: 16, overflow: 'hidden' }}>
+        <LinearGradient colors={['#002B5C', '#001F3F']} style={StyleSheet.absoluteFill} />
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Gavel size={40} color="rgba(255,255,255,0.2)" />
+          <Text style={{ color: 'rgba(255,255,255,0.4)', marginTop: 8, fontSize: 13 }}>{item.name}</Text>
+        </View>
+      </View>
+    )
+  }
+
   return (
     <View style={{
       width: SCREEN_W_ACTUAL * 0.75, height: 220, marginRight: 12,
       borderRadius: 16, overflow: 'hidden',
       shadowColor: colors.awashBlue, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.15, shadowRadius: 16, elevation: 8,
     }}>
-      {item.images?.[0] ? (
-        <Image source={{ uri: item.images[0] }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-      ) : (
-        <LinearGradient colors={['#002B5C', '#001F3F']} style={StyleSheet.absoluteFill} />
-      )}
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.4)' }]} />
-      <View style={{ flex: 1, padding: 14, justifyContent: 'space-between' }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,43,92,0.75)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' }}>
-            <Gavel size={12} color="#FFF" />
-            <Text style={{ fontSize: 11, fontWeight: '700', color: '#FFF' }}>Live Auction</Text>
-          </View>
-          <View style={{ backgroundColor: urgent ? colors.primary + '30' : 'rgba(255,255,255,0.8)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: urgent ? colors.primary + '40' : 'rgba(255,255,255,0.3)' }}>
-            <Text style={{ fontSize: 11, fontWeight: '800', color: urgent ? colors.primary : colors.awashBlue, fontVariant: ['tabular-nums'] }}>
-              {d !== '00' ? `${parseInt(d)}d ` : ''}{h}:{m}:{s}
-            </Text>
-          </View>
-        </View>
-        <View>
-          <Text style={{ color: '#FFF', fontFamily: 'System', fontSize: 18, fontWeight: '800', textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 }}>
-            {item.name}
-          </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
-            <Text style={{ color: '#FFF', fontSize: 13, fontWeight: '700' }}>{CURRENCY} {formatETB(item.bidFee)} bid</Text>
-            <Text style={{ color: '#34D399', fontSize: 11, fontWeight: '600', textDecorationLine: 'line-through' }}>{CURRENCY} {formatETB(item.marketPrice)}</Text>
-            <View style={{ backgroundColor: colors.primary + '33', borderRadius: 10, paddingHorizontal: 6, paddingVertical: 2 }}>
-              <Text style={{ color: colors.primary, fontSize: 10, fontWeight: '700' }}>-{savings}%</Text>
+      <ImageCarousel
+        images={item.images}
+        alt={item.name}
+        containerWidth={SCREEN_W_ACTUAL * 0.75 + 32}
+        autoPlayInterval={5000}
+        overlay={
+          <>
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.35)' }]} />
+            <View style={{ position: 'absolute', top: 8, left: 10, right: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', zIndex: 10 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,43,92,0.75)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' }}>
+                <Gavel size={12} color="#FFF" />
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#FFF' }}>Live Auction</Text>
+              </View>
+              <View style={{ backgroundColor: urgent ? colors.primary + '30' : 'rgba(255,255,255,0.8)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: urgent ? colors.primary + '40' : 'rgba(255,255,255,0.3)' }}>
+                <Text style={{ fontSize: 11, fontWeight: '800', color: urgent ? colors.primary : colors.awashBlue, fontVariant: ['tabular-nums'] }}>
+                  {d !== '00' ? `${parseInt(d)}d ` : ''}{h}:{m}:{s}
+                </Text>
+              </View>
             </View>
-          </View>
-          <TouchableOpacity onPress={onJoin} activeOpacity={0.85} style={{ marginTop: 10, borderRadius: 12, overflow: 'hidden' }}>
-            <LinearGradient colors={['#C8A642', '#D4B85E', '#C8A642']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ paddingVertical: 10, alignItems: 'center' }}>
-              <Text style={{ color: colors.primaryForeground, fontSize: 13, fontWeight: '700' }}>Join Auction</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
-      </View>
+            <View style={{ position: 'absolute', bottom: 10, left: 10, right: 10, zIndex: 10 }}>
+              <Text style={{ color: '#FFF', fontFamily: 'System', fontSize: 18, fontWeight: '800', textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 }}>
+                {item.name}
+              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                <Text style={{ color: '#FFF', fontSize: 13, fontWeight: '700' }}>{CURRENCY} {formatETB(item.bidFee)} bid</Text>
+                <Text style={{ color: '#34D399', fontSize: 11, fontWeight: '600', textDecorationLine: 'line-through' }}>{CURRENCY} {formatETB(item.marketPrice)}</Text>
+                <View style={{ backgroundColor: colors.primary + '33', borderRadius: 10, paddingHorizontal: 6, paddingVertical: 2 }}>
+                  <Text style={{ color: colors.primary, fontSize: 10, fontWeight: '700' }}>-{savings}%</Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={onJoin} activeOpacity={0.85} style={{ marginTop: 8, borderRadius: 12, overflow: 'hidden' }}>
+                <LinearGradient colors={['#C8A642', '#D4B85E', '#C8A642']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ paddingVertical: 10, alignItems: 'center' }}>
+                  <Text style={{ color: colors.primaryForeground, fontSize: 13, fontWeight: '700' }}>Join Auction</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </>
+        }
+      />
     </View>
   )
 }
@@ -108,7 +125,6 @@ export function HomeScreen() {
   const [showBalance, setShowBalance] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
-  const heroScrollRef = useRef<ScrollView>(null)
   const winnerScrollRef = useRef<ScrollView>(null)
 
   const onRefresh = useCallback(async () => {
@@ -124,7 +140,7 @@ export function HomeScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.neutralGray50 }}>
-      {/* ── Header: 60% Awash Blue ── */}
+      {/* ── Header ── */}
       <View style={{ backgroundColor: colors.awashBlue, paddingBottom: 24 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8 }}>
           <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFF', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 4, elevation: 3 }}>
@@ -135,7 +151,6 @@ export function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Wallet Card — Gold glass accent */}
         <LinearGradient colors={['#003366', '#001F3F']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ marginHorizontal: 16, marginTop: 8, borderRadius: 16, borderWidth: 1, borderColor: colors.primary + '33', padding: 16 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
@@ -164,7 +179,7 @@ export function HomeScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}
       >
-        {/* ── Section A: Live Auctions (60% focus) ── */}
+        {/* ── Section A: Live Auctions ── */}
         <View style={{ paddingHorizontal: 16, paddingTop: 20 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -184,9 +199,7 @@ export function HomeScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Hero Carousel */}
           <ScrollView
-            ref={heroScrollRef}
             horizontal
             showsHorizontalScrollIndicator={false}
             style={{ marginBottom: 16, marginHorizontal: -16, paddingHorizontal: 16 }}
@@ -205,7 +218,6 @@ export function HomeScreen() {
             )}
           </ScrollView>
 
-          {/* Grid Preview */}
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
             {auctionsLoading
               ? [1, 2, 3, 4].map((i) => (
@@ -220,6 +232,13 @@ export function HomeScreen() {
                           <Image source={{ uri: a.images[0] }} style={s.cardImgWrap} resizeMode="cover" />
                         ) : (
                           <View style={[s.cardImgWrap, { backgroundColor: colors.neutralGray100 }]} />
+                        )}
+                        {a.images?.length > 1 && (
+                          <View style={{ position: 'absolute', top: 6, right: 6, flexDirection: 'row', gap: 2 }}>
+                            {a.images.slice(0, 3).map((_: string, i: number) => (
+                              <View key={i} style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: i === 0 ? '#FFF' : 'rgba(255,255,255,0.4)' }} />
+                            ))}
+                          </View>
                         )}
                         <View style={s.cardImgTop}>
                           {urgent ? (
@@ -260,7 +279,6 @@ export function HomeScreen() {
                 })}
           </View>
 
-          {/* View All Live Auctions — Gold Gradient Button */}
           {activeAuctions.length > 4 && (
             <TouchableOpacity onPress={() => go('auctions')} activeOpacity={0.85} style={{ marginTop: 12, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: colors.primary + '50' }}>
               <LinearGradient colors={['#C8A642', '#D4B85E', '#C8A642']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ paddingVertical: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
@@ -272,7 +290,7 @@ export function HomeScreen() {
           )}
         </View>
 
-        {/* ── Section B: Closed Auctions — Winners! (30% focus) ── */}
+        {/* ── Section B: Winners ── */}
         <View style={{ paddingHorizontal: 16, paddingTop: 24 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -303,7 +321,6 @@ export function HomeScreen() {
             ))}
           </ScrollView>
 
-          {/* View All Closed Auctions — Gold Gradient Button */}
           <TouchableOpacity onPress={() => go('winners-list')} activeOpacity={0.85} style={{ marginTop: 8, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: colors.primary + '50' }}>
             <LinearGradient colors={['#C8A642', '#D4B85E', '#C8A642']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ paddingVertical: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
               <Trophy size={14} color={colors.primaryForeground} />
@@ -313,7 +330,7 @@ export function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* ── Promo Section ── */}
+        {/* ── Promo ── */}
         <View style={{ paddingHorizontal: 16, paddingTop: 24 }}>
           <LinearGradient colors={['#002B5C', '#001A3A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ borderRadius: 16, padding: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -339,7 +356,6 @@ export function HomeScreen() {
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* ── Menu Modal ── */}
       <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
         <Pressable style={s.backdrop} onPress={() => setMenuOpen(false)}>
           <View />
@@ -371,7 +387,6 @@ export function HomeScreen() {
   )
 }
 
-// ─── Inline CountdownPill ──
 function CountdownPill({ seconds, urgent }: { seconds: number; urgent: boolean }) {
   const t = useCountdown(seconds)
   const { d, h, m, s: secs } = formatCountdown(t)

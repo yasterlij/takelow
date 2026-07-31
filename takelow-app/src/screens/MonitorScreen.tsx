@@ -144,11 +144,11 @@ export function MonitorScreen() {
         </Text>
       </View>
 
-      <View style={s.bottomCta}>
+      <Card style={s.bottomCta}>
         <CTAButton variant="navy" onPress={() => go('closed')}>
           <Eye size={18} /> View Result Now
         </CTAButton>
-      </View>
+      </Card>
     </View>
   )
 }
@@ -170,5 +170,5 @@ const s = StyleSheet.create({
   statLabel: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1, color: colors.mutedForeground, marginTop: 4 },
   bidStat: { fontSize: 24, fontWeight: '800', color: colors.emerald600, fontVariant: ['tabular-nums'] },
   alertIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' },
-  bottomCta: { position: 'absolute', bottom: 0, left: 0, right: 0, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.card + 'F2', padding: 16 },
+  bottomCta: { position: 'absolute', bottom: 0, left: 0, right: 0, borderTopWidth: 1, borderTopColor: colors.border, padding: 16 },
 })

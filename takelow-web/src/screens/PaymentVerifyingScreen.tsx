@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react"
+import { motion } from "framer-motion"
 import { Check, X, Loader2, ArrowRight, Gavel, ArrowLeft } from "lucide-react"
 import { useApp } from "../AppContext"
 import { api } from "../api"
@@ -76,100 +77,156 @@ export function PaymentVerifyingScreen() {
 
   if (paid) {
     return (
-      <div className="flex flex-1 flex-col overflow-y-auto">
-        <div className="flex items-center gap-3 border-b border-border bg-white/80 px-4 py-3 backdrop-blur-md">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="flex flex-1 flex-col overflow-y-auto"
+      >
+        <div className="flex items-center gap-3 border-b border-border/60 bg-white/80 px-4 py-3 backdrop-blur-md">
           <button onClick={() => go("auctions")} className="flex size-8 items-center justify-center rounded-full text-neutral-600 transition-colors hover:bg-neutral-100">
             <ArrowLeft className="size-5" />
           </button>
           <h1 className="font-display text-base font-bold text-awash-blue">Payment</h1>
         </div>
-        <div className="flex flex-1 flex-col items-center justify-center px-6 py-10 text-center">
-          <div className="relative">
+        <motion.div
+          initial="hidden"
+          animate="visible"
+          variants={{ visible: { transition: { staggerChildren: 0.08 } } }}
+          className="flex flex-1 flex-col items-center justify-center px-6 py-10 text-center"
+        >
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", damping: 15, stiffness: 200 }}
+            className="relative"
+          >
             <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/30" />
             <span className="relative flex size-20 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-500/30">
               <Check className="size-10" strokeWidth={3} />
             </span>
-          </div>
-          <h1 className="mt-6 font-display text-2xl font-extrabold text-navy">Payment Successful!</h1>
-          <p className="mt-2 max-w-xs text-sm font-medium text-muted-foreground">
-            Your payment of <span className="font-bold text-navy">{formatETB(amount)} {CURRENCY}</span> was received.
-          </p>
-          <Card className="mt-6 w-full max-w-xs p-5 text-left">
-            <dl className="space-y-2 text-xs">
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Product</dt>
-                <dd className="font-semibold text-navy">{auction?.name || "—"}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Amount</dt>
-                <dd className="font-semibold text-navy">{CURRENCY} {formatETB(amount)}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Status</dt>
-                <dd className="font-semibold text-emerald-600">Completed</dd>
-              </div>
-            </dl>
-          </Card>
-        </div>
-        <div className="border-t border-border bg-card p-4">
+          </motion.div>
+          <motion.h1
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="mt-6 font-display text-2xl font-extrabold text-awash-blue"
+          >
+            Payment Successful!
+          </motion.h1>
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.25 }}
+            className="mt-2 max-w-xs text-sm font-medium text-neutral-400"
+          >
+            Your payment of <span className="font-bold text-awash-blue">{formatETB(amount)} {CURRENCY}</span> was received.
+          </motion.p>
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.35 }}
+            className="mt-6 w-full max-w-xs"
+          >
+            <Card className="p-5 text-left">
+              <dl className="space-y-2 text-xs">
+                <div className="flex justify-between">
+                  <dt className="text-neutral-400">Product</dt>
+                  <dd className="font-semibold text-awash-blue">{auction?.name || "—"}</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-neutral-400">Amount</dt>
+                  <dd className="font-semibold text-awash-blue">{CURRENCY} {formatETB(amount)}</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-neutral-400">Status</dt>
+                  <dd className="font-semibold text-emerald-600">Completed</dd>
+                </div>
+              </dl>
+            </Card>
+          </motion.div>
+        </motion.div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.45 }}
+          className="border-t border-border/60 bg-white/90 p-4 backdrop-blur-xl"
+        >
           <CTAButton onClick={handleSuccessAction}>
             {isBidFee ? <><Gavel className="size-[18px]" /> Continue to Place Bid</> : <><ArrowRight className="size-[18px]" /> Track Delivery</>}
           </CTAButton>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
     )
   }
 
   if (failed) {
     return (
-      <div className="flex flex-1 flex-col overflow-y-auto">
-        <div className="flex items-center gap-3 border-b border-border bg-white/80 px-4 py-3 backdrop-blur-md">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="flex flex-1 flex-col overflow-y-auto"
+      >
+        <div className="flex items-center gap-3 border-b border-border/60 bg-white/80 px-4 py-3 backdrop-blur-md">
           <button onClick={() => go("auctions")} className="flex size-8 items-center justify-center rounded-full text-neutral-600 transition-colors hover:bg-neutral-100">
             <ArrowLeft className="size-5" />
           </button>
           <h1 className="font-display text-base font-bold text-awash-blue">Payment</h1>
         </div>
         <div className="flex flex-1 flex-col items-center justify-center px-6 py-10 text-center">
-          <span className="flex size-20 items-center justify-center rounded-full bg-red-100 text-red-500">
+          <motion.span
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", damping: 15, stiffness: 200 }}
+            className="flex size-20 items-center justify-center rounded-full bg-red-100 text-red-500"
+          >
             <X className="size-10" strokeWidth={3} />
-          </span>
-          <h1 className="mt-6 font-display text-2xl font-extrabold text-navy">Still Waiting for Confirmation</h1>
-          <p className="mt-2 max-w-xs text-sm font-medium text-muted-foreground">
+          </motion.span>
+          <h1 className="mt-6 font-display text-2xl font-extrabold text-awash-blue">Still Waiting for Confirmation</h1>
+          <p className="mt-2 max-w-xs text-sm font-medium text-neutral-400">
             Payment was not automatically confirmed. If you've already paid, click confirm below.
           </p>
           <Card className="mt-6 w-full max-w-xs p-4">
             <button
               onClick={handleConfirmPaid}
               disabled={confirming}
-              className="w-full rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground disabled:opacity-50"
+              className="w-full rounded-xl bg-gradient-to-r from-awash-gold to-awash-gold-light py-3 text-sm font-bold text-awash-blue shadow-lg shadow-primary/20 transition-all hover:shadow-primary/30 disabled:opacity-50 active:scale-[0.98]"
             >
               {confirming ? "Confirming..." : "I've Already Paid"}
             </button>
             <button
               onClick={() => go(isBidFee ? "pay-fee" : "pay-winning")}
-              className="mt-2 w-full rounded-xl border border-border bg-card py-3 text-sm font-bold text-navy"
+              className="mt-2 w-full rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm py-3 text-sm font-bold text-awash-blue transition-all hover:bg-white active:scale-[0.98]"
             >
               Try Again
             </button>
           </Card>
         </div>
-      </div>
+      </motion.div>
     )
   }
 
   return (
-    <div className="flex flex-1 flex-col overflow-y-auto">
-      <div className="flex items-center gap-3 border-b border-border bg-white/80 px-4 py-3 backdrop-blur-md">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="flex flex-1 flex-col overflow-y-auto"
+    >
+      <div className="flex items-center gap-3 border-b border-border/60 bg-white/80 px-4 py-3 backdrop-blur-md">
         <button onClick={() => go("auctions")} className="flex size-8 items-center justify-center rounded-full text-neutral-600 transition-colors hover:bg-neutral-100">
           <ArrowLeft className="size-5" />
         </button>
         <h1 className="font-display text-base font-bold text-awash-blue">Payment</h1>
       </div>
       <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6">
-        <Loader2 className="size-10 animate-spin text-primary" />
-        <p className="text-sm font-medium text-muted-foreground">{message}</p>
-        <p className="text-xs text-muted-foreground/60">Complete the payment in the opened window</p>
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+        >
+          <Loader2 className="size-10 text-primary" />
+        </motion.div>
+        <p className="text-sm font-medium text-neutral-400">{message}</p>
+        <p className="text-xs text-neutral-400/60">Complete the payment in the opened window</p>
       </div>
-    </div>
+    </motion.div>
   )
 }

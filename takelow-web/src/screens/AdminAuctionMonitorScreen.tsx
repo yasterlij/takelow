@@ -166,8 +166,18 @@ export function AdminAuctionMonitorScreen() {
         </button>
       }
     >
-      <div className="space-y-4">
+      <motion.div
+        initial="hidden"
+        animate="visible"
+        variants={{
+          visible: { transition: { staggerChildren: 0.06 } },
+        }}
+        className="space-y-4"
+      >
         {/* Live status banner */}
+        <motion.div
+          variants={{ hidden: { opacity: 0, y: -12 }, visible: { opacity: 1, y: 0 } }}
+        >
         <div className={`flex items-center justify-between rounded-2xl border p-4 ${
           isClosed
             ? "border-neutral-200 bg-neutral-50"
@@ -197,11 +207,17 @@ export function AdminAuctionMonitorScreen() {
             </div>
           )}
         </div>
+        </motion.div>
 
         {/* Product + stats grid */}
         <div className="grid gap-4 lg:grid-cols-3">
           {/* Product card */}
-          <div className="overflow-hidden rounded-2xl border border-border/60 bg-white shadow-[0_4px_20px_rgba(0,43,92,0.04)] lg:col-span-1">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            className="overflow-hidden rounded-2xl border border-border/60 bg-white/80 backdrop-blur-sm shadow-[0_4px_20px_rgba(0,43,92,0.04)] lg:col-span-1"
+          >
             <div className="relative aspect-[4/3] w-full overflow-hidden bg-neutral-100">
               {liveAuction.images?.[0] ? (
                 <img src={liveAuction.images[0]} alt={liveAuction.name} className="size-full object-cover" />
@@ -219,10 +235,15 @@ export function AdminAuctionMonitorScreen() {
                 <span className="font-display text-sm font-extrabold text-primary">{CURRENCY} {formatETB(liveAuction.marketPrice)}</span>
               </div>
             </div>
-          </div>
+          </motion.div>
 
           {/* Stats */}
-          <div className="grid grid-cols-2 gap-3 lg:col-span-2">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, delay: 0.08, ease: [0.16, 1, 0.3, 1] }}
+            className="grid grid-cols-2 gap-3 lg:col-span-2"
+          >
             <StatBox icon={<Gavel className="size-5" />} label="Total Bids" value={bidCount} accent="text-awash-blue" bg="bg-awash-blue/10" />
             <StatBox icon={<Users className="size-5" />} label="Unique Bidders" value={liveAuction.uniqueBidders ?? "—"} accent="text-primary" bg="bg-primary/10" />
             <StatBox icon={<TrendingDown className="size-5" />} label="Min Bids Required" value={liveAuction.minBid ?? "—"} accent="text-amber-600" bg="bg-amber-500/10" />
@@ -230,7 +251,12 @@ export function AdminAuctionMonitorScreen() {
 
             {/* Bid capacity progress */}
             {liveAuction.maxBid && (
-              <div className="col-span-2 rounded-2xl border border-border/60 bg-white p-4">
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.35, delay: 0.15 }}
+                className="col-span-2 rounded-2xl border border-border/60 bg-white/80 backdrop-blur-sm p-4"
+              >
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-xs font-bold text-awash-blue">Bid Capacity</span>
                   <span className="text-xs font-medium text-neutral-400">{bidCount} / {liveAuction.maxBid}</span>
@@ -249,18 +275,23 @@ export function AdminAuctionMonitorScreen() {
                     <AlertCircle className="size-3" /> Almost at capacity
                   </p>
                 )}
-              </div>
+              </motion.div>
             )}
-          </div>
+          </motion.div>
         </div>
 
         {/* Admin actions */}
-        <div className="rounded-2xl border border-border/60 bg-white p-5 shadow-[0_4px_20px_rgba(0,43,92,0.04)]">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, delay: 0.12, ease: [0.16, 1, 0.3, 1] }}
+          className="rounded-2xl border border-border/60 bg-white/80 backdrop-blur-sm p-5 shadow-[0_4px_20px_rgba(0,43,92,0.04)]"
+        >
           <h2 className="font-display text-sm font-bold text-awash-blue">Admin Actions</h2>
           <div className="mt-4 flex flex-wrap gap-2.5">
             <button
               onClick={handleViewBids}
-              className="flex items-center gap-2 rounded-xl border border-border/60 bg-white px-4 py-2.5 text-xs font-bold text-awash-blue transition-all hover:bg-awash-blue/5 hover:border-awash-blue/30"
+              className="flex items-center gap-2 rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm px-4 py-2.5 text-xs font-bold text-awash-blue transition-all hover:bg-awash-blue/5 hover:border-awash-blue/30 active:scale-95"
             >
               <Eye className="size-3.5" /> View All Bids ({bidCount})
             </button>
@@ -301,20 +332,23 @@ export function AdminAuctionMonitorScreen() {
               </p>
             </div>
           )}
-        </div>
+        </motion.div>
 
         {/* Recent bids preview */}
-        <div className="rounded-2xl border border-border/60 bg-white p-5 shadow-[0_4px_20px_rgba(0,43,92,0.04)]">
+        <motion.div
+          variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}
+          className="rounded-2xl border border-border/60 bg-white/80 backdrop-blur-sm p-5 shadow-[0_4px_20px_rgba(0,43,92,0.04)]"
+        >
           <div className="flex items-center justify-between">
             <h2 className="font-display text-sm font-bold text-awash-blue">Recent Bids</h2>
-            <button onClick={handleViewBids} className="text-[11px] font-bold text-primary hover:text-awash-gold-dark">View all</button>
+            <button onClick={handleViewBids} className="text-[11px] font-bold text-primary transition-colors hover:text-awash-gold-dark">View all</button>
           </div>
           <div className="mt-3 space-y-2">
             {bids.slice(0, 5).map((b, i) => {
             const coded = `User ${b.user_id?.slice(0, 8) || "—"}`
             const display = b.user_name ? `${b.user_name} (${coded})` : coded
             return (
-              <div key={b.id || i} className="flex items-center justify-between rounded-xl bg-neutral-50 px-3 py-2">
+              <div key={b.id || i} className="flex items-center justify-between rounded-xl bg-neutral-50/80 backdrop-blur-sm px-3 py-2 transition-all hover:bg-neutral-100">
                 <span className="flex items-center gap-2 text-xs font-semibold text-neutral-500">
                   <span className="flex size-5 items-center justify-center rounded-full bg-awash-blue/10 text-[9px] font-bold text-awash-blue/60">{i + 1}</span>
                   {display}
@@ -327,8 +361,8 @@ export function AdminAuctionMonitorScreen() {
               <p className="py-4 text-center text-xs font-medium text-neutral-400">No bids yet. Click "View All Bids" to refresh.</p>
             )}
           </div>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
 
       {/* Bids Modal */}
       <Modal open={showBids} onClose={() => setShowBids(false)} title={`All Bids (${bids.length})`} size="lg">
@@ -481,10 +515,13 @@ export function AdminAuctionMonitorScreen() {
 
 function StatBox({ icon, label, value, accent, bg }: { icon: React.ReactNode; label: string; value: string | number; accent: string; bg: string }) {
   return (
-    <div className="rounded-2xl border border-border/60 bg-white p-4 shadow-[0_4px_20px_rgba(0,43,92,0.04)]">
+    <motion.div
+      variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }}
+      className="rounded-2xl border border-border/60 bg-white/80 backdrop-blur-sm p-4 shadow-[0_4px_20px_rgba(0,43,92,0.04)] transition-all hover:shadow-lg"
+    >
       <div className={`flex size-9 items-center justify-center rounded-xl ${bg} ${accent}`}>{icon}</div>
       <p className="mt-2 font-display text-xl font-extrabold tabular-nums text-awash-blue">{value}</p>
       <p className="text-xs font-medium text-neutral-400">{label}</p>
-    </div>
+    </motion.div>
   )
 }

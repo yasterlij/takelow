@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react"
+import { motion, AnimatePresence } from "framer-motion"
 import { Package, Plus, Search, X, Pencil, Trash2, Camera, Link, Upload, ImageIcon, Filter, DollarSign, ShoppingBag, Tag } from "lucide-react"
 import { useApp } from "../AppContext"
 import { api } from "../api"
@@ -189,115 +190,168 @@ export function AdminProductsScreen() {
         </button>
       }
     >
-      <div className="space-y-4">
+      <motion.div
+        initial="hidden"
+        animate="visible"
+        variants={{
+          visible: { transition: { staggerChildren: 0.05 } },
+        }}
+        className="space-y-4"
+      >
       {lightboxImg && <ImageLightbox src={lightboxImg} onClose={() => setLightboxImg(null)} />}
 
-      <div className="flex flex-wrap items-center gap-2">
+      <motion.div
+        variants={{ hidden: { opacity: 0, y: -8 }, visible: { opacity: 1, y: 0 } }}
+        className="flex flex-wrap items-center gap-2"
+      >
           <div className="relative flex-1 min-w-[180px]">
             <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-neutral-400" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search products..."
-              className="w-full rounded-xl border border-border/60 bg-white py-2 pl-8 pr-3 text-xs font-medium outline-none placeholder:text-neutral-400/50 focus:border-awash-gold"
+              className="w-full rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm py-2 pl-8 pr-3 text-xs font-medium outline-none transition-all placeholder:text-neutral-400/50 focus:border-awash-gold focus:bg-white focus:shadow-lg"
             />
           </div>
           {brands.length > 0 && (
             <select
               value={brandFilter}
               onChange={(e) => setBrandFilter(e.target.value)}
-              className="rounded-xl border border-border/60 bg-white px-3 py-2 text-xs font-semibold text-awash-blue outline-none focus:border-awash-gold"
+              className="rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm px-3 py-2 text-xs font-semibold text-awash-blue outline-none transition-all focus:border-awash-gold focus:bg-white"
             >
               <option value="all">All Brands</option>
               {brands.map((b) => <option key={b}>{b}</option>)}
             </select>
           )}
-        </div>
+        </motion.div>
 
-      <div className="grid grid-cols-3 gap-3">
-          <Card className="items-center p-3 text-center">
-            <ShoppingBag className="size-5 text-awash-gold" />
-            <p className="mt-1 font-display text-2xl font-extrabold text-awash-blue tabular-nums">{loading ? "..." : products.length}</p>
-            <p className="text-[10px] font-medium text-neutral-400">Products</p>
-          </Card>
-          <Card className="items-center p-3 text-center">
-            <DollarSign className="size-5 text-awash-gold" />
-            <p className="mt-1 font-display text-2xl font-extrabold text-awash-gold-dark tabular-nums">{CURRENCY} {formatETB(totalValue)}</p>
-            <p className="text-[10px] font-medium text-neutral-400">Total Value</p>
-          </Card>
-          <Card className="items-center p-3 text-center">
-            <Tag className="size-5 text-emerald-600" />
-            <p className="mt-1 font-display text-2xl font-extrabold text-emerald-600 tabular-nums">{brands.length}</p>
-            <p className="text-[10px] font-medium text-neutral-400">Brands</p>
-          </Card>
-        </div>
+      <motion.div
+        variants={{
+          hidden: { opacity: 0 },
+          visible: { opacity: 1, transition: { staggerChildren: 0.06 } },
+        }}
+        className="grid grid-cols-3 gap-3"
+      >
+          <motion.div variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }}>
+            <Card className="items-center p-3 text-center">
+              <ShoppingBag className="size-5 text-awash-gold" />
+              <p className="mt-1 font-display text-2xl font-extrabold text-awash-blue tabular-nums">{loading ? "..." : products.length}</p>
+              <p className="text-[10px] font-medium text-neutral-400">Products</p>
+            </Card>
+          </motion.div>
+          <motion.div variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }}>
+            <Card className="items-center p-3 text-center">
+              <DollarSign className="size-5 text-awash-gold" />
+              <p className="mt-1 font-display text-2xl font-extrabold text-awash-gold-dark tabular-nums">{CURRENCY} {formatETB(totalValue)}</p>
+              <p className="text-[10px] font-medium text-neutral-400">Total Value</p>
+            </Card>
+          </motion.div>
+          <motion.div variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }}>
+            <Card className="items-center p-3 text-center">
+              <Tag className="size-5 text-emerald-600" />
+              <p className="mt-1 font-display text-2xl font-extrabold text-emerald-600 tabular-nums">{brands.length}</p>
+              <p className="text-[10px] font-medium text-neutral-400">Brands</p>
+            </Card>
+          </motion.div>
+        </motion.div>
 
-        {showForm && (
-          <Card className="mb-4 space-y-3 border border-awash-gold/20 p-4 shadow-lg">
-            <div className="flex items-center justify-between">
-              <h2 className="font-display text-sm font-bold text-awash-blue">{editing ? "Edit Product" : "New Product"}</h2>
-              <button onClick={resetForm} className="rounded-lg p-1 hover:bg-neutral-100"><X className="size-4 text-neutral-400" /></button>
-            </div>
+        <AnimatePresence>
+          {showForm && (
+            <motion.div
+              key="product-form"
+              initial={{ opacity: 0, height: 0, y: -20 }}
+              animate={{ opacity: 1, height: "auto", y: 0 }}
+              exit={{ opacity: 0, height: 0, y: -20 }}
+              transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <Card className="mb-4 space-y-3 border border-awash-gold/20 p-4 shadow-lg">
+                <div className="flex items-center justify-between">
+                  <h2 className="font-display text-sm font-bold text-awash-blue">{editing ? "Edit Product" : "New Product"}</h2>
+                  <button onClick={resetForm} className="rounded-lg p-1 transition-colors hover:bg-neutral-100"><X className="size-4 text-neutral-400" /></button>
+                </div>
 
-            <div className="flex gap-3">
-              <div className="flex-1 space-y-3">
-                <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Product name" className="w-full rounded-xl border border-border/60 bg-white px-3 py-2.5 text-xs font-medium outline-none focus:border-awash-gold" />
-                <input value={form.brand} onChange={(e) => setForm((f) => ({ ...f, brand: e.target.value }))} placeholder="Brand" className="w-full rounded-xl border border-border/60 bg-white px-3 py-2.5 text-xs font-medium outline-none focus:border-awash-gold" />
-                <input value={form.price} onChange={(e) => setForm((f) => ({ ...f, price: e.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1").replace(/(\.\d{2})\d+/g, "$1") }))} type="text" inputMode="decimal" placeholder="Market price" className="w-full rounded-xl border border-border/60 bg-white px-3 py-2.5 text-xs font-medium outline-none focus:border-awash-gold" />
-              </div>
-              <div className="flex-shrink-0">
-                <ImageUploadBox
-                  src={form.imageUrl}
-                  onFile={(dataUrl) => setForm((f) => ({ ...f, imageUrl: dataUrl }))}
-                  onClear={() => setForm((f) => ({ ...f, imageUrl: "" }))}
-                />
-              </div>
-            </div>
+                <div className="flex gap-3">
+                  <div className="flex-1 space-y-3">
+                    <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Product name" className="input-full" />
+                    <input value={form.brand} onChange={(e) => setForm((f) => ({ ...f, brand: e.target.value }))} placeholder="Brand" className="input-full" />
+                    <input value={form.price} onChange={(e) => setForm((f) => ({ ...f, price: e.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1").replace(/(\.\d{2})\d+/g, "$1") }))} type="text" inputMode="decimal" placeholder="Market price" className="input-full" />
+                  </div>
+                  <div className="flex-shrink-0">
+                    <ImageUploadBox
+                      src={form.imageUrl}
+                      onFile={(dataUrl) => setForm((f) => ({ ...f, imageUrl: dataUrl }))}
+                      onClear={() => setForm((f) => ({ ...f, imageUrl: "" }))}
+                    />
+                  </div>
+                </div>
 
-            <textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="Description" className="w-full rounded-xl border border-border/60 bg-white px-3 py-2.5 text-xs font-medium outline-none focus:border-awash-gold" rows={2} />
+                <textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="Description" className="input-full" rows={2} />
 
-            <div className="flex gap-2">
-              <CTAButton variant="outline" onClick={resetForm} className="flex-1">Cancel</CTAButton>
-              <CTAButton onClick={handleSave} disabled={submitting || !form.name || !form.price} className="flex-1">
-                {submitting ? "Saving..." : editing ? "Update Product" : "Create Product"}
-              </CTAButton>
-            </div>
-          </Card>
-        )}
+                <div className="flex gap-2">
+                  <CTAButton variant="outline" onClick={resetForm} className="flex-1">Cancel</CTAButton>
+                  <CTAButton onClick={handleSave} disabled={submitting || !form.name || !form.price} className="flex-1">
+                    {submitting ? "Saving..." : editing ? "Update Product" : "Create Product"}
+                  </CTAButton>
+                </div>
+              </Card>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        <div className="mb-3 flex items-center justify-between">
+        <motion.div
+          variants={{ hidden: { opacity: 0 }, visible: { opacity: 1 } }}
+          className="mb-3 flex items-center justify-between"
+        >
           <p className="text-xs font-semibold text-neutral-400">
             {filtered.length} of {products.length} products
           </p>
           {inUseCount > 0 && (
             <Badge tone="blue">{inUseCount} in auctions</Badge>
           )}
-        </div>
+        </motion.div>
 
         {loading ? (
           <div className="flex justify-center py-16">
             <div className="size-8 animate-spin rounded-full border-4 border-primary/30 border-t-primary" />
           </div>
         ) : error ? (
-          <div className="flex flex-col items-center gap-3 py-16 text-neutral-400">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex flex-col items-center gap-3 py-16 text-neutral-400"
+          >
             <Filter className="size-8 opacity-30 text-red-400" />
             <p className="text-sm font-medium text-red-500">{error}</p>
-            <button onClick={loadProducts} className="text-xs font-semibold text-awash-gold hover:text-awash-gold-dark transition-colors">Retry</button>
-          </div>
+            <button onClick={loadProducts} className="text-xs font-semibold text-awash-gold transition-colors hover:text-awash-gold-dark">Retry</button>
+          </motion.div>
         ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 py-16 text-neutral-400">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex flex-col items-center gap-3 py-16 text-neutral-400"
+          >
             <Package className="size-8 opacity-30" />
             <p className="text-sm font-medium">{search || brandFilter !== "all" ? "No matching products" : "No products yet"}</p>
             {search || brandFilter !== "all" ? (
-              <button onClick={() => { setSearch(""); setBrandFilter("all") }} className="text-xs font-semibold text-awash-gold">Clear filters</button>
+              <button onClick={() => { setSearch(""); setBrandFilter("all") }} className="text-xs font-semibold text-awash-gold transition-colors hover:text-awash-gold-dark">Clear filters</button>
             ) : (
               <p className="text-xs">Click "New Product" to get started</p>
             )}
-          </div>
+          </motion.div>
         ) : (
-          <div className="space-y-2">
+          <motion.div
+            variants={{
+              hidden: { opacity: 0 },
+              visible: { opacity: 1, transition: { staggerChildren: 0.04 } },
+            }}
+            className="space-y-2"
+          >
             {filtered.map((p: any) => (
-              <div key={p.id} className="flex items-center gap-3 rounded-2xl border border-border/60 bg-white p-3 shadow-sm transition-all hover:border-awash-gold/20 hover:shadow-md">
+              <motion.div
+                key={p.id}
+                variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}
+                className="flex items-center gap-3 rounded-2xl border border-border/60 bg-white/80 backdrop-blur-sm p-3 shadow-sm transition-all hover:border-awash-gold/20 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.99]"
+              >
                 <ProductThumb src={p.image_urls?.[0]} onClick={() => p.image_urls?.[0] && setLightboxImg(p.image_urls[0])} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
@@ -310,24 +364,27 @@ export function AdminProductsScreen() {
                   </p>
                 </div>
                 <div className="flex gap-1">
-                  <button onClick={() => openEdit(p)} className="flex items-center gap-1 rounded-lg border border-border/60 px-2.5 py-1.5 text-[10px] font-semibold text-awash-blue hover:bg-neutral-50 transition-colors" title="Edit">
+                  <button onClick={() => openEdit(p)} className="flex items-center gap-1 rounded-lg border border-border/60 px-2.5 py-1.5 text-[10px] font-semibold text-awash-blue transition-colors hover:bg-neutral-50 active:scale-95" title="Edit">
                     <Pencil className="size-3" />
                   </button>
-                  <button onClick={() => confirmDelete(p.id, p.name)} className="flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1.5 text-[10px] font-semibold text-red-600 hover:bg-red-50 transition-colors" title="Delete">
+                  <button onClick={() => confirmDelete(p.id, p.name)} className="flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1.5 text-[10px] font-semibold text-red-600 transition-colors hover:bg-red-50 active:scale-95" title="Delete">
                     <Trash2 className="size-3" />
                   </button>
                 </div>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         )}
 
         {products.length > 0 && (
-          <div className="mt-4 flex items-center justify-center gap-2">
+          <motion.div
+            variants={{ hidden: { opacity: 0 }, visible: { opacity: 1 } }}
+            className="mt-4 flex items-center justify-center gap-2"
+          >
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page <= 1}
-              className="rounded-lg border border-border/60 px-3 py-1.5 text-xs font-semibold text-awash-blue hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="rounded-lg border border-border/60 px-3 py-1.5 text-xs font-semibold text-awash-blue transition-colors hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95"
             >
               Previous
             </button>
@@ -335,13 +392,13 @@ export function AdminProductsScreen() {
             <button
               onClick={() => setPage((p) => p + 1)}
               disabled={products.length < perPage}
-              className="rounded-lg border border-border/60 px-3 py-1.5 text-xs font-semibold text-awash-blue hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="rounded-lg border border-border/60 px-3 py-1.5 text-xs font-semibold text-awash-blue transition-colors hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95"
             >
               Next
             </button>
-          </div>
+          </motion.div>
         )}
-      </div>
+      </motion.div>
     </AdminLayout>
   )
 }

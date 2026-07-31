@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
 import { Gavel, Trophy, Shield, Loader2, Sparkles, CheckCircle2, ArrowLeft } from 'lucide-react-native'
 import { useApp } from '../AppContext'
-import { PhoneStatusBar, CTAButton, AwashLogo } from '../components/AuctionUI'
+import { PhoneStatusBar, CTAButton, AwashLogo, Card } from '../components/AuctionUI'
 import { colors, CURRENCY } from '../theme'
 import { formatETB } from '../mockDataV0'
 import { api } from '../api'
@@ -160,7 +160,7 @@ export function ClosedScreen() {
       </View>
 
       {/* Bottom Actions */}
-      <View style={{ borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.card, padding: 16 }}>
+      <Card style={{ borderTopWidth: 1, borderTopColor: colors.border, padding: 16 }}>
         {isAdmin ? (
           <CTAButton disabled={!done || revealing} onPress={handleReveal}>
             {revealing ? (
@@ -174,7 +174,7 @@ export function ClosedScreen() {
         ) : (
           <CTAButton variant="outline" onPress={() => go('home')}>Back to Home</CTAButton>
         )}
-      </View>
+      </Card>
     </View>
   )
 }

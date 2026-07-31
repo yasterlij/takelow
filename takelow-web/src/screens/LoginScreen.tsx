@@ -27,7 +27,12 @@ export function LoginScreen() {
   const displayError = (form.errors as any)._form || authError
 
   return (
-    <div className="relative flex min-h-screen flex-col overflow-y-auto bg-gradient-to-br from-awash-blue via-awash-blue-dark to-[#001224] px-6">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.4 }}
+      className="relative flex min-h-screen flex-col overflow-y-auto bg-gradient-to-br from-awash-blue via-awash-blue-dark to-[#001224] px-6"
+    >
       {/* Decorative orbs */}
       <motion.div
         animate={{ y: [0, -30, 0], rotate: [0, 8, 0] }}
@@ -161,6 +166,6 @@ export function LoginScreen() {
           </button>
         </motion.p>
       </div>
-    </div>
+    </motion.div>
   )
 }

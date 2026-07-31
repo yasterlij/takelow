@@ -199,7 +199,7 @@ export function PayFeeScreen() {
         </TouchableOpacity>
 
         {showMethods && (
-          <View style={s.methodsList}>
+          <Card style={s.methodsList}>
             <TouchableOpacity
               onPress={() => { setSelected('SIKINAPAY'); setShowMethods(false) }}
               style={[s.methodOption, selected === 'SIKINAPAY' && s.methodOptionSelected]}
@@ -222,7 +222,7 @@ export function PayFeeScreen() {
                 <Text style={s.methodOptionSub}>Pay using your wallet balance</Text>
               </View>
             </TouchableOpacity>
-          </View>
+          </Card>
         )}
 
         {selected === 'SIKINAPAY' && (
@@ -257,7 +257,7 @@ export function PayFeeScreen() {
         </View>
       </ScrollView>
 
-      <View style={s.bottomCta}>
+      <Card style={s.bottomCta}>
         {walletBalance < auction.bidFee && (
           <Text style={{ fontSize: 12, fontWeight: '600', color: colors.destructive, textAlign: 'center', marginBottom: 8 }}>
             Insufficient balance — top up before paying
@@ -273,17 +273,17 @@ export function PayFeeScreen() {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <Wallet size={18} color={colors.primaryForeground} />
               <Text style={{ color: colors.primaryForeground, fontWeight: '700', fontSize: 14 }}>Pay {CURRENCY} {formatETB(auction.bidFee)} from Wallet</Text>
-            </View>
-          )}
+          </View>
+        )}
         </CTAButton>
-      </View>
+      </Card>
 
       <Modal visible={showPinModal} transparent animationType="fade" onRequestClose={() => setShowPinModal(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <TouchableOpacity style={s.backdrop} activeOpacity={1} onPress={() => setShowPinModal(false)}>
             <View />
           </TouchableOpacity>
-          <View style={s.modalSheet}>
+          <Card style={s.modalSheet}>
             <View style={s.modalHeader}>
               <Text style={s.modalTitle}>{needsPinSetup ? 'Set Wallet PIN' : 'Enter Wallet PIN'}</Text>
               <TouchableOpacity onPress={() => setShowPinModal(false)}>
@@ -359,7 +359,7 @@ export function PayFeeScreen() {
                 </CTAButton>
               </>
             )}
-          </View>
+          </Card>
         </KeyboardAvoidingView>
       </Modal>
     </View>
@@ -380,14 +380,14 @@ const s = StyleSheet.create({
   methodSelector: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 16, marginTop: 12 },
   methodSelectorTitle: { fontSize: 14, fontWeight: '700', color: colors.navy },
   methodSelectorSub: { fontSize: 12, color: colors.mutedForeground, marginTop: 2 },
-  methodsList: { borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 8, marginTop: 8 },
+  methodsList: { borderRadius: 12, borderWidth: 1, borderColor: colors.border, padding: 8, marginTop: 8 },
   methodOption: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 8, padding: 12 },
   methodOptionSelected: { backgroundColor: colors.primary + '1A' },
   methodOptionTitle: { fontSize: 13, fontWeight: '700', color: colors.navy },
   methodOptionSub: { fontSize: 11, color: colors.mutedForeground, marginTop: 2 },
-  bottomCta: { position: 'absolute', bottom: 0, left: 0, right: 0, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.card + 'F2', padding: 16 },
+  bottomCta: { position: 'absolute', bottom: 0, left: 0, right: 0, borderTopWidth: 1, borderTopColor: colors.border, padding: 16 },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
-  modalSheet: { backgroundColor: colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, gap: 16 },
+  modalSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, gap: 16 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   modalTitle: { fontSize: 18, fontWeight: '700', color: colors.navy },
   modalDesc: { fontSize: 13, fontWeight: '500', color: colors.mutedForeground, lineHeight: 20 },

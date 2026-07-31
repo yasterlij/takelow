@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, RefreshControl, I
 import { LinearGradient } from 'expo-linear-gradient'
 import { Trophy, ArrowLeft, Crown, Sparkles, ArrowRight, Gavel, Timer, CreditCard, Users } from 'lucide-react-native'
 import { useApp } from '../AppContext'
-import { Badge } from '../components/AuctionUI'
+import { Badge, Card } from '../components/AuctionUI'
 import { colors, CURRENCY } from '../theme'
 import { formatETB } from '../mockDataV0'
 
@@ -69,74 +69,76 @@ export function WinnersListScreen() {
               const winnerCount = a.winnersCount ?? a.winners?.length ?? 0
               const paidCount = a.winners?.filter((w) => w.payment_status === 'PAID').length ?? 0
               return (
-                <TouchableOpacity key={a.id} onPress={() => selectAuction(a.id)} activeOpacity={0.85} style={s.card}>
-                  <View style={s.cardImgWrap}>
-                    {a.images?.[0] ? (
-                      <Image source={{ uri: a.images[0] }} style={s.cardImgFull} resizeMode="cover" />
-                    ) : (
-                      <View style={[s.cardImgFull, { backgroundColor: colors.neutralGray200, justifyContent: 'center', alignItems: 'center' }]}>
-                        <Trophy size={32} color={colors.neutralGray400} />
-                      </View>
-                    )}
-                    <LinearGradient colors={['transparent', 'rgba(0,0,0,0.7)']} style={s.cardImgOverlay} />
-                    <View style={s.cardImgTop}>
-                      <Badge tone="gold"><Crown size={10} /> Winner</Badge>
-                      <Badge tone="gold"><Trophy size={9} /> -{savings}%</Badge>
-                    </View>
-                    <View style={s.cardImgBottom}>
-                      <Text style={s.cardName} numberOfLines={1}>{a.name}</Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <Text style={{ color: colors.primary, fontSize: 15, fontWeight: '800' }}>
-                          {CURRENCY} {formatETB(a.winning_bid_amount ?? a.bidFee)}
-                        </Text>
-                        <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10, fontWeight: '500', textDecorationLine: 'line-through' }}>
-                          {CURRENCY} {formatETB(a.marketPrice)}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                  <View style={{ paddingHorizontal: 12, paddingVertical: 10, gap: 6 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: colors.primary + '1A', justifyContent: 'center', alignItems: 'center' }}>
-                          <Timer size={12} color={colors.primary} />
+                <TouchableOpacity key={a.id} onPress={() => selectAuction(a.id)} activeOpacity={0.85}>
+                  <Card style={s.card}>
+                    <View style={s.cardImgWrap}>
+                      {a.images?.[0] ? (
+                        <Image source={{ uri: a.images[0] }} style={s.cardImgFull} resizeMode="cover" />
+                      ) : (
+                        <View style={[s.cardImgFull, { backgroundColor: colors.neutralGray200, justifyContent: 'center', alignItems: 'center' }]}>
+                          <Trophy size={32} color={colors.neutralGray400} />
                         </View>
-                        <Text style={{ fontSize: 10, fontWeight: '600', color: colors.mutedForeground }}>
-                          {a.totalBids || a.bidders} bids
-                        </Text>
+                      )}
+                      <LinearGradient colors={['transparent', 'rgba(0,0,0,0.7)']} style={s.cardImgOverlay} />
+                      <View style={s.cardImgTop}>
+                        <Badge tone="gold"><Crown size={10} /> Winner</Badge>
+                        <Badge tone="gold"><Trophy size={9} /> -{savings}%</Badge>
                       </View>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                        <Text style={{ fontSize: 10, fontWeight: '600', color: colors.primary }}>View Details</Text>
-                        <ArrowRight size={12} color={colors.primary} />
-                      </View>
-                    </View>
-                    {winnerCount > 0 && (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                          <Users size={10} color={colors.mutedForeground} />
-                          <Text style={{ fontSize: 9, fontWeight: '600', color: colors.mutedForeground }}>
-                            {winnerCount} winner{winnerCount !== 1 ? 's' : ''}
+                      <View style={s.cardImgBottom}>
+                        <Text style={s.cardName} numberOfLines={1}>{a.name}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <Text style={{ color: colors.primary, fontSize: 15, fontWeight: '800' }}>
+                            {CURRENCY} {formatETB(a.winning_bid_amount ?? a.bidFee)}
+                          </Text>
+                          <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10, fontWeight: '500', textDecorationLine: 'line-through' }}>
+                            {CURRENCY} {formatETB(a.marketPrice)}
                           </Text>
                         </View>
-                        {paidCount > 0 && (
+                      </View>
+                    </View>
+                    <View style={{ paddingHorizontal: 12, paddingVertical: 10, gap: 6 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: colors.primary + '1A', justifyContent: 'center', alignItems: 'center' }}>
+                            <Timer size={12} color={colors.primary} />
+                          </View>
+                          <Text style={{ fontSize: 10, fontWeight: '600', color: colors.mutedForeground }}>
+                            {a.totalBids || a.bidders} bids
+                          </Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <Text style={{ fontSize: 10, fontWeight: '600', color: colors.primary }}>View Details</Text>
+                          <ArrowRight size={12} color={colors.primary} />
+                        </View>
+                      </View>
+                      {winnerCount > 0 && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                            <CreditCard size={10} color={colors.emerald600} />
-                            <Text style={{ fontSize: 9, fontWeight: '600', color: colors.emerald600 }}>
-                              {paidCount} paid
+                            <Users size={10} color={colors.mutedForeground} />
+                            <Text style={{ fontSize: 9, fontWeight: '600', color: colors.mutedForeground }}>
+                              {winnerCount} winner{winnerCount !== 1 ? 's' : ''}
                             </Text>
                           </View>
-                        )}
-                        {a.winners?.slice(0, 2).map((w) => (
-                          <Text key={w.user_id} style={{ fontSize: 8, color: colors.mutedForeground }} numberOfLines={1}>
-                            {formatETB(w.amount)}
-                          </Text>
-                        ))}
-                        {winnerCount > 2 && (
-                          <Text style={{ fontSize: 8, color: colors.mutedForeground }}>+{winnerCount - 2}</Text>
-                        )}
-                      </View>
-                    )}
-                  </View>
+                          {paidCount > 0 && (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                              <CreditCard size={10} color={colors.emerald600} />
+                              <Text style={{ fontSize: 9, fontWeight: '600', color: colors.emerald600 }}>
+                                {paidCount} paid
+                              </Text>
+                            </View>
+                          )}
+                          {a.winners?.slice(0, 2).map((w) => (
+                            <Text key={w.user_id} style={{ fontSize: 8, color: colors.mutedForeground }} numberOfLines={1}>
+                              {formatETB(w.amount)}
+                            </Text>
+                          ))}
+                          {winnerCount > 2 && (
+                            <Text style={{ fontSize: 8, color: colors.mutedForeground }}>+{winnerCount - 2}</Text>
+                          )}
+                        </View>
+                      )}
+                    </View>
+                  </Card>
                 </TouchableOpacity>
               )
             })}
@@ -161,17 +163,9 @@ const s = StyleSheet.create({
   emptyTitle: { fontFamily: 'System', fontSize: 17, fontWeight: '700', color: colors.foreground, marginTop: 16 },
   emptySub: { fontSize: 13, color: colors.mutedForeground, textAlign: 'center', marginTop: 6, lineHeight: 18 },
   card: {
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.06)',
-    backgroundColor: 'rgba(255,255,255,0.85)',
     marginBottom: 14,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
+    borderRadius: 16,
   },
   cardImgWrap: { width: '100%', height: 160, position: 'relative' },
   cardImgFull: { width: '100%', height: '100%' },

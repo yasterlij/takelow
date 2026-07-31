@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react"
+import { motion } from "framer-motion"
 import { ScrollText, ShieldAlert, LogIn, UserCog, Gavel, Search, Download } from "lucide-react"
 import { AdminLayout } from "../components/AdminLayout"
 import { DataTable } from "../components/DataTable"
@@ -110,21 +111,31 @@ export function AdminAuditScreen() {
 
   return (
     <AdminLayout title="Audit Log" subtitle="Security events and admin actions">
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-center gap-2.5">
+      <motion.div
+        initial="hidden"
+        animate="visible"
+        variants={{
+          visible: { transition: { staggerChildren: 0.05 } },
+        }}
+        className="space-y-4"
+      >
+        <motion.div
+          variants={{ hidden: { opacity: 0, y: -8 }, visible: { opacity: 1, y: 0 } }}
+          className="flex flex-wrap items-center gap-2.5"
+        >
           <div className="relative flex-1 min-w-[180px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-neutral-400" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by phone, action, entity…"
-              className="h-10 w-full rounded-xl border border-border/60 bg-white pl-9 pr-3 text-sm font-medium outline-none transition-all focus:border-primary/50 focus:ring-2 focus:ring-primary/20"
+              className="h-10 w-full rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm pl-9 pr-3 text-sm font-medium outline-none transition-all focus:border-primary/50 focus:bg-white focus:shadow-lg focus:ring-2 focus:ring-primary/20"
             />
           </div>
           <select
             value={actionFilter}
             onChange={(e) => setActionFilter(e.target.value)}
-            className="h-10 rounded-xl border border-border/60 bg-white px-3 text-sm font-medium outline-none focus:border-primary/50"
+            className="h-10 rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm px-3 text-sm font-medium outline-none transition-all focus:border-primary/50 focus:bg-white"
           >
             <option value="all">All actions</option>
             {actions.map((a) => (
@@ -133,13 +144,16 @@ export function AdminAuditScreen() {
           </select>
           <button
             onClick={load}
-            className="h-10 rounded-xl border border-border/60 bg-white px-4 text-sm font-bold text-neutral-600 transition-all hover:bg-neutral-50"
+            className="h-10 rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm px-4 text-sm font-bold text-neutral-600 transition-all hover:bg-neutral-50 active:scale-95"
           >
             Refresh
           </button>
-        </div>
+        </motion.div>
 
-        <div className="rounded-2xl border border-border/60 bg-white shadow-[0_4px_20px_rgba(0,43,92,0.04)]">
+        <motion.div
+          variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}
+          className="glass-card-solid"
+        >
           <DataTable
             columns={columns}
             rows={filtered}
@@ -147,8 +161,8 @@ export function AdminAuditScreen() {
             loading={loading}
             empty={{ icon: <ScrollText className="size-6" />, title: "No audit logs", message: "Security events will appear here" }}
           />
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
     </AdminLayout>
   )
 }

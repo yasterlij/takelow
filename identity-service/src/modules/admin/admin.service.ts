@@ -1,15 +1,19 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, In } from 'typeorm';
 import { User, UserRole } from '../auth/entities/user.entity';
+import { UserPermission } from './entities/user-permission.entity';
 import { Transaction } from '../wallet/entities/transaction.entity';
 import { AuditService } from './audit.service';
+import { ALL_PERMISSIONS, Permission } from './constants/permissions';
 
 @Injectable()
 export class AdminService {
   constructor(
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    @InjectRepository(UserPermission)
+    private userPermissionRepository: Repository<UserPermission>,
     @InjectRepository(Transaction)
     private transactionRepository: Repository<Transaction>,
     private auditService: AuditService,
@@ -195,5 +199,99 @@ export class AdminService {
       [t.id, t.user_id, t.amount, t.type, t.reference_id || '', t.created_at].join(','),
     );
     return [header, ...rows].join('\n');
+  }
+
+  async getUserPermissions(userId: string) {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+
+    const permissions = await this.userPermissionRepository.find({
+      where: { user_id: userId },
+      relations: ['grantor'],
+      order: { created_at: 'DESC' },
+    });
+
+    return {
+      user_id: userId,
+      role: user.role,
+      permissions: permissions.map((p) => ({
+        id: p.id,
+        permission: p.permission,
+        granted_by: p.granted_by,
+        granted_by_name: p.grantor?.full_name || null,
+        created_at: p.created_at,
+      })),
+    };
+  }
+
+  async grantPermissions(
+    userId: string,
+    permissions: string[],
+    actor: { id: string; phone?: string },
+  ) {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+
+    const invalid = permissions.filter((p) => !ALL_PERMISSIONS.includes(p as Permission));
+    if (invalid.length > 0) {
+      throw new BadRequestException(`Invalid permissions: ${invalid.join(', ')}`);
+    }
+
+    const existing = await this.userPermissionRepository.find({
+      where: { user_id: userId, permission: In(permissions) },
+    });
+    const existingSet = new Set(existing.map((p) => p.permission));
+    const newPermissions = permissions.filter((p) => !existingSet.has(p));
+
+    if (newPermissions.length === 0) {
+      return { granted: [], message: 'All permissions already assigned' };
+    }
+
+    const entities = this.userPermissionRepository.create(
+      newPermissions.map((permission) => ({
+        user_id: userId,
+        permission,
+        granted_by: actor.id,
+      })),
+    );
+    await this.userPermissionRepository.save(entities);
+
+    await this.auditService.log({
+      actor_id: actor.id,
+      actor_phone: actor.phone,
+      action: 'grant_permissions',
+      entity_type: 'user',
+      entity_id: userId,
+      details: { granted: newPermissions },
+    });
+
+    return { granted: newPermissions };
+  }
+
+  async revokePermissions(
+    userId: string,
+    permissions: string[],
+    actor: { id: string; phone?: string },
+  ) {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+
+    const result = await this.userPermissionRepository.delete({
+      user_id: userId,
+      permission: In(permissions),
+    });
+
+    if (result.affected && result.affected > 0) {
+      await this.auditService.log({
+        actor_id: actor.id,
+        actor_phone: actor.phone,
+        action: 'revoke_permissions',
+        entity_type: 'user',
+        entity_id: userId,
+        details: { revoked: permissions },
+      });
+    }
+
+    return { revoked: result.affected || 0 };
   }
 }

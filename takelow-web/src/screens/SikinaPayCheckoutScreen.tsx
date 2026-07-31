@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react"
+import { motion } from "framer-motion"
 import { X, Check, ArrowLeft, ExternalLink, RefreshCw } from "lucide-react"
 import { useApp } from "../AppContext"
 import { api, openSikinaPopup, closeSikinaPopup } from "../api"
@@ -126,56 +127,97 @@ export function SikinaPayCheckoutScreen() {
 
   if (status === "paid") {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center px-6 py-10 text-center">
-        <div className="relative">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="flex flex-1 flex-col items-center justify-center px-6 py-10 text-center"
+      >
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ type: "spring", damping: 15, stiffness: 200 }}
+          className="relative"
+        >
           <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/30" />
           <span className="relative flex size-20 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-500/30">
             <Check className="size-10" strokeWidth={3} />
           </span>
-        </div>
-        <h1 className="mt-6 font-display text-2xl font-extrabold text-navy">Payment Successful!</h1>
-        <p className="mt-2 max-w-xs text-sm font-medium text-muted-foreground">
-          Your payment of <span className="font-bold text-navy">{formatETB(userBid ?? 0)} {CURRENCY}</span> was received.
-        </p>
-        <button
+        </motion.div>
+        <motion.h1
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="mt-6 font-display text-2xl font-extrabold text-awash-blue"
+        >
+          Payment Successful!
+        </motion.h1>
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.25 }}
+          className="mt-2 max-w-xs text-sm font-medium text-neutral-400"
+        >
+          Your payment of <span className="font-bold text-awash-blue">{formatETB(userBid ?? 0)} {CURRENCY}</span> was received.
+        </motion.p>
+        <motion.button
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.35 }}
+          whileTap={{ scale: 0.97 }}
           onClick={handleContinuePaid}
-          className="mt-8 flex items-center gap-2 rounded-xl bg-primary px-8 py-3 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 transition-all hover:brightness-110"
+          className="mt-8 flex items-center gap-2 rounded-xl bg-gradient-to-r from-awash-gold to-awash-gold-light px-8 py-3 text-sm font-bold text-awash-blue shadow-lg shadow-primary/30 transition-all hover:shadow-primary/40"
         >
           {paymentContext === "bid-fee" ? "Continue to Place Bid" : "Track Delivery"}
-        </button>
-      </div>
+        </motion.button>
+      </motion.div>
     )
   }
 
   if (status === "failed") {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center px-6 py-10 text-center">
-        <span className="flex size-20 items-center justify-center rounded-full bg-red-100 text-red-500">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="flex flex-1 flex-col items-center justify-center px-6 py-10 text-center"
+      >
+        <motion.span
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ type: "spring", damping: 15, stiffness: 200 }}
+          className="flex size-20 items-center justify-center rounded-full bg-red-100 text-red-500"
+        >
           <X className="size-10" strokeWidth={3} />
-        </span>
-        <h1 className="mt-6 font-display text-2xl font-extrabold text-navy">Payment Not Confirmed</h1>
-        <p className="mt-2 max-w-xs text-sm font-medium text-muted-foreground">
+        </motion.span>
+        <h1 className="mt-6 font-display text-2xl font-extrabold text-awash-blue">Payment Not Confirmed</h1>
+        <p className="mt-2 max-w-xs text-sm font-medium text-neutral-400">
           We couldn't automatically confirm your payment. If you've already paid, tap confirm below.
         </p>
         <button
           onClick={handleConfirmManually}
-          className="mt-8 w-full max-w-xs rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 transition-all hover:brightness-110"
+          className="mt-8 w-full max-w-xs rounded-xl bg-gradient-to-r from-awash-gold to-awash-gold-light py-3 text-sm font-bold text-awash-blue shadow-lg shadow-primary/30 transition-all hover:shadow-primary/40 active:scale-[0.98]"
         >
           I've Already Paid
         </button>
         <button
           onClick={handleTryAgain}
-          className="mt-3 w-full max-w-xs rounded-xl border border-border bg-card py-3 text-sm font-bold text-navy transition-all hover:bg-muted"
+          className="mt-3 w-full max-w-xs rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm py-3 text-sm font-bold text-awash-blue transition-all hover:bg-white active:scale-[0.98]"
         >
           Try Again
         </button>
-      </div>
+      </motion.div>
     )
   }
 
   return (
-    <div className="flex flex-1 flex-col">
-      <div className="flex items-center gap-3 border-b border-border bg-white/80 px-4 py-3 backdrop-blur-md">
+    <motion.div
+      initial="hidden"
+      animate="visible"
+      variants={{
+        visible: { transition: { staggerChildren: 0.06 } },
+      }}
+      className="flex flex-1 flex-col"
+    >
+      <div className="flex items-center gap-3 border-b border-border/60 bg-white/80 px-4 py-3 backdrop-blur-md">
         <button onClick={handleBack} className="flex size-8 items-center justify-center rounded-full text-neutral-600 transition-colors hover:bg-neutral-100">
           <ArrowLeft className="size-5" />
         </button>
@@ -184,13 +226,20 @@ export function SikinaPayCheckoutScreen() {
         </h1>
       </div>
 
-      <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
-        <div className="mb-6 flex size-20 items-center justify-center rounded-2xl bg-gradient-to-br from-awash-blue/10 to-emerald-500/10">
-          <RefreshCw className="size-10 animate-spin text-awash-blue" />
-        </div>
+      <motion.div
+        variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}
+        className="flex flex-1 flex-col items-center justify-center px-6 text-center"
+      >
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+          className="mb-6 flex size-20 items-center justify-center rounded-2xl bg-gradient-to-br from-awash-blue/10 to-emerald-500/10"
+        >
+          <RefreshCw className="size-10 text-awash-blue" />
+        </motion.div>
 
-        <h2 className="font-display text-xl font-bold text-navy">Waiting for Payment</h2>
-        <p className="mt-2 max-w-xs text-sm text-muted-foreground">
+        <h2 className="font-display text-xl font-bold text-awash-blue">Waiting for Payment</h2>
+        <p className="mt-2 max-w-xs text-sm text-neutral-400">
           {popupBlocked
             ? "Click the button below to open the SikinaPay payment page."
             : "Complete your payment in the opened SikinaPay window."}
@@ -199,7 +248,7 @@ export function SikinaPayCheckoutScreen() {
         <div className="mt-8 flex flex-col items-center gap-3">
           <button
             onClick={handleOpenPopup}
-            className="flex items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 transition-all hover:brightness-110"
+            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-awash-gold to-awash-gold-light px-6 py-3 text-sm font-bold text-awash-blue shadow-lg shadow-primary/30 transition-all hover:shadow-primary/40 active:scale-[0.98]"
           >
             <ExternalLink className="size-4" />
             {popupBlocked ? "Open Payment Page" : "Reopen Payment Window"}
@@ -209,26 +258,26 @@ export function SikinaPayCheckoutScreen() {
             href={sikinaPayUrl ?? "#"}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1 text-xs font-semibold text-muted-foreground underline underline-offset-2 hover:text-awash-blue"
+            className="flex items-center gap-1 text-xs font-semibold text-neutral-400 underline underline-offset-2 transition-colors hover:text-awash-blue"
           >
             Open in new tab
           </a>
         </div>
 
-        <div className="mt-10 flex items-center gap-2 rounded-xl border border-border bg-muted/50 px-4 py-2.5 text-xs text-muted-foreground">
+        <div className="mt-10 flex items-center gap-2 rounded-xl border border-border/60 bg-white/50 backdrop-blur-sm px-4 py-2.5 text-xs text-neutral-400">
           <RefreshCw className="size-3 animate-spin" />
           Checking payment status every 2 seconds...
         </div>
-      </div>
+      </motion.div>
 
-      <div className="flex items-center justify-center border-t border-border bg-white/80 px-4 py-3 backdrop-blur-sm">
+      <div className="flex items-center justify-center border-t border-border/60 bg-white/80 px-4 py-3 backdrop-blur-sm">
         <button
           onClick={handleConfirmManually}
-          className="text-sm font-semibold text-awash-blue underline underline-offset-2"
+          className="text-sm font-semibold text-awash-blue underline underline-offset-2 transition-colors hover:text-awash-gold-dark"
         >
           Already Paid? Confirm
         </button>
       </div>
-    </div>
+    </motion.div>
   )
 }

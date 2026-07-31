@@ -91,7 +91,7 @@ export function PaymentConfirmedScreen() {
         <Text style={s.confirmText}>Thank you for your payment!</Text>
       </View>
 
-      <View style={s.bottomCta}>
+      <Card style={s.bottomCta}>
         <View style={{ flexDirection: 'row', gap: 12 }}>
           <View style={{ flex: 1 }}>
             <CTAButton variant="navy" onPress={() => go('delivery')}>
@@ -104,7 +104,7 @@ export function PaymentConfirmedScreen() {
             </CTAButton>
           </View>
         </View>
-      </View>
+      </Card>
     </View>
   )
 }
@@ -148,5 +148,5 @@ const s = StyleSheet.create({
   },
   downloadText: { fontSize: 12, fontWeight: '600', color: colors.navy },
   confirmText: { fontSize: 12, fontWeight: '500', color: colors.navy + 'B3', textAlign: 'center', marginTop: 20 },
-  bottomCta: { borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.card, padding: 16 },
+  bottomCta: { borderTopWidth: 1, borderTopColor: colors.border, padding: 16 },
 })

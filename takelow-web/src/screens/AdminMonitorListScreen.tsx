@@ -50,35 +50,55 @@ export function AdminMonitorListScreen() {
 
   return (
     <AdminLayout title="Monitor Auctions" subtitle={`${activeAuctions.length} live auctions`}>
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-center gap-2.5">
+      <motion.div
+        initial="hidden"
+        animate="visible"
+        variants={{
+          visible: { transition: { staggerChildren: 0.04 } },
+        }}
+        className="space-y-4"
+      >
+        <motion.div
+          variants={{ hidden: { opacity: 0, y: -8 }, visible: { opacity: 1, y: 0 } }}
+          className="flex flex-wrap items-center gap-2.5"
+        >
           <div className="relative flex-1 min-w-[180px]">
             <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search auctions…"
-              className="h-10 w-full rounded-xl border border-border/60 bg-white pl-9 pr-3 text-sm font-medium outline-none transition-all focus:border-primary/50 focus:ring-2 focus:ring-primary/20"
+              className="h-10 w-full rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm pl-9 pr-3 text-sm font-medium outline-none transition-all focus:border-primary/50 focus:bg-white focus:shadow-lg focus:ring-2 focus:ring-primary/20"
             />
           </div>
           <button
             onClick={handleRefresh}
-            className="flex h-10 items-center gap-1.5 rounded-xl border border-border/60 bg-white px-4 text-sm font-bold text-neutral-600 transition-all hover:bg-neutral-50"
+            className="flex h-10 items-center gap-1.5 rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm px-4 text-sm font-bold text-neutral-600 transition-all hover:bg-neutral-50 active:scale-95"
           >
             <RefreshCw className="size-3.5" /> Refresh
           </button>
-        </div>
+        </motion.div>
 
         {filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex flex-col items-center justify-center py-20 text-center"
+          >
             <div className="flex size-14 items-center justify-center rounded-full bg-neutral-100 text-neutral-300">
               <Inbox className="size-7" />
             </div>
             <p className="mt-4 text-sm font-bold text-neutral-500">No active auctions to monitor</p>
             <p className="mt-1 text-xs font-medium text-neutral-400">Create an auction or check back later</p>
-          </div>
+          </motion.div>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <motion.div
+            variants={{
+              hidden: { opacity: 0 },
+              visible: { opacity: 1, transition: { staggerChildren: 0.05 } },
+            }}
+            className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+          >
             {filtered.map((a, i) => (
               <AuctionMonitorCard
                 key={a.id}
@@ -87,9 +107,9 @@ export function AdminMonitorListScreen() {
                 onMonitor={() => selectAuctionForMonitor(a.id)}
               />
             ))}
-          </div>
+          </motion.div>
         )}
-      </div>
+      </motion.div>
     </AdminLayout>
   )
 }
@@ -103,9 +123,10 @@ function AuctionMonitorCard({ auction, delay, onMonitor }: { auction: AdminAucti
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, delay, ease: [0.16, 1, 0.3, 1] }}
-      whileHover={{ y: -3 }}
+      whileHover={{ y: -4, scale: 1.015 }}
+      whileTap={{ scale: 0.98 }}
       onClick={onMonitor}
-      className="group cursor-pointer overflow-hidden rounded-2xl border border-border/60 bg-white shadow-[0_4px_20px_rgba(0,43,92,0.04)] transition-all hover:border-primary/30 hover:shadow-[0_8px_32px_rgba(0,43,92,0.08)]"
+      className="group cursor-pointer overflow-hidden rounded-2xl border border-border/60 bg-white/80 backdrop-blur-sm shadow-[0_4px_20px_rgba(0,43,92,0.04)] transition-all hover:border-primary/30 hover:shadow-[0_8px_32px_rgba(0,43,92,0.08)]"
     >
       {/* Image */}
       <div className="relative aspect-[16/9] w-full overflow-hidden bg-neutral-100">

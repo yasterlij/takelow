@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from 'rea
 import { Check, X, ArrowRight, ExternalLink } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { api } from '../api'
+import { Card } from '../components/AuctionUI'
 import { colors } from '../theme'
 import { CURRENCY, formatETB } from '../mockDataV0'
 
@@ -69,7 +70,7 @@ export function PaymentVerifyingScreen() {
         <Text style={s.subtitle}>
           Your payment of <Text style={s.amount}>{formatETB(amount)} {CURRENCY}</Text> was received.
         </Text>
-        <View style={s.card}>
+        <Card style={{ width: '100%', maxWidth: 300, padding: 20, marginTop: 24 }}>
           <View style={s.row}>
             <Text style={s.label}>Product</Text>
             <Text style={s.value}>{auction?.name || '—'}</Text>
@@ -82,7 +83,7 @@ export function PaymentVerifyingScreen() {
             <Text style={s.label}>Status</Text>
             <Text style={[s.value, { color: colors.emerald500 }]}>Completed</Text>
           </View>
-        </View>
+        </Card>
         <TouchableOpacity style={s.btn} onPress={() => go('delivery')} activeOpacity={0.8}>
           <ArrowRight size={18} color={colors.primaryForeground} />
           <Text style={s.btnText}>Track Delivery</Text>

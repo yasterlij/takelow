@@ -86,7 +86,7 @@ export function PayWinningScreen() {
         </TouchableOpacity>
 
         {showMethods && (
-          <View style={s.methodsList}>
+          <Card style={s.methodsList}>
             <TouchableOpacity
               onPress={() => { setSelected('SIKINAPAY'); setShowMethods(false) }}
               style={[s.methodOption, selected === 'SIKINAPAY' && s.methodOptionSelected]}
@@ -107,7 +107,7 @@ export function PayWinningScreen() {
                 <Text style={s.methodOptionSub}>Pay directly from your Awash Bank account</Text>
               </View>
             </TouchableOpacity>
-          </View>
+          </Card>
         )}
 
         {selected === 'AWASH' && (
@@ -203,7 +203,7 @@ const s = StyleSheet.create({
   methodSelector: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 16, marginTop: 16 },
   methodSelectorTitle: { fontSize: 14, fontWeight: '700', color: colors.navy },
   methodSelectorSub: { fontSize: 12, color: colors.mutedForeground, marginTop: 2 },
-  methodsList: { borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 8, marginTop: 8 },
+  methodsList: { borderRadius: 12, borderWidth: 1, borderColor: colors.border, padding: 8, marginTop: 8 },
   methodOption: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 8, padding: 12 },
   methodOptionSelected: { backgroundColor: colors.primary + '1A' },
   methodOptionTitle: { fontSize: 13, fontWeight: '700', color: colors.navy },

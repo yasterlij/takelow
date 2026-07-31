@@ -51,7 +51,7 @@ export function PlaceBidScreen() {
         </View>
 
         {auction.maxBid && (
-          <View style={s.bidProgress}>
+          <Card style={s.bidProgress}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
               <Text style={{ fontSize: 10, fontWeight: '600', color: colors.mutedForeground }}>Total bids: {auction.totalBids || auction.bidders}</Text>
               <Text style={{ fontSize: 10, fontWeight: '600', color: colors.mutedForeground }}>Capacity: {auction.maxBid}</Text>
@@ -59,7 +59,7 @@ export function PlaceBidScreen() {
             <View style={{ height: 4, borderRadius: 2, backgroundColor: colors.border, overflow: 'hidden' }}>
               <View style={{ width: `${Math.min((auction.totalBids || auction.bidders) / auction.maxBid * 100, 100)}%`, height: '100%', borderRadius: 2, backgroundColor: (auction.totalBids || auction.bidders) / auction.maxBid > 0.8 ? colors.primary : colors.emerald500 }} />
             </View>
-          </View>
+          </Card>
         )}
 
         <View style={{ alignItems: 'center', marginTop: 16 }}>
@@ -120,7 +120,7 @@ const s = StyleSheet.create({
   feePaidText: { fontSize: 12, fontWeight: '600', color: colors.emerald700, flex: 1 },
   statChip: { borderRadius: 6, backgroundColor: colors.accent, paddingHorizontal: 8, paddingVertical: 4 },
   statChipText: { fontSize: 10, fontWeight: '600', color: colors.primary },
-  bidProgress: { borderRadius: 8, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, padding: 8, marginTop: 8 },
+  bidProgress: { borderRadius: 8, borderWidth: 1, borderColor: colors.border, padding: 8, marginTop: 8 },
   enterBidTitle: { fontSize: 18, fontWeight: '800', color: colors.navy },
   enterBidSub: { fontSize: 12, fontWeight: '500', color: colors.mutedForeground, marginTop: 4, maxWidth: 256, textAlign: 'center' },
   inputRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', gap: 8 },

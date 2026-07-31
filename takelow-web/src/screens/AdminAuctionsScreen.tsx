@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from "react"
+import { motion, AnimatePresence } from "framer-motion"
 import { Plus, X, Pencil, XCircle, Trash2, Eye, ImageIcon, Filter, Search, Upload, BarChart3, TrendingDown, ArrowUpRight, Camera, Link, Trophy, PartyPopper } from "lucide-react"
 import { useApp } from "../AppContext"
 import { api } from "../api"
@@ -268,90 +269,110 @@ export function AdminAuctionsScreen() {
         </button>
       }
     >
-      <div className="space-y-4">
+      <motion.div
+        initial="hidden"
+        animate="visible"
+        variants={{
+          visible: { transition: { staggerChildren: 0.04 } },
+        }}
+        className="space-y-4"
+      >
         {lightboxImg && <ImageLightbox src={lightboxImg} onClose={() => setLightboxImg(null)} />}
 
-        <div className="flex flex-wrap items-center gap-2">
+        <motion.div
+          variants={{ hidden: { opacity: 0, y: -8 }, visible: { opacity: 1, y: 0 } }}
+          className="flex flex-wrap items-center gap-2"
+        >
           <div className="relative flex-1 min-w-[180px]">
             <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-neutral-400" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search auctions..."
-              className="w-full rounded-xl border border-border/60 bg-white py-2 pl-8 pr-3 text-xs font-medium outline-none placeholder:text-neutral-400/50 focus:border-awash-gold"
+              className="w-full rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm py-2 pl-8 pr-3 text-xs font-medium outline-none transition-all placeholder:text-neutral-400/50 focus:border-awash-gold focus:bg-white focus:shadow-lg"
             />
           </div>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="rounded-xl border border-border/60 bg-white px-3 py-2 text-xs font-semibold text-awash-blue outline-none focus:border-awash-gold"
+            className="rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm px-3 py-2 text-xs font-semibold text-awash-blue outline-none transition-all focus:border-awash-gold focus:bg-white"
           >
             <option value="all">All</option>
             <option value="live">Live</option>
             <option value="ending-soon">Ending Soon</option>
             <option value="closed">Closed</option>
           </select>
-        </div>
-      </div>
+        </motion.div>
 
-      <div className="mt-4">
-        {showForm && (
-          <Card className="mb-4 space-y-3 border border-awash-gold/20 p-4 shadow-lg">
-            <div className="flex items-center justify-between">
-              <h2 className="font-display text-sm font-bold text-awash-blue">{editingId ? "Edit Auction" : "New Auction"}</h2>
-              <button onClick={() => { setShowForm(false); setEditingId(null) }} className="rounded-lg p-1 hover:bg-neutral-100"><X className="size-4 text-neutral-400" /></button>
-            </div>
+        <AnimatePresence>
+          {showForm && (
+            <motion.div
+              key="auction-form"
+              initial={{ opacity: 0, height: 0, y: -20 }}
+              animate={{ opacity: 1, height: "auto", y: 0 }}
+              exit={{ opacity: 0, height: 0, y: -20 }}
+              transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <Card className="mb-4 space-y-3 border border-awash-gold/20 p-4 shadow-lg">
+                <div className="flex items-center justify-between">
+                  <h2 className="font-display text-sm font-bold text-awash-blue">{editingId ? "Edit Auction" : "New Auction"}</h2>
+                  <button onClick={() => { setShowForm(false); setEditingId(null) }} className="rounded-lg p-1 transition-colors hover:bg-neutral-100"><X className="size-4 text-neutral-400" /></button>
+                </div>
 
-            <div className="flex gap-3">
-              <div className="flex-1 space-y-3">
-                <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Product name" className="w-full rounded-xl border border-border/60 bg-white px-3 py-2.5 text-xs font-medium outline-none focus:border-awash-gold" />
-                <select value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))} className="w-full rounded-xl border border-border/60 bg-white px-3 py-2.5 text-xs font-medium outline-none focus:border-awash-gold">
-                  {["Computer", "Electronics", "Phone/Tablet", "Car", "Machinery"].map((c) => <option key={c}>{c}</option>)}
-                </select>
-              </div>
-              <div className="flex-shrink-0">
-                <ImageUploadBox
-                  src={form.imageUrl}
-                  onFile={(dataUrl) => { setForm((f) => ({ ...f, imageUrl: dataUrl })); setImgPreviewErr(false) }}
-                  onClear={() => setForm((f) => ({ ...f, imageUrl: "" }))}
-                />
-              </div>
-            </div>
+                <div className="flex gap-3">
+                  <div className="flex-1 space-y-3">
+                    <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Product name" className="input-full" />
+                    <select value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))} className="input-full">
+                      {["Computer", "Electronics", "Phone/Tablet", "Car", "Machinery"].map((c) => <option key={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div className="flex-shrink-0">
+                    <ImageUploadBox
+                      src={form.imageUrl}
+                      onFile={(dataUrl) => { setForm((f) => ({ ...f, imageUrl: dataUrl })); setImgPreviewErr(false) }}
+                      onClear={() => setForm((f) => ({ ...f, imageUrl: "" }))}
+                    />
+                  </div>
+                </div>
 
-            <div className="flex gap-3">
-              <input value={form.marketPrice} onChange={(e) => setForm((f) => ({ ...f, marketPrice: e.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1").replace(/(\.\d{2})\d+/g, "$1") }))} placeholder="Market price" className="w-1/2 rounded-xl border border-border/60 bg-white px-3 py-2.5 text-xs font-medium outline-none focus:border-awash-gold" />
-              <input value={form.bidFee} onChange={(e) => setForm((f) => ({ ...f, bidFee: e.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1").replace(/(\.\d{2})\d+/g, "$1") }))} placeholder="Bid fee" className="w-1/2 rounded-xl border border-border/60 bg-white px-3 py-2.5 text-xs font-medium outline-none focus:border-awash-gold" />
-            </div>
-            <div className="flex gap-3">
-              <label className="flex-1">
-                <span className="mb-1 block text-[10px] font-semibold text-neutral-400">Min Bids (optional)</span>
-                <input value={form.minBid} onChange={(e) => setForm((f) => ({ ...f, minBid: e.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1").replace(/(\.\d{2})\d+/g, "$1") }))} placeholder="e.g. 5" className="w-full rounded-xl border border-border/60 bg-white px-3 py-2.5 text-xs font-medium outline-none focus:border-awash-gold" />
-              </label>
-              <label className="flex-1">
-                <span className="mb-1 block text-[10px] font-semibold text-neutral-400">Max Bids (optional)</span>
-                <input value={form.maxBid} onChange={(e) => setForm((f) => ({ ...f, maxBid: e.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1").replace(/(\.\d{2})\d+/g, "$1") }))} placeholder="e.g. 100" className="w-full rounded-xl border border-border/60 bg-white px-3 py-2.5 text-xs font-medium outline-none focus:border-awash-gold" />
-              </label>
+                <div className="flex gap-3">
+                  <input value={form.marketPrice} onChange={(e) => setForm((f) => ({ ...f, marketPrice: e.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1").replace(/(\.\d{2})\d+/g, "$1") }))} placeholder="Market price" className="input-full" />
+                  <input value={form.bidFee} onChange={(e) => setForm((f) => ({ ...f, bidFee: e.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1").replace(/(\.\d{2})\d+/g, "$1") }))} placeholder="Bid fee" className="input-full" />
+                </div>
+                <div className="flex gap-3">
+                  <label className="flex-1">
+                    <span className="mb-1 block text-[10px] font-semibold text-neutral-400">Min Bids (optional)</span>
+                    <input value={form.minBid} onChange={(e) => setForm((f) => ({ ...f, minBid: e.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1").replace(/(\.\d{2})\d+/g, "$1") }))} placeholder="e.g. 5" className="input-full" />
+                  </label>
+                  <label className="flex-1">
+                    <span className="mb-1 block text-[10px] font-semibold text-neutral-400">Max Bids (optional)</span>
+                    <input value={form.maxBid} onChange={(e) => setForm((f) => ({ ...f, maxBid: e.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1").replace(/(\.\d{2})\d+/g, "$1") }))} placeholder="e.g. 100" className="input-full" />
+                  </label>
+                </div>
+                <textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="Description" className="input-full" rows={2} />
+                <input value={form.highlights} onChange={(e) => setForm((f) => ({ ...f, highlights: e.target.value }))} placeholder="Highlights (comma separated)" className="input-full" />
+                <div className="flex gap-3">
+                  <label className="flex-1">
+                    <span className="mb-1 block text-[10px] font-semibold text-neutral-400">Start</span>
+                    <input type="datetime-local" value={form.startTime} onChange={(e) => setForm((f) => ({ ...f, startTime: e.target.value }))} className="input-full" />
+                  </label>
+                  <label className="flex-1">
+                    <span className="mb-1 block text-[10px] font-semibold text-neutral-400">End</span>
+                    <input type="datetime-local" value={form.endTime} onChange={(e) => setForm((f) => ({ ...f, endTime: e.target.value }))} className="input-full" />
+                  </label>
+                </div>
+                <CTAButton onClick={handleSubmit} disabled={submitting || !form.name || !form.marketPrice}>
+                  {submitting ? "Saving..." : editingId ? "Update Auction" : "Create Auction"}
+                </CTAButton>
+              </Card>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-            </div>
-            <textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="Description" className="w-full rounded-xl border border-border/60 bg-white px-3 py-2.5 text-xs font-medium outline-none focus:border-awash-gold" rows={2} />
-            <input value={form.highlights} onChange={(e) => setForm((f) => ({ ...f, highlights: e.target.value }))} placeholder="Highlights (comma separated)" className="w-full rounded-xl border border-border/60 bg-white px-3 py-2.5 text-xs font-medium outline-none focus:border-awash-gold" />
-            <div className="flex gap-3">
-              <label className="flex-1">
-                <span className="mb-1 block text-[10px] font-semibold text-neutral-400">Start</span>
-                <input type="datetime-local" value={form.startTime} onChange={(e) => setForm((f) => ({ ...f, startTime: e.target.value }))} className="w-full rounded-xl border border-border/60 bg-white px-3 py-2.5 text-xs font-medium outline-none focus:border-awash-gold" />
-              </label>
-              <label className="flex-1">
-                <span className="mb-1 block text-[10px] font-semibold text-neutral-400">End</span>
-                <input type="datetime-local" value={form.endTime} onChange={(e) => setForm((f) => ({ ...f, endTime: e.target.value }))} className="w-full rounded-xl border border-border/60 bg-white px-3 py-2.5 text-xs font-medium outline-none focus:border-awash-gold" />
-              </label>
-            </div>
-            <CTAButton onClick={handleSubmit} disabled={submitting || !form.name || !form.marketPrice}>
-              {submitting ? "Saving..." : editingId ? "Update Auction" : "Create Auction"}
-            </CTAButton>
-          </Card>
-        )}
-
-        <div className="mb-3 flex items-center justify-between">
+        <motion.div
+          variants={{ hidden: { opacity: 0 }, visible: { opacity: 1 } }}
+          className="mb-3 flex items-center justify-between"
+        >
           <p className="text-xs font-semibold text-neutral-400">
             {filtered.length} of {auctions.length} auctions
           </p>
@@ -359,22 +380,32 @@ export function AdminAuctionsScreen() {
             <Badge tone="green">{auctions.filter((a) => a.status === "live" || a.status === "ending-soon").length} active</Badge>
             <Badge tone="muted">{auctions.filter((a) => a.status === "closed").length} closed</Badge>
           </div>
-        </div>
+        </motion.div>
 
         {filtered.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 py-16 text-neutral-400">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex flex-col items-center gap-3 py-16 text-neutral-400"
+          >
             <Filter className="size-8 opacity-30" />
             <p className="text-sm font-medium">No matching auctions</p>
             {search || statusFilter !== "all" ? (
-              <button onClick={() => { setSearch(""); setStatusFilter("all") }} className="text-xs font-semibold text-awash-gold">
+              <button onClick={() => { setSearch(""); setStatusFilter("all") }} className="text-xs font-semibold text-awash-gold transition-colors hover:text-awash-gold-dark">
                 Clear filters
               </button>
             ) : (
               <p className="text-xs">Click "Create Auction" to get started</p>
             )}
-          </div>
+          </motion.div>
         ) : (
-          <div className="flex flex-col gap-2">
+          <motion.div
+            variants={{
+              hidden: { opacity: 0 },
+              visible: { opacity: 1, transition: { staggerChildren: 0.04 } },
+            }}
+            className="flex flex-col gap-2"
+          >
             {filtered.map((a: Auction) => {
               const bids = viewBidsId === a.id ? (bidsByAuction[a.id] ?? []) : []
               const isEncrypted = bids.some((b: any) => b.amount_encrypted)
@@ -382,8 +413,11 @@ export function AdminAuctionsScreen() {
               const avgBid = bidAmounts.length > 0 ? Math.round(bidAmounts.reduce((s, v) => s + v, 0) / bidAmounts.length) : 0
               const isClosed = a.status === "closed"
               return (
-                <div key={a.id}>
-                  <div className="flex items-center gap-3 rounded-2xl border border-border/60 bg-white p-3 shadow-sm transition-all hover:border-awash-gold/20 hover:shadow-md">
+                <motion.div
+                  key={a.id}
+                  variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}
+                >
+                  <div className="flex items-center gap-3 rounded-2xl border border-border/60 bg-white/80 backdrop-blur-sm p-3 shadow-sm transition-all hover:border-awash-gold/20 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.99]">
                     <AuctionThumb src={a.images?.[0]} onClick={() => a.images?.[0] && setLightboxImg(a.images[0])} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
@@ -444,7 +478,11 @@ export function AdminAuctionsScreen() {
                   )}
 
                   {viewBidsId === a.id && (
-                    <div className="-mt-2 mb-2 mx-2 rounded-2xl border border-border/60 bg-gradient-to-br from-neutral-50 to-white p-3 shadow-inner">
+                    <motion.div
+                      initial={{ opacity: 0, y: -8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="-mt-2 mb-2 mx-2 rounded-2xl border border-border/60 bg-gradient-to-br from-neutral-50 to-white p-3 shadow-inner"
+                    >
                       <div className="flex items-center justify-between">
                         <p className="flex items-center gap-2 text-[11px] font-bold text-awash-blue">
                           <Eye className="size-3.5" /> Bids ({bids.length})
@@ -484,14 +522,14 @@ export function AdminAuctionsScreen() {
                               })}
                         </div>
                       )}
-                    </div>
+                    </motion.div>
                   )}
-                </div>
+                </motion.div>
               )
             })}
-          </div>
+          </motion.div>
         )}
-      </div>
+      </motion.div>
     </AdminLayout>
   )
 }

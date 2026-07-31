@@ -2,7 +2,7 @@ import React from 'react'
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native'
 import { Gavel, Users, TrendingUp, DollarSign, Clock, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react-native'
 import { useApp } from '../AppContext'
-import { CTAButton, Badge } from '../components/AuctionUI'
+import { CTAButton, Badge, Card } from '../components/AuctionUI'
 import { CURRENCY, formatETB } from '../mockDataV0'
 import { colors } from '../theme'
 
@@ -40,26 +40,26 @@ export function AdminDashboardScreen() {
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
           {stats.map((s) => (
-            <View key={s.label} style={s2.statCard}>
+            <Card key={s.label} style={s2.statCard}>
               <s.icon size={20} color={s.color} />
               <Text style={s2.statValue}>{s.value}</Text>
               <Text style={s2.statLabel}>{s.label}</Text>
-            </View>
+            </Card>
           ))}
         </View>
 
         <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
           {paymentStats.map((s) => (
-            <View key={s.label} style={{ flex: 1, borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, alignItems: 'center' }}>
+            <Card key={s.label} style={{ flex: 1, padding: 12, alignItems: 'center' }}>
               <s.icon size={16} color={s.color} />
               <Text style={{ fontSize: 18, fontWeight: '800', color: colors.navy, fontVariant: ['tabular-nums'], marginTop: 4 }}>{s.count}</Text>
               <Text style={{ fontSize: 10, fontWeight: '500', color: colors.mutedForeground, marginTop: 2 }}>{s.label}</Text>
-            </View>
+            </Card>
           ))}
         </View>
 
         {extended.length > 0 && (
-          <View style={[s2.section, { borderColor: colors.orange + '44', backgroundColor: colors.secondary, marginTop: 16 }]}>
+          <Card style={{ borderColor: colors.orange + '44', backgroundColor: colors.secondary, marginTop: 16, padding: 16 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <AlertTriangle size={16} color={colors.orange} />
               <Text style={{ fontSize: 13, fontWeight: '700', color: colors.orange + 'CC' }}>{extended.length} Extended Auction(s)</Text>
@@ -69,10 +69,10 @@ export function AdminDashboardScreen() {
                 {a.name} — extended due to low bids
               </Text>
             ))}
-          </View>
+          </Card>
         )}
 
-        <View style={s2.section}>
+        <Card style={s2.section}>
           <Text style={s2.sectionTitle}>All Auctions ({auctions.length})</Text>
           {auctions.slice(0, 10).map((a) => {
             const isExtended = a.endTime && new Date(a.endTime).getTime() > Date.now() + 86400000
@@ -98,7 +98,7 @@ export function AdminDashboardScreen() {
               +{auctions.length - 10} more auctions
             </Text>
           )}
-        </View>
+        </Card>
 
         <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
           <View style={{ flex: 1 }}><CTAButton variant="navy" onPress={() => go('admin-auctions')}>Manage Auctions</CTAButton></View>
@@ -114,10 +114,10 @@ export function AdminDashboardScreen() {
 }
 
 const s2 = StyleSheet.create({
-  statCard: { width: '47%', borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 16 },
+  statCard: { width: '47%', borderRadius: 16, borderWidth: 1, borderColor: colors.border, padding: 16 },
   statValue: { fontSize: 24, fontWeight: '800', color: colors.navy, fontVariant: ['tabular-nums'], marginTop: 8 },
   statLabel: { fontSize: 12, fontWeight: '500', color: colors.mutedForeground, marginTop: 4 },
-  section: { marginTop: 24, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 16 },
+  section: { marginTop: 24, borderRadius: 16, borderWidth: 1, borderColor: colors.border, padding: 16 },
   sectionTitle: { fontSize: 14, fontWeight: '700', color: colors.navy, marginBottom: 12 },
   auctionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderRadius: 12, backgroundColor: colors.secondary + '99', paddingHorizontal: 12, paddingVertical: 10, marginBottom: 8 },
   auctionName: { fontSize: 13, fontWeight: '600', color: colors.navy },

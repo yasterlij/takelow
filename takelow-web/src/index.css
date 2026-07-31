@@ -57,6 +57,36 @@ body {
     @apply shadow-[0_8px_32px_rgba(0,43,92,0.08)] -translate-y-0.5 border-primary/20;
   }
 
+  .glass-card-gold {
+    @apply rounded-2xl border border-primary/20 bg-gradient-to-br from-awash-gold/10 via-awash-gold-light/5 to-white/50 backdrop-blur-sm shadow-[0_4px_20px_rgba(200,166,66,0.06)];
+  }
+
+  /* ─── Filter Chips ──────────────────────────────────────────── */
+
+  .btn-filter-chip {
+    @apply rounded-full border px-4 py-2 text-xs font-semibold transition-all duration-300 hover:scale-105 active:scale-[0.97];
+  }
+
+  .btn-filter-chip-glass {
+    @apply border-border/60 bg-white/80 backdrop-blur-sm text-neutral-500 hover:border-awash-blue/40 hover:bg-white hover:shadow-sm;
+  }
+
+  .btn-filter-chip-navy {
+    @apply border-awash-blue bg-awash-blue text-white shadow-md;
+  }
+
+  .btn-filter-chip-gold {
+    @apply border-primary bg-primary text-primary-foreground shadow-md;
+  }
+
+  .btn-filter-chip-active {
+    @apply shadow-md;
+  }
+
+  .btn-icon-glass {
+    @apply flex items-center justify-center rounded-full bg-white/90 backdrop-blur-sm shadow-lg border border-white/30 text-awash-blue hover:bg-white transition-all;
+  }
+
   .glass-nav {
     @apply bg-white/80 backdrop-blur-xl border-b border-white/20 shadow-sm;
   }
@@ -549,4 +579,76 @@ html {
 
 .animate-slide-in-right {
   animation: slide-in-right 0.2s ease-out;
+}
+
+/* ─── New Animations ───────────────────────────── */
+
+@keyframes ken-burns {
+  0% { transform: scale(1) translate(0, 0); }
+  50% { transform: scale(1.08) translate(-1%, -1%); }
+  100% { transform: scale(1) translate(0, 0); }
+}
+
+@keyframes shimmer-slide {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes card-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes scale-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+}
+
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes slide-up-fade {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes reveal-right {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
+
+.animate-ken-burns { animation: ken-burns 20s ease-in-out infinite; }
+.animate-shimmer-slide { background: linear-gradient(90deg, transparent, rgba(200,166,66,0.06), transparent); background-size: 200% 100%; animation: shimmer-slide 2s infinite; }
+.animate-card-float { animation: card-float 4s ease-in-out infinite; }
+.animate-scale-pulse { animation: scale-pulse 2s ease-in-out infinite; }
+.animate-gradient-shift { background-size: 200% 200%; animation: gradient-shift 4s ease infinite; }
+.animate-slide-up-fade { animation: slide-up-fade 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.animate-reveal-right { animation: reveal-right 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+/* ─── Card hover micro-interactions ───────────── */
+
+.card-micro {
+  @apply transition-all duration-300;
+}
+.card-micro:hover {
+  @apply -translate-y-1.5 shadow-[0_12px_40px_rgba(0,43,92,0.08)];
+}
+.card-micro:active {
+  @apply scale-[0.98];
+}
+
+/* ─── Smooth image loading ────────────────────── */
+
+img {
+  transition: filter 0.3s ease;
+}
+img[loading="lazy"] {
+  filter: blur(0px);
+}
+img.loading {
+  filter: blur(10px);
+  transform: scale(1.05);
 }

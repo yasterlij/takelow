@@ -1,9 +1,17 @@
 import { useEffect, useState } from "react"
-import { Trophy, PartyPopper, Loader2, AlertTriangle, Users, Clock, CreditCard, ArrowLeft, MapPin, Info, CheckCircle2 } from "lucide-react"
+import { motion, AnimatePresence } from "framer-motion"
+import { Trophy, Loader2, AlertTriangle, Users, Clock, CreditCard, ArrowLeft, Info, CheckCircle2, PartyPopper, Sparkles } from "lucide-react"
 import { useApp } from "../AppContext"
-import { Card } from "../components/AuctionUI"
 import { api, type ApiWinnerResult, type ApiAuctionResult, type ApiWinnerInfo, type ApiBid } from "../api"
 import { CURRENCY, formatETB } from "../mockDataV0"
+
+const confettiParticles = Array.from({ length: 20 }, (_, i) => ({
+  id: i,
+  left: `${Math.random() * 100}%`,
+  delay: `${Math.random() * 0.5}s`,
+  duration: `${0.8 + Math.random() * 0.8}s`,
+  color: i % 3 === 0 ? "#C8A642" : i % 3 === 1 ? "#002B5C" : "#D4B85E",
+}))
 
 export function WinnerScreen() {
   const { go, selectedId, user, getAuction } = useApp()
@@ -12,7 +20,6 @@ export function WinnerScreen() {
   const [winner, setWinner] = useState<ApiWinnerResult | ApiAuctionResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
   const [refreshKey, setRefreshKey] = useState(0)
   const [bidsPage, setBidsPage] = useState(0)
 
@@ -39,12 +46,10 @@ export function WinnerScreen() {
   const deadline = ((winner as any)?.payment_deadline) ? new Date((winner as any).payment_deadline) : null
   const deadlineHrs = deadline ? Math.max(0, Math.round((deadline.getTime() - Date.now()) / 3600000)) : null
   const allWinners = (winner as any)?.all_winners as ApiWinnerInfo[] | undefined
-  const winnersCount = (winner as any)?.winners_count as number | undefined
+const winnersCount = (winner as any)?.winners_count as number | undefined
   const myBidInfo = (winner as any)?.my_bid as { amount: number; service_fee_paid: boolean } | undefined
-
   const isUserWinner = allWinners?.some((w) => w.user_id === user?.id)
   const userWinnerInfo = allWinners?.find((w) => w.user_id === user?.id)
-
   const allBids = (winner as any)?.bids as ApiBid[] | undefined
   const amountCount = new Map<number, number>()
   allBids?.forEach((b) => amountCount.set(b.amount, (amountCount.get(b.amount) || 0) + 1))
@@ -58,13 +63,37 @@ export function WinnerScreen() {
   const hasMore = pagedBids.length < lowerBidsGrouped.length
 
   return (
-    <div className="flex flex-1 flex-col items-center gap-6 pb-16">
-      {/* ── Back + Header ── */}
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+      className="flex flex-1 flex-col items-center gap-6 pb-16 relative"
+    >
+      {/* ── Confetti when winner found ── */}
+      {winner?.winner_user_id && (
+        <div className="pointer-events-none fixed inset-0 z-50 overflow-hidden">
+          {confettiParticles.map((p) => (
+            <div
+              key={p.id}
+              className="absolute size-2 rounded-sm"
+              style={{
+                left: p.left,
+                top: "-10px",
+                backgroundColor: p.color,
+                animation: `confetti ${p.duration} ${p.delay} ease-out forwards`,
+                transform: `rotate(${Math.random() * 360}deg)`,
+              }}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* ── Header ── */}
       <div className="flex w-full items-center justify-between">
-        <button onClick={() => go("home")} className="flex size-10 items-center justify-center rounded-xl border border-border bg-white text-awash-blue hover:bg-neutral-50 transition-colors">
+        <button onClick={() => go("home")} className="flex size-10 items-center justify-center rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm text-awash-blue hover:bg-white transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5 active:scale-[0.97]">
           <ArrowLeft className="size-5" />
         </button>
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary border border-primary/20">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-br from-primary/15 to-awash-gold/10 backdrop-blur-sm px-3 py-1 text-xs font-bold text-primary border border-primary/20">
           <PartyPopper className="size-3.5" /> Winner Results
         </span>
       </div>
@@ -75,58 +104,77 @@ export function WinnerScreen() {
           <p className="text-sm font-medium text-neutral-500">Calculating winners...</p>
         </div>
       ) : error ? (
-        <div className="flex flex-col items-center gap-2 py-16">
+        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center gap-2 py-16">
           <AlertTriangle className="size-10 text-amber-400" />
           <p className="text-sm font-medium text-neutral-500">{error}</p>
-          <button onClick={() => go("home")} className="text-sm font-semibold text-primary">Back to Dashboard</button>
-        </div>
+          <button onClick={() => go("home")} className="text-sm font-semibold text-primary hover:underline">Back to Dashboard</button>
+        </motion.div>
       ) : winner ? (
-        <div className="flex w-full max-w-2xl flex-col items-center">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex w-full max-w-2xl flex-col items-center gap-6"
+        >
           {/* ── Trophy ── */}
-          <div className="relative">
-            <span className="absolute inset-0 animate-ping rounded-full bg-primary/20" />
-            <span className="relative flex size-28 items-center justify-center rounded-full bg-gradient-to-br from-primary to-awash-gold-light text-primary-foreground shadow-xl shadow-primary/40">
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", stiffness: 200, damping: 15 }}
+            className="relative"
+          >
+            <span className={`absolute inset-0 rounded-full ${winner.winner_user_id ? "bg-primary/20 animate-ping" : ""}`} />
+            <span className={`relative flex size-28 items-center justify-center rounded-full bg-gradient-to-br shadow-xl ${
+              winner.winner_user_id
+                ? "from-primary to-awash-gold-light text-primary-foreground shadow-primary/40"
+                : "from-neutral-300 to-neutral-400 text-white"
+            }`}>
               <Trophy className="size-14" />
             </span>
+          </motion.div>
+
+          <div className="text-center">
+            <h1 className="font-display text-3xl font-extrabold text-foreground">{winner.winner_user_id ? "Winner Found!" : "No Winner"}</h1>
+            <p className="mt-2 text-sm font-medium text-neutral-500">
+              {winner.winner_user_id
+                ? `${allWinners?.length || 1} winner(s) from ${winner.total_bids} bids`
+                : `No unique bids among ${winner.total_bids} bids.`}
+            </p>
+            {winner?.payment_status === "PAID" && (
+              <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700 border border-emerald-200">
+                <CheckCircle2 className="size-3.5" /> All Payments Complete
+              </span>
+            )}
           </div>
-
-          <h1 className="mt-6 font-display text-3xl font-extrabold text-foreground">{winner.winner_user_id ? "Winner Found!" : "No Winner"}</h1>
-          <p className="mt-2 text-sm font-medium text-neutral-500">
-            {winner.winner_user_id
-              ? `${winnersCount || 1} winner(s) from ${winner.total_bids} bids`
-              : `No unique bids among ${winner.total_bids} bids.`}
-          </p>
-
-          {winner?.payment_status === "PAID" && (
-            <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700 border border-emerald-200">
-              <CreditCard className="size-3.5" /> All Payments Complete
-            </span>
-          )}
 
           {/* ── Winner Card ── */}
           {winner?.winner_user_id && (
-            <div className="mt-6 w-full max-w-md">
-              <Card className="p-6 border-primary/10">
-                <div className="mx-auto flex size-28 items-center justify-center rounded-2xl bg-neutral-100 p-3">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="w-full max-w-md"
+            >
+              <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-awash-gold/10 via-awash-gold-light/5 to-white/50 backdrop-blur-sm p-6 shadow-[0_4px_20px_rgba(200,166,66,0.06)]">
+                <div className="mx-auto flex size-28 items-center justify-center rounded-2xl bg-white/80 border border-border/60 p-3 shadow-sm">
                   <img src={auction.images?.[0] || "/placeholder.svg"} alt={auction.name} loading="lazy" decoding="async" className="h-full w-auto object-contain" />
                 </div>
                 <h2 className="mt-4 text-center font-display text-lg font-bold text-foreground">{auction.name}</h2>
-                <div className="mt-4 rounded-xl bg-awash-gold-bg border border-primary/20 p-4 text-center">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-primary">Primary Winning Bid</p>
-                  <p className="font-display text-4xl font-extrabold text-primary tabular-nums">{formatETB(winner.winning_bid_amount ?? 0)} {CURRENCY}</p>
+                <div className="mt-4 rounded-xl bg-gradient-to-br from-awash-gold/15 to-awash-gold-light/10 border border-primary/20 p-4 text-center">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-awash-gold-dark">Primary Winning Bid</p>
+                  <p className="font-display text-4xl font-extrabold text-gradient-gold tabular-nums">{formatETB(winner.winning_bid_amount ?? 0)} {CURRENCY}</p>
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                  <div><span className="text-neutral-400">Total Bids</span><p className="font-semibold text-foreground">{winner.total_bids}</p></div>
-                  <div><span className="text-neutral-400">Unique Bidders</span><p className="font-semibold text-foreground">{winner.unique_bidders}</p></div>
-                  <div><span className="text-neutral-400">Primary Winner</span><p className="font-bold text-foreground">{winnerName || "Unknown"}</p></div>
+                  <div className="rounded-lg bg-white/60 p-2.5"><span className="text-xs text-neutral-400">Total Bids</span><p className="font-semibold text-foreground">{winner.total_bids}</p></div>
+                  <div className="rounded-lg bg-white/60 p-2.5"><span className="text-xs text-neutral-400">Unique Bidders</span><p className="font-semibold text-foreground">{winner.unique_bidders}</p></div>
+                  <div className="rounded-lg bg-white/60 p-2.5"><span className="text-xs text-neutral-400">Primary Winner</span><p className="font-bold text-foreground">{winnerName || "Unknown"}</p></div>
                   {winner.lowest_unique_bid != null && (
-                    <div><span className="text-neutral-400">Lowest Unique Bid</span><p className="font-bold text-emerald-600">{CURRENCY} {formatETB(winner.lowest_unique_bid)}</p></div>
+                    <div className="rounded-lg bg-white/60 p-2.5"><span className="text-xs text-neutral-400">Lowest Unique Bid</span><p className="font-bold text-emerald-600">{CURRENCY} {formatETB(winner.lowest_unique_bid)}</p></div>
                   )}
                   {deadlineHrs != null && (
-                    <div><span className="flex items-center gap-1 text-neutral-400"><Clock className="size-3" /> Deadline</span><p className={`font-bold ${deadlineHrs < 6 ? "text-red-500" : "text-foreground"}`}>{deadlineHrs > 0 ? `${deadlineHrs}h` : "Expired"}</p></div>
+                    <div className="rounded-lg bg-white/60 p-2.5 col-span-2"><span className="flex items-center gap-1 text-xs text-neutral-400"><Clock className="size-3" /> Payment Deadline</span><p className={`font-bold ${deadlineHrs < 6 ? "text-red-500" : "text-foreground"}`}>{deadlineHrs > 0 ? `${deadlineHrs}h remaining` : "Expired"}</p></div>
                   )}
                 </div>
-                <div className="my-3 border-t border-border" />
+                <div className="my-3 border-t border-primary/10" />
                 <div className="flex justify-between text-sm">
                   <span className="text-neutral-400">Market Price</span>
                   <span className="font-semibold text-neutral-400 line-through">{CURRENCY} {formatETB(auction.marketPrice)}</span>
@@ -135,12 +183,17 @@ export function WinnerScreen() {
                   <span className="text-neutral-400">Amount Saved</span>
                   <span className="font-bold text-emerald-600">{CURRENCY} {formatETB(savings)} ({savingsPct}%)</span>
                 </div>
-              </Card>
-            </div>
+              </div>
+            </motion.div>
           )}
 
           {/* ── How Winners Are Selected ── */}
-          <Card className="mt-4 w-full max-w-md p-4 border-primary/10 bg-awash-gold-bg/50">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="w-full max-w-md rounded-2xl border border-primary/20 bg-gradient-to-br from-awash-gold/10 to-awash-gold-light/5 backdrop-blur-sm p-4"
+          >
             <div className="flex items-start gap-2">
               <Info className="size-4 text-primary mt-0.5 flex-shrink-0" />
               <div>
@@ -152,11 +205,16 @@ export function WinnerScreen() {
                 </p>
               </div>
             </div>
-          </Card>
+          </motion.div>
 
           {/* ── All Winners List ── */}
           {allWinners && allWinners.length > 0 && (
-            <Card className="mt-4 w-full max-w-md p-4 border-primary/10">
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.35 }}
+              className="w-full max-w-md rounded-2xl border border-primary/20 bg-white/80 backdrop-blur-sm p-4"
+            >
               <div className="flex items-center gap-1.5 mb-3">
                 <Users className="size-4 text-primary" />
                 <h3 className="text-sm font-bold text-foreground">Winner List ({allWinners.length})</h3>
@@ -169,15 +227,13 @@ export function WinnerScreen() {
                   const isExpired = w.payment_status === "EXPIRED"
                   const isCurrentUser = w.user_id === user?.id
                   return (
-                    <div key={w.user_id} className={`flex items-center justify-between rounded-xl p-3 transition-colors ${
-                      isCurrentUser ? "bg-primary/5 border border-primary/20" : "bg-neutral-50 border border-transparent"
+                    <div key={w.user_id} className={`flex items-center justify-between rounded-xl p-3 transition-all ${
+                      isCurrentUser ? "bg-primary/5 border border-primary/20 shadow-sm" : "bg-neutral-50/80 border border-transparent"
                     }`}>
                       <div className="flex items-center gap-3">
                         <span className={`flex size-8 items-center justify-center rounded-full text-xs font-bold ${
-                          i === 0 ? "bg-awash-gold-bg text-primary" : "bg-neutral-200 text-neutral-600"
-                        }`}>
-                          #{i + 1}
-                        </span>
+                          i === 0 ? "bg-gradient-to-br from-awash-gold/20 to-awash-gold-light/10 text-primary border border-primary/20" : "bg-neutral-200/80 text-neutral-600"
+                        }`}>#{i + 1}</span>
                         <div>
                           <p className={`text-sm font-semibold ${isCurrentUser ? "text-primary" : "text-foreground"}`}>
                             {(() => {
@@ -188,13 +244,11 @@ export function WinnerScreen() {
                             {isCurrentUser && <span className="ml-1.5 text-[10px] font-bold text-primary">(You)</span>}
                           </p>
                           <div className="flex items-center gap-2 text-xs text-neutral-400">
-                            <span className="text-emerald-600 font-medium">Unique: {CURRENCY}{formatETB(w.amount)}</span>
+                            <span className="font-medium text-emerald-600">{CURRENCY}{formatETB(w.amount)}</span>
                             {isPaid && <span className="text-emerald-600 font-medium">• Paid</span>}
                             {isExpired && <span className="text-red-500 font-medium">• Expired</span>}
                             {!isPaid && !isExpired && wDeadlineHrs != null && (
-                              <span className={wDeadlineHrs < 6 ? "text-red-500" : ""}>
-                                • {wDeadlineHrs > 0 ? `${wDeadlineHrs}h left` : "Overdue"}
-                              </span>
+                              <span className={wDeadlineHrs < 6 ? "text-red-500" : ""}>• {wDeadlineHrs > 0 ? `${wDeadlineHrs}h left` : "Overdue"}</span>
                             )}
                           </div>
                         </div>
@@ -204,12 +258,12 @@ export function WinnerScreen() {
                   )
                 })}
               </div>
-            </Card>
+            </motion.div>
           )}
 
           {/* ── My Bid Info ── */}
           {myBidInfo && (
-            <Card className="mt-4 w-full max-w-md p-4 border-primary/10">
+            <div className="w-full max-w-md rounded-2xl border border-primary/20 bg-white/80 backdrop-blur-sm p-4">
               <h3 className="mb-2 text-sm font-bold text-foreground">Your Bid</h3>
               <div className="flex justify-between text-sm">
                 <span className="text-neutral-400">Amount</span>
@@ -219,51 +273,49 @@ export function WinnerScreen() {
                 <span className="text-neutral-400">Fee Paid</span>
                 <span className={`font-bold ${myBidInfo.service_fee_paid ? "text-emerald-600" : "text-red-500"}`}>{myBidInfo.service_fee_paid ? "Yes" : "No"}</span>
               </div>
-            </Card>
+            </div>
           )}
 
-          {/* ── Collection Info ── */}
+          {/* ── Next Steps ── */}
           {userWinnerInfo && userWinnerInfo.payment_status !== "PAID" && (
-            <Card className="mt-4 w-full max-w-md p-4 border-primary/10 bg-blue-50/50">
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+              className="w-full max-w-md rounded-2xl border border-blue-200/60 bg-gradient-to-br from-blue-50 to-blue-100/30 p-4"
+            >
               <div className="flex items-start gap-2">
                 <Info className="size-4 text-primary mt-0.5 flex-shrink-0" />
                 <div>
                   <h3 className="text-sm font-bold text-foreground">Next Steps</h3>
                   <ul className="mt-1 space-y-1 text-xs text-neutral-600">
-                    <li className="flex items-start gap-1.5">
-                      <span className="text-primary mt-0.5">1.</span>
-                      Complete payment before the deadline
-                    </li>
-                    <li className="flex items-start gap-1.5">
-                      <span className="text-primary mt-0.5">2.</span>
-                      Collect your item at the designated collection point
-                    </li>
-                    <li className="flex items-start gap-1.5">
-                      <span className="text-primary mt-0.5">3.</span>
-                      Present payment confirmation for collection
-                    </li>
+                    <li className="flex items-start gap-1.5"><span className="text-primary mt-0.5 font-bold">1.</span> Complete payment before the deadline</li>
+                    <li className="flex items-start gap-1.5"><span className="text-primary mt-0.5 font-bold">2.</span> Collect your item at the designated collection point</li>
+                    <li className="flex items-start gap-1.5"><span className="text-primary mt-0.5 font-bold">3.</span> Present payment confirmation for collection</li>
                   </ul>
                 </div>
               </div>
-            </Card>
+            </motion.div>
           )}
 
+          {/* ── Bids Table ── */}
           {allBids && allBids.length > 0 && (
-            <Card className="mt-4 w-full max-w-md p-4 border-primary/10">
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.45 }}
+              className="w-full max-w-md rounded-2xl border border-border/60 bg-white/80 backdrop-blur-sm p-4"
+            >
               <div className="mb-3 flex items-center justify-between">
-                <h3 className="text-sm font-bold text-foreground">Bids ({allBids.length})</h3>
+                <h3 className="text-sm font-bold text-foreground">All Bids ({allBids.length})</h3>
               </div>
-              {/* ── Winning bid always on top ── */}
               {winningAmount != null && (() => {
                 const winnerBid = allBids.find((b) => b.amount === winningAmount)
                 if (!winnerBid) return null
-                const count = amountCount.get(winningAmount) || 1
                 return (
                   <div className="flex items-center justify-between rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2.5 mb-3">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-xs font-semibold text-emerald-800 truncate">
-                        {winnerBid.user_name || winnerBid.user_id.slice(0, 8)}
-                      </span>
+                      <span className="text-xs font-semibold text-emerald-800 truncate">{winnerBid.user_name || winnerBid.user_id.slice(0, 8)}</span>
                       {winnerBid.user_id === user?.id && <span className="text-[10px] font-bold text-primary shrink-0">You</span>}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
@@ -273,7 +325,6 @@ export function WinnerScreen() {
                   </div>
                 )
               })()}
-              {/* ── Bids below the winning amount ── */}
               {lowerBidsGrouped.length > 0 && (
                 <>
                   <div className="flex items-center gap-2 mb-2">
@@ -283,14 +334,10 @@ export function WinnerScreen() {
                   </div>
                   <div className="space-y-1">
                     {pagedBids.map(({ amount, count }) => (
-                      <div key={amount} className="flex items-center justify-between rounded-lg bg-neutral-50 border border-transparent px-3 py-2">
-                        <span className="text-xs text-neutral-500">
-                          {count} bidder{count > 1 ? 's' : ''}
-                        </span>
+                      <div key={amount} className="flex items-center justify-between rounded-lg bg-neutral-50/80 border border-transparent px-3 py-2">
+                        <span className="text-xs text-neutral-500">{count} bidder{count > 1 ? 's' : ''}</span>
                         <div className="flex items-center gap-2">
-                          {count > 1 && (
-                            <span className="text-[10px] font-medium text-neutral-400">×{count}</span>
-                          )}
+                          {count > 1 && <span className="text-[10px] font-medium text-neutral-400">×{count}</span>}
                           <span className="text-xs font-bold text-foreground tabular-nums">{CURRENCY} {formatETB(amount)}</span>
                         </div>
                       </div>
@@ -299,43 +346,44 @@ export function WinnerScreen() {
                   {hasMore && (
                     <button
                       onClick={() => setBidsPage((p) => p + 1)}
-                      className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-border bg-white py-2 text-xs font-semibold text-neutral-500 hover:bg-neutral-50 transition-colors"
+                      className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-border/60 bg-white/80 py-2 text-xs font-semibold text-neutral-500 hover:bg-white hover:shadow-sm transition-all"
                     >
                       Show {Math.min(BIDS_PAGE_SIZE, lowerBidsGrouped.length - pagedBids.length)} more
                     </button>
                   )}
                 </>
               )}
-            </Card>
+            </motion.div>
           )}
 
-          {/* ── Action ── */}
-          <div className="mt-6 w-full max-w-md space-y-2">
+          {/* ── Actions ── */}
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+            className="w-full max-w-md space-y-2"
+          >
             {winner.winner_user_id && isUserWinner ? (
               winner.payment_status === "PAID" ? (
-                <button onClick={() => go("home")}
-                  className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 text-sm font-bold tracking-wide text-white shadow-sm shadow-emerald-600/30 transition-all hover:bg-emerald-700 active:scale-[0.98]">
+                <button onClick={() => go("home")} className="btn-primary">
                   <CheckCircle2 className="size-[18px]" /> Payment Complete — Back Home
                 </button>
               ) : (
-                <button onClick={() => go("pay-winning")}
-                  className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold tracking-wide text-primary-foreground shadow-sm shadow-primary/30 transition-all hover:bg-primary/90 active:scale-[0.98]">
+                <button onClick={() => go("pay-winning")} className="btn-primary animate-shine">
                   <CreditCard className="size-[18px]" /> Process Payment
                 </button>
               )
             ) : (
-              <button onClick={() => go("home")}
-                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-border bg-card px-5 text-sm font-bold tracking-wide text-foreground transition-all hover:bg-neutral-50 active:scale-[0.98]">
+              <button onClick={() => go("home")} className="btn-outline">
                 Back to Home
               </button>
             )}
-            <button onClick={() => setRefreshKey((k) => k + 1)}
-              className="flex w-full items-center justify-center gap-1 text-xs font-medium text-neutral-400 hover:text-awash-gold transition-colors">
+            <button onClick={() => setRefreshKey((k) => k + 1)} className="flex w-full items-center justify-center gap-1 text-xs font-medium text-neutral-400 hover:text-awash-gold transition-colors">
               <Loader2 className="size-3" /> Refresh results
             </button>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       ) : null}
-    </div>
+    </motion.div>
   )
 }

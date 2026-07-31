@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react"
+import { motion } from "framer-motion"
 import { Receipt, Download, RefreshCw, ArrowDownCircle, ArrowUpCircle, Wallet } from "lucide-react"
 import { AdminLayout } from "../components/AdminLayout"
 import { DataTable } from "../components/DataTable"
@@ -98,40 +99,68 @@ export function AdminTransactionsScreen() {
 
   return (
     <AdminLayout title="Transactions" subtitle="Wallet deposits, fees, and refunds">
-      <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <div className="rounded-2xl border border-emerald-200/60 bg-emerald-50/50 p-4">
+      <motion.div
+        initial="hidden"
+        animate="visible"
+        variants={{
+          visible: { transition: { staggerChildren: 0.06 } },
+        }}
+        className="space-y-4"
+      >
+        <motion.div
+          variants={{
+            hidden: { opacity: 0 },
+            visible: { opacity: 1, transition: { staggerChildren: 0.06 } },
+          }}
+          className="grid grid-cols-2 gap-3 sm:grid-cols-3"
+        >
+          <motion.div
+            variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }}
+            className="rounded-2xl border border-emerald-200/60 bg-emerald-50/50 backdrop-blur-sm p-4 transition-all hover:shadow-lg"
+          >
             <ArrowDownCircle className="size-5 text-emerald-600" />
             <p className="mt-2 font-display text-xl font-extrabold tabular-nums text-emerald-700">{CURRENCY} {formatETB(totalIn)}</p>
             <p className="text-xs font-medium text-emerald-600/70">Total Deposits</p>
-          </div>
-          <div className="rounded-2xl border border-amber-200/60 bg-amber-50/50 p-4">
+          </motion.div>
+          <motion.div
+            variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }}
+            className="rounded-2xl border border-amber-200/60 bg-amber-50/50 backdrop-blur-sm p-4 transition-all hover:shadow-lg"
+          >
             <ArrowUpCircle className="size-5 text-amber-600" />
             <p className="mt-2 font-display text-xl font-extrabold tabular-nums text-amber-700">{CURRENCY} {formatETB(totalOut)}</p>
             <p className="text-xs font-medium text-amber-600/70">Bid Fees Collected</p>
-          </div>
-          <div className="rounded-2xl border border-border/60 bg-white p-4 col-span-2 sm:col-span-1">
+          </motion.div>
+          <motion.div
+            variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }}
+            className="rounded-2xl border border-border/60 bg-white/80 backdrop-blur-sm p-4 col-span-2 sm:col-span-1 transition-all hover:shadow-lg"
+          >
             <Wallet className="size-5 text-awash-blue" />
             <p className="mt-2 font-display text-xl font-extrabold tabular-nums text-awash-blue">{txns.length}</p>
             <p className="text-xs font-medium text-neutral-400">Total Transactions</p>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
+        <motion.div
+          variants={{ hidden: { opacity: 0, y: -8 }, visible: { opacity: 1, y: 0 } }}
+          className="flex flex-wrap items-center gap-2.5"
+        >
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
-            className="h-10 rounded-xl border border-border/60 bg-white px-3 text-sm font-medium outline-none focus:border-primary/50"
+            className="h-10 rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm px-3 text-sm font-medium outline-none transition-all focus:border-primary/50 focus:bg-white"
           >
             <option value="all">All types</option>
             {types.map((t) => <option key={t} value={t}>{t.replace(/_/g, " ")}</option>)}
           </select>
-          <button onClick={load} className="flex h-10 items-center gap-1.5 rounded-xl border border-border/60 bg-white px-4 text-sm font-bold text-neutral-600 transition-all hover:bg-neutral-50">
+          <button onClick={load} className="flex h-10 items-center gap-1.5 rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm px-4 text-sm font-bold text-neutral-600 transition-all hover:bg-neutral-50 active:scale-95">
             <RefreshCw className="size-3.5" /> Refresh
           </button>
-        </div>
+        </motion.div>
 
-        <div className="rounded-2xl border border-border/60 bg-white shadow-[0_4px_20px_rgba(0,43,92,0.04)]">
+        <motion.div
+          variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}
+          className="glass-card-solid"
+        >
           <DataTable
             columns={columns}
             rows={filtered}
@@ -139,8 +168,8 @@ export function AdminTransactionsScreen() {
             loading={loading}
             empty={{ icon: <Receipt className="size-6" />, title: "No transactions", message: "Wallet activity will appear here" }}
           />
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
     </AdminLayout>
   )
 }

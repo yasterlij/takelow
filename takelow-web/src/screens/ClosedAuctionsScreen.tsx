@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react"
+import { motion } from "framer-motion"
 import { Trophy, ArrowLeft, Users, Clock, CreditCard, Gavel, Sparkles, Loader2 } from "lucide-react"
 import { useApp } from "../AppContext"
-import { Card } from "../components/AuctionUI"
+import { Card, Badge } from "../components/AuctionUI"
 import { CURRENCY, formatETB } from "../mockDataV0"
 
 export function ClosedAuctionsScreen() {
@@ -20,11 +21,21 @@ export function ClosedAuctionsScreen() {
   }, [closedAuctions, filter])
 
   return (
-    <div className="flex flex-1 flex-col gap-6 pb-8">
+    <motion.div
+      initial="hidden"
+      animate="visible"
+      variants={{
+        visible: { transition: { staggerChildren: 0.05 } },
+      }}
+      className="flex flex-1 flex-col gap-6 pb-8"
+    >
       {/* ── Header ── */}
-      <div className="flex items-center justify-between">
+      <motion.div
+        variants={{ hidden: { opacity: 0, y: -8 }, visible: { opacity: 1, y: 0 } }}
+        className="flex items-center justify-between"
+      >
         <div className="flex items-center gap-3">
-          <button onClick={() => go("home")} className="flex size-10 items-center justify-center rounded-xl border border-border bg-white text-awash-blue hover:bg-neutral-50 transition-colors">
+          <button onClick={() => go("home")} className="flex size-10 items-center justify-center rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm text-awash-blue shadow-sm transition-all hover:bg-white">
             <ArrowLeft className="size-5" />
           </button>
           <div>
@@ -32,53 +43,73 @@ export function ClosedAuctionsScreen() {
             <p className="text-sm font-medium text-neutral-500">{closedAuctions.length} auctions closed</p>
           </div>
         </div>
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary border border-primary/20">
+        <Badge tone="gold">
           <Trophy className="size-3.5" /> Winners
-        </span>
-      </div>
+        </Badge>
+      </motion.div>
 
       {/* ── Filter Tabs ── */}
-      <div className="flex gap-2">
+      <motion.div
+        variants={{ hidden: { opacity: 0, y: -8 }, visible: { opacity: 1, y: 0 } }}
+        className="flex gap-2"
+      >
         {(["all", "won", "paid"] as const).map((f) => (
           <button
             key={f}
             onClick={() => setFilter(f)}
-            className={`rounded-full border px-4 py-2 text-xs font-semibold transition-all ${
+            className={`rounded-full border px-4 py-2 text-xs font-semibold transition-all active:scale-95 ${
               filter === f
-                ? "border-awash-blue bg-awash-blue text-white"
-                : "border-border bg-white text-neutral-500 hover:border-awash-blue/40"
+                ? "border-awash-blue bg-awash-blue text-white shadow-md"
+                : "border-border/60 bg-white/80 backdrop-blur-sm text-neutral-500 transition-all hover:border-awash-blue/40 hover:bg-white"
             }`}
           >
             {f === "all" ? "All" : f === "won" ? "With Winners" : "Paid"}
           </button>
         ))}
-      </div>
+      </motion.div>
 
       {/* ── Loading ── */}
       {auctionsLoading && closedAuctions.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 py-16">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex flex-col items-center gap-3 py-16"
+        >
           <Loader2 className="size-8 animate-spin text-primary" />
           <p className="text-sm font-medium text-neutral-500">Loading closed auctions...</p>
-        </div>
+        </motion.div>
       ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 py-16">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex flex-col items-center gap-2 py-16"
+        >
           <Trophy className="size-10 text-neutral-300" />
           <p className="text-sm font-medium text-neutral-400">No closed auctions yet</p>
-          <button onClick={() => go("home")} className="text-sm font-semibold text-primary">Back to Home</button>
-        </div>
+          <button onClick={() => go("home")} className="text-sm font-semibold text-primary transition-colors hover:text-awash-gold-dark">Back to Home</button>
+        </motion.div>
       ) : (
-        <div className="flex flex-col gap-4">
+        <motion.div
+          variants={{
+            hidden: { opacity: 0 },
+            visible: { opacity: 1, transition: { staggerChildren: 0.06 } },
+          }}
+          className="flex flex-col gap-4"
+        >
           {filtered.map((auction) => {
             const winners = auction.winners || []
             const paidCount = winners.filter((w) => w.payment_status === "PAID").length
             const totalWinners = winners.length
 
             return (
-              <button
+              <motion.div
                 key={auction.id}
-                onClick={() => selectAuction(auction.id)}
-                className="group w-full rounded-2xl border border-border/60 bg-white p-4 text-left shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-md active:scale-[0.99]"
+                variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }}
               >
+                <button
+                  onClick={() => selectAuction(auction.id)}
+                  className="group w-full rounded-2xl border border-border/60 bg-white/80 backdrop-blur-sm p-4 text-left shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-md active:scale-[0.99]"
+                >
                 <div className="flex items-start gap-4">
                   {/* ── Thumbnail ── */}
                   <div className="flex size-20 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl bg-neutral-100">
@@ -152,10 +183,11 @@ export function ClosedAuctionsScreen() {
                   </div>
                 </div>
               </button>
+              </motion.div>
             )
           })}
-        </div>
+        </motion.div>
       )}
-    </div>
+    </motion.div>
   )
 }

@@ -361,7 +361,7 @@ export function WinnerScreen() {
           ) : null}
         </View>
       </View>
-      <View style={s.bottomCta}>
+      <Card style={s.bottomCta}>
         {winner?.winner_user_id && allWinners?.some((w: any) => w.user_id === user?.id) ? (
           <CTAButton onPress={() => go('pay-winning')}>
             <CreditCard size={18} /> {winner.payment_status === 'PAID' ? 'View Receipt' : 'Process Payment'}
@@ -369,7 +369,7 @@ export function WinnerScreen() {
         ) : (
           <CTAButton variant="outline" onPress={() => go('home')}>Back to Dashboard</CTAButton>
         )}
-      </View>
+      </Card>
     </View>
   )
 }
@@ -398,5 +398,5 @@ const s = StyleSheet.create({
   winLabel: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1, color: colors.mutedForeground },
   winAmount: { fontSize: 28, fontWeight: '800', color: colors.primary, fontVariant: ['tabular-nums'] },
   divider: { height: 1, backgroundColor: colors.border, marginVertical: 12 },
-  bottomCta: { borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.card + 'F2', padding: 16 },
+  bottomCta: { borderTopWidth: 1, borderTopColor: colors.border, padding: 16 },
 })

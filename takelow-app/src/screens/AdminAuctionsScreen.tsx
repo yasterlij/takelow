@@ -457,7 +457,7 @@ const [category, setCategory] = useState('Computer')
             const avgBid = bidAmounts.length > 0 ? Math.round(bidAmounts.reduce((s, v) => s + v, 0) / bidAmounts.length) : 0
             return (
               <View key={a.id}>
-                <View style={s.row}>
+                <Card style={s.row}>
                   <AuctionThumb src={a.images?.[0]} />
                   <View style={{ flex: 1 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -489,7 +489,7 @@ const [category, setCategory] = useState('Computer')
                     <TouchableOpacity onPress={() => handleClose(a.id)} style={s.closeBtn}><XCircle size={12} color={colors.destructive} /></TouchableOpacity>
                   )}
                   <TouchableOpacity onPress={() => handleDelete(a.id)} style={[s.iconBtn, { borderColor: colors.destructive + '4D' }]}><Trash2 size={12} color={colors.destructive} /></TouchableOpacity>
-                </View>
+                </Card>
                 {viewBidsId === a.id && (
                   <View style={s.bidsBox}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -583,7 +583,7 @@ const s = StyleSheet.create({
   searchWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.secondary, paddingHorizontal: 10 },
   searchInput: { flex: 1, fontSize: 13, fontWeight: '500', color: colors.foreground, paddingVertical: 8 },
   filterChip: { borderRadius: 16, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 5, marginRight: 0 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, marginBottom: 12 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, borderWidth: 1, borderColor: colors.border, padding: 12, marginBottom: 12 },
   thumbWrap: { width: 56, height: 56, borderRadius: 12, backgroundColor: colors.secondary, justifyContent: 'center', alignItems: 'center' },
   name: { fontSize: 14, fontWeight: '700', color: colors.navy },
   meta: { fontSize: 11, fontWeight: '500', color: colors.mutedForeground, marginTop: 2 },

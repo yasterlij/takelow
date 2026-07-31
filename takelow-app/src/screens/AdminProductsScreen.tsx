@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert,
 import { Package, Plus, Search, Edit3, Trash2, ImageIcon, X, ArrowLeft } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { api } from '../api'
-import { CTAButton } from '../components/AuctionUI'
+import { CTAButton, Card } from '../components/AuctionUI'
 import { colors } from '../theme'
 
 export function AdminProductsScreen() {
@@ -94,11 +94,11 @@ export function AdminProductsScreen() {
         </ScrollView>
       ) : (
         <>
-          <View style={s.searchRow}>
+          <Card style={s.searchRow}>
             <Search size={16} color={colors.mutedForeground} />
             <TextInput value={search} onChangeText={setSearch} placeholder="Search products..." style={s.searchInput} placeholderTextColor={colors.mutedForeground} />
             {search ? <TouchableOpacity onPress={() => setSearch('')}><X size={16} color={colors.mutedForeground} /></TouchableOpacity> : null}
-          </View>
+          </Card>
           {loading ? (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}><ActivityIndicator size="large" color={colors.primary} /></View>
           ) : (
@@ -106,7 +106,7 @@ export function AdminProductsScreen() {
               {filtered.length === 0 ? (
                 <Text style={{ textAlign: 'center', color: colors.mutedForeground, marginTop: 40 }}>No products found</Text>
               ) : filtered.map((p: any) => (
-                <View key={p.id} style={s.productRow}>
+                <Card key={p.id} style={s.productRow}>
                   <View style={s.productIcon}>
                     {p.image_urls?.[0] ? <ImageIcon size={20} color={colors.primary} /> : <Package size={20} color={colors.mutedForeground} />}
                   </View>
@@ -116,7 +116,7 @@ export function AdminProductsScreen() {
                   </View>
                   <TouchableOpacity onPress={() => openEdit(p)} style={s.actionBtn}><Edit3 size={16} color={colors.navy} /></TouchableOpacity>
                   <TouchableOpacity onPress={() => remove(p.id, p.name)} style={s.actionBtn}><Trash2 size={16} color={colors.destructive} /></TouchableOpacity>
-                </View>
+                </Card>
               ))}
             </ScrollView>
           )}
@@ -131,11 +131,11 @@ const s = StyleSheet.create({
   backBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: colors.navyForeground + '1A', justifyContent: 'center', alignItems: 'center' },
   headerTitle: { fontSize: 18, fontWeight: '800', color: colors.navyForeground },
   addBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' },
-  searchRow: { flexDirection: 'row', alignItems: 'center', margin: 16, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, paddingHorizontal: 12, height: 40 },
+  searchRow: { flexDirection: 'row', alignItems: 'center', margin: 16, borderRadius: 12, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, height: 40 },
   searchInput: { flex: 1, fontSize: 13, fontWeight: '500', color: colors.navy, marginLeft: 8 },
   formTitle: { fontSize: 16, fontWeight: '700', color: colors.navy, marginBottom: 16 },
   input: { borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, fontSize: 13, fontWeight: '500', color: colors.navy, marginBottom: 12 },
-  productRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, backgroundColor: colors.card, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: colors.border },
+  productRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: colors.border },
   productIcon: { width: 40, height: 40, borderRadius: 10, backgroundColor: colors.secondary, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
   productName: { fontSize: 13, fontWeight: '700', color: colors.navy },
   productMeta: { fontSize: 10, fontWeight: '500', color: colors.mutedForeground, marginTop: 2 },
