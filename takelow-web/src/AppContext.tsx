@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, useRef } from "react"
 import type { ReactNode } from "react"
-import { api, setApiToken, setRefreshToken, getApiToken, getRefreshToken, getUserFriendlyMessage, openSikinaPopup } from "./api"
+import { api, setApiToken, setRefreshToken, getApiToken, getRefreshToken, getUserFriendlyMessage } from "./api"
 import { toast } from "./store/toast.store"
 import { useAuctionSocket, applySocketUpdate } from "./hooks/useAuctionSocket"
 import type { Auction } from "./mockDataV0"
@@ -45,6 +45,8 @@ type AppState = {
   setPaymentContext: (ctx: 'bid-fee' | 'winning' | null) => void
   sikinaPayUrl: string | null
   setSikinaPayUrl: (url: string | null) => void
+  sikinaProxyUrl: string | null
+  setSikinaProxyUrl: (url: string | null) => void
   myBids: PlacedBid[]
   user: User | null
   allBids: PlacedBid[]
@@ -133,6 +135,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [paymentContext, setPaymentContextState] = useState<'bid-fee' | 'winning' | null>(null)
   const setPaymentContext = useCallback((ctx: 'bid-fee' | 'winning' | null) => setPaymentContextState(ctx), [])
   const [sikinaPayUrl, setSikinaPayUrl] = useState<string | null>(null)
+  const [sikinaProxyUrl, setSikinaProxyUrl] = useState<string | null>(null)
   const [myBids, setMyBids] = useState<PlacedBid[]>([])
   const [allBids, setAllBids] = useState<PlacedBid[]>([])
   const [auctions, setAuctions] = useState<Auction[]>([])
@@ -207,6 +210,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setBidTicketNumber(null)
     setPaymentContext(null)
     setSikinaPayUrl(null)
+    setSikinaProxyUrl(null)
     const auction = auctions.find((a) => a.id === id)
     if (auction?.status === 'closed') {
       setView('winner')
@@ -235,9 +239,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return
       }
       setPaymentContext('bid-fee')
-      const { payment_url } = await api.createBidFeePaymentLink(selectedId, paymentMethod)
+      const { payment_url, proxy_url } = await api.createBidFeePaymentLink(selectedId, paymentMethod)
       setSikinaPayUrl(payment_url)
-      openSikinaPopup(payment_url)
+      setSikinaProxyUrl(proxy_url || null)
       setView('sikina-pay-checkout')
     } catch (e) {
       const msg = getUserFriendlyMessage(e)
@@ -291,9 +295,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       setPaymentContext('winning')
       setLastPaymentMethod(pm)
-      const { payment_url } = await api.createPaymentLink(selectedId, pm, customerPhone)
+      const { payment_url, proxy_url } = await api.createPaymentLink(selectedId, pm, customerPhone)
       setSikinaPayUrl(payment_url)
-      openSikinaPopup(payment_url)
+      setSikinaProxyUrl(proxy_url || null)
       setView('sikina-pay-checkout')
     } catch (e) {
       const msg = getUserFriendlyMessage(e)
@@ -538,13 +542,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [auctions])
 
   const value = useMemo(() => ({
-    view, selectedId, userBid, bidTicketNumber, feePaid, walletBalance, paymentMethod, lastPaymentMethod, paymentContext, setPaymentContext, sikinaPayUrl, setSikinaPayUrl, myBids, user, allBids,
+    view, selectedId, userBid, bidTicketNumber, feePaid, walletBalance, paymentMethod, lastPaymentMethod, paymentContext, setPaymentContext, sikinaPayUrl, setSikinaPayUrl, sikinaProxyUrl, setSikinaProxyUrl, myBids, user, allBids,
     auctions, auctionsLoading, authError,
     go, selectAuction, selectAuctionForMonitor, setSelectedIdOnly, setFeePaid, payFee, submitBid, payWinning, setPaymentMethod, checkPaymentStatus, reset,
     login, register, logout, addAuction, updateAuction, deleteAuction, closeAuction, forceCloseAuction,
     refreshAuctions, refreshWallet, fetchAuctionById, getAuction,
   }), [
-    view, selectedId, userBid, bidTicketNumber, feePaid, walletBalance, paymentMethod, lastPaymentMethod, paymentContext, setPaymentContext, sikinaPayUrl, setSikinaPayUrl, myBids, user, allBids,
+    view, selectedId, userBid, bidTicketNumber, feePaid, walletBalance, paymentMethod, lastPaymentMethod, paymentContext, setPaymentContext, sikinaPayUrl, setSikinaPayUrl, sikinaProxyUrl, setSikinaProxyUrl, myBids, user, allBids,
     auctions, auctionsLoading, authError,
     go, selectAuction, selectAuctionForMonitor, setSelectedIdOnly, setFeePaid, payFee, submitBid, payWinning, setPaymentMethod, checkPaymentStatus, reset,
     login, register, logout, addAuction, updateAuction, deleteAuction, closeAuction, forceCloseAuction,

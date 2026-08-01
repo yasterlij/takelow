@@ -1,25 +1,33 @@
 import { useEffect, useRef, useState, useCallback } from "react"
+import { createPortal } from "react-dom"
 import { motion } from "framer-motion"
-import { X, Check, ArrowLeft, ExternalLink, RefreshCw } from "lucide-react"
+import { X, Check, ArrowLeft, ExternalLink, RefreshCw, ShieldCheck } from "lucide-react"
 import { useApp } from "../AppContext"
-import { api, openSikinaPopup, closeSikinaPopup } from "../api"
+import { api, openSikinaPopup, closeSikinaPopup, isSikinaPopupOpen } from "../api"
 import { CURRENCY, formatETB } from "../mockDataV0"
 
+const POLL_INTERVAL = 2500
+const TIMEOUT_MS = 120_000
+
 export function SikinaPayCheckoutScreen() {
-  const { go, selectedId, sikinaPayUrl, setSikinaPayUrl, paymentContext, setFeePaid, userBid } = useApp()
-  const [status, setStatus] = useState<"loading" | "paid" | "failed">("loading")
+  const { go, selectedId, sikinaPayUrl, setSikinaPayUrl, setSikinaProxyUrl, paymentContext, setFeePaid, userBid } = useApp()
+  const [status, setStatus] = useState<"waiting" | "paid" | "failed">("waiting")
   const [popupBlocked, setPopupBlocked] = useState(false)
+  const [popupClosed, setPopupClosed] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const watchRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const cleanup = () => {
+  const clearAll = useCallback(() => {
     if (pollRef.current) clearInterval(pollRef.current)
+    if (watchRef.current) clearInterval(watchRef.current)
     if (timeoutRef.current) clearTimeout(timeoutRef.current)
-  }
+  }, [])
 
-  const closePopup = () => {
+  const closeAndClear = useCallback(() => {
+    clearAll()
     closeSikinaPopup()
-  }
+  }, [clearAll])
 
   const checkStatus = useCallback(async (): Promise<boolean> => {
     try {
@@ -27,67 +35,112 @@ export function SikinaPayCheckoutScreen() {
         ? await api.getBidFeePaymentStatus(selectedId!)
         : await api.getPaymentLinkStatus(selectedId!)
       if (res.status === "SUCCESSFUL") {
-        cleanup()
-        closePopup()
+        closeAndClear()
         setStatus("paid")
         return true
       }
       if (["FAILED", "CANCELLED", "EXPIRED"].includes(res.status)) {
-        cleanup()
-        closePopup()
+        closeAndClear()
         setStatus("failed")
         return true
       }
     } catch {
-      // retry on next interval
+      // retry on next tick
     }
     return false
-  }, [selectedId, paymentContext])
+  }, [selectedId, paymentContext, closeAndClear])
 
-  useEffect(() => {
-    if (!selectedId || !sikinaPayUrl) return
-
+  const openPaymentPopup = useCallback(() => {
+    if (!sikinaPayUrl) return
     const popup = openSikinaPopup(sikinaPayUrl)
-    if (!popup || popup.closed) {
-      setPopupBlocked(true)
-    }
-
-    pollRef.current = setInterval(async () => {
-      const done = await checkStatus()
-      if (done) return
-    }, 2000)
-
-    timeoutRef.current = setTimeout(() => {
-      cleanup()
-      closePopup()
-      setStatus("failed")
-    }, 120000)
-
-    return () => {
-      cleanup()
-      closePopup()
-    }
-  }, [selectedId, sikinaPayUrl, paymentContext, checkStatus])
-
-  const handleOpenPopup = () => {
-    const popup = openSikinaPopup(sikinaPayUrl!)
     if (!popup || popup.closed) {
       setPopupBlocked(true)
     } else {
       setPopupBlocked(false)
+      setPopupClosed(false)
     }
-  }
+  }, [sikinaPayUrl])
 
-  const handleBack = () => {
-    cleanup()
-    closePopup()
+  const handleRelayResult = useCallback((result: string) => {
+    localStorage.removeItem('sikina_payment_result')
+    closeAndClear()
+    if (result === 'success') setStatus('paid')
+    else setStatus('failed')
+  }, [closeAndClear])
+
+  // Auto-open popup & start polling on mount
+  useEffect(() => {
+    if (!selectedId || !sikinaPayUrl) return
+
+    // Clean up any stale localStorage result from a previous session
+    localStorage.removeItem('sikina_payment_result')
+
+    openPaymentPopup()
+
+    // Instant detection via postMessage from the relay page
+    const onMessage = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin) return
+      if (e.data?.type !== 'SIKINA_PAYMENT_RESULT') return
+      handleRelayResult(e.data.result)
+    }
+    window.addEventListener('message', onMessage)
+
+    // BroadcastChannel fallback (same-origin, different browsing context)
+    let bc: BroadcastChannel | null = null
+    try {
+      bc = new BroadcastChannel('sikina_payment')
+      bc.onmessage = (e) => handleRelayResult(e.data?.result)
+    } catch { /* not supported */ }
+
+    // localStorage fallback (for browsers that block BroadcastChannel)
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== 'sikina_payment_result' || !e.newValue) return
+      try {
+        const { result } = JSON.parse(e.newValue)
+        handleRelayResult(result)
+      } catch { /* ignore */ }
+    }
+    window.addEventListener('storage', onStorage)
+
+    pollRef.current = setInterval(async () => {
+      await checkStatus()
+    }, POLL_INTERVAL)
+
+    // Watch for the popup being closed by the user
+    watchRef.current = setInterval(() => {
+      if (!isSikinaPopupOpen()) setPopupClosed(true)
+      else setPopupClosed(false)
+    }, 800)
+
+    timeoutRef.current = setTimeout(() => {
+      closeAndClear()
+      setStatus("failed")
+    }, TIMEOUT_MS)
+
+    return () => {
+      clearAll()
+      window.removeEventListener('message', onMessage)
+      window.removeEventListener('storage', onStorage)
+      bc?.close()
+    }
+  }, [selectedId, sikinaPayUrl]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleBack = useCallback(() => {
+    closeAndClear()
     setSikinaPayUrl(null)
+    setSikinaProxyUrl(null)
     go(paymentContext === "bid-fee" ? "pay-fee" : "pay-winning")
-  }
+  }, [go, paymentContext, setSikinaPayUrl, setSikinaProxyUrl, closeAndClear])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") handleBack() }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [handleBack])
 
   const handleContinuePaid = () => {
-    cleanup()
     setSikinaPayUrl(null)
+    setSikinaProxyUrl(null)
     if (paymentContext === "bid-fee") {
       setFeePaid(true)
       go("place-bid")
@@ -97,9 +150,9 @@ export function SikinaPayCheckoutScreen() {
   }
 
   const handleConfirmManually = async () => {
-    cleanup()
-    closePopup()
+    closeAndClear()
     setSikinaPayUrl(null)
+    setSikinaProxyUrl(null)
     if (paymentContext === "bid-fee") {
       try {
         await api.confirmBidFeePayment(selectedId!)
@@ -119,165 +172,185 @@ export function SikinaPayCheckoutScreen() {
   }
 
   const handleTryAgain = () => {
-    cleanup()
-    closePopup()
+    closeAndClear()
     setSikinaPayUrl(null)
+    setSikinaProxyUrl(null)
     go(paymentContext === "bid-fee" ? "pay-fee" : "pay-winning")
   }
 
-  if (status === "paid") {
-    return (
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="flex flex-1 flex-col items-center justify-center px-6 py-10 text-center"
-      >
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ type: "spring", damping: 15, stiffness: 200 }}
-          className="relative"
-        >
-          <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/30" />
-          <span className="relative flex size-20 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-500/30">
-            <Check className="size-10" strokeWidth={3} />
-          </span>
-        </motion.div>
-        <motion.h1
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-          className="mt-6 font-display text-2xl font-extrabold text-awash-blue"
-        >
-          Payment Successful!
-        </motion.h1>
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.25 }}
-          className="mt-2 max-w-xs text-sm font-medium text-neutral-400"
-        >
-          Your payment of <span className="font-bold text-awash-blue">{formatETB(userBid ?? 0)} {CURRENCY}</span> was received.
-        </motion.p>
-        <motion.button
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.35 }}
-          whileTap={{ scale: 0.97 }}
-          onClick={handleContinuePaid}
-          className="mt-8 flex items-center gap-2 rounded-xl bg-gradient-to-r from-awash-gold to-awash-gold-light px-8 py-3 text-sm font-bold text-awash-blue shadow-lg shadow-primary/30 transition-all hover:shadow-primary/40"
-        >
-          {paymentContext === "bid-fee" ? "Continue to Place Bid" : "Track Delivery"}
-        </motion.button>
-      </motion.div>
-    )
-  }
-
-  if (status === "failed") {
-    return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="flex flex-1 flex-col items-center justify-center px-6 py-10 text-center"
-      >
-        <motion.span
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ type: "spring", damping: 15, stiffness: 200 }}
-          className="flex size-20 items-center justify-center rounded-full bg-red-100 text-red-500"
-        >
-          <X className="size-10" strokeWidth={3} />
-        </motion.span>
-        <h1 className="mt-6 font-display text-2xl font-extrabold text-awash-blue">Payment Not Confirmed</h1>
-        <p className="mt-2 max-w-xs text-sm font-medium text-neutral-400">
-          We couldn't automatically confirm your payment. If you've already paid, tap confirm below.
-        </p>
-        <button
-          onClick={handleConfirmManually}
-          className="mt-8 w-full max-w-xs rounded-xl bg-gradient-to-r from-awash-gold to-awash-gold-light py-3 text-sm font-bold text-awash-blue shadow-lg shadow-primary/30 transition-all hover:shadow-primary/40 active:scale-[0.98]"
-        >
-          I've Already Paid
-        </button>
-        <button
-          onClick={handleTryAgain}
-          className="mt-3 w-full max-w-xs rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm py-3 text-sm font-bold text-awash-blue transition-all hover:bg-white active:scale-[0.98]"
-        >
-          Try Again
-        </button>
-      </motion.div>
-    )
-  }
-
-  return (
+  return createPortal(
     <motion.div
-      initial="hidden"
-      animate="visible"
-      variants={{
-        visible: { transition: { staggerChildren: 0.06 } },
-      }}
-      className="flex flex-1 flex-col"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+      onClick={handleBack}
     >
-      <div className="flex items-center gap-3 border-b border-border/60 bg-white/80 px-4 py-3 backdrop-blur-md">
-        <button onClick={handleBack} className="flex size-8 items-center justify-center rounded-full text-neutral-600 transition-colors hover:bg-neutral-100">
-          <ArrowLeft className="size-5" />
-        </button>
-        <h1 className="font-display text-base font-bold text-awash-blue">
-          {paymentContext === "bid-fee" ? "Pay Bid Fee" : "Pay Winning Amount"}
-        </h1>
-      </div>
-
       <motion.div
-        variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}
-        className="flex flex-1 flex-col items-center justify-center px-6 text-center"
+        initial={{ opacity: 0, scale: 0.95, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.97, y: 8 }}
+        transition={{ type: "spring", damping: 26, stiffness: 320 }}
+        className="flex w-full max-w-sm flex-col overflow-hidden rounded-2xl border border-border/60 bg-white shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
       >
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-          className="mb-6 flex size-20 items-center justify-center rounded-2xl bg-gradient-to-br from-awash-blue/10 to-emerald-500/10"
-        >
-          <RefreshCw className="size-10 text-awash-blue" />
-        </motion.div>
-
-        <h2 className="font-display text-xl font-bold text-awash-blue">Waiting for Payment</h2>
-        <p className="mt-2 max-w-xs text-sm text-neutral-400">
-          {popupBlocked
-            ? "Click the button below to open the SikinaPay payment page."
-            : "Complete your payment in the opened SikinaPay window."}
-        </p>
-
-        <div className="mt-8 flex flex-col items-center gap-3">
+        {/* Header */}
+        <div className="flex items-center gap-3 border-b border-border/60 bg-white/80 px-4 py-3 backdrop-blur-md">
           <button
-            onClick={handleOpenPopup}
-            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-awash-gold to-awash-gold-light px-6 py-3 text-sm font-bold text-awash-blue shadow-lg shadow-primary/30 transition-all hover:shadow-primary/40 active:scale-[0.98]"
+            onClick={handleBack}
+            className="flex size-8 items-center justify-center rounded-full text-neutral-600 transition-colors hover:bg-neutral-100"
           >
-            <ExternalLink className="size-4" />
-            {popupBlocked ? "Open Payment Page" : "Reopen Payment Window"}
+            <ArrowLeft className="size-5" />
           </button>
-
-          <a
-            href={sikinaPayUrl ?? "#"}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1 text-xs font-semibold text-neutral-400 underline underline-offset-2 transition-colors hover:text-awash-blue"
+          <h1 className="font-display text-base font-bold text-awash-blue">
+            {paymentContext === "bid-fee" ? "Pay Bid Fee" : "Pay Winning Amount"}
+          </h1>
+          <button
+            onClick={handleBack}
+            className="ml-auto flex size-8 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600"
           >
-            Open in new tab
-          </a>
+            <X className="size-5" />
+          </button>
         </div>
 
-        <div className="mt-10 flex items-center gap-2 rounded-xl border border-border/60 bg-white/50 backdrop-blur-sm px-4 py-2.5 text-xs text-neutral-400">
-          <RefreshCw className="size-3 animate-spin" />
-          Checking payment status every 2 seconds...
-        </div>
+        {/* Waiting state */}
+        {status === "waiting" && (
+          <div className="flex flex-col items-center px-6 py-10 text-center">
+            {/* Animated icon */}
+            <div className="relative mb-6 flex size-24 items-center justify-center">
+              <span className="absolute inset-0 animate-ping rounded-full bg-awash-blue/10" style={{ animationDuration: "2s" }} />
+              <div className="relative flex size-24 items-center justify-center rounded-full bg-gradient-to-br from-awash-blue/10 to-emerald-500/10">
+                <ShieldCheck className="size-10 text-awash-blue" />
+              </div>
+            </div>
+
+            {popupBlocked ? (
+              <>
+                <h2 className="font-display text-lg font-bold text-awash-blue">Open Payment Page</h2>
+                <p className="mt-2 text-sm text-neutral-400">
+                  Your browser blocked the payment popup. Click below to open it manually.
+                </p>
+                <button
+                  onClick={openPaymentPopup}
+                  className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-awash-gold to-awash-gold-light py-3.5 text-sm font-bold text-awash-blue shadow-lg shadow-primary/20 transition-all hover:shadow-primary/30 active:scale-[0.98]"
+                >
+                  <ExternalLink className="size-4" />
+                  Open SikinaPay Checkout
+                </button>
+              </>
+            ) : (
+              <>
+                <h2 className="font-display text-lg font-bold text-awash-blue">
+                  {popupClosed ? "Payment window closed" : "Complete payment in the opened window"}
+                </h2>
+                <p className="mt-2 text-sm text-neutral-400">
+                  {popupClosed
+                    ? "Did you complete the payment? You can reopen the window or confirm below."
+                    : "A SikinaPay checkout window has opened. Complete your payment there and we'll confirm it automatically."}
+                </p>
+
+                {/* Steps */}
+                {!popupClosed && (
+                  <ol className="mt-6 w-full space-y-3 text-left">
+                    {[
+                      "Select your payment method in the SikinaPay window",
+                      "Enter your details and confirm the payment",
+                      "Return here — we'll detect it automatically",
+                    ].map((step, i) => (
+                      <li key={i} className="flex items-start gap-3">
+                        <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-awash-blue/10 text-xs font-bold text-awash-blue">
+                          {i + 1}
+                        </span>
+                        <span className="text-sm text-neutral-500">{step}</span>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+
+                <button
+                  onClick={openPaymentPopup}
+                  className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-awash-gold to-awash-gold-light py-3.5 text-sm font-bold text-awash-blue shadow-lg shadow-primary/20 transition-all hover:shadow-primary/30 active:scale-[0.98]"
+                >
+                  <ExternalLink className="size-4" />
+                  {popupClosed ? "Reopen Payment Window" : "Reopen Window"}
+                </button>
+              </>
+            )}
+
+            {/* Footer polling indicator */}
+            <div className="mt-6 flex items-center gap-2 text-xs text-neutral-400">
+              <RefreshCw className="size-3 animate-spin" />
+              Waiting for payment confirmation…
+            </div>
+
+            {/* Manual confirm for edge cases */}
+            <button
+              onClick={handleConfirmManually}
+              className="mt-3 text-xs font-medium text-neutral-400 underline-offset-2 hover:text-awash-blue hover:underline"
+            >
+              I've paid but not seeing confirmation
+            </button>
+          </div>
+        )}
+
+        {/* Paid state */}
+        {status === "paid" && (
+          <div className="flex flex-col items-center justify-center px-6 py-10 text-center">
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: "spring", damping: 15, stiffness: 200 }}
+              className="relative"
+            >
+              <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/30" />
+              <span className="relative flex size-20 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-500/30">
+                <Check className="size-10" strokeWidth={3} />
+              </span>
+            </motion.div>
+            <h1 className="mt-6 font-display text-2xl font-extrabold text-awash-blue">Payment Successful!</h1>
+            <p className="mt-2 max-w-xs text-sm font-medium text-neutral-400">
+              {paymentContext === "winning" && userBid != null ? (
+                <>Your payment of <span className="font-bold text-awash-blue">{formatETB(userBid)} {CURRENCY}</span> was received.</>
+              ) : (
+                "Your payment was received successfully."
+              )}
+            </p>
+            <button
+              onClick={handleContinuePaid}
+              className="mt-8 flex items-center gap-2 rounded-xl bg-gradient-to-r from-awash-gold to-awash-gold-light px-8 py-3 text-sm font-bold text-awash-blue shadow-lg shadow-primary/30 transition-all hover:shadow-primary/40"
+            >
+              {paymentContext === "bid-fee" ? "Continue to Place Bid" : "Track Delivery"}
+            </button>
+          </div>
+        )}
+
+        {/* Failed state */}
+        {status === "failed" && (
+          <div className="flex flex-col items-center justify-center px-6 py-10 text-center">
+            <span className="flex size-20 items-center justify-center rounded-full bg-red-100 text-red-500">
+              <X className="size-10" strokeWidth={3} />
+            </span>
+            <h1 className="mt-6 font-display text-2xl font-extrabold text-awash-blue">Payment Not Confirmed</h1>
+            <p className="mt-2 max-w-xs text-sm font-medium text-neutral-400">
+              We couldn't automatically confirm your payment. If you've already paid, tap confirm below.
+            </p>
+            <button
+              onClick={handleConfirmManually}
+              className="mt-8 w-full max-w-xs rounded-xl bg-gradient-to-r from-awash-gold to-awash-gold-light py-3 text-sm font-bold text-awash-blue shadow-lg shadow-primary/30 transition-all hover:shadow-primary/40 active:scale-[0.98]"
+            >
+              I've Already Paid
+            </button>
+            <button
+              onClick={handleTryAgain}
+              className="mt-3 w-full max-w-xs rounded-xl border border-border/60 bg-white/80 py-3 text-sm font-bold text-awash-blue backdrop-blur-sm transition-all hover:bg-white active:scale-[0.98]"
+            >
+              Try Again
+            </button>
+          </div>
+        )}
       </motion.div>
-
-      <div className="flex items-center justify-center border-t border-border/60 bg-white/80 px-4 py-3 backdrop-blur-sm">
-        <button
-          onClick={handleConfirmManually}
-          className="text-sm font-semibold text-awash-blue underline underline-offset-2 transition-colors hover:text-awash-gold-dark"
-        >
-          Already Paid? Confirm
-        </button>
-      </div>
-    </motion.div>
+    </motion.div>,
+    document.body,
   )
 }

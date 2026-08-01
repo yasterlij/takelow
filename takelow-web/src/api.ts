@@ -456,7 +456,15 @@ export function openSikinaPopup(url: string): Window | null {
     _sikinaPopup.focus()
     return _sikinaPopup
   }
-  _sikinaPopup = window.open(url, 'sikina-pay', 'width=450,height=750,scrollbars=yes,resizable=yes')
+  const w = 520
+  const h = 720
+  const left = Math.max(0, Math.round(window.screenX + (window.outerWidth - w) / 2))
+  const top = Math.max(0, Math.round(window.screenY + (window.outerHeight - h) / 2))
+  _sikinaPopup = window.open(
+    url,
+    'sikina-pay',
+    `popup=1,width=${w},height=${h},left=${left},top=${top},scrollbars=yes,resizable=yes`,
+  )
   return _sikinaPopup
 }
 

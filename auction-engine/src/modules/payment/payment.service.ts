@@ -107,9 +107,19 @@ export class PaymentService {
       },
     });
 
-    const body = await res.text();
+    let body = await res.text();
     const contentType =
       res.headers.get("content-type") || "text/html;charset=UTF-8";
+
+    if (contentType.includes("text/html")) {
+      const origin = new URL(paymentUrl).origin;
+      const baseTag = `<base href="${origin}">`;
+      if (/<head[^>]*>/i.test(body)) {
+        body = body.replace(/<head[^>]*>/i, (m) => `${m}${baseTag}`);
+      } else {
+        body = `<head>${baseTag}</head>${body}`;
+      }
+    }
 
     return { body, contentType };
   }
