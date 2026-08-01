@@ -7,6 +7,22 @@ const QUERY = process.env.VITE_QUERY_API_BASE_URL || 'http://localhost:3003';
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('framer-motion') || id.includes('motion-dom') || id.includes('motion-utils')) return 'framer-motion'
+            if (id.includes('lucide-react')) return 'icons'
+            if (id.includes('socket.io-client') || id.includes('engine.io-client')) return 'socket'
+            if (id.includes('axios')) return 'axios'
+            if (id.includes('react') || id.includes('scheduler')) return 'react-vendor'
+            return 'vendor'
+          }
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     proxy: {

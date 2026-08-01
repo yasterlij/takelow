@@ -1,4 +1,8 @@
-import { Injectable, Logger } from "@nestjs/common";
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import * as crypto from "node:crypto";
 
@@ -81,8 +85,8 @@ export class AwashService {
       this.logger.error(
         `Awash generatePaymentLink failed: ${res.status} ${text}`,
       );
-      throw new Error(
-        `Awash payment link creation failed: ${res.status} ${text}`,
+      throw new ServiceUnavailableException(
+        `Awash payment link creation failed: ${res.status} ${text.slice(0, 200)}`,
       );
     }
 
@@ -136,6 +140,8 @@ export class AwashService {
       Authorization: `Bearer ${this.secretKey}`,
       "Content-Type": "application/json",
       "X-Merchant-Id": this.merchantId,
+      "User-Agent":
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     };
   }
 }

@@ -10,25 +10,25 @@
     "seed": "curl -X POST https://YOUR_VERCEL_URL.vercel.app/api/seed -H 'x-setup-key: your-setup-key'"
   },
   "dependencies": {
-    "axios": "^1.6.2",
+    "axios": "^1.18.1",
     "framer-motion": "^12.42.2",
     "lucide-react": "^1.25.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "socket.io-client": "^4.7.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "socket.io-client": "^4.8.3",
     "zod": "^4.4.3",
-    "zustand": "^4.4.7"
+    "zustand": "^4.5.7"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",
-    "@vercel/node": "^5.1.14",
-    "@types/react": "^18.2.45",
-    "@types/react-dom": "^18.2.18",
-    "@vitejs/plugin-react": "^4.2.1",
-    "autoprefixer": "^10.4.16",
-    "postcss": "^8.4.32",
-    "tailwindcss": "^3.4.0",
-    "typescript": "^5.3.2",
-    "vite": "^5.0.10"
+    "@vercel/node": "^5.9.1",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.7.0",
+    "autoprefixer": "^10.5.4",
+    "postcss": "^8.5.19",
+    "tailwindcss": "^3.4.19",
+    "typescript": "^5.9.3",
+    "vite": "^5.4.21"
   }
 }
