@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useCallback } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, Image, StyleSheet, Dimensions, RefreshControl } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
 import { Flame, ShieldCheck, Trophy, Sparkles, PiggyBank, ImageIcon } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { AppBar, Badge } from '../components/AuctionUI'
@@ -48,6 +49,13 @@ function AuctionCard({ auction, onOpen }: { auction: Auction; onOpen: () => void
     <TouchableOpacity onPress={onOpen} activeOpacity={0.85} style={s.card}>
       <View style={s.cardImgOuter}>
         <AuctionImage src={auction.images?.[0]} alt={auction.name} />
+        <LinearGradient
+          colors={['rgba(0,43,92,0.06)', 'transparent', 'rgba(200,166,66,0.05)']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
         <View style={s.cardImgTop}>
           {endingSoon ? (
             <Badge tone="orange"><Flame size={10} /> Ending Soon</Badge>
@@ -128,7 +136,7 @@ export function AuctionsScreen() {
       >
         {auctionsLoading && auctions.length === 0 ? (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-            {[1, 2, 3, 4].map((i) => <SkeletonCard key={i} style={{ width: CARD_W }} />)}
+            {[1, 2, 3, 4].map((i) => <SkeletonCard key={i} style={{ width: CARD_W }} imageHeight={CARD_W * 0.75} />)}
           </View>
         ) : (
           <>

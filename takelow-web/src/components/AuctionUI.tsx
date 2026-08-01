@@ -1,5 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react"
-import { ChevronLeft, Gavel, Trophy, Zap } from "lucide-react"
+import { ChevronLeft, Trophy, Zap } from "lucide-react"
 
 // ─── Awash Bank Brand Logo ───────────────────────────────────────────
 
@@ -432,70 +432,6 @@ export function ConfettiOverlay({ show }: { show: boolean }) {
           }}
         />
       ))}
-    </div>
-  )
-}
-
-// ─── Hero Slide (for live auction carousel) ──────────────────────────
-
-export function HeroSlide({
-  image,
-  title,
-  price,
-  timeLeft,
-  urgent,
-  onJoin,
-}: {
-  image?: string
-  title: string
-  price: string
-  timeLeft: string
-  urgent?: boolean
-  onJoin?: () => void
-}) {
-  return (
-    <div className="auction-hero-slide group cursor-pointer relative h-[240px] flex-shrink-0 w-[320px]">
-      {image ? (
-        <img
-          src={image}
-          alt={title}
-          loading="lazy"
-          decoding="async"
-          className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-        />
-      ) : (
-        <div className="absolute inset-0 bg-gradient-to-br from-awash-blue via-awash-blue-dark to-[#001224]" />
-      )}
-      <div className="absolute inset-0 auction-hero-content" />
-      <div className="absolute inset-0 p-5 flex flex-col justify-between">
-        <div className="flex items-start justify-between">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-awash-blue/70 backdrop-blur-md px-3 py-1.5 text-xs font-bold text-white border border-white/10">
-            <Gavel className="size-3" />
-            Live Auction
-          </span>
-          <span
-            className={`inline-flex items-center gap-1.5 rounded-full backdrop-blur-md px-3.5 py-1.5 text-sm font-bold tabular-nums border ${
-              urgent
-                ? "bg-primary/20 text-primary border-primary/30 animate-glow-pulse"
-                : "bg-white/70 text-awash-blue border-white/20"
-            }`}
-          >
-            {timeLeft}
-          </span>
-        </div>
-        <div className="translate-y-0 transition-transform duration-300 group-hover:-translate-y-1">
-          <h3 className="text-white font-display text-xl font-extrabold drop-shadow-lg mb-1">
-            {title}
-          </h3>
-          <p className="text-white/80 text-sm font-semibold mb-3 drop-shadow">{price}</p>
-          <button
-            onClick={onJoin}
-            className="auction-hero-btn relative overflow-hidden"
-          >
-            <span className="relative z-10">Join Auction</span>
-          </button>
-        </div>
-      </div>
     </div>
   )
 }

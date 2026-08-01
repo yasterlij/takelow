@@ -52,7 +52,9 @@ export function SkeletonCard({ style }: { style?: React.CSSProperties }) {
         ...style,
       }}
     >
-      <ShimmerBlock style={{ width: '100%', height: 140, borderRadius: 0 }} />
+      <div className="aspect-[4/3] w-full">
+        <ShimmerBlock style={{ width: '100%', height: '100%', borderRadius: 0 }} />
+      </div>
       <div style={{ padding: 12, gap: 8, display: 'flex', flexDirection: 'column' }}>
         <ShimmerBlock style={{ width: '70%', height: 14 }} />
         <ShimmerBlock style={{ width: '40%', height: 12 }} />

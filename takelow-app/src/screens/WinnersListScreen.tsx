@@ -167,7 +167,7 @@ const s = StyleSheet.create({
     overflow: 'hidden',
     borderRadius: 16,
   },
-  cardImgWrap: { width: '100%', height: 160, position: 'relative' },
+  cardImgWrap: { width: '100%', aspectRatio: 4 / 3, position: 'relative' },
   cardImgFull: { width: '100%', height: '100%' },
   cardImgOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: '60%' },
   cardImgTop: { position: 'absolute', top: 8, left: 8, right: 8, flexDirection: 'row', justifyContent: 'space-between' },

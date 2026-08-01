@@ -78,7 +78,7 @@ export function MonitorScreen() {
 
         <Card style={{ alignItems: 'center', padding: 20, marginTop: 16 }}>
           <View style={s.productImage}>
-            {auction.images?.[0] ? <Image source={{ uri: auction.images[0] }} style={{ width: 80, height: 80 }} resizeMode="contain" /> : <ImageIcon size={32} color="#94a3b8" />}
+            {auction.images?.[0] ? <Image source={{ uri: auction.images[0] }} style={{ width: 96, height: 96 }} resizeMode="cover" /> : <ImageIcon size={32} color="#94a3b8" />}
           </View>
           <Text style={s.productName}>{auction.name}</Text>
           <Text style={{ fontSize: 12, fontWeight: '500', color: colors.mutedForeground }}>Time Left</Text>
@@ -164,7 +164,7 @@ function StatusBarCustom() {
 const s = StyleSheet.create({
   liveBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 20, backgroundColor: colors.emerald100, paddingHorizontal: 12, paddingVertical: 4 },
   liveText: { fontSize: 12, fontWeight: '700', color: colors.emerald700 },
-  productImage: { width: 96, height: 96, borderRadius: 16, backgroundColor: colors.secondary, justifyContent: 'center', alignItems: 'center' },
+  productImage: { width: 96, height: 96, borderRadius: 16, backgroundColor: colors.secondary, justifyContent: 'center', alignItems: 'center', overflow: 'hidden', shadowColor: colors.awashBlue, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.18, shadowRadius: 12, elevation: 5 },
   productName: { fontSize: 18, fontWeight: '800', color: colors.navy, marginTop: 12 },
   statNumber: { fontSize: 24, fontWeight: '800', color: colors.navy, fontVariant: ['tabular-nums'], marginTop: 4 },
   statLabel: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1, color: colors.mutedForeground, marginTop: 4 },

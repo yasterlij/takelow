@@ -39,7 +39,7 @@ export function DeliveryScreen() {
 
         <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, marginTop: 12 }}>
           <View style={s.productImgWrap}>
-            {auction.images?.[0] ? <Image source={{ uri: auction.images[0] }} style={{ width: 56, height: 56 }} resizeMode="contain" /> : <ImageIcon size={24} color="#94a3b8" />}
+            {auction.images?.[0] ? <Image source={{ uri: auction.images[0] }} style={{ width: 64, height: 64 }} resizeMode="cover" /> : <ImageIcon size={24} color="#94a3b8" />}
           </View>
           <View style={{ flex: 1 }}>
             <Text style={{ fontSize: 14, fontWeight: '700', color: colors.navy }}>{auction.name}</Text>
@@ -116,7 +116,7 @@ function StatusBarCustom() {
 
 const s = StyleSheet.create({
   courierIcon: { width: 56, height: 56, borderRadius: 16, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' },
-  productImgWrap: { width: 64, height: 64, borderRadius: 12, backgroundColor: colors.secondary, overflow: 'hidden', justifyContent: 'center', alignItems: 'center' },
+  productImgWrap: { width: 64, height: 64, borderRadius: 12, backgroundColor: colors.secondary, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', shadowColor: colors.awashBlue, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 4 },
   stageIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.secondary, justifyContent: 'center', alignItems: 'center' },
   stageIconDone: { backgroundColor: colors.primary },
   stageIconActive: { backgroundColor: colors.navy },

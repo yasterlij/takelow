@@ -623,5 +623,5 @@ const s = StyleSheet.create({
   input: { borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.secondary, paddingHorizontal: 12, paddingVertical: 8, fontSize: 13, fontWeight: '500', color: colors.foreground, marginBottom: 12 },
   dateBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.secondary, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 12 },
   dateText: { fontSize: 13, fontWeight: '500', color: colors.foreground },
-  imgPreviewBtn: { width: 64, height: 64, borderRadius: 12, backgroundColor: colors.secondary, justifyContent: 'center', alignItems: 'center', overflow: 'hidden', borderWidth: 1, borderColor: colors.border },
+  imgPreviewBtn: { width: 80, height: 80, borderRadius: 12, backgroundColor: colors.secondary, justifyContent: 'center', alignItems: 'center', overflow: 'hidden', borderWidth: 1, borderColor: colors.border },
 })

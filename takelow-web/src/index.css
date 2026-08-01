@@ -309,27 +309,6 @@ body {
 }
 
 @layer components {
-  .auction-hero-slide {
-    @apply relative flex-shrink-0 w-[300px] h-[220px] rounded-2xl overflow-hidden;
-  }
-
-  .auction-hero-content {
-    @apply absolute inset-0 p-5 flex flex-col justify-between;
-    background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.05) 50%);
-  }
-
-  .auction-hero-badge {
-    @apply inline-flex items-center gap-1.5 rounded-full bg-awash-blue/80 backdrop-blur-md px-3 py-1.5 text-xs font-bold text-white border border-white/10;
-  }
-
-  .auction-hero-title {
-    @apply font-display text-lg font-extrabold text-white drop-shadow-lg;
-  }
-
-  .auction-hero-countdown {
-    @apply flex items-center gap-1.5 rounded-full bg-white/80 backdrop-blur-md px-3.5 py-1.5 text-sm font-bold text-awash-blue border border-white/20;
-  }
-
   .auction-hero-btn {
     @apply w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground transition-all duration-300 hover:shadow-lg hover:shadow-primary/30 active:scale-[0.98];
     background: linear-gradient(135deg, #C8A642 0%, #D4B85E 100%);

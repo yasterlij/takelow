@@ -218,7 +218,7 @@ export function AdminAuctionMonitorScreen() {
             transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
             className="overflow-hidden rounded-2xl border border-border/60 bg-white/80 backdrop-blur-sm shadow-[0_4px_20px_rgba(0,43,92,0.04)] lg:col-span-1"
           >
-            <div className="relative aspect-[4/3] w-full overflow-hidden bg-neutral-100">
+            <div className="relative aspect-[4/3] w-full overflow-hidden bg-gradient-to-br from-awash-blue/10 via-neutral-100 to-awash-gold/10 ring-1 ring-awash-blue/10">
               {liveAuction.images?.[0] ? (
                 <img src={liveAuction.images[0]} alt={liveAuction.name} className="size-full object-cover" />
               ) : (

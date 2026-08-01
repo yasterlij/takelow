@@ -48,13 +48,13 @@ export function DeliveryScreen() {
         </motion.div>
         <motion.div variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}>
           <Card className="mt-4 flex items-center gap-3 p-3">
-            <div className="flex size-16 items-center justify-center rounded-xl bg-awash-blue/5">
+            <div className="flex size-16 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-awash-blue/10 via-white to-awash-gold/10 shadow-[0_6px_18px_rgba(0,43,92,0.14)] ring-1 ring-awash-blue/10">
               <img
                 src={auction.images?.[0] || "/placeholder.svg"}
                 alt={auction.name}
                 loading="lazy"
                 decoding="async"
-                className="h-12 w-auto object-contain"
+                className="h-full w-full object-cover"
               />
             </div>
             <div className="flex-1">

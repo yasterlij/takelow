@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert, ActivityIndicator } from 'react-native'
+import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert, ActivityIndicator, Image } from 'react-native'
 import { Package, Plus, Search, Edit3, Trash2, ImageIcon, X, ArrowLeft } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { api } from '../api'
@@ -101,7 +101,16 @@ export function AdminProductsScreen() {
           <TextInput value={brand} onChangeText={setBrand} placeholder="Brand" style={s.input} placeholderTextColor={colors.mutedForeground} />
           <TextInput value={price} onChangeText={setPrice} placeholder="Payment" keyboardType="numeric" style={s.input} placeholderTextColor={colors.mutedForeground} />
           <TextInput value={description} onChangeText={setDescription} placeholder="Description" multiline style={[s.input, { height: 80 }]} placeholderTextColor={colors.mutedForeground} />
-          <TextInput value={imageUrl} onChangeText={setImageUrl} placeholder="Image URL" style={s.input} placeholderTextColor={colors.mutedForeground} />
+          <View style={s.imgPreviewRow}>
+            {imageUrl.trim() ? (
+              <Image source={{ uri: imageUrl.trim() }} style={s.imgPreviewBtn} resizeMode="cover" onError={() => setImageUrl('')} />
+            ) : (
+              <View style={[s.imgPreviewBtn, { justifyContent: 'center', alignItems: 'center' }]}>
+                <ImageIcon size={20} color={colors.mutedForeground} />
+              </View>
+            )}
+            <TextInput value={imageUrl} onChangeText={setImageUrl} placeholder="Image URL" style={[s.input, { flex: 1, marginBottom: 0 }]} placeholderTextColor={colors.mutedForeground} />
+          </View>
           {specFields.map((field) => (
             <TextInput
               key={field.key}
@@ -133,7 +142,7 @@ export function AdminProductsScreen() {
               ) : filtered.map((p: any) => (
                 <Card key={p.id} style={s.productRow}>
                   <View style={s.productIcon}>
-                    {p.image_urls?.[0] ? <ImageIcon size={20} color={colors.primary} /> : <Package size={20} color={colors.mutedForeground} />}
+                    {p.image_urls?.[0] ? <Image source={{ uri: p.image_urls[0] }} style={s.productThumb} resizeMode="cover" /> : <Package size={20} color={colors.mutedForeground} />}
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={s.productName}>{p.name}</Text>
@@ -162,8 +171,11 @@ const s = StyleSheet.create({
   formTitle: { fontSize: 16, fontWeight: '700', color: colors.navy, marginBottom: 16 },
   input: { borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, fontSize: 13, fontWeight: '500', color: colors.navy, marginBottom: 12 },
   productRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: colors.border },
-  productIcon: { width: 40, height: 40, borderRadius: 10, backgroundColor: colors.secondary, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  productIcon: { width: 56, height: 56, borderRadius: 12, backgroundColor: colors.secondary, justifyContent: 'center', alignItems: 'center', marginRight: 12, overflow: 'hidden' },
+  productThumb: { width: '100%', height: '100%' },
   productName: { fontSize: 13, fontWeight: '700', color: colors.navy },
   productMeta: { fontSize: 10, fontWeight: '500', color: colors.mutedForeground, marginTop: 2 },
   actionBtn: { width: 32, height: 32, borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginLeft: 4 },
+  imgPreviewRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
+  imgPreviewBtn: { width: 80, height: 80, borderRadius: 12, backgroundColor: colors.secondary, overflow: 'hidden', borderWidth: 1, borderColor: colors.border },
 })

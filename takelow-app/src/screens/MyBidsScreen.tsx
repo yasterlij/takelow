@@ -73,7 +73,7 @@ export function MyBidsScreen() {
               return (
                 <TouchableOpacity key={`${bid.auctionId}-${bid.placedAt}`} onPress={() => selectAuction(bid.auctionId)} activeOpacity={0.8}>
                   <Card style={s.bidRow}>
-                    <View style={s.bidImg}>{auction.images?.[0] ? <Image source={{ uri: auction.images[0] }} style={{ width: '100%', height: '100%' }} resizeMode="contain" /> : <ImageIcon size={24} color="#94a3b8" />}</View>
+                    <View style={s.bidImg}>{auction.images?.[0] ? <Image source={{ uri: auction.images[0] }} style={{ width: '100%', height: '100%' }} resizeMode="cover" /> : <ImageIcon size={24} color="#94a3b8" />}</View>
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontSize: 14, fontWeight: '700', color: colors.navy }} numberOfLines={1}>{auction.name}</Text>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
@@ -121,5 +121,5 @@ function StatusBarCustom() {
 
 const s = StyleSheet.create({
   bidRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, padding: 12 },
-  bidImg: { width: 64, height: 64, borderRadius: 12, backgroundColor: colors.secondary, overflow: 'hidden', justifyContent: 'center', alignItems: 'center' },
+  bidImg: { width: 64, height: 64, borderRadius: 12, backgroundColor: colors.secondary, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', shadowColor: colors.awashBlue, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 4 },
 })

@@ -46,7 +46,7 @@ function AuctionCard({ auction, onOpen, index }: { auction: Auction; onOpen: () 
       transition={{ duration: 0.3, delay: index * 0.04, ease: [0.16, 1, 0.3, 1] }}
     >
       <button onClick={onOpen} className="group flex w-full flex-col overflow-hidden rounded-2xl border border-border/60 bg-white shadow-[0_4px_20px_rgba(0,43,92,0.04)] text-left transition-all duration-500 hover:-translate-y-1.5 hover:border-primary/20 hover:shadow-[0_16px_48px_rgba(200,166,66,0.1)] active:scale-[0.98]">
-        <div className="relative aspect-[4/3] w-full overflow-hidden bg-neutral-100">
+        <div className="relative aspect-[4/3] w-full overflow-hidden bg-gradient-to-br from-awash-blue/10 via-neutral-100 to-awash-gold/10 ring-1 ring-awash-blue/10">
           <AuctionImage src={auction.images?.[0]} alt={auction.name} />
           {auction.images?.length > 1 && (
             <div className="absolute top-2 right-2 z-10 flex gap-1">
@@ -272,7 +272,7 @@ export function AuctionsScreen() {
           <div ref={heroScrollRef} className="flex gap-4 overflow-x-auto pb-2 snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden scroll-smooth">
             {endingSoon.slice(0, 6).map((a) => (
               <button key={a.id} onClick={() => selectAuction(a.id)}
-                className="group relative flex-shrink-0 w-[300px] h-[210px] overflow-hidden rounded-2xl shadow-md transition-all duration-500 hover:shadow-[0_16px_48px_rgba(200,166,66,0.2)] hover:-translate-y-1 active:scale-[0.98] text-left">
+                className="group relative w-[300px] flex-shrink-0 aspect-[4/3] overflow-hidden rounded-2xl shadow-md transition-all duration-500 hover:shadow-[0_16px_48px_rgba(200,166,66,0.2)] hover:-translate-y-1 active:scale-[0.98] text-left">
                 <div className="absolute inset-0 bg-gradient-to-br from-awash-blue via-awash-blue-dark to-[#001224]" />
                 {a.images?.[0] && <img src={a.images[0]} alt={a.name} loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover opacity-50 transition-all duration-500 group-hover:scale-110 group-hover:opacity-60" />}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />

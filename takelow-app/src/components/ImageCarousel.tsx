@@ -3,6 +3,7 @@ import {
   View, Image, TouchableOpacity, ScrollView, Dimensions, StyleSheet, Text,
 } from 'react-native'
 import { ChevronLeft, ChevronRight, ZoomIn } from 'lucide-react-native'
+import { LinearGradient } from 'expo-linear-gradient'
 import { colors } from '../theme'
 
 const { width: SCREEN_W } = Dimensions.get('window')
@@ -32,6 +33,7 @@ export function ImageCarousel({
   const total = images.length
 
   const CARD_W = containerWidth - 32
+  const SLIDE_H = CARD_W * (3 / 4)
 
   const goTo = useCallback((i: number) => {
     const idx = (i + total) % total
@@ -61,6 +63,13 @@ export function ImageCarousel({
       onTouchStart={() => setIsPaused(true)}
       onTouchEnd={() => setTimeout(() => setIsPaused(false), 2000)}
     >
+      <LinearGradient
+        colors={['rgba(0,43,92,0.10)', 'rgba(200,166,66,0.08)']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.wrapperGlow}
+        pointerEvents="none"
+      />
       <ScrollView
         ref={scrollRef}
         horizontal
@@ -79,7 +88,7 @@ export function ImageCarousel({
             key={i}
             activeOpacity={0.95}
             onPress={() => onImagePress?.(i)}
-            style={[styles.slide, { width: CARD_W }]}
+            style={[styles.slide, { width: CARD_W, height: SLIDE_H }]}
           >
             <Image
               source={{ uri: src }}
@@ -146,12 +155,23 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: colors.neutralGray100,
+    shadowColor: colors.awashBlue,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.25,
+    shadowRadius: 24,
+    elevation: 10,
+  },
+  wrapperGlow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '100%',
   },
   scrollView: {
     width: '100%',
   },
   slide: {
-    height: 280,
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',

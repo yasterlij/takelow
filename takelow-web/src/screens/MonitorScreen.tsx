@@ -65,8 +65,8 @@ export function MonitorScreen() {
 
         <motion.div variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }}>
           <Card className="mt-4 items-center p-5 text-center">
-            <div className="mx-auto flex size-24 items-center justify-center rounded-2xl bg-awash-blue/5">
-              <img src={auction.images?.[0] || "/placeholder.svg"} alt={auction.name} loading="lazy" decoding="async" className="h-20 w-auto object-contain" />
+            <div className="mx-auto flex size-24 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-awash-blue/10 via-white to-awash-gold/10 shadow-[0_8px_24px_rgba(0,43,92,0.14)] ring-1 ring-awash-blue/10">
+              <img src={auction.images?.[0] || "/placeholder.svg"} alt={auction.name} loading="lazy" decoding="async" className="h-full w-full object-cover" />
             </div>
             <h2 className="mt-3 font-display text-lg font-extrabold text-awash-blue">{auction.name}</h2>
             <span className="text-xs font-medium text-neutral-400">Time Left</span>

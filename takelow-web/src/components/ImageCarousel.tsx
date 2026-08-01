@@ -96,7 +96,7 @@ export function ImageCarousel({
 
   return (
     <div
-      className={`group relative overflow-hidden rounded-2xl bg-neutral-100 select-none ${aspectRatio} ${className}`}
+      className={`group relative overflow-hidden rounded-2xl bg-gradient-to-br from-awash-blue/10 via-neutral-100 to-awash-gold/10 select-none shadow-[0_24px_60px_rgba(0,43,92,0.18)] ring-1 ring-awash-blue/10 transition-shadow duration-300 hover:shadow-[0_30px_80px_rgba(0,43,92,0.25)] ${aspectRatio} ${className}`}
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
       onPointerDown={handlePointerDown}
@@ -106,6 +106,7 @@ export function ImageCarousel({
       ref={containerRef}
       style={{ touchAction: "pan-y" }}
     >
+      <div className="absolute -inset-10 rounded-full bg-[radial-gradient(circle_at_center,rgba(200,166,66,0.18),transparent_65%)] blur-2xl" />
       <div className="absolute inset-0">
         {images.map((src, i) => (
           <div

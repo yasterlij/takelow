@@ -155,8 +155,8 @@ const winnersCount = (winner as any)?.winners_count as number | undefined
               className="w-full max-w-md"
             >
               <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-awash-gold/10 via-awash-gold-light/5 to-white/50 backdrop-blur-sm p-6 shadow-[0_4px_20px_rgba(200,166,66,0.06)]">
-                <div className="mx-auto flex size-28 items-center justify-center rounded-2xl bg-white/80 border border-border/60 p-3 shadow-sm">
-                  <img src={auction.images?.[0] || "/placeholder.svg"} alt={auction.name} loading="lazy" decoding="async" className="h-full w-auto object-contain" />
+                <div className="mx-auto flex size-24 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-awash-blue/10 via-white to-awash-gold/10 border border-border/60 p-1 shadow-[0_12px_32px_rgba(0,43,92,0.16)]">
+                  <img src={auction.images?.[0] || "/placeholder.svg"} alt={auction.name} loading="lazy" decoding="async" className="h-full w-full object-cover" />
                 </div>
                 <h2 className="mt-4 text-center font-display text-lg font-bold text-foreground">{auction.name}</h2>
                 <div className="mt-4 rounded-xl bg-gradient-to-br from-awash-gold/15 to-awash-gold-light/10 border border-primary/20 p-4 text-center">

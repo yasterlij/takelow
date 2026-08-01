@@ -129,7 +129,7 @@ function AuctionMonitorCard({ auction, delay, onMonitor }: { auction: AdminAucti
       className="group cursor-pointer overflow-hidden rounded-2xl border border-border/60 bg-white/80 backdrop-blur-sm shadow-[0_4px_20px_rgba(0,43,92,0.04)] transition-all hover:border-primary/30 hover:shadow-[0_8px_32px_rgba(0,43,92,0.08)]"
     >
       {/* Image */}
-      <div className="relative aspect-[16/9] w-full overflow-hidden bg-neutral-100">
+      <div className="relative aspect-[4/3] w-full overflow-hidden bg-gradient-to-br from-awash-blue/10 via-neutral-100 to-awash-gold/10 ring-1 ring-awash-blue/10">
         {auction.images?.[0] ? (
           <img src={auction.images[0]} alt={auction.name} className="size-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
         ) : (

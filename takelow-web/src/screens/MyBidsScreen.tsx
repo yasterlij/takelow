@@ -85,7 +85,7 @@ export function MyBidsScreen() {
                   onClick={() => selectAuction(bid.auctionId)}
                   className="group flex w-full items-center gap-4 rounded-2xl border border-border/60 bg-white/80 backdrop-blur-sm p-4 text-left transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/20 hover:bg-white hover:shadow-[0_8px_32px_rgba(200,166,66,0.08)] active:scale-[0.98]"
                 >
-                  <div className="flex size-16 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-neutral-100 to-neutral-50 border border-border/40 shadow-sm">
+                  <div className="flex size-16 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-awash-blue/10 via-neutral-100 to-awash-gold/10 border border-border/40 shadow-[0_6px_18px_rgba(0,43,92,0.12)]">
                     <img
                       src={auction.images?.[0] || "/placeholder.svg"}
                       alt={auction.name}

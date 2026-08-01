@@ -96,7 +96,7 @@ function ActiveAuctionCard({ auction, onSelect }: { auction: any; onSelect: () =
 
   return (
     <button onClick={onSelect} className="group flex w-[240px] flex-shrink-0 snap-start flex-col overflow-hidden rounded-2xl border border-border/60 bg-white shadow-[0_4px_20px_rgba(0,43,92,0.04)] text-left transition-all duration-500 hover:-translate-y-2 hover:border-primary/20 hover:shadow-[0_16px_48px_rgba(200,166,66,0.12)] active:scale-[0.98]">
-      <div className="relative h-[150px] w-full overflow-hidden bg-neutral-100">
+      <div className="relative aspect-[4/3] w-full overflow-hidden bg-gradient-to-br from-awash-blue/10 via-neutral-100 to-awash-gold/10 ring-1 ring-awash-blue/10">
         {auction.images?.[0] ? (
           <img src={auction.images[0]} alt={auction.name} loading="lazy" decoding="async" className="h-full w-full object-cover transition-all duration-700 group-hover:scale-110 group-hover:rotate-[2deg]" />
         ) : (
@@ -174,7 +174,7 @@ function WinnerShowcaseSlide({ auction, index }: { auction: any; index: number }
           />
         ))}
       </div>
-      <div className="relative h-36 w-full overflow-hidden bg-neutral-100">
+      <div className="relative aspect-[4/3] w-full overflow-hidden bg-gradient-to-br from-awash-blue/10 via-neutral-100 to-awash-gold/10 ring-1 ring-awash-blue/10">
         <img src={auction.images?.[0] || "/placeholder.svg"} alt={auction.name} loading="lazy" decoding="async" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
         <div className="absolute bottom-2 left-3">
@@ -295,7 +295,7 @@ export function HomeScreen() {
             )}
             <div ref={auctionScrollRef} className="flex gap-4 overflow-x-auto pb-2 snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden scroll-smooth">
               {auctionsLoading
-                ? Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-[300px] w-[240px] flex-shrink-0 snap-start rounded-2xl skeleton" />)
+                ? Array.from({ length: 4 }).map((_, i) => <div key={i} className="w-[240px] flex-shrink-0 snap-start overflow-hidden rounded-2xl skeleton"><div className="aspect-[4/3] w-full" /></div>)
                 : activeAuctions.slice(0, 8).map((a) => <ActiveAuctionCard key={a.id} auction={a} onSelect={() => selectAuction(a.id)} />)}
             </div>
           </div>

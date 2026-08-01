@@ -110,7 +110,7 @@ export function WinnerScreen() {
                 <Card style={{ width: '100%', maxWidth: 320, padding: 20, marginTop: 24 }}>
                   <View style={{ alignItems: 'center' }}>
                     <View style={s.productImageWrap}>
-                      {auction.images?.[0] ? <Image source={{ uri: auction.images[0] }} style={{ width: 88, height: 88 }} resizeMode="contain" /> : <ImageIcon size={32} color="#94a3b8" />}
+                      {auction.images?.[0] ? <Image source={{ uri: auction.images[0] }} style={{ width: 96, height: 96 }} resizeMode="cover" /> : <ImageIcon size={32} color="#94a3b8" />}
                     </View>
                     <Text style={s.productName}>{auction.name}</Text>
                   </View>
@@ -392,7 +392,7 @@ const s = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '800', color: colors.navyForeground, marginTop: 20, textAlign: 'center' },
   subtitle: { fontSize: 14, fontWeight: '500', color: colors.white + 'CC', textAlign: 'center', maxWidth: 280, marginTop: 8 },
   paidBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 20, backgroundColor: colors.emerald600 + '22', paddingHorizontal: 12, paddingVertical: 4, marginTop: 8 },
-  productImageWrap: { width: 96, height: 96, borderRadius: 16, backgroundColor: colors.secondary, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
+  productImageWrap: { width: 96, height: 96, borderRadius: 16, backgroundColor: colors.secondary, justifyContent: 'center', alignItems: 'center', overflow: 'hidden', shadowColor: colors.awashBlue, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.18, shadowRadius: 12, elevation: 5 },
   productName: { fontSize: 16, fontWeight: '700', color: colors.navy, marginTop: 12 },
   winningBidBox: { borderRadius: 12, backgroundColor: colors.accent, paddingVertical: 12, paddingHorizontal: 20, alignItems: 'center', marginTop: 16 },
   winLabel: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1, color: colors.mutedForeground },

@@ -17,6 +17,8 @@ function getInitials(name: string) {
 }
 
 const SCREEN_W_ACTUAL = Dimensions.get('window').width
+const HERO_W = SCREEN_W_ACTUAL * 0.75
+const HERO_H = HERO_W * (3 / 4)
 
 function HeroSlide({ item, onJoin }: { item: any; onJoin: () => void }) {
   const t = useCountdown(item.timeLeft)
@@ -27,7 +29,7 @@ function HeroSlide({ item, onJoin }: { item: any; onJoin: () => void }) {
 
   if (!item.images?.length) {
     return (
-      <View style={{ width: SCREEN_W_ACTUAL * 0.75, height: 220, marginRight: 12, borderRadius: 16, overflow: 'hidden' }}>
+      <View style={{ width: HERO_W, height: HERO_H, marginRight: 12, borderRadius: 16, overflow: 'hidden' }}>
         <LinearGradient colors={['#002B5C', '#001F3F']} style={StyleSheet.absoluteFill} />
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <Gavel size={40} color="rgba(255,255,255,0.2)" />
@@ -39,14 +41,14 @@ function HeroSlide({ item, onJoin }: { item: any; onJoin: () => void }) {
 
   return (
     <View style={{
-      width: SCREEN_W_ACTUAL * 0.75, height: 220, marginRight: 12,
+      width: HERO_W, height: HERO_H, marginRight: 12,
       borderRadius: 16, overflow: 'hidden',
       shadowColor: colors.awashBlue, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.15, shadowRadius: 16, elevation: 8,
     }}>
       <ImageCarousel
         images={item.images}
         alt={item.name}
-        containerWidth={SCREEN_W_ACTUAL * 0.75 + 32}
+        containerWidth={HERO_W + 32}
         autoPlayInterval={5000}
         overlay={
           <>
@@ -217,7 +219,7 @@ export function HomeScreen() {
             style={{ marginBottom: 16, marginHorizontal: -16, paddingHorizontal: 16 }}
           >
             {auctionsLoading ? (
-              <View style={{ width: SCREEN_W * 0.75, height: 220, borderRadius: 16, backgroundColor: colors.neutralGray200, marginRight: 12 }} />
+              <View style={{ width: HERO_W, height: HERO_H, borderRadius: 16, backgroundColor: colors.neutralGray200, marginRight: 12 }} />
             ) : displayHero.length > 0 ? (
               displayHero.slice(0, 5).map((a) => (
                 <HeroSlide key={a.id} item={a} onJoin={() => selectAuction(a.id)} />
@@ -233,7 +235,7 @@ export function HomeScreen() {
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
             {auctionsLoading
               ? [1, 2, 3, 4].map((i) => (
-                  <View key={i} style={{ width: CARD_W, height: 180, borderRadius: 16, backgroundColor: colors.neutralGray200 }} />
+                  <View key={i} style={{ width: CARD_W, height: CARD_W * 0.75, borderTopLeftRadius: 16, borderTopRightRadius: 16, backgroundColor: colors.neutralGray200 }} />
                 ))
               : activeAuctions.slice(0, 4).map((a) => {
                   const urgent = a.status === 'ending-soon' || (a.timeLeft > 0 && a.timeLeft < 3600)
@@ -245,6 +247,13 @@ export function HomeScreen() {
                         ) : (
                           <View style={[s.cardImgWrap, { backgroundColor: colors.neutralGray100 }]} />
                         )}
+                        <LinearGradient
+                          colors={['rgba(0,43,92,0.06)', 'transparent', 'rgba(200,166,66,0.05)']}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={StyleSheet.absoluteFill}
+                          pointerEvents="none"
+                        />
                         {a.images?.length > 1 && (
                           <View style={{ position: 'absolute', top: 6, right: 6, flexDirection: 'row', gap: 2 }}>
                             {a.images.slice(0, 3).map((_: string, i: number) => (

@@ -48,7 +48,7 @@ function ShimmerBlock({ style }: { style?: ViewStyle }) {
   )
 }
 
-export function SkeletonCard({ style }: { style?: ViewStyle }) {
+export function SkeletonCard({ style, imageHeight = 140 }: { style?: ViewStyle; imageHeight?: number }) {
   return (
     <View
       style={[
@@ -62,7 +62,7 @@ export function SkeletonCard({ style }: { style?: ViewStyle }) {
         style,
       ]}
     >
-      <ShimmerBlock style={{ width: '100%', height: 140, borderRadius: 0 }} />
+      <ShimmerBlock style={{ width: '100%', height: imageHeight, borderRadius: 0 }} />
       <View style={{ padding: 12, gap: 8 }}>
         <ShimmerBlock style={{ width: '70%', height: 14 }} />
         <ShimmerBlock style={{ width: '40%', height: 12 }} />

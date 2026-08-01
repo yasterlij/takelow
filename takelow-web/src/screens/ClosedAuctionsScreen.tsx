@@ -112,7 +112,7 @@ export function ClosedAuctionsScreen() {
                 >
                 <div className="flex items-start gap-4">
                   {/* ── Thumbnail ── */}
-                  <div className="flex size-20 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl bg-neutral-100">
+                  <div className="flex size-20 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-awash-blue/10 via-neutral-100 to-awash-gold/10 shadow-[0_8px_24px_rgba(0,43,92,0.14)] ring-1 ring-awash-blue/10">
                     {auction.images?.[0] ? (
                       <img src={auction.images[0]} alt={auction.name} loading="lazy" decoding="async" className="h-full w-full object-cover" />
                     ) : (
