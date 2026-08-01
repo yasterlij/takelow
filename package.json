@@ -12,7 +12,8 @@
     "dev": "npm run docker:up && bash scripts/wait-for-db.sh && concurrently \"npm run services\" \"bash scripts/wait-for-services.sh\" \"cd takelow-web && npm run dev\"",
     "app": "cd takelow-app && npx expo start",
     "setup": "npm install && npm run docker:up && bash scripts/wait-for-db.sh && concurrently \"cd identity-service && npm install\" \"cd auction-engine && npm install\" \"cd query-service && npm install\" \"cd takelow-web && npm install\" \"cd takelow-app && npm install\" && npm run db:migrate && npm run seed",
-    "start": "echo '\n  \u26a1 TakeLow\n\n  npm run dev     Full stack: Docker \u2192 backends \u2192 frontend\n  npm run app     Mobile app (Expo)\n  npm run db:setup  Docker \u2192 migrate \u2192 seed\n  npm run seed      Seed database\n  npm run services  Backends only (requires Docker)\n'"
+    "start": "echo '\n  \u26a1 TakeLow\n\n  npm run dev     Full stack: Docker \u2192 backends \u2192 frontend\n  npm run app     Mobile app (Expo)\n  npm run db:setup  Docker \u2192 migrate \u2192 seed\n  npm run seed      Seed database\n  npm run services  Backends only (requires Docker)\n  npm run sikina   Update the SikinaPay API key\n'",
+    "sikina": "bash scripts/update-sikina-key.sh"
   },
   "devDependencies": {
     "@types/react": "~19.2.18",
