@@ -1,4 +1,9 @@
-import { Injectable, Logger } from "@nestjs/common";
+import {
+  Injectable,
+  Logger,
+  HttpException,
+  ServiceUnavailableException,
+} from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { ConfigService } from "@nestjs/config";
 import { Repository, LessThan, IsNull, Not } from "typeorm";
@@ -349,7 +354,10 @@ export class PaymentService {
       } catch {
         message = text;
       }
-      throw new Error(message);
+      if (res.status >= 400 && res.status < 500) {
+        throw new HttpException(message, res.status);
+      }
+      throw new ServiceUnavailableException("Wallet service unavailable");
     }
   }
 

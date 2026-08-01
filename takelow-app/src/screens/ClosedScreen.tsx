@@ -4,7 +4,7 @@ import { Gavel, Trophy, Shield, Loader2, Sparkles, CheckCircle2, ArrowLeft } fro
 import { useApp } from '../AppContext'
 import { PhoneStatusBar, CTAButton, AwashLogo, Card } from '../components/AuctionUI'
 import { colors, CURRENCY } from '../theme'
-import { formatETB } from '../mockDataV0'
+import { formatCurrency, formatETB } from '../mockDataV0'
 import { api } from '../api'
 
 export function ClosedScreen() {
@@ -111,8 +111,8 @@ export function ClosedScreen() {
               </View>
               <View style={{ flexDirection: 'row', gap: 24 }}>
                 <View style={{ alignItems: 'center' }}>
-                  <Text style={{ fontSize: 9, fontWeight: '500', textTransform: 'uppercase', letterSpacing: 1, color: colors.mutedForeground }}>Bid Fee</Text>
-                  <Text style={{ fontFamily: 'System', fontWeight: '800', fontSize: 16, color: colors.primary }}>{CURRENCY} {formatETB(auction.bidFee)}</Text>
+                  <Text style={{ fontSize: 9, fontWeight: '500', textTransform: 'uppercase', letterSpacing: 1, color: colors.mutedForeground }}>Bid Amount</Text>
+                  <Text style={{ fontFamily: 'System', fontWeight: '800', fontSize: 16, color: colors.primary }}>{formatCurrency(auction.bidFee)}</Text>
                 </View>
                 <View style={{ alignItems: 'center' }}>
                   <Text style={{ fontSize: 9, fontWeight: '500', textTransform: 'uppercase', letterSpacing: 1, color: colors.mutedForeground }}>Savings</Text>

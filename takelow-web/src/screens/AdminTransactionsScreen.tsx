@@ -5,7 +5,7 @@ import { AdminLayout } from "../components/AdminLayout"
 import { DataTable } from "../components/DataTable"
 import { api } from "../api"
 import { toast } from "../store/toast.store"
-import { CURRENCY, formatETB } from "../mockDataV0"
+import { formatCurrency, formatETB } from "../mockDataV0"
 
 type Txn = {
   id: string
@@ -66,7 +66,7 @@ export function AdminTransactionsScreen() {
         const amt = Number(t.amount)
         return (
           <span className={`font-display text-sm font-bold tabular-nums ${meta?.color || "text-awash-blue"}`}>
-            {meta?.sign}{CURRENCY} {formatETB(amt)}
+            {meta?.sign}{formatCurrency(amt)}
           </span>
         )
       },
@@ -119,7 +119,7 @@ export function AdminTransactionsScreen() {
             className="rounded-2xl border border-emerald-200/60 bg-emerald-50/50 backdrop-blur-sm p-4 transition-all hover:shadow-lg"
           >
             <ArrowDownCircle className="size-5 text-emerald-600" />
-            <p className="mt-2 font-display text-xl font-extrabold tabular-nums text-emerald-700">{CURRENCY} {formatETB(totalIn)}</p>
+            <p className="mt-2 font-display text-xl font-extrabold tabular-nums text-emerald-700">{formatCurrency(totalIn)}</p>
             <p className="text-xs font-medium text-emerald-600/70">Total Deposits</p>
           </motion.div>
           <motion.div
@@ -127,7 +127,7 @@ export function AdminTransactionsScreen() {
             className="rounded-2xl border border-amber-200/60 bg-amber-50/50 backdrop-blur-sm p-4 transition-all hover:shadow-lg"
           >
             <ArrowUpCircle className="size-5 text-amber-600" />
-            <p className="mt-2 font-display text-xl font-extrabold tabular-nums text-amber-700">{CURRENCY} {formatETB(totalOut)}</p>
+            <p className="mt-2 font-display text-xl font-extrabold tabular-nums text-amber-700">{formatCurrency(totalOut)}</p>
             <p className="text-xs font-medium text-amber-600/70">Bid Fees Collected</p>
           </motion.div>
           <motion.div

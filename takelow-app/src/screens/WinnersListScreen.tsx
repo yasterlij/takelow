@@ -4,8 +4,8 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { Trophy, ArrowLeft, Crown, Sparkles, ArrowRight, Gavel, Timer, CreditCard, Users } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { Badge, Card } from '../components/AuctionUI'
-import { colors, CURRENCY } from '../theme'
-import { formatETB } from '../mockDataV0'
+import { colors } from '../theme'
+import { formatCurrency, formatETB } from '../mockDataV0'
 
 export function WinnersListScreen() {
   const { go, auctions, refreshAuctions, selectAuction } = useApp()
@@ -88,10 +88,10 @@ export function WinnersListScreen() {
                         <Text style={s.cardName} numberOfLines={1}>{a.name}</Text>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                           <Text style={{ color: colors.primary, fontSize: 15, fontWeight: '800' }}>
-                            {CURRENCY} {formatETB(a.winning_bid_amount ?? a.bidFee)}
+                            {formatCurrency(a.winning_bid_amount ?? a.bidFee)}
                           </Text>
                           <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10, fontWeight: '500', textDecorationLine: 'line-through' }}>
-                            {CURRENCY} {formatETB(a.marketPrice)}
+                            {formatCurrency(a.marketPrice)}
                           </Text>
                         </View>
                       </View>
@@ -129,7 +129,7 @@ export function WinnersListScreen() {
                           )}
                           {a.winners?.slice(0, 2).map((w) => (
                             <Text key={w.user_id} style={{ fontSize: 8, color: colors.mutedForeground }} numberOfLines={1}>
-                              {formatETB(w.amount)}
+                              {formatCurrency(w.amount)}
                             </Text>
                           ))}
                           {winnerCount > 2 && (

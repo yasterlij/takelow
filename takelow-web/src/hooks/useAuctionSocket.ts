@@ -3,6 +3,23 @@ import { io, Socket } from "socket.io-client"
 import type { Auction } from "../mockDataV0"
 import { getApiToken } from "../api"
 
+function getSocketBaseUrl(): string {
+  const explicit = import.meta.env.VITE_ENGINE_API_BASE_URL as string | undefined
+  if (explicit) {
+    return explicit.replace(/\/api\/v1\/?$/, "")
+  }
+
+  if (typeof window !== "undefined") {
+    const { protocol, hostname } = window.location
+    if (hostname === "localhost" || hostname === "127.0.0.1") {
+      return `${protocol}//${hostname}:3002`
+    }
+    return window.location.origin
+  }
+
+  return "http://localhost:3002"
+}
+
 export type SocketUpdatePayload = {
   auction_id: string
   total_bids: number
@@ -37,7 +54,10 @@ export function useAuctionSocket(
     const token = getApiToken()
     if (!token) return
 
-    const socket = io("/auctions", {
+    const baseUrl = getSocketBaseUrl()
+
+    const socket = io(`${baseUrl}/auctions`, {
+      path: "/socket.io",
       transports: ["websocket"],
       auth: { token },
       reconnection: true,
@@ -47,6 +67,14 @@ export function useAuctionSocket(
 
     socket.on("auction:update", (payload: SocketUpdatePayload) => {
       onUpdateRef.current(payload)
+    })
+
+    socket.on("connect_error", (error) => {
+      const message = error?.message || ""
+      if (/auth|jwt|token|unauthorized|forbidden/i.test(message)) {
+        socket.io.opts.reconnection = false
+        window.dispatchEvent(new CustomEvent("session-expired"))
+      }
     })
 
     socket.on("connect", () => {

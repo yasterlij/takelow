@@ -6,6 +6,7 @@ import {
   Min,
   IsDateString,
   IsEnum,
+  IsObject,
 } from "class-validator";
 import { AuctionStatus } from "../../winner/entities/auction.entity";
 
@@ -29,6 +30,10 @@ export class CreateProductDto {
   @IsOptional()
   @IsString()
   brand?: string;
+
+  @IsOptional()
+  @IsObject()
+  specs?: Record<string, string>;
 }
 
 export class UpdateProductDto {
@@ -53,6 +58,10 @@ export class UpdateProductDto {
   @IsOptional()
   @IsString()
   brand?: string;
+
+  @IsOptional()
+  @IsObject()
+  specs?: Record<string, string>;
 }
 
 export class CreateAuctionDto {

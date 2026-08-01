@@ -2,7 +2,7 @@ import { motion } from "framer-motion"
 import { Check, Download, Truck, Wallet, ShieldCheck, Building2, ArrowLeft } from "lucide-react"
 import { useApp } from "../AppContext"
 import { CTAButton, Card } from "../components/AuctionUI"
-import { CURRENCY, formatETB } from "../mockDataV0"
+import { formatCurrency, formatETB } from "../mockDataV0"
 
 const METHOD_LABELS: Record<string, { label: string; icon: any }> = {
   WALLET: { label: "Wallet", icon: Wallet },
@@ -72,7 +72,7 @@ export function PaymentConfirmedScreen() {
         >
           Thank you. Your payment of{" "}
           <span className="font-bold text-awash-blue">
-            {formatETB(userBid ?? 0)} {CURRENCY}
+            {formatCurrency(userBid ?? 0)}
           </span>{" "}
           was successful.
         </motion.p>
@@ -95,7 +95,7 @@ export function PaymentConfirmedScreen() {
               <div className="flex justify-between">
                 <dt className="text-neutral-400">Amount</dt>
                 <dd className="font-semibold text-awash-blue">
-                  {CURRENCY} {formatETB(userBid ?? 0)}
+                  {formatCurrency(userBid ?? 0)}
                 </dd>
               </div>
               <div className="flex justify-between">

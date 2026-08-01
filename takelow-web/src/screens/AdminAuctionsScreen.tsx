@@ -5,8 +5,21 @@ import { useApp } from "../AppContext"
 import { api } from "../api"
 import { AdminLayout } from "../components/AdminLayout"
 import { CTAButton, Badge, Card } from "../components/AuctionUI"
-import { CURRENCY, formatETB } from "../mockDataV0"
+import { formatCurrency, formatETB, formatMaskedCurrency } from "../mockDataV0"
 import type { Auction } from "../mockDataV0"
+
+const specFields = [
+  { key: "storage", label: "Storage" },
+  { key: "ram", label: "RAM" },
+  { key: "edition", label: "Edition" },
+  { key: "battery", label: "Battery" },
+  { key: "camera", label: "Camera" },
+  { key: "osVersion", label: "OS Version" },
+  { key: "display", label: "Display" },
+  { key: "chipset", label: "Chipset" },
+] as const
+
+const emptySpecs = { storage: "", ram: "", edition: "", battery: "", camera: "", osVersion: "", display: "", chipset: "" }
 
 function AuctionThumb({ src, onClick }: { src?: string; onClick?: () => void }) {
   const [err, setErr] = useState(false)
@@ -45,7 +58,7 @@ function BidChart({ amounts, total }: { amounts: number[]; total: number }) {
     const bucketSize = range / count
     const result = Array.from({ length: count }, (_, i) => {
       const start = min + i * bucketSize
-      return { label: `${CURRENCY} ${formatETB(Math.round(start))}`, count: 0 }
+      return { label: formatCurrency(Math.round(start)), count: 0 }
     })
     amounts.forEach((a) => {
       const idx = Math.min(Math.floor((a - min) / bucketSize), count - 1)
@@ -143,7 +156,7 @@ function toDatetimeLocal(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
-const emptyForm = { name: "", category: "Computer", marketPrice: "", bidFee: "10", description: "", highlights: "", imageUrl: "", startTime: "", endTime: "", minBid: "", maxBid: "" }
+const emptyForm = { name: "", category: "Computer", marketPrice: "", bidFee: "10", description: "", highlights: "", imageUrl: "", startTime: "", endTime: "", minBid: "", maxBid: "", ...emptySpecs }
 
 export function AdminAuctionsScreen() {
   const { go, auctions, addAuction, updateAuction, deleteAuction, closeAuction } = useApp()
@@ -196,6 +209,8 @@ export function AdminAuctionsScreen() {
       imageUrl: a.images?.[0] || "", startTime: toDatetimeLocal(startDate), endTime: toDatetimeLocal(endDate),
       minBid: a.minBid != null ? String(a.minBid) : "",
       maxBid: a.maxBid != null ? String(a.maxBid) : "",
+      ...emptySpecs,
+      ...(a.specs || {}),
     })
     setImgPreviewErr(false)
     setShowForm(true)
@@ -210,6 +225,7 @@ export function AdminAuctionsScreen() {
     const base = {
       name: form.name, category: form.category, marketPrice: Number(form.marketPrice),
       description: form.description, highlights,
+      specs: Object.fromEntries(Object.keys(emptySpecs).map((key) => [key, (form as any)[key]?.trim()]).filter(([, value]) => value)),
       ...(form.imageUrl ? { images: [form.imageUrl] } : {}),
       ...(form.startTime ? { startTime: new Date(form.startTime).toISOString() } : {}),
       ...(form.endTime ? { endTime: new Date(form.endTime).toISOString() } : {}),
@@ -336,8 +352,8 @@ export function AdminAuctionsScreen() {
                 </div>
 
                 <div className="flex gap-3">
-                  <input value={form.marketPrice} onChange={(e) => setForm((f) => ({ ...f, marketPrice: e.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1").replace(/(\.\d{2})\d+/g, "$1") }))} placeholder="Market price" className="input-full" />
-                  <input value={form.bidFee} onChange={(e) => setForm((f) => ({ ...f, bidFee: e.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1").replace(/(\.\d{2})\d+/g, "$1") }))} placeholder="Bid fee" className="input-full" />
+                  <input value={form.marketPrice} onChange={(e) => setForm((f) => ({ ...f, marketPrice: e.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1").replace(/(\.\d{2})\d+/g, "$1") }))} placeholder="Payment" className="input-full" />
+                  <input value={form.bidFee} onChange={(e) => setForm((f) => ({ ...f, bidFee: e.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1").replace(/(\.\d{2})\d+/g, "$1") }))} placeholder="Bid Amount" className="input-full" />
                 </div>
                 <div className="flex gap-3">
                   <label className="flex-1">
@@ -351,6 +367,19 @@ export function AdminAuctionsScreen() {
                 </div>
                 <textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="Description" className="input-full" rows={2} />
                 <input value={form.highlights} onChange={(e) => setForm((f) => ({ ...f, highlights: e.target.value }))} placeholder="Highlights (comma separated)" className="input-full" />
+                <div className="grid grid-cols-2 gap-3">
+                  {specFields.map((field) => (
+                    <label key={field.key}>
+                      <span className="mb-1 block text-[10px] font-semibold text-neutral-400">{field.label}</span>
+                      <input
+                        value={(form as any)[field.key] || ""}
+                        onChange={(e) => setForm((f) => ({ ...f, [field.key]: e.target.value }))}
+                        placeholder={field.label}
+                        className="input-full"
+                      />
+                    </label>
+                  ))}
+                </div>
                 <div className="flex gap-3">
                   <label className="flex-1">
                     <span className="mb-1 block text-[10px] font-semibold text-neutral-400">Start</span>
@@ -422,13 +451,15 @@ export function AdminAuctionsScreen() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="truncate text-sm font-bold text-awash-blue">{a.name}</p>
+                        {a.publicCode && <Badge tone="green">Code {a.publicCode}</Badge>}
                         <StatusBadge status={a.status} />
                       </div>
                       <p className="mt-0.5 text-xs font-medium text-neutral-400">
-                        {a.bidders} bidders · {CURRENCY} {formatETB(a.marketPrice)}
+                        {a.bidders} bidders · {formatCurrency(a.marketPrice)}
                         {bidAmounts.length > 0 && (
-                          <span className="ml-2">· Avg bid {CURRENCY} {formatETB(avgBid)}</span>
+                          <span className="ml-2">· Avg bid {formatCurrency(avgBid)}</span>
                         )}
+                        {a.specSummary && <span className="ml-2">· {a.specSummary}</span>}
                         {a.minBid && <span className="ml-2">· Min {a.minBid}</span>}
                         {a.maxBid && <span className="ml-2">· Max {a.maxBid}</span>}
 
@@ -471,7 +502,7 @@ export function AdminAuctionsScreen() {
                       </div>
                       <p className="mt-1 text-xs font-medium text-emerald-700">
                         {winnerResult.winnerName
-                          ? `Winner: ${winnerResult.winnerName}${winnerResult.winnerUserId ? ` (User ${winnerResult.winnerUserId.slice(0, 8)})` : ""}${winnerResult.amount ? ` — ${CURRENCY} ${formatETB(winnerResult.amount)}` : ""}`
+                          ? `Winner: ${winnerResult.winnerName}${winnerResult.winnerUserId ? ` (User ${winnerResult.winnerUserId.slice(0, 8)})` : ""}${winnerResult.amount ? ` — ${formatCurrency(winnerResult.amount)}` : ""}`
                           : "No unique winner found for this auction."}
                       </p>
                     </div>
@@ -490,10 +521,10 @@ export function AdminAuctionsScreen() {
                         {bidAmounts.length > 1 && (
                           <div className="flex items-center gap-2 text-[10px] text-neutral-400">
                             <span className="flex items-center gap-1">
-                              <TrendingDown className="size-3" /> Min: {CURRENCY} {formatETB(Math.min(...bidAmounts))}
+                              <TrendingDown className="size-3" /> Min: {formatCurrency(Math.min(...bidAmounts))}
                             </span>
                             <span className="flex items-center gap-1">
-                              <ArrowUpRight className="size-3" /> Max: {CURRENCY} {formatETB(Math.max(...bidAmounts))}
+                              <ArrowUpRight className="size-3" /> Max: {formatCurrency(Math.max(...bidAmounts))}
                             </span>
                           </div>
                         )}
@@ -516,7 +547,7 @@ export function AdminAuctionsScreen() {
                                 <span className="flex size-4 items-center justify-center rounded-full bg-awash-blue/10 text-[8px] font-bold text-awash-blue/60">{i + 1}</span>
                                 {display}
                               </span>
-                              <span className="text-[11px] font-bold text-awash-blue">{(b as any).amount_encrypted ? `${CURRENCY} ••••` : `${CURRENCY} ${formatETB(b.amount)}`}</span>
+                              <span className="text-[11px] font-bold text-awash-blue">{(b as any).amount_encrypted ? formatMaskedCurrency() : formatCurrency(b.amount)}</span>
                             </div>
                                 )
                               })}

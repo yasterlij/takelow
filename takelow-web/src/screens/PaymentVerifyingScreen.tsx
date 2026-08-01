@@ -4,10 +4,10 @@ import { Check, X, Loader2, ArrowRight, Gavel, ArrowLeft } from "lucide-react"
 import { useApp } from "../AppContext"
 import { api } from "../api"
 import { CTAButton, Card } from "../components/AuctionUI"
-import { CURRENCY, formatETB } from "../mockDataV0"
+import { formatCurrency, formatETB } from "../mockDataV0"
 
 export function PaymentVerifyingScreen() {
-  const { go, selectedId, userBid, getAuction, paymentContext, setFeePaid } = useApp()
+  const { go, selectedId, userBid, pendingBidAmount, getAuction, paymentContext, setFeePaid } = useApp()
   const auction = getAuction(selectedId)
   const [message, setMessage] = useState("Waiting for payment confirmation...")
   const [paid, setPaid] = useState(false)
@@ -15,8 +15,8 @@ export function PaymentVerifyingScreen() {
   const [confirming, setConfirming] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const amount = userBid ?? 0
   const isBidFee = paymentContext === 'bid-fee'
+  const amount = isBidFee ? (auction?.bidFee ?? 0) : (userBid ?? 0)
 
   useEffect(() => {
     let attempts = 0
@@ -119,8 +119,18 @@ export function PaymentVerifyingScreen() {
             transition={{ delay: 0.25 }}
             className="mt-2 max-w-xs text-sm font-medium text-neutral-400"
           >
-            Your payment of <span className="font-bold text-awash-blue">{formatETB(amount)} {CURRENCY}</span> was received.
+            Your payment of <span className="font-bold text-awash-blue">{formatCurrency(amount)}</span> was received.
           </motion.p>
+          {isBidFee && pendingBidAmount != null && (
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.3 }}
+              className="mt-2 max-w-xs text-xs font-semibold text-emerald-700"
+            >
+              Saved bid {formatCurrency(pendingBidAmount)} will be submitted next.
+            </motion.p>
+          )}
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
@@ -135,8 +145,14 @@ export function PaymentVerifyingScreen() {
                 </div>
                 <div className="flex justify-between">
                   <dt className="text-neutral-400">Amount</dt>
-                  <dd className="font-semibold text-awash-blue">{CURRENCY} {formatETB(amount)}</dd>
+                  <dd className="font-semibold text-awash-blue">{formatCurrency(amount)}</dd>
                 </div>
+                {isBidFee && pendingBidAmount != null && (
+                  <div className="flex justify-between">
+                    <dt className="text-neutral-400">Saved bid</dt>
+                    <dd className="font-semibold text-awash-blue">{formatCurrency(pendingBidAmount)}</dd>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <dt className="text-neutral-400">Status</dt>
                   <dd className="font-semibold text-emerald-600">Completed</dd>
@@ -152,7 +168,7 @@ export function PaymentVerifyingScreen() {
           className="border-t border-border/60 bg-white/90 p-4 backdrop-blur-xl"
         >
           <CTAButton onClick={handleSuccessAction}>
-            {isBidFee ? <><Gavel className="size-[18px]" /> Continue to Place Bid</> : <><ArrowRight className="size-[18px]" /> Track Delivery</>}
+            {isBidFee ? <><Gavel className="size-[18px]" /> Submit Saved Bid</> : <><ArrowRight className="size-[18px]" /> Track Delivery</>}
           </CTAButton>
         </motion.div>
       </motion.div>

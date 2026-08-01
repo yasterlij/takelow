@@ -1,13 +1,13 @@
 import React, { useMemo, useState, useCallback } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, Image, StyleSheet, Dimensions, RefreshControl } from 'react-native'
-import { Flame, ShieldCheck, Trophy, Sparkles, PiggyBank, Zap, ImageIcon } from 'lucide-react-native'
+import { Flame, ShieldCheck, Trophy, Sparkles, PiggyBank, ImageIcon } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { AppBar, Badge } from '../components/AuctionUI'
 import { useCountdown } from '../components/Countdown'
 import { SkeletonCard } from '../components/SkeletonLoader'
 import { EmptyState } from '../components/EmptyState'
 import type { Auction } from '../mockDataV0'
-import { CURRENCY, formatETB, formatCountdown } from '../mockDataV0'
+import { formatCurrency, formatCountdown } from '../mockDataV0'
 import { colors } from '../theme'
 
 const CARD_W = (Dimensions.get('window').width - 16 * 2 - 12) / 2
@@ -42,8 +42,8 @@ function TimePill({ seconds, endingSoon }: { seconds: number; endingSoon: boolea
 
 function AuctionCard({ auction, onOpen }: { auction: Auction; onOpen: () => void }) {
   const endingSoon = auction.status === 'ending-soon'
-  const savings = Math.round((1 - auction.bidFee / auction.marketPrice) * 100)
   const bidProgress = auction.maxBid ? Math.min(auction.totalBids / auction.maxBid, 1) : 0
+  const publicCode = auction.publicCode || auction.id.slice(0, 6).toUpperCase()
   return (
     <TouchableOpacity onPress={onOpen} activeOpacity={0.85} style={s.card}>
       <View style={s.cardImgOuter}>
@@ -54,47 +54,33 @@ function AuctionCard({ auction, onOpen }: { auction: Auction; onOpen: () => void
           ) : (
             <Badge tone="green">Live</Badge>
           )}
+          <View style={s.codeBadge}><Text style={s.codeBadgeText}>{publicCode}</Text></View>
         </View>
       </View>
-      <View style={s.statsRow}>
-        <TimePill seconds={auction.timeLeft} endingSoon={endingSoon} />
-        <View style={s.bidCount}>
-          <Text style={s.bidCountText}>{auction.totalBids || auction.bidders} bids</Text>
+      <View style={{ padding: 10, gap: 6 }}>
+        <Text style={s.cardName} numberOfLines={1}>{auction.name}</Text>
+        {auction.specSummary ? <Text style={s.cardSpec} numberOfLines={1}>{auction.specSummary}</Text> : null}
+        <Text style={{ fontSize: 9, fontWeight: '500', color: colors.mutedForeground, textDecorationLine: 'line-through' }}>
+          {formatCurrency(auction.marketPrice)}
+        </Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+          <View style={s.feeTag}><Text style={s.feeTagText}>Bid Amount: {formatCurrency(auction.bidFee)}</Text></View>
+          <View style={s.bidderBadge}>
+            <Text style={s.bidderBadgeText}>{auction.totalBids || auction.bidders} bidders</Text>
+          </View>
+        </View>
+        <View style={s.viewSpecsBar}><Text style={s.viewSpecsText}>View more specs</Text></View>
+        <View style={{ alignItems: 'center', marginTop: 2 }}>
+          <TimePill seconds={auction.timeLeft} endingSoon={endingSoon} />
         </View>
       </View>
       {auction.maxBid && (
         <View style={{ paddingHorizontal: 10, paddingTop: 6 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 }}>
-            <Text style={{ fontSize: 8, fontWeight: '600', color: colors.mutedForeground }}>Bids</Text>
-            <Text style={{ fontSize: 8, fontWeight: '600', color: colors.mutedForeground }}>{auction.totalBids}/{auction.maxBid}</Text>
-          </View>
           <View style={{ height: 3, borderRadius: 2, backgroundColor: colors.border, overflow: 'hidden' }}>
             <View style={{ width: `${bidProgress * 100}%`, height: '100%', borderRadius: 2, backgroundColor: bidProgress > 0.8 ? colors.primary : colors.emerald500 }} />
           </View>
         </View>
       )}
-      <View style={{ padding: 10, gap: 6 }}>
-        <Text style={s.cardName} numberOfLines={1}>{auction.name}</Text>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <View>
-            <Text style={{ fontSize: 9, fontWeight: '500', color: colors.mutedForeground, textDecorationLine: 'line-through' }}>
-              {CURRENCY} {formatETB(auction.marketPrice)}
-            </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 2 }}>
-              <Text style={{ fontSize: 15, fontWeight: '800', color: colors.primary }}>
-                {CURRENCY} {formatETB(auction.bidFee)}
-              </Text>
-              <Text style={{ fontSize: 9, fontWeight: '500', color: colors.mutedForeground }}>bid</Text>
-            </View>
-          </View>
-          {savings > 0 && (
-            <View style={s.savingsBadge}>
-              <Zap size={10} color={colors.emerald600} />
-              <Text style={{ fontSize: 9, fontWeight: '700', color: colors.emerald600 }}>{savings}% off</Text>
-            </View>
-          )}
-        </View>
-      </View>
     </TouchableOpacity>
   )
 }
@@ -240,13 +226,18 @@ const s = StyleSheet.create({
   cardImgOuter: { width: '100%', height: CARD_W * 0.75, position: 'relative' },
   cardImgWrap: { width: '100%', height: '100%' },
   cardImgTop: { position: 'absolute', top: 8, left: 8, right: 8, flexDirection: 'row', justifyContent: 'space-between' },
-  statsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
-  bidCount: { backgroundColor: colors.muted, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 3 },
-  bidCountText: { fontSize: 10, fontWeight: '700', color: colors.navy },
+  codeBadge: { borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.92)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)', paddingHorizontal: 8, paddingVertical: 4 },
+  codeBadgeText: { fontSize: 9, fontWeight: '800', color: colors.awashBlue, letterSpacing: 1 },
+  cardSpec: { fontSize: 10, fontWeight: '500', color: colors.mutedForeground },
+  feeTag: { borderRadius: 999, backgroundColor: colors.primary + '14', borderWidth: 1, borderColor: colors.primary + '33', paddingHorizontal: 8, paddingVertical: 4 },
+  feeTagText: { fontSize: 10, fontWeight: '700', color: colors.primary },
+  bidderBadge: { borderRadius: 16, backgroundColor: colors.emerald50, paddingHorizontal: 8, paddingVertical: 4 },
+  bidderBadgeText: { fontSize: 10, fontWeight: '700', color: colors.emerald700 },
   cardName: { fontSize: 13, fontWeight: '700', color: colors.navy },
-  savingsBadge: { flexDirection: 'row', alignItems: 'center', gap: 2, borderRadius: 20, backgroundColor: colors.emerald500 + '1A', paddingHorizontal: 8, paddingVertical: 3 },
-  timePill: { flexDirection: 'row', alignItems: 'center', gap: 2, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 3 },
-  timePillText: { fontSize: 10, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  viewSpecsBar: { marginTop: 2, borderRadius: 10, backgroundColor: colors.awashBlue + '0D', paddingVertical: 6, paddingHorizontal: 8, alignItems: 'center' },
+  viewSpecsText: { fontSize: 9, fontWeight: '700', color: colors.awashBlue, textTransform: 'uppercase', letterSpacing: 1 },
+  timePill: { flexDirection: 'row', alignItems: 'center', gap: 2, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
+  timePillText: { fontSize: 11, fontWeight: '800', fontVariant: ['tabular-nums'] },
   pageTitle: { fontSize: 18, fontWeight: '800', color: colors.navy },
   pageSub: { fontSize: 12, fontWeight: '500', color: colors.mutedForeground, marginTop: 2 },
   greenDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.emerald500 },

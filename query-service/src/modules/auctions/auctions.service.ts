@@ -25,13 +25,94 @@ export class AuctionsService {
     private bidEncryptionService: BidEncryptionService,
   ) {}
 
+  private isMissingColumnError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error);
+    return message.includes('public_code') || message.includes('specs');
+  }
+
+  private async loadAuctionRows(statuses: AuctionStatus[], activeOnly = false): Promise<any[]> {
+    const statusPlaceholders = statuses.map((_, index) => `$${index + 1}`).join(', ');
+    const params: any[] = [...statuses];
+    let where = `a.status IN (${statusPlaceholders})`;
+    if (activeOnly) {
+      params.push(new Date());
+      where += ` AND a.end_time > $${params.length}`;
+    }
+
+    return this.auctionRepository.query(
+      `WITH ranked AS (
+        SELECT id, LPAD(ROW_NUMBER() OVER (ORDER BY created_at ASC)::text, 5, '0') AS public_code
+        FROM auctions
+      )
+      SELECT
+        a.id,
+        ranked.public_code,
+        a.product_id,
+        a.start_time,
+        a.end_time,
+        a.status,
+        a.winner_user_id,
+        a.winning_bid_amount,
+        a.payment_status,
+        a.payment_deadline,
+        a.created_at,
+        p.id AS product_ref_id,
+        p.name AS product_name,
+        p.description AS product_description,
+        p.image_urls AS product_image_urls,
+        p.current_market_price AS product_current_market_price,
+        p.brand AS product_brand
+      FROM auctions a
+      LEFT JOIN ranked ON ranked.id = a.id
+      LEFT JOIN products p ON p.id = a.product_id
+      WHERE ${where}
+      ORDER BY a.created_at DESC
+      LIMIT 50`,
+      params,
+    );
+  }
+
+  private toAuctionRecord(row: any) {
+    return {
+      id: row.id,
+      public_code: row.public_code,
+      product_id: row.product_id,
+      product: row.product_ref_id
+        ? {
+            id: row.product_ref_id,
+            name: row.product_name,
+            description: row.product_description,
+            image_urls: row.product_image_urls,
+            current_market_price: Number(row.product_current_market_price || 0),
+            brand: row.product_brand,
+            specs: null,
+          }
+        : null,
+      start_time: row.start_time,
+      end_time: row.end_time,
+      status: row.status,
+      winner_user_id: row.winner_user_id,
+      winning_bid_amount: row.winning_bid_amount,
+      payment_status: row.payment_status,
+      payment_deadline: row.payment_deadline,
+      created_at: row.created_at,
+    };
+  }
+
   async getActiveAuctions(): Promise<any[]> {
-    const auctions = await this.auctionRepository.find({
-      where: { status: AuctionStatus.ACTIVE, end_time: MoreThan(new Date()) },
-      relations: ['product'],
-      order: { created_at: 'DESC' },
-      take: 50,
-    });
+    let auctions: any[] = [];
+    try {
+      auctions = await this.auctionRepository.find({
+        where: { status: AuctionStatus.ACTIVE, end_time: MoreThan(new Date()) },
+        relations: ['product'],
+        order: { created_at: 'DESC' },
+        take: 50,
+      });
+    } catch (error) {
+      if (!this.isMissingColumnError(error)) throw error;
+      const rows = await this.loadAuctionRows([AuctionStatus.ACTIVE], true);
+      auctions = rows.map((row) => this.toAuctionRecord(row));
+    }
 
     if (auctions.length === 0) return [];
 
@@ -59,6 +140,7 @@ export class AuctionsService {
 
     return auctions.map((auction) => ({
       id: auction.id,
+      public_code: auction.public_code,
       product_id: auction.product_id,
       product: auction.product || null,
       start_time: auction.start_time,
@@ -73,10 +155,46 @@ export class AuctionsService {
   }
 
   async getActiveAuction(auctionId: string): Promise<any> {
-    const auction = await this.auctionRepository.findOne({
-      where: { id: auctionId },
-      relations: ['product'],
-    });
+    let auction: any = null;
+    try {
+      auction = await this.auctionRepository.findOne({
+        where: { id: auctionId },
+        relations: ['product'],
+      });
+    } catch (error) {
+      if (!this.isMissingColumnError(error)) throw error;
+      const rows = await this.auctionRepository.query(
+        `WITH ranked AS (
+          SELECT id, LPAD(ROW_NUMBER() OVER (ORDER BY created_at ASC)::text, 5, '0') AS public_code
+          FROM auctions
+        )
+        SELECT
+          a.id,
+          ranked.public_code,
+          a.product_id,
+          a.start_time,
+          a.end_time,
+          a.status,
+          a.winner_user_id,
+          a.winning_bid_amount,
+          a.payment_status,
+          a.payment_deadline,
+          a.created_at,
+          p.id AS product_ref_id,
+          p.name AS product_name,
+          p.description AS product_description,
+          p.image_urls AS product_image_urls,
+          p.current_market_price AS product_current_market_price,
+          p.brand AS product_brand
+        FROM auctions a
+        LEFT JOIN ranked ON ranked.id = a.id
+        LEFT JOIN products p ON p.id = a.product_id
+        WHERE a.id = $1
+        LIMIT 1`,
+        [auctionId],
+      );
+      auction = rows[0] ? this.toAuctionRecord(rows[0]) : null;
+    }
 
     if (!auction || auction.status !== AuctionStatus.ACTIVE || auction.end_time.getTime() <= Date.now()) {
       throw new NotFoundException('Auction not found or has ended');
@@ -97,6 +215,7 @@ export class AuctionsService {
 
     return {
       id: auction.id,
+      public_code: auction.public_code,
       product: (auction as any).product || null,
       time_remaining: {
         days: Math.floor(timeRemaining / 86400000),
@@ -113,15 +232,22 @@ export class AuctionsService {
   }
 
   async getClosedAuctions(): Promise<any[]> {
-    const auctions = await this.auctionRepository.find({
-      where: [
-        { status: AuctionStatus.CLOSED },
-        { status: AuctionStatus.EXPIRED },
-      ],
-      relations: ['product'],
-      order: { created_at: 'DESC' },
-      take: 50,
-    });
+    let auctions: any[] = [];
+    try {
+      auctions = await this.auctionRepository.find({
+        where: [
+          { status: AuctionStatus.CLOSED },
+          { status: AuctionStatus.EXPIRED },
+        ],
+        relations: ['product'],
+        order: { created_at: 'DESC' },
+        take: 50,
+      });
+    } catch (error) {
+      if (!this.isMissingColumnError(error)) throw error;
+      const rows = await this.loadAuctionRows([AuctionStatus.CLOSED, AuctionStatus.EXPIRED]);
+      auctions = rows.map((row) => this.toAuctionRecord(row));
+    }
 
     const auctionIds = auctions.map((a) => a.id);
 
@@ -170,6 +296,7 @@ export class AuctionsService {
       const auctionWinners = winnersByAuction.get(auction.id) || [];
       return {
         id: auction.id,
+        public_code: auction.public_code,
         product_id: auction.product_id,
         product: auction.product || null,
         start_time: auction.start_time,

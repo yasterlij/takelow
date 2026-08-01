@@ -3,7 +3,7 @@ import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-nati
 import { Gavel, Users, TrendingUp, DollarSign, Clock, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { CTAButton, Badge, Card } from '../components/AuctionUI'
-import { CURRENCY, formatETB } from '../mockDataV0'
+import { formatCurrency, formatETB } from '../mockDataV0'
 import { colors } from '../theme'
 
 export function AdminDashboardScreen() {
@@ -17,7 +17,7 @@ export function AdminDashboardScreen() {
     { icon: Gavel, label: 'Active Auctions', value: active.length, color: colors.primary },
     { icon: Users, label: 'Users', value: users.length, color: colors.navy },
     { icon: TrendingUp, label: 'Total Bids', value: allBids.length, color: colors.emerald600 },
-    { icon: DollarSign, label: 'Bid Fee Revenue', value: `${CURRENCY} ${formatETB(totalRevenue)}`, color: colors.primary },
+    { icon: DollarSign, label: 'Bid Fee Revenue', value: formatCurrency(totalRevenue), color: colors.primary },
   ]
 
   const paymentStats = [

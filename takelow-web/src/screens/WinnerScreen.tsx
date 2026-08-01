@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Trophy, Loader2, AlertTriangle, Users, Clock, CreditCard, ArrowLeft, Info, CheckCircle2, PartyPopper, Sparkles } from "lucide-react"
 import { useApp } from "../AppContext"
 import { api, type ApiWinnerResult, type ApiAuctionResult, type ApiWinnerInfo, type ApiBid } from "../api"
-import { CURRENCY, formatETB } from "../mockDataV0"
+import { formatCurrency, formatETB, formatMaskedCurrency } from "../mockDataV0"
 
 const confettiParticles = Array.from({ length: 20 }, (_, i) => ({
   id: i,
@@ -161,14 +161,14 @@ const winnersCount = (winner as any)?.winners_count as number | undefined
                 <h2 className="mt-4 text-center font-display text-lg font-bold text-foreground">{auction.name}</h2>
                 <div className="mt-4 rounded-xl bg-gradient-to-br from-awash-gold/15 to-awash-gold-light/10 border border-primary/20 p-4 text-center">
                   <p className="text-xs font-semibold uppercase tracking-wide text-awash-gold-dark">Primary Winning Bid</p>
-                  <p className="font-display text-4xl font-extrabold text-gradient-gold tabular-nums">{formatETB(winner.winning_bid_amount ?? 0)} {CURRENCY}</p>
+                  <p className="font-display text-4xl font-extrabold text-gradient-gold tabular-nums">{formatCurrency(winner.winning_bid_amount ?? 0)}</p>
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
                   <div className="rounded-lg bg-white/60 p-2.5"><span className="text-xs text-neutral-400">Total Bids</span><p className="font-semibold text-foreground">{winner.total_bids}</p></div>
                   <div className="rounded-lg bg-white/60 p-2.5"><span className="text-xs text-neutral-400">Unique Bidders</span><p className="font-semibold text-foreground">{winner.unique_bidders}</p></div>
                   <div className="rounded-lg bg-white/60 p-2.5"><span className="text-xs text-neutral-400">Primary Winner</span><p className="font-bold text-foreground">{winnerName || "Unknown"}</p></div>
                   {winner.lowest_unique_bid != null && (
-                    <div className="rounded-lg bg-white/60 p-2.5"><span className="text-xs text-neutral-400">Lowest Unique Bid</span><p className="font-bold text-emerald-600">{CURRENCY} {formatETB(winner.lowest_unique_bid)}</p></div>
+                    <div className="rounded-lg bg-white/60 p-2.5"><span className="text-xs text-neutral-400">Lowest Unique Bid</span><p className="font-bold text-emerald-600">{formatCurrency(winner.lowest_unique_bid)}</p></div>
                   )}
                   {deadlineHrs != null && (
                     <div className="rounded-lg bg-white/60 p-2.5 col-span-2"><span className="flex items-center gap-1 text-xs text-neutral-400"><Clock className="size-3" /> Payment Deadline</span><p className={`font-bold ${deadlineHrs < 6 ? "text-red-500" : "text-foreground"}`}>{deadlineHrs > 0 ? `${deadlineHrs}h remaining` : "Expired"}</p></div>
@@ -176,12 +176,12 @@ const winnersCount = (winner as any)?.winners_count as number | undefined
                 </div>
                 <div className="my-3 border-t border-primary/10" />
                 <div className="flex justify-between text-sm">
-                  <span className="text-neutral-400">Market Price</span>
-                  <span className="font-semibold text-neutral-400 line-through">{CURRENCY} {formatETB(auction.marketPrice)}</span>
+                  <span className="text-neutral-400">Payment</span>
+                  <span className="font-semibold text-neutral-400 line-through">{formatCurrency(auction.marketPrice)}</span>
                 </div>
                 <div className="mt-1 flex justify-between text-sm">
                   <span className="text-neutral-400">Amount Saved</span>
-                  <span className="font-bold text-emerald-600">{CURRENCY} {formatETB(savings)} ({savingsPct}%)</span>
+                  <span className="font-bold text-emerald-600">{formatCurrency(savings)} ({savingsPct}%)</span>
                 </div>
               </div>
             </motion.div>
@@ -244,7 +244,7 @@ const winnersCount = (winner as any)?.winners_count as number | undefined
                             {isCurrentUser && <span className="ml-1.5 text-[10px] font-bold text-primary">(You)</span>}
                           </p>
                           <div className="flex items-center gap-2 text-xs text-neutral-400">
-                            <span className="font-medium text-emerald-600">{CURRENCY}{formatETB(w.amount)}</span>
+                            <span className="font-medium text-emerald-600">{formatCurrency(w.amount)}</span>
                             {isPaid && <span className="text-emerald-600 font-medium">• Paid</span>}
                             {isExpired && <span className="text-red-500 font-medium">• Expired</span>}
                             {!isPaid && !isExpired && wDeadlineHrs != null && (
@@ -253,7 +253,7 @@ const winnersCount = (winner as any)?.winners_count as number | undefined
                           </div>
                         </div>
                       </div>
-                      <span className="font-bold text-foreground tabular-nums">{CURRENCY} {formatETB(w.amount)}</span>
+                      <span className="font-bold text-foreground tabular-nums">{formatCurrency(w.amount)}</span>
                     </div>
                   )
                 })}
@@ -267,7 +267,7 @@ const winnersCount = (winner as any)?.winners_count as number | undefined
               <h3 className="mb-2 text-sm font-bold text-foreground">Your Bid</h3>
               <div className="flex justify-between text-sm">
                 <span className="text-neutral-400">Amount</span>
-                <span className="font-bold text-primary">{CURRENCY} {formatETB(myBidInfo.amount)}</span>
+                <span className="font-bold text-primary">{formatCurrency(myBidInfo.amount)}</span>
               </div>
               <div className="mt-1 flex justify-between text-sm">
                 <span className="text-neutral-400">Fee Paid</span>
@@ -320,7 +320,7 @@ const winnersCount = (winner as any)?.winners_count as number | undefined
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">Winner</span>
-                      <span className="text-xs font-bold text-emerald-700 tabular-nums">{CURRENCY} {formatETB(winningAmount)}</span>
+                      <span className="text-xs font-bold text-emerald-700 tabular-nums">{formatCurrency(winningAmount)}</span>
                     </div>
                   </div>
                 )
@@ -338,7 +338,7 @@ const winnersCount = (winner as any)?.winners_count as number | undefined
                         <span className="text-xs text-neutral-500">{count} bidder{count > 1 ? 's' : ''}</span>
                         <div className="flex items-center gap-2">
                           {count > 1 && <span className="text-[10px] font-medium text-neutral-400">×{count}</span>}
-                          <span className="text-xs font-bold text-foreground tabular-nums">{CURRENCY} {formatETB(amount)}</span>
+                          <span className="text-xs font-bold text-foreground tabular-nums">{formatCurrency(amount)}</span>
                         </div>
                       </div>
                     ))}

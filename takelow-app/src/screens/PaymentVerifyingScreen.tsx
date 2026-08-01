@@ -5,16 +5,19 @@ import { useApp } from '../AppContext'
 import { api } from '../api'
 import { Card } from '../components/AuctionUI'
 import { colors } from '../theme'
-import { CURRENCY, formatETB } from '../mockDataV0'
+import { formatCurrency, formatETB } from '../mockDataV0'
 
 export function PaymentVerifyingScreen() {
-  const { go, selectedId, userBid, getAuction } = useApp()
+  const { go, selectedId, userBid, getAuction, sikinaPayContext, setFeePaid } = useApp()
   const auction = getAuction(selectedId)
   const [message, setMessage] = useState('Waiting for payment confirmation...')
   const [paid, setPaid] = useState(false)
   const [failed, setFailed] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const isBidFee = sikinaPayContext === 'bid-fee'
+  const amount = isBidFee ? (auction?.bidFee ?? 0) : (userBid ?? 0)
 
   useEffect(() => {
     let attempts = 0
@@ -23,7 +26,9 @@ export function PaymentVerifyingScreen() {
       setMessage(`Waiting for payment confirmation${'.'.repeat((attempts % 3) + 1)}`)
       try {
         if (!selectedId) return
-        const status = await api.getPaymentLinkStatus(selectedId)
+        const status = isBidFee
+            ? await api.getBidFeePaymentStatus(selectedId)
+            : await api.getPaymentLinkStatus(selectedId)
         if (status.status === 'SUCCESSFUL') {
           setPaid(true)
           if (pollRef.current) clearInterval(pollRef.current)
@@ -50,6 +55,10 @@ export function PaymentVerifyingScreen() {
   const handleConfirmPaid = async () => {
     if (!selectedId) return
     setConfirming(true)
+    if (isBidFee) {
+      setPaid(true)
+      return
+    }
     try {
       await api.confirmPayment(selectedId)
       setPaid(true)
@@ -57,8 +66,6 @@ export function PaymentVerifyingScreen() {
       setConfirming(false)
     }
   }
-
-  const amount = userBid ?? 0
 
   if (paid) {
     return (
@@ -68,7 +75,7 @@ export function PaymentVerifyingScreen() {
         </View>
         <Text style={s.title}>Payment Successful!</Text>
         <Text style={s.subtitle}>
-          Your payment of <Text style={s.amount}>{formatETB(amount)} {CURRENCY}</Text> was received.
+          Your payment of <Text style={s.amount}>{formatCurrency(amount)}</Text> was received.
         </Text>
         <Card style={{ width: '100%', maxWidth: 300, padding: 20, marginTop: 24 }}>
           <View style={s.row}>
@@ -77,16 +84,18 @@ export function PaymentVerifyingScreen() {
           </View>
           <View style={s.row}>
             <Text style={s.label}>Amount</Text>
-            <Text style={s.value}>{CURRENCY} {formatETB(amount)}</Text>
+            <Text style={s.value}>{formatCurrency(amount)}</Text>
           </View>
           <View style={s.row}>
             <Text style={s.label}>Status</Text>
             <Text style={[s.value, { color: colors.emerald500 }]}>Completed</Text>
           </View>
         </Card>
-        <TouchableOpacity style={s.btn} onPress={() => go('delivery')} activeOpacity={0.8}>
+        <TouchableOpacity style={s.btn} onPress={() => {
+          if (isBidFee) { setFeePaid(true); go('place-bid') } else { go('delivery') }
+        }} activeOpacity={0.8}>
           <ArrowRight size={18} color={colors.primaryForeground} />
-          <Text style={s.btnText}>Track Delivery</Text>
+          <Text style={s.btnText}>{isBidFee ? 'Submit Saved Bid' : 'Track Delivery'}</Text>
         </TouchableOpacity>
       </View>
     )
@@ -112,7 +121,7 @@ export function PaymentVerifyingScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           style={[s.btnOutline, { marginTop: 12 }]}
-          onPress={() => go('pay-winning')}
+          onPress={() => go(isBidFee ? 'pay-fee' : 'pay-winning')}
           activeOpacity={0.8}
         >
           <Text style={s.btnOutlineText}>Try Again</Text>

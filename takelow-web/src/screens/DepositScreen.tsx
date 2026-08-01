@@ -6,7 +6,7 @@ import { api } from "../api"
 import { FormField } from "../components/FormField"
 import { useForm } from "../hooks/useForm"
 import { depositSchema, type DepositValues } from "../lib/validation"
-import { CURRENCY, formatETB } from "../mockDataV0"
+import { CURRENCY, formatCurrency, formatETB } from "../mockDataV0"
 
 const QUICK_AMOUNTS = [100, 250, 500, 1000]
 
@@ -66,7 +66,7 @@ export function DepositScreen() {
             <Wallet className="size-5 text-primary" />
           </div>
           <p className="mt-2 font-display text-3xl font-extrabold tabular-nums text-white">
-            {CURRENCY} {formatETB(walletBalance)}
+            {formatCurrency(walletBalance)}
           </p>
         </motion.div>
 
@@ -80,7 +80,7 @@ export function DepositScreen() {
             label="Amount"
             error={form.errors.amount}
             touched={form.touched.amount}
-            hint="Maximum 2 decimal places. Up to 1,000,000 ETB."
+            hint="Maximum 2 decimal places. Up to 1,000,000 birr."
           >
             <div className="relative">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 font-display text-xl font-extrabold text-foreground">{CURRENCY}</span>
@@ -137,7 +137,7 @@ export function DepositScreen() {
             {loading ? (
               <><Loader2 className="size-4 animate-spin" /> Processing…</>
             ) : (
-              <><Wallet className="size-4" /> Deposit{form.values.amount > 0 ? ` ${CURRENCY} ${formatETB(form.values.amount)}` : ""}</>
+              <><Wallet className="size-4" /> Deposit{form.values.amount > 0 ? ` ${formatCurrency(form.values.amount)}` : ""}</>
             )}
           </motion.button>
         </motion.div>

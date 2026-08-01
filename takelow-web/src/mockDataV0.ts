@@ -10,8 +10,20 @@ export type AuctionWinnerInfo = {
   phone?: string
 }
 
+export type ProductSpecs = {
+  storage?: string
+  ram?: string
+  edition?: string
+  battery?: string
+  camera?: string
+  osVersion?: string
+  display?: string
+  chipset?: string
+}
+
 export type Auction = {
   id: string
+  publicCode?: string
   name: string
   category: string
   images: string[]
@@ -22,6 +34,8 @@ export type Auction = {
   status: AuctionStatus
   description: string
   highlights: string[]
+  specs?: ProductSpecs | null
+  specSummary?: string
   productId?: string
   uniqueBidders?: number
   totalBids?: number
@@ -36,10 +50,40 @@ export type Auction = {
   total_revenue?: number
 }
 
-export const CURRENCY = "ETB"
+export const CURRENCY = "birr"
 
 export function formatETB(amount: number | null | undefined): string {
   return new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(amount ?? 0)
+}
+
+export function formatCurrency(amount: number | null | undefined): string {
+  return `${formatETB(amount)} ${CURRENCY}`
+}
+
+export function formatMaskedCurrency(mask = "••••"): string {
+  return `${mask} ${CURRENCY}`
+}
+
+export function formatSpecSummary(specs?: ProductSpecs | null): string {
+  if (!specs) return ""
+  return [specs.storage, specs.ram, specs.edition].filter(Boolean).join(" | ")
+}
+
+export function getSpecEntries(specs?: ProductSpecs | null): Array<{ key: keyof ProductSpecs; label: string; value: string }> {
+  if (!specs) return []
+  const fields: Array<{ key: keyof ProductSpecs; label: string }> = [
+    { key: "storage", label: "Storage" },
+    { key: "ram", label: "RAM" },
+    { key: "edition", label: "Edition" },
+    { key: "battery", label: "Battery" },
+    { key: "camera", label: "Camera" },
+    { key: "osVersion", label: "OS Version" },
+    { key: "display", label: "Display" },
+    { key: "chipset", label: "Chipset" },
+  ]
+  return fields
+    .map((field) => ({ ...field, value: specs[field.key] || "" }))
+    .filter((field) => field.value)
 }
 
 export function formatCountdown(totalSeconds: number): {

@@ -4,7 +4,20 @@ import { Package, Plus, Search, Edit3, Trash2, ImageIcon, X, ArrowLeft } from 'l
 import { useApp } from '../AppContext'
 import { api } from '../api'
 import { CTAButton, Card } from '../components/AuctionUI'
+import { formatCurrency, formatSpecSummary } from '../mockDataV0'
 import { colors } from '../theme'
+
+const emptySpecs = { storage: '', ram: '', edition: '', battery: '', camera: '', osVersion: '', display: '', chipset: '' }
+const specFields = [
+  { key: 'storage', label: 'Storage' },
+  { key: 'ram', label: 'RAM' },
+  { key: 'edition', label: 'Edition' },
+  { key: 'battery', label: 'Battery' },
+  { key: 'camera', label: 'Camera' },
+  { key: 'osVersion', label: 'OS Version' },
+  { key: 'display', label: 'Display' },
+  { key: 'chipset', label: 'Chipset' },
+] as const
 
 export function AdminProductsScreen() {
   const { go } = useApp()
@@ -18,6 +31,7 @@ export function AdminProductsScreen() {
   const [price, setPrice] = useState('')
   const [description, setDescription] = useState('')
   const [imageUrl, setImageUrl] = useState('')
+  const [specs, setSpecs] = useState(emptySpecs)
 
   const loadProducts = async () => {
     setLoading(true)
@@ -31,13 +45,13 @@ export function AdminProductsScreen() {
   useEffect(() => { loadProducts() }, [])
 
   const resetForm = () => {
-    setName(''); setBrand(''); setPrice(''); setDescription(''); setImageUrl('')
+    setName(''); setBrand(''); setPrice(''); setDescription(''); setImageUrl(''); setSpecs(emptySpecs)
     setEditing(null); setShowForm(false)
   }
 
   const openEdit = (p: any) => {
     setName(p.name || ''); setBrand(p.brand || ''); setPrice(String(p.current_market_price || ''))
-    setDescription(p.description || ''); setImageUrl((p.image_urls || [])[0] || '')
+    setDescription(p.description || ''); setImageUrl((p.image_urls || [])[0] || ''); setSpecs({ ...emptySpecs, ...(p.specs || {}) })
     setEditing(p); setShowForm(true)
   }
 
@@ -49,6 +63,7 @@ export function AdminProductsScreen() {
       brand: brand.trim() || undefined,
       description: description.trim() || undefined,
       image_urls: imageUrl.trim() ? [imageUrl.trim()] : undefined,
+      specs: Object.fromEntries(Object.entries(specs).filter(([, value]) => value.trim())),
     }
     try {
       if (editing) { await api.updateProduct(editing.id, data) }
@@ -84,9 +99,19 @@ export function AdminProductsScreen() {
           <Text style={s.formTitle}>{editing ? 'Edit Product' : 'New Product'}</Text>
           <TextInput value={name} onChangeText={setName} placeholder="Product name" style={s.input} placeholderTextColor={colors.mutedForeground} />
           <TextInput value={brand} onChangeText={setBrand} placeholder="Brand" style={s.input} placeholderTextColor={colors.mutedForeground} />
-          <TextInput value={price} onChangeText={setPrice} placeholder="Market price" keyboardType="numeric" style={s.input} placeholderTextColor={colors.mutedForeground} />
+          <TextInput value={price} onChangeText={setPrice} placeholder="Payment" keyboardType="numeric" style={s.input} placeholderTextColor={colors.mutedForeground} />
           <TextInput value={description} onChangeText={setDescription} placeholder="Description" multiline style={[s.input, { height: 80 }]} placeholderTextColor={colors.mutedForeground} />
           <TextInput value={imageUrl} onChangeText={setImageUrl} placeholder="Image URL" style={s.input} placeholderTextColor={colors.mutedForeground} />
+          {specFields.map((field) => (
+            <TextInput
+              key={field.key}
+              value={specs[field.key]}
+              onChangeText={(value) => setSpecs((prev) => ({ ...prev, [field.key]: value }))}
+              placeholder={field.label}
+              style={s.input}
+              placeholderTextColor={colors.mutedForeground}
+            />
+          ))}
           <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
             <View style={{ flex: 1 }}><CTAButton variant="outline" onPress={resetForm}>Cancel</CTAButton></View>
             <View style={{ flex: 1 }}><CTAButton onPress={save}>{editing ? 'Update' : 'Create'}</CTAButton></View>
@@ -112,7 +137,8 @@ export function AdminProductsScreen() {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={s.productName}>{p.name}</Text>
-                    <Text style={s.productMeta}>{p.brand || 'No brand'} · ETB {p.current_market_price}</Text>
+                    <Text style={s.productMeta}>{p.brand || 'No brand'} · {formatCurrency(p.current_market_price)}</Text>
+                    {p.specs && formatSpecSummary(p.specs) ? <Text style={s.productMeta}>{formatSpecSummary(p.specs)}</Text> : null}
                   </View>
                   <TouchableOpacity onPress={() => openEdit(p)} style={s.actionBtn}><Edit3 size={16} color={colors.navy} /></TouchableOpacity>
                   <TouchableOpacity onPress={() => remove(p.id, p.name)} style={s.actionBtn}><Trash2 size={16} color={colors.destructive} /></TouchableOpacity>

@@ -12,7 +12,7 @@ import { Countdown } from "../components/Countdown"
 import { useAuctionSocket, applySocketUpdate, type SocketUpdatePayload } from "../hooks/useAuctionSocket"
 import { api, type ApiWinnerResult } from "../api"
 import { toast } from "../store/toast.store"
-import { CURRENCY, formatETB } from "../mockDataV0"
+import { formatCurrency, formatETB, formatMaskedCurrency } from "../mockDataV0"
 import type { Auction } from "../mockDataV0"
 
 type BidRow = { id: string; amount: number; user_id: string; user_name?: string | null; bid_time: string; ticket_number?: string; amount_encrypted?: boolean }
@@ -231,8 +231,8 @@ export function AdminAuctionMonitorScreen() {
               <h3 className="font-display text-sm font-bold text-awash-blue">{liveAuction.name}</h3>
               <p className="mt-0.5 text-xs font-medium text-neutral-400">{liveAuction.category || "No category"}</p>
               <div className="mt-3 flex items-center justify-between">
-                <span className="text-xs font-semibold text-neutral-400">Market Price</span>
-                <span className="font-display text-sm font-extrabold text-primary">{CURRENCY} {formatETB(liveAuction.marketPrice)}</span>
+                <span className="text-xs font-semibold text-neutral-400">Payment</span>
+                <span className="font-display text-sm font-extrabold text-primary">{formatCurrency(liveAuction.marketPrice)}</span>
               </div>
             </div>
           </motion.div>
@@ -353,7 +353,7 @@ export function AdminAuctionMonitorScreen() {
                   <span className="flex size-5 items-center justify-center rounded-full bg-awash-blue/10 text-[9px] font-bold text-awash-blue/60">{i + 1}</span>
                   {display}
                 </span>
-                <span className="font-display text-sm font-bold text-awash-blue">{b.amount_encrypted ? `${CURRENCY} ••••` : `${CURRENCY} ${formatETB(b.amount)}`}</span>
+                <span className="font-display text-sm font-bold text-awash-blue">{b.amount_encrypted ? formatMaskedCurrency() : formatCurrency(b.amount)}</span>
               </div>
             )
           })}
@@ -388,7 +388,7 @@ export function AdminAuctionMonitorScreen() {
                 key: "amount",
                 header: "Amount",
                 align: "right" as const,
-                render: (b: BidRow) => <span className="font-display text-sm font-bold text-awash-blue">{b.amount_encrypted ? `${CURRENCY} ••••` : `${CURRENCY} ${formatETB(b.amount)}`}</span>,
+                render: (b: BidRow) => <span className="font-display text-sm font-bold text-awash-blue">{b.amount_encrypted ? formatMaskedCurrency() : formatCurrency(b.amount)}</span>,
               },
               {
                 key: "ticket",
@@ -463,7 +463,7 @@ export function AdminAuctionMonitorScreen() {
                 <div className="mt-4 flex items-center gap-6">
                   <div className="text-center">
                     <p className="text-[10px] font-semibold uppercase text-neutral-400">Winning Bid</p>
-                    <p className="font-display text-xl font-extrabold text-primary">{CURRENCY} {formatETB(winner.winning_bid_amount)}</p>
+                    <p className="font-display text-xl font-extrabold text-primary">{formatCurrency(winner.winning_bid_amount)}</p>
                   </div>
                   <div className="text-center">
                     <p className="text-[10px] font-semibold uppercase text-neutral-400">Total Bids</p>

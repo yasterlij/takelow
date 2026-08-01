@@ -5,7 +5,20 @@ import { useApp } from "../AppContext"
 import { api } from "../api"
 import { AdminLayout } from "../components/AdminLayout"
 import { CTAButton, Badge, Card } from "../components/AuctionUI"
-import { CURRENCY, formatETB } from "../mockDataV0"
+import { formatCurrency, formatETB, formatSpecSummary } from "../mockDataV0"
+
+const specFields = [
+  { key: "storage", label: "Storage" },
+  { key: "ram", label: "RAM" },
+  { key: "edition", label: "Edition" },
+  { key: "battery", label: "Battery" },
+  { key: "camera", label: "Camera" },
+  { key: "osVersion", label: "OS Version" },
+  { key: "display", label: "Display" },
+  { key: "chipset", label: "Chipset" },
+] as const
+
+const emptySpecs = { storage: "", ram: "", edition: "", battery: "", camera: "", osVersion: "", display: "", chipset: "" }
 
 function ProductThumb({ src, onClick }: { src?: string; onClick?: () => void }) {
   const [err, setErr] = useState(false)
@@ -82,7 +95,7 @@ function ImageLightbox({ src, onClose }: { src: string; onClose: () => void }) {
   )
 }
 
-const emptyForm = { name: "", brand: "", price: "", description: "", imageUrl: "" }
+const emptyForm = { name: "", brand: "", price: "", description: "", imageUrl: "", ...emptySpecs }
 
 export function AdminProductsScreen() {
   const { go, auctions } = useApp()
@@ -135,6 +148,8 @@ export function AdminProductsScreen() {
       price: String(p.current_market_price || ""),
       description: p.description || "",
       imageUrl: (p.image_urls || [])[0] || "",
+      ...emptySpecs,
+      ...(p.specs || {}),
     })
     setShowForm(true)
   }
@@ -147,6 +162,7 @@ export function AdminProductsScreen() {
       current_market_price: Number(form.price),
       brand: form.brand.trim() || undefined,
       description: form.description.trim() || undefined,
+      specs: Object.fromEntries(Object.keys(emptySpecs).map((key) => [key, (form as any)[key]?.trim()]).filter(([, value]) => value)),
       image_urls: form.imageUrl.trim() ? [form.imageUrl.trim()] : undefined,
     }
     try {
@@ -242,7 +258,7 @@ export function AdminProductsScreen() {
           <motion.div variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }}>
             <Card className="items-center p-3 text-center">
               <DollarSign className="size-5 text-awash-gold" />
-              <p className="mt-1 font-display text-2xl font-extrabold text-awash-gold-dark tabular-nums">{CURRENCY} {formatETB(totalValue)}</p>
+              <p className="mt-1 font-display text-2xl font-extrabold text-awash-gold-dark tabular-nums">{formatCurrency(totalValue)}</p>
               <p className="text-[10px] font-medium text-neutral-400">Total Value</p>
             </Card>
           </motion.div>
@@ -274,7 +290,7 @@ export function AdminProductsScreen() {
                   <div className="flex-1 space-y-3">
                     <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Product name" className="input-full" />
                     <input value={form.brand} onChange={(e) => setForm((f) => ({ ...f, brand: e.target.value }))} placeholder="Brand" className="input-full" />
-                    <input value={form.price} onChange={(e) => setForm((f) => ({ ...f, price: e.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1").replace(/(\.\d{2})\d+/g, "$1") }))} type="text" inputMode="decimal" placeholder="Market price" className="input-full" />
+                      <input value={form.price} onChange={(e) => setForm((f) => ({ ...f, price: e.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1").replace(/(\.\d{2})\d+/g, "$1") }))} type="text" inputMode="decimal" placeholder="Payment" className="input-full" />
                   </div>
                   <div className="flex-shrink-0">
                     <ImageUploadBox
@@ -286,6 +302,19 @@ export function AdminProductsScreen() {
                 </div>
 
                 <textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="Description" className="input-full" rows={2} />
+                <div className="grid grid-cols-2 gap-3">
+                  {specFields.map((field) => (
+                    <label key={field.key}>
+                      <span className="mb-1 block text-[10px] font-semibold text-neutral-400">{field.label}</span>
+                      <input
+                        value={(form as any)[field.key] || ""}
+                        onChange={(e) => setForm((f) => ({ ...f, [field.key]: e.target.value }))}
+                        placeholder={field.label}
+                        className="input-full"
+                      />
+                    </label>
+                  ))}
+                </div>
 
                 <div className="flex gap-2">
                   <CTAButton variant="outline" onClick={resetForm} className="flex-1">Cancel</CTAButton>
@@ -357,9 +386,10 @@ export function AdminProductsScreen() {
                   <div className="flex items-center gap-2">
                     <p className="truncate text-sm font-bold text-awash-blue">{p.name}</p>
                     {p.brand && <Badge tone="navy">{p.brand}</Badge>}
+                    {p.specs && formatSpecSummary(p.specs) && <Badge tone="green">{formatSpecSummary(p.specs)}</Badge>}
                   </div>
                   <p className="mt-0.5 text-xs font-medium text-neutral-400">
-                    {CURRENCY} {formatETB(p.current_market_price)}
+                    {formatCurrency(p.current_market_price)}
                     {p.description && <span className="ml-2">· {p.description.slice(0, 60)}</span>}
                   </p>
                 </div>

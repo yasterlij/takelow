@@ -5,12 +5,13 @@ import { X, Check, ArrowLeft } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { api } from '../api'
 import { colors } from '../theme'
+import { formatCurrency } from '../mockDataV0'
 
 const POLL_INTERVAL = 3000
 const POLL_TIMEOUT = 120000
 
 export function SikinaPayCheckout() {
-  const { go, selectedId, sikinaPayUrl, setSikinaPayUrl, sikinaPayContext, setFeePaid } = useApp()
+  const { go, selectedId, sikinaPayUrl, setSikinaPayUrl, sikinaPayContext, setFeePaid, pendingBidAmount } = useApp()
   const [status, setStatus] = useState<'loading' | 'paid' | 'failed'>('loading')
   const [webviewLoading, setWebviewLoading] = useState(true)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -100,7 +101,9 @@ export function SikinaPayCheckout() {
         </View>
         <Text style={{ fontSize: 24, fontWeight: '800', color: colors.awashBlue, marginTop: 24 }}>Payment Successful!</Text>
         <Text style={{ fontSize: 14, fontWeight: '500', color: colors.mutedForeground, textAlign: 'center', marginTop: 8, maxWidth: 280 }}>
-          Your payment was received successfully.
+          {sikinaPayContext === 'bid-fee'
+            ? `Your service fee was received successfully.${pendingBidAmount != null ? ` Saved bid ${formatCurrency(pendingBidAmount)} will be submitted next.` : ''}`
+            : 'Your payment was received successfully.'}
         </Text>
         <TouchableOpacity
           onPress={handleContinuePaid}
@@ -108,7 +111,7 @@ export function SikinaPayCheckout() {
           activeOpacity={0.8}
         >
           <Text style={{ fontSize: 15, fontWeight: '700', color: colors.primaryForeground }}>
-            {sikinaPayContext === 'bid-fee' ? 'Continue to Place Bid' : 'Track Delivery'}
+            {sikinaPayContext === 'bid-fee' ? 'Submit Saved Bid' : 'Track Delivery'}
           </Text>
         </TouchableOpacity>
       </View>

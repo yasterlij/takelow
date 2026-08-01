@@ -24,6 +24,86 @@ import { BidEncryptionService } from "../common/bid-encryption.service";
 @Injectable()
 export class AuctionManageService {
   private readonly logger = new Logger(AuctionManageService.name);
+  private readonly specKeys = [
+    "storage",
+    "ram",
+    "edition",
+    "battery",
+    "camera",
+    "osVersion",
+    "display",
+    "chipset",
+  ] as const;
+
+  private isMissingColumnError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error);
+    return message.includes("public_code") || message.includes("specs");
+  }
+
+  private async listProductsFallback(page = 1, limit = 20, search?: string) {
+    const offset = (page - 1) * limit;
+    const params: any[] = [];
+    let where = "";
+    if (search) {
+      params.push(`%${search}%`);
+      where = `WHERE name ILIKE $${params.length}`;
+    }
+    params.push(limit, offset);
+    const rows = await this.productRepository.query(
+      `SELECT id, name, description, image_urls, current_market_price, brand, created_at
+       FROM products
+       ${where}
+       ORDER BY created_at DESC
+       LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      params,
+    );
+    const countRows = await this.productRepository.query(
+      `SELECT COUNT(*)::int AS total FROM products ${where}`,
+      search ? [`%${search}%`] : [],
+    );
+    const total = countRows[0]?.total || 0;
+    return {
+      data: rows.map((row: any) => ({ ...row, specs: null })),
+      meta: { total, page, limit, total_pages: Math.ceil(total / limit) },
+    };
+  }
+
+  private async listAuctionsFallback(page = 1, limit = 20, status?: AuctionStatus) {
+    const offset = (page - 1) * limit;
+    const params: any[] = [];
+    let where = "";
+    if (status) {
+      params.push(status);
+      where = `WHERE a.status = $${params.length}`;
+    }
+    params.push(limit, offset);
+    const rows = await this.auctionRepository.query(
+      `WITH ranked AS (
+         SELECT id, LPAD(ROW_NUMBER() OVER (ORDER BY created_at ASC)::text, 5, '0') AS public_code
+         FROM auctions
+       )
+       SELECT a.*, ranked.public_code,
+              p.id AS product_ref_id,
+              p.name AS product_name,
+              p.description AS product_description,
+              p.image_urls AS product_image_urls,
+              p.current_market_price AS product_current_market_price,
+              p.brand AS product_brand
+       FROM auctions a
+       LEFT JOIN ranked ON ranked.id = a.id
+       LEFT JOIN products p ON p.id = a.product_id
+       ${where}
+       ORDER BY a.created_at DESC
+       LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      params,
+    );
+    const countRows = await this.auctionRepository.query(
+      `SELECT COUNT(*)::int AS total FROM auctions a ${status ? 'WHERE a.status = $1' : ''}`,
+      status ? [status] : [],
+    );
+    const total = countRows[0]?.total || 0;
+    return { rows, total };
+  }
 
   constructor(
     @InjectRepository(Auction)
@@ -41,18 +121,23 @@ export class AuctionManageService {
   ) {}
 
   async listProducts(page = 1, limit = 20, search?: string) {
-    const where: any = {};
-    if (search) where.name = Like(`%${search}%`);
-    const [data, total] = await this.productRepository.findAndCount({
-      where,
-      order: { created_at: "DESC" },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
-    return {
-      data,
-      meta: { total, page, limit, total_pages: Math.ceil(total / limit) },
-    };
+    try {
+      const where: any = {};
+      if (search) where.name = Like(`%${search}%`);
+      const [data, total] = await this.productRepository.findAndCount({
+        where,
+        order: { created_at: "DESC" },
+        skip: (page - 1) * limit,
+        take: limit,
+      });
+      return {
+        data,
+        meta: { total, page, limit, total_pages: Math.ceil(total / limit) },
+      };
+    } catch (error) {
+      if (!this.isMissingColumnError(error)) throw error;
+      return this.listProductsFallback(page, limit, search);
+    }
   }
 
   async createProduct(dto: CreateProductDto) {
@@ -60,18 +145,55 @@ export class AuctionManageService {
     if (data.image_urls?.length) {
       data.image_urls = await this.imageService.processImageUrls(data.image_urls);
     }
-    return this.productRepository.save(this.productRepository.create(data));
+    data.specs = this.normalizeSpecs(data.specs) ?? undefined;
+    try {
+      return await this.productRepository.save(this.productRepository.create(data));
+    } catch (error) {
+      if (!this.isMissingColumnError(error)) throw error;
+      const rows = await this.productRepository.query(
+        `INSERT INTO products (name, description, image_urls, current_market_price, brand)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING id, name, description, image_urls, current_market_price, brand, created_at`,
+        [data.name, data.description || null, data.image_urls || null, data.current_market_price, data.brand || null],
+      );
+      return { ...rows[0], specs: null };
+    }
   }
 
   async updateProduct(id: string, dto: UpdateProductDto) {
-    const product = await this.productRepository.findOne({ where: { id } });
+    let product = null as any;
+    try {
+      product = await this.productRepository.findOne({ where: { id } });
+    } catch (error) {
+      if (!this.isMissingColumnError(error)) throw error;
+      const rows = await this.productRepository.query(
+        `SELECT id, name, description, image_urls, current_market_price, brand, created_at FROM products WHERE id = $1 LIMIT 1`,
+        [id],
+      );
+      product = rows[0] || null;
+    }
     if (!product) throw new NotFoundException("Product not found");
     const data = { ...dto };
     if (data.image_urls?.length) {
       data.image_urls = await this.imageService.processImageUrls(data.image_urls);
     }
+    if (data.specs !== undefined) {
+      data.specs = this.normalizeSpecs(data.specs) ?? undefined;
+    }
     Object.assign(product, data);
-    return this.productRepository.save(product);
+    try {
+      return await this.productRepository.save(product);
+    } catch (error) {
+      if (!this.isMissingColumnError(error)) throw error;
+      const rows = await this.productRepository.query(
+        `UPDATE products
+         SET name = $2, description = $3, image_urls = $4, current_market_price = $5, brand = $6
+         WHERE id = $1
+         RETURNING id, name, description, image_urls, current_market_price, brand, created_at`,
+        [id, product.name, product.description || null, product.image_urls || null, product.current_market_price, product.brand || null],
+      );
+      return { ...rows[0], specs: null };
+    }
   }
 
   async deleteProduct(id: string) {
@@ -118,11 +240,18 @@ export class AuctionManageService {
   async exportProductsCsv(search?: string) {
     const where: any = {};
     if (search) where.name = Like(`%${search}%`);
-    const products = await this.productRepository.find({
-      where,
-      order: { created_at: "DESC" },
-    });
-    const header = "id,name,description,brand,current_market_price,created_at";
+    let products: any[] = [];
+    try {
+      products = await this.productRepository.find({
+        where,
+        order: { created_at: "DESC" },
+      });
+    } catch (error) {
+      if (!this.isMissingColumnError(error)) throw error;
+      const fallback = await this.listProductsFallback(1, 100000, search);
+      products = fallback.data;
+    }
+    const header = "id,name,description,brand,current_market_price,specs,created_at";
     const rows = products.map((p) =>
       [
         p.id,
@@ -130,6 +259,7 @@ export class AuctionManageService {
         (p.description || "").replace(/,/g, ";"),
         p.brand || "",
         p.current_market_price,
+        JSON.stringify(p.specs || {}).replace(/,/g, ";"),
         p.created_at,
       ].join(","),
     );
@@ -137,15 +267,39 @@ export class AuctionManageService {
   }
 
   async listAuctions(page = 1, limit = 20, status?: AuctionStatus) {
-    const where: any = {};
-    if (status) where.status = status;
-    const [data, total] = await this.auctionRepository.findAndCount({
-      where,
-      relations: ["product"],
-      order: { created_at: "DESC" },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    let data: any[] = [];
+    let total = 0;
+    try {
+      const where: any = {};
+      if (status) where.status = status;
+      const result = await this.auctionRepository.findAndCount({
+        where,
+        relations: ["product"],
+        order: { created_at: "DESC" },
+        skip: (page - 1) * limit,
+        take: limit,
+      });
+      data = result[0];
+      total = result[1];
+    } catch (error) {
+      if (!this.isMissingColumnError(error)) throw error;
+      const fallback = await this.listAuctionsFallback(page, limit, status);
+      data = fallback.rows.map((row: any) => ({
+        ...row,
+        product: row.product_ref_id
+          ? {
+              id: row.product_ref_id,
+              name: row.product_name,
+              description: row.product_description,
+              image_urls: row.product_image_urls,
+              current_market_price: Number(row.product_current_market_price || 0),
+              brand: row.product_brand,
+              specs: null,
+            }
+          : null,
+      }));
+      total = fallback.total;
+    }
     const auctionIds = data.map((a) => a.id);
     const bidCounts = auctionIds.length
       ? await this.bidRepository
@@ -177,9 +331,16 @@ export class AuctionManageService {
   }
 
   async createAuction(dto: CreateAuctionDto) {
-    const product = await this.productRepository.findOne({
-      where: { id: dto.product_id },
-    });
+    let product = null as any;
+    try {
+      product = await this.productRepository.findOne({
+        where: { id: dto.product_id },
+      });
+    } catch (error) {
+      if (!this.isMissingColumnError(error)) throw error;
+      const rows = await this.productRepository.query(`SELECT id FROM products WHERE id = $1 LIMIT 1`, [dto.product_id]);
+      product = rows[0] || null;
+    }
     if (!product) throw new NotFoundException("Product not found");
     const entity = this.auctionRepository.create() as Auction;
     entity.product_id = dto.product_id;
@@ -188,11 +349,39 @@ export class AuctionManageService {
     entity.status = AuctionStatus.ACTIVE;
     if (dto.min_bid != null) entity.min_bid = dto.min_bid;
     if (dto.max_bid != null) entity.max_bid = dto.max_bid;
-    return this.auctionRepository.save(entity);
+    try {
+      return await this.auctionRepository.save(entity);
+    } catch (error) {
+      if (!this.isMissingColumnError(error)) throw error;
+      const rows = await this.auctionRepository.query(
+        `INSERT INTO auctions (product_id, start_time, end_time, status, min_bid, max_bid)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING *`,
+        [entity.product_id, entity.start_time, entity.end_time, entity.status, entity.min_bid ?? null, entity.max_bid ?? null],
+      );
+      return rows[0];
+    }
+  }
+
+  private normalizeSpecs(specs?: Record<string, string>) {
+    if (!specs || typeof specs !== "object") return null;
+    const normalized = this.specKeys.reduce<Record<string, string>>((acc, key) => {
+      const value = specs[key];
+      if (typeof value === "string" && value.trim()) acc[key] = value.trim();
+      return acc;
+    }, {});
+    return Object.keys(normalized).length ? normalized : null;
   }
 
   async updateAuction(id: string, dto: UpdateAuctionDto) {
-    const auction = await this.auctionRepository.findOne({ where: { id } });
+    let auction = null as any;
+    try {
+      auction = await this.auctionRepository.findOne({ where: { id } });
+    } catch (error) {
+      if (!this.isMissingColumnError(error)) throw error;
+      const rows = await this.auctionRepository.query(`SELECT * FROM auctions WHERE id = $1 LIMIT 1`, [id]);
+      auction = rows[0] || null;
+    }
     if (!auction) throw new NotFoundException("Auction not found");
     if (dto.product_id != null) {
       const product = await this.productRepository.findOne({
@@ -206,7 +395,19 @@ export class AuctionManageService {
     if (dto.status != null) auction.status = dto.status;
     if (dto.min_bid != null) auction.min_bid = dto.min_bid;
     if (dto.max_bid != null) auction.max_bid = dto.max_bid;
-    return this.auctionRepository.save(auction);
+    try {
+      return await this.auctionRepository.save(auction);
+    } catch (error) {
+      if (!this.isMissingColumnError(error)) throw error;
+      const rows = await this.auctionRepository.query(
+        `UPDATE auctions
+         SET product_id = $2, start_time = $3, end_time = $4, status = $5, min_bid = $6, max_bid = $7
+         WHERE id = $1
+         RETURNING *`,
+        [id, auction.product_id, auction.start_time, auction.end_time, auction.status, auction.min_bid ?? null, auction.max_bid ?? null],
+      );
+      return rows[0];
+    }
   }
 
   async deleteAuction(id: string) {

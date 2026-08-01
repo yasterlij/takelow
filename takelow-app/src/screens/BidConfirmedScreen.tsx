@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Animated } from 'react-native'
 import { Check, Eye, Home, MessageSquareText } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { CTAButton, Card } from '../components/AuctionUI'
-import { CURRENCY, formatETB } from '../mockDataV0'
+import { formatCurrency, formatETB } from '../mockDataV0'
 import { colors } from '../theme'
 
 export function BidConfirmedScreen() {
@@ -26,7 +26,7 @@ export function BidConfirmedScreen() {
   if (!auction) return null
 
   const smsMessage = bidTicketNumber
-    ? `Your bid of ${formatETB(userBid ?? 0)} ETB on '${auction.name}' has been placed successfully. Your BID ticket number is: ${bidTicketNumber}`
+    ? `Your bid of ${formatCurrency(userBid ?? 0)} on '${auction.name}' has been placed successfully. Your BID ticket number is: ${bidTicketNumber}`
     : null
 
   return (
@@ -55,7 +55,7 @@ export function BidConfirmedScreen() {
 
         <Card style={{ width: '100%', maxWidth: 280, padding: 20, marginTop: smsMessage ? 12 : 24 }}>
           <Text style={s.sectionLabel}>Your Bid</Text>
-          <Text style={s.bidAmount}>{formatETB(userBid ?? 0)} {CURRENCY}</Text>
+          <Text style={s.bidAmount}>{formatCurrency(userBid ?? 0)}</Text>
           <View style={s.divider} />
           <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
             <Text style={s.infoLabel}>Product</Text>

@@ -5,7 +5,7 @@ import { api, setApiToken, setRefreshToken, getApiToken, getRefreshToken, getUse
 import { useToast } from './components/Toast'
 import { useAuctionSocket, applySocketUpdate } from './hooks/useAuctionSocket'
 import { registerForPushNotifications, useNotificationObserver } from './hooks/usePushNotifications'
-import { type Auction } from './mockDataV0'
+import { type Auction, type ProductSpecs, formatSpecSummary } from './mockDataV0'
 
 export type View =
   | 'login' | 'register' | 'home' | 'auctions' | 'my-bids' | 'product'
@@ -39,6 +39,7 @@ type AppState = {
   view: View
   selectedId: string | null
   userBid: number | null
+  pendingBidAmount: number | null
   bidTicketNumber: string | null
   feePaid: boolean
   walletBalance: number
@@ -54,6 +55,7 @@ type AppState = {
   setSikinaPayUrl: (url: string | null) => void
   sikinaPayContext: 'bid-fee' | 'winning' | null
   setFeePaid: (paid: boolean) => void
+  setPendingBidAmount: (amount: number | null) => void
   go: (view: View) => void
   selectAuction: (id: string) => void
   payFee: (fee: number, paymentMethod?: 'SIKINAPAY' | 'AWASH') => void
@@ -65,8 +67,8 @@ type AppState = {
   login: (phone: string, password: string) => Promise<string | null>
   register: (name: string, phone: string, password: string) => Promise<string | null>
   logout: () => void
-  addAuction: (a: { name: string; category: string; marketPrice: number; bidFee: number; description: string; highlights: string[]; startTime: string; endTime: string; images?: string[]; minBid?: number; maxBid?: number }) => Promise<void>
-  updateAuction: (id: string, data: Partial<Pick<Auction, "name" | "category" | "marketPrice" | "description" | "highlights" | "images">> & { startTime?: string; endTime?: string; minBid?: number; maxBid?: number }) => Promise<void>
+  addAuction: (a: { name: string; category: string; marketPrice: number; bidFee: number; description: string; highlights: string[]; specs?: ProductSpecs; startTime: string; endTime: string; images?: string[]; minBid?: number; maxBid?: number }) => Promise<void>
+  updateAuction: (id: string, data: Partial<Pick<Auction, "name" | "category" | "marketPrice" | "description" | "highlights" | "images" | "specs">> & { startTime?: string; endTime?: string; minBid?: number; maxBid?: number }) => Promise<void>
   deleteAuction: (id: string) => Promise<void>
   closeAuction: (id: string) => Promise<void>
   forceCloseAuction: (id: string) => Promise<void>
@@ -86,6 +88,7 @@ function mapAuction(apiAuction: any): Auction {
   const timeLeft = Math.max(0, Math.floor((new Date(apiAuction.end_time).getTime() - Date.now()) / 1000))
   return {
     id: apiAuction.id,
+    publicCode: apiAuction.public_code,
     name: apiAuction.product?.name || 'Unknown Product',
     category: apiAuction.product?.brand || '',
     images: apiAuction.product?.image_urls || [],
@@ -99,6 +102,8 @@ function mapAuction(apiAuction: any): Auction {
     status: (apiAuction.status === 'ACTIVE' ? (timeLeft < 3600 ? 'ending-soon' : 'live') : 'closed') as Auction['status'],
     description: apiAuction.product?.description || '',
     highlights: [],
+    specs: apiAuction.product?.specs || null,
+    specSummary: formatSpecSummary(apiAuction.product?.specs),
     minBid: apiAuction.min_bid ?? undefined,
     maxBid: apiAuction.max_bid ?? undefined,
     winners: apiAuction.winners?.map((w: any) => ({ ...w, name: w.name || w.user_name || null })) ?? undefined,
@@ -118,10 +123,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [view, setView] = useState<View>('login')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [userBid, setUserBid] = useState<number | null>(null)
+  const [pendingBidAmount, setPendingBidAmount] = useState<number | null>(null)
   const [bidTicketNumber, setBidTicketNumber] = useState<string | null>(null)
   const [feePaid, setFeePaid] = useState(false)
   const [walletBalance, setWalletBalance] = useState(INITIAL_BALANCE)
-  const [paymentMethod, setPaymentMethodState] = useState<'SIKINAPAY' | 'AWASH'>('SIKINAPAY')
+  const [paymentMethod, setPaymentMethodState] = useState<'SIKINAPAY' | 'AWASH'>('AWASH')
   const [sikinaPayUrl, setSikinaPayUrl] = useState<string | null>(null)
   const [sikinaPayContext, setSikinaPayContext] = useState<'bid-fee' | 'winning' | null>(null)
   const [myBids, setMyBids] = useState<PlacedBid[]>([])
@@ -149,6 +155,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           const unique = Array.from(new Map<string, Auction>(saved.auctions.map((a: any) => [a.id, a])).values())
           setAuctions(unique)
         }
+        if (saved.pendingBidAmount != null) setPendingBidAmount(saved.pendingBidAmount)
         if (saved.allBids?.length) setAllBids(saved.allBids)
         if (saved.myBids?.length) setMyBids(saved.myBids)
         if (saved.walletBalance != null) setWalletBalance(saved.walletBalance)
@@ -182,9 +189,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!hydrated) return
     const tokens = user ? { accessToken: getApiToken(), refreshToken: getRefreshToken() } : {}
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({
-      auctions, allBids, myBids, walletBalance, user, ...tokens,
+      auctions, allBids, myBids, walletBalance, pendingBidAmount, user, ...tokens,
     })).catch(() => {})
-  }, [auctions, allBids, myBids, walletBalance, user, hydrated])
+  }, [auctions, allBids, myBids, walletBalance, pendingBidAmount, user, hydrated])
 
   const refreshAuctions = useCallback(async () => {
     if (refreshing.current) return
@@ -228,6 +235,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const selectAuction = useCallback((id: string) => {
     setSelectedId(id)
     setFeePaid(false)
+    setPendingBidAmount(null)
     setUserBid(null)
     setBidTicketNumber(null)
     const auction = auctions.find((a) => a.id === id)
@@ -277,13 +285,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setMyBids((prev) => [bid, ...prev])
       setAllBids((prev) => [bid, ...prev])
       setUserBid(amount)
+      setPendingBidAmount(null)
       setAuctions((prev) =>
         prev.map((a) => (a.id === selectedId ? { ...a, bidders: (a.bidders ?? 0) + 1, totalBids: (a.totalBids ?? 0) + 1 } : a)),
       )
       setView('bid-confirmed')
       setTimeout(() => refreshAuctions(), 3000)
       const name = auctions.find((a) => a.id === selectedId)?.name || 'Unknown'
-      const smsText = `Your bid of ETB ${amount} on '${name}' has been placed successfully. Your BID ticket: ${ticket || 'N/A'}`
+      const smsText = `Your bid of ${amount.toFixed(2)} birr on '${name}' has been placed successfully. Your BID ticket: ${ticket || 'N/A'}`
       toast.show(`📱 SMS: ${smsText}`, 'success')
     } catch (e: any) {
       const msg = getUserFriendlyMessage(e)
@@ -327,7 +336,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setUserBid(null)
     setBidTicketNumber(null)
     setFeePaid(false)
-    setPaymentMethodState('SIKINAPAY')
+    setPendingBidAmount(null)
+    setPaymentMethodState('AWASH')
     setAuthError(null)
     setSikinaPayUrl(null)
     setSikinaPayContext(null)
@@ -424,7 +434,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => onSessionExpired(null)
   }, [logout])
 
-  const addAuction = useCallback(async (a: { name: string; category: string; marketPrice: number; bidFee: number; description: string; highlights: string[]; startTime: string; endTime: string; images?: string[]; minBid?: number; maxBid?: number }) => {
+  const addAuction = useCallback(async (a: { name: string; category: string; marketPrice: number; bidFee: number; description: string; highlights: string[]; specs?: ProductSpecs; startTime: string; endTime: string; images?: string[]; minBid?: number; maxBid?: number }) => {
     if (user?.role !== 'admin') return
     try {
       const product = await api.createProduct({
@@ -432,6 +442,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         description: a.description,
         current_market_price: a.marketPrice,
         brand: a.category,
+        ...(a.specs ? { specs: a.specs } : {}),
         ...(a.images?.length ? { image_urls: a.images } : {}),
       })
       await api.createAuction({
@@ -485,6 +496,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             ...(data.description !== undefined ? { description: data.description } : {}),
             ...(data.category !== undefined ? { brand: data.category } : {}),
             ...(data.images !== undefined ? { image_urls: data.images } : {}),
+            ...(data.specs !== undefined ? { specs: data.specs } : {}),
           })
         }
         if (data.startTime || data.endTime || data.minBid != null || data.maxBid != null) {
@@ -540,13 +552,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       view, selectedId, userBid, bidTicketNumber, feePaid, walletBalance, paymentMethod, sikinaPayUrl, setSikinaPayUrl, sikinaPayContext, setFeePaid, myBids, user, users, allBids,
-      auctions, auctionsLoading, authError,
-      go, selectAuction, payFee, submitBid, payWinning, setPaymentMethod, checkPaymentStatus, reset,
+      pendingBidAmount, auctions, auctionsLoading, authError,
+      go, selectAuction, setPendingBidAmount, payFee, submitBid, payWinning, setPaymentMethod, checkPaymentStatus, reset,
       login, register, logout, addAuction, updateAuction, deleteAuction, closeAuction, forceCloseAuction, refreshAuctions, refreshWallet, getAuction, fetchAuctionById,
     }),
-    [view, selectedId, userBid, bidTicketNumber, feePaid, walletBalance, paymentMethod, sikinaPayUrl, sikinaPayContext, setFeePaid, myBids, user, users, allBids,
+    [view, selectedId, userBid, bidTicketNumber, feePaid, walletBalance, paymentMethod, sikinaPayUrl, sikinaPayContext, setFeePaid, pendingBidAmount, myBids, user, users, allBids,
      auctions, auctionsLoading, authError,
-     go, selectAuction, payFee, submitBid, payWinning, setPaymentMethod, checkPaymentStatus, reset,
+     go, selectAuction, setPendingBidAmount, payFee, submitBid, payWinning, setPaymentMethod, checkPaymentStatus, reset,
      login, register, logout, addAuction, updateAuction, deleteAuction, closeAuction, forceCloseAuction, refreshAuctions, refreshWallet, getAuction, fetchAuctionById],
   )
 

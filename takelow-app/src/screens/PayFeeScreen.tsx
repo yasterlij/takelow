@@ -1,19 +1,18 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { View, Text, ScrollView, StyleSheet, Modal, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, Linking } from 'react-native'
-import { Wallet, ShieldCheck, Info, Lock, X, AlertTriangle, Building2, ChevronDown, ChevronUp } from 'lucide-react-native'
+import { Wallet, ShieldCheck, Info, Lock, X, AlertTriangle, Building2, ChevronDown, ChevronUp, Minus, Plus } from 'lucide-react-native'
 import { useApp } from '../AppContext'
-import { AppBar, CTAButton, Card } from '../components/AuctionUI'
-import { AwashMark } from '../components/AuctionUI'
-import { CURRENCY, formatETB } from '../mockDataV0'
+import { AppBar, CTAButton, Card, AwashMark } from '../components/AuctionUI'
+import { CURRENCY, formatCurrency, formatETB } from '../mockDataV0'
 import { api } from '../api'
 import { colors, fontSize } from '../theme'
 
 export function PayFeeScreen() {
-  const { go, selectedId, walletBalance, payFee, getAuction, paymentMethod, setPaymentMethod } = useApp()
+  const { go, selectedId, walletBalance, payFee, getAuction, paymentMethod, setPaymentMethod, pendingBidAmount, setPendingBidAmount } = useApp()
   const auction = getAuction(selectedId)
 
   const [showMethods, setShowMethods] = useState(false)
-  const [selected, setSelected] = useState<'SIKINAPAY' | 'AWASH'>(paymentMethod)
+  const [selected, setSelected] = useState<'SIKINAPAY' | 'AWASH'>('AWASH')
 
   const [showPinModal, setShowPinModal] = useState(false)
   const [pinInput, setPinInput] = useState('')
@@ -30,6 +29,10 @@ export function PayFeeScreen() {
   const [setupLoading, setSetupLoading] = useState(false)
 
   const [checkingPin, setCheckingPin] = useState(false)
+  const [bidAmount, setBidAmount] = useState(pendingBidAmount != null ? pendingBidAmount.toFixed(2) : '')
+  const [bidError, setBidError] = useState<string | null>(null)
+  const [bidFlash, setBidFlash] = useState(false)
+  const STEP = 0.01
 
   useEffect(() => {
     if (showPinModal) {
@@ -38,8 +41,34 @@ export function PayFeeScreen() {
     }
   }, [showPinModal])
 
+  const numericBid = bidAmount ? Number(bidAmount) : 0
+  const hasValidBid = numericBid >= 1 && /^\d+(\.\d{1,2})?$/.test(bidAmount)
+
+  useEffect(() => {
+    if (!bidFlash) return
+    const id = setTimeout(() => setBidFlash(false), 240)
+    return () => clearTimeout(id)
+  }, [bidFlash])
+
+  const updateBid = useCallback((next: number) => {
+    const safe = Math.max(1, Number(next.toFixed(2)))
+    setBidAmount(safe.toFixed(2))
+    setBidError(null)
+    setPendingBidAmount(safe)
+    setBidFlash(true)
+  }, [setPendingBidAmount])
+
+  const adjustBid = useCallback((delta: number) => {
+    updateBid((bidAmount ? Number(bidAmount) : 1) + delta)
+  }, [bidAmount, updateBid])
+
   const handlePayPress = useCallback(async () => {
     if (!auction) return
+    if (!hasValidBid) {
+      setBidError('Enter a valid bid amount to continue')
+      return
+    }
+    setPendingBidAmount(numericBid)
     if (selected === 'SIKINAPAY') {
       setPaymentMethod('SIKINAPAY')
       payFee(auction.bidFee, 'SIKINAPAY')
@@ -63,7 +92,7 @@ export function PayFeeScreen() {
     } finally {
       setCheckingPin(false)
     }
-  }, [selected, auction, payFee, setPaymentMethod])
+  }, [selected, auction, hasValidBid, numericBid, payFee, setPaymentMethod, setPendingBidAmount])
 
   const handleVerifyPin = useCallback(async () => {
     if (!auction) return
@@ -164,17 +193,78 @@ export function PayFeeScreen() {
       <View style={{ backgroundColor: colors.navy }}>
         <StatusBarCustom />
       </View>
-      <AppBar title="Pay Bid Fee" onBack={() => go('product')} />
+      <AppBar
+        title="Place Bid & Pay"
+        onBack={() => go('product')}
+        right={
+          <TouchableOpacity onPress={() => go('home')} style={{ width: 34, height: 34, justifyContent: 'center', alignItems: 'center' }}>
+            <AwashMark size={22} />
+          </TouchableOpacity>
+        }
+      />
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 120 }}>
         <Text style={{ fontSize: 14, fontWeight: '500', color: colors.mutedForeground }}>
           Pay the non-refundable participation fee to enter this auction.
         </Text>
 
+        <Card style={{ padding: 16, marginTop: 16, borderWidth: 1, borderColor: colors.awashBlue + '1A', backgroundColor: colors.awashBlue + '0D' }}>
+          <Text style={{ fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', color: colors.awashBlue }}>Bid amount required before payment</Text>
+          <Text style={{ fontSize: 13, fontWeight: '500', color: colors.mutedForeground, marginTop: 6 }}>Enter your bid amount to continue.</Text>
+          <View style={[s.bidControl, bidFlash && s.bidControlActive]}>
+            <TouchableOpacity onPress={() => adjustBid(-STEP)} disabled={numericBid <= 1} style={[s.bidAdjustBtn, numericBid <= 1 && s.bidAdjustBtnDisabled]}>
+              <Minus size={18} color={numericBid <= 1 ? colors.mutedForeground : colors.awashBlue} />
+            </TouchableOpacity>
+            <View style={{ flex: 1 }}>
+              <TextInput
+                value={bidAmount}
+                onChangeText={(t) => {
+                  const clean = t.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1').replace(/(\.\d{2})\d+/g, '$1').slice(0, 8)
+                  setBidAmount(clean)
+                  setBidError(null)
+                  setPendingBidAmount(clean ? Number(clean) : null)
+                }}
+                onBlur={() => {
+                  if (!bidAmount) return
+                  const normalized = Number(bidAmount)
+                  if (normalized < 1) {
+                    setBidError('Minimum bid is 1.00')
+                    updateBid(1)
+                    return
+                  }
+                  updateBid(normalized)
+                }}
+                placeholder="0.00"
+                keyboardType="decimal-pad"
+                style={s.bidInput}
+                placeholderTextColor={colors.mutedForeground}
+              />
+              <Text style={s.bidCurrency}>{CURRENCY}</Text>
+            </View>
+            <TouchableOpacity onPress={() => adjustBid(STEP)} style={s.bidAdjustBtn}>
+              <Plus size={18} color={colors.awashBlue} />
+            </TouchableOpacity>
+          </View>
+          {bidError ? <Text style={s.pinError}>{bidError}</Text> : null}
+          <Text style={{ fontSize: 11, color: colors.mutedForeground, marginTop: 8 }}>Minimum bid is 1.00 {CURRENCY}. Uniqueness is checked when the bid is submitted.</Text>
+        </Card>
+
         <Card style={{ alignItems: 'center', padding: 24, marginTop: 16 }}>
-          <Text style={{ fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1, color: colors.mutedForeground }}>Bid Fee</Text>
-          <Text style={{ fontSize: 36, fontWeight: '800', color: colors.navy, marginTop: 8 }}>{CURRENCY} {formatETB(auction.bidFee)}</Text>
+          <Text style={{ fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1, color: colors.mutedForeground }}>Service Fee</Text>
+          <Text style={{ fontSize: 36, fontWeight: '800', color: colors.navy, marginTop: 8 }}>{formatCurrency(auction.bidFee)}</Text>
           <Text style={{ fontSize: 12, fontWeight: '500', color: colors.mutedForeground, marginTop: 8 }}>for {auction.name}</Text>
         </Card>
+
+        {hasValidBid && (
+          <Card style={{ padding: 16, marginTop: 16, borderWidth: 1, borderColor: colors.emerald200, backgroundColor: colors.emerald50 }}>
+            <Text style={{ fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', color: colors.emerald700 }}>Preview before payment</Text>
+            <View style={{ marginTop: 10, gap: 8 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Text style={{ fontSize: 12, color: colors.mutedForeground }}>Your bid</Text><Text style={{ fontSize: 12, fontWeight: '700', color: colors.awashBlue }}>{formatCurrency(numericBid)}</Text></View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Text style={{ fontSize: 12, color: colors.mutedForeground }}>Service fee (charged now)</Text><Text style={{ fontSize: 12, fontWeight: '700', color: colors.awashBlue }}>{formatCurrency(auction.bidFee)}</Text></View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: colors.emerald200, paddingTop: 8 }}><Text style={{ fontSize: 12, color: colors.mutedForeground }}>Total charged today</Text><Text style={{ fontSize: 12, fontWeight: '700', color: colors.emerald700 }}>{formatCurrency(auction.bidFee)}</Text></View>
+            </View>
+            <Text style={{ fontSize: 11, color: colors.mutedForeground, marginTop: 8 }}>Your bid is saved and will be submitted automatically after payment confirmation.</Text>
+          </Card>
+        )}
 
         <Text style={{ fontSize: 14, fontWeight: '700', color: colors.navy, marginTop: 24, marginBottom: 8 }}>Pay with</Text>
 
@@ -201,16 +291,6 @@ export function PayFeeScreen() {
         {showMethods && (
           <Card style={s.methodsList}>
             <TouchableOpacity
-              onPress={() => { setSelected('SIKINAPAY'); setShowMethods(false) }}
-              style={[s.methodOption, selected === 'SIKINAPAY' && s.methodOptionSelected]}
-            >
-              <ShieldCheck size={20} color={colors.primary} />
-              <View style={{ flex: 1 }}>
-                <Text style={s.methodOptionTitle}>SikinaPay</Text>
-                <Text style={s.methodOptionSub}>Pay via online payment gateway</Text>
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity
               onPress={() => { setSelected('AWASH'); setShowMethods(false) }}
               style={[s.methodOption, selected === 'AWASH' && s.methodOptionSelected]}
             >
@@ -220,6 +300,16 @@ export function PayFeeScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={s.methodOptionTitle}>Awash Bank Wallet</Text>
                 <Text style={s.methodOptionSub}>Pay using your wallet balance</Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => { setSelected('SIKINAPAY'); setShowMethods(false) }}
+              style={[s.methodOption, selected === 'SIKINAPAY' && s.methodOptionSelected]}
+            >
+              <ShieldCheck size={20} color={colors.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={s.methodOptionTitle}>SikinaPay</Text>
+                <Text style={s.methodOptionSub}>Pay via online payment gateway</Text>
               </View>
             </TouchableOpacity>
           </Card>
@@ -239,14 +329,14 @@ export function PayFeeScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 14, fontWeight: '700', color: colors.navy }}>Awash Bank Wallet</Text>
-              <Text style={{ fontSize: 12, fontWeight: '500', color: colors.mutedForeground }}><Wallet size={14} /> Balance: {CURRENCY} {formatETB(walletBalance)}</Text>
+              <Text style={{ fontSize: 12, fontWeight: '500', color: colors.mutedForeground }}><Wallet size={14} /> Balance: {formatCurrency(walletBalance)}</Text>
             </View>
           </Card>
         )}
 
         <View style={s.infoBox}>
           <Info size={16} color={colors.navy + '99'} />
-          <Text style={s.infoText}>The bid fee is non-refundable and confirms your participation. You will place your unique bid on the next step.</Text>
+          <Text style={s.infoText}>The service fee is non-refundable and confirms your participation. Your saved bid will be submitted after payment confirmation.</Text>
         </View>
 
         <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, marginTop: 16 }}>
@@ -263,16 +353,16 @@ export function PayFeeScreen() {
             Insufficient balance — top up before paying
           </Text>
         )}
-        <CTAButton onPress={handlePayPress} disabled={selected === 'AWASH' && (walletBalance < auction.bidFee || checkingPin)}>
+        <CTAButton onPress={handlePayPress} disabled={!hasValidBid || (selected === 'AWASH' && (walletBalance < auction.bidFee || checkingPin))}>
           {checkingPin ? 'Checking...' : selected === 'SIKINAPAY' ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <ShieldCheck size={18} color={colors.primaryForeground} />
-              <Text style={{ color: colors.primaryForeground, fontWeight: '700', fontSize: 14 }}>Pay {CURRENCY} {formatETB(auction.bidFee)} with SikinaPay</Text>
+              <Text style={{ color: colors.primaryForeground, fontWeight: '700', fontSize: 14 }}>Proceed to Payment · {formatCurrency(auction.bidFee)}</Text>
             </View>
           ) : (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <Wallet size={18} color={colors.primaryForeground} />
-              <Text style={{ color: colors.primaryForeground, fontWeight: '700', fontSize: 14 }}>Pay {CURRENCY} {formatETB(auction.bidFee)} from Wallet</Text>
+              <Text style={{ color: colors.primaryForeground, fontWeight: '700', fontSize: 14 }}>Proceed to Payment · {formatCurrency(auction.bidFee)}</Text>
           </View>
         )}
         </CTAButton>
@@ -334,7 +424,7 @@ export function PayFeeScreen() {
               </>
             ) : (
               <>
-                <Text style={s.modalDesc}>Enter your wallet PIN to confirm payment of {CURRENCY} {formatETB(auction.bidFee)}.</Text>
+                <Text style={s.modalDesc}>Enter your wallet PIN to confirm payment of {formatCurrency(auction.bidFee)}.</Text>
                 <TextInput
                   style={s.pinInput}
                   placeholder="Enter PIN"
@@ -354,7 +444,7 @@ export function PayFeeScreen() {
                     </Text>
                   </View>
                 )}
-                <CTAButton onPress={handleVerifyPin} disabled={pinLoading}>
+                <CTAButton onPress={handleVerifyPin} disabled={pinLoading || !pinInput.trim()}>
                   {pinLoading ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : 'Confirm Payment'}
                 </CTAButton>
               </>
@@ -385,6 +475,12 @@ const s = StyleSheet.create({
   methodOptionSelected: { backgroundColor: colors.primary + '1A' },
   methodOptionTitle: { fontSize: 13, fontWeight: '700', color: colors.navy },
   methodOptionSub: { fontSize: 11, color: colors.mutedForeground, marginTop: 2 },
+  bidControl: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.white, padding: 8 },
+  bidControlActive: { borderColor: colors.emerald200, shadowColor: colors.emerald500, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.12, shadowRadius: 12, elevation: 2 },
+  bidAdjustBtn: { width: 48, height: 48, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.secondary, justifyContent: 'center', alignItems: 'center' },
+  bidAdjustBtnDisabled: { opacity: 0.45 },
+  bidInput: { width: '100%', textAlign: 'center', fontSize: 36, fontWeight: '800', color: colors.navy, paddingVertical: 8 },
+  bidCurrency: { textAlign: 'center', fontSize: 14, fontWeight: '700', color: colors.mutedForeground, paddingBottom: 4 },
   bottomCta: { position: 'absolute', bottom: 0, left: 0, right: 0, borderTopWidth: 1, borderTopColor: colors.border, padding: 16 },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
   modalSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, gap: 16 },

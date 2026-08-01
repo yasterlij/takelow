@@ -2,7 +2,7 @@ import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Clock, ShieldCheck, Wallet, Building2, ChevronDown, ChevronUp, CheckCircle2, AlertTriangle, ArrowLeft, Trophy, Sparkles } from "lucide-react"
 import { useApp } from "../AppContext"
-import { CURRENCY, formatETB } from "../mockDataV0"
+import { formatCurrency, formatETB } from "../mockDataV0"
 
 const methods = [
   { id: "WALLET" as const, label: "Wallet", desc: "Pay instantly from your wallet balance", icon: Wallet, gradient: "from-emerald-500/10 to-emerald-500/5 border-emerald-200/50" },
@@ -77,7 +77,7 @@ export function PayWinningScreen() {
           <Trophy className="size-4 text-awash-gold" />
           <span className="text-xs font-semibold uppercase tracking-wide text-awash-gold-dark">Winning Bid</span>
         </div>
-        <p className="mt-1 font-display text-4xl font-extrabold text-gradient-gold tabular-nums">{formatETB(amount)} {CURRENCY}</p>
+        <p className="mt-1 font-display text-4xl font-extrabold text-gradient-gold tabular-nums">{formatCurrency(amount)}</p>
         <span className="mt-2 inline-block text-xs font-medium text-neutral-500">for {auction.name}</span>
       </motion.div>
 
@@ -90,7 +90,7 @@ export function PayWinningScreen() {
       >
         <div className="flex justify-between text-xs">
           <span className="text-neutral-500">Winning amount</span>
-          <span className="font-semibold text-foreground">{CURRENCY} {formatETB(amount)}</span>
+          <span className="font-semibold text-foreground">{formatCurrency(amount)}</span>
         </div>
         <div className="mt-2 flex justify-between text-xs">
           <span className="text-neutral-500">Delivery</span>
@@ -98,7 +98,7 @@ export function PayWinningScreen() {
         </div>
         <div className="mt-3 flex justify-between border-t border-border/60 pt-3">
           <span className="text-sm font-bold text-foreground">Total</span>
-          <span className="font-display text-sm font-extrabold text-gradient-gold">{CURRENCY} {formatETB(amount)}</span>
+          <span className="font-display text-sm font-extrabold text-gradient-gold">{formatCurrency(amount)}</span>
         </div>
       </motion.div>
 
@@ -122,12 +122,12 @@ export function PayWinningScreen() {
               <div>
                 <p className="text-sm font-bold text-foreground">Wallet Balance</p>
                 <p className={`text-lg font-extrabold tabular-nums ${hasSufficientBalance ? "text-emerald-700" : "text-amber-700"}`}>
-                  {CURRENCY} {formatETB(walletBalance)}
+                  {formatCurrency(walletBalance)}
                 </p>
                 <p className="mt-1 text-xs font-medium text-neutral-500">
                   {hasSufficientBalance
                     ? "You have enough balance to pay directly from your wallet."
-                    : `Insufficient balance. You need ${CURRENCY} ${formatETB(amount - walletBalance)} more.`}
+                    : `Insufficient balance. You need ${formatCurrency(amount - walletBalance)} more.`}
                 </p>
               </div>
             </div>
@@ -183,7 +183,7 @@ export function PayWinningScreen() {
                         <p className="text-xs text-neutral-500">{method.desc}</p>
                       </div>
                       {method.id === "WALLET" && (
-                        <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">{CURRENCY} {formatETB(walletBalance)}</span>
+                        <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">{formatCurrency(walletBalance)}</span>
                       )}
                     </button>
                   )

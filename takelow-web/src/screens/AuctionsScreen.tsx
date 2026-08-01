@@ -1,10 +1,10 @@
 import { useMemo, useState, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Flame, TicketCheck, ShieldCheck, Trophy, Sparkles, PiggyBank, Zap, RefreshCw, Gavel, ChevronLeft, ChevronRight, Filter, ArrowLeft, TrendingDown } from "lucide-react"
+import { Flame, TicketCheck, ShieldCheck, Trophy, Sparkles, PiggyBank, RefreshCw, Gavel, ChevronLeft, ChevronRight, Filter, ArrowLeft, TrendingDown, Users } from "lucide-react"
 import { useApp } from "../AppContext"
 import { Badge } from "../components/AuctionUI"
 import { useCountdown } from "../components/Countdown"
-import { CURRENCY, formatETB, formatCountdown, type Auction } from "../mockDataV0"
+import { CURRENCY, formatCurrency, formatETB, formatCountdown, type Auction } from "../mockDataV0"
 
 function AuctionImage({ src, alt }: { src?: string; alt: string }) {
   const [err, setErr] = useState(false)
@@ -36,9 +36,9 @@ function TimePill({ seconds, endingSoon }: { seconds: number; endingSoon: boolea
 
 function AuctionCard({ auction, onOpen, index }: { auction: Auction; onOpen: () => void; index: number }) {
   const endingSoon = auction.status === "ending-soon"
-  const savings = Math.round((1 - auction.bidFee / auction.marketPrice) * 100)
   const bidProgress = auction.maxBid ? Math.min((auction.totalBids || auction.bidders) / auction.maxBid, 1) : 0
   const isClosed = auction.status === "closed"
+  const publicCode = auction.publicCode || auction.productId || auction.id.slice(0, 6).toUpperCase()
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -63,46 +63,37 @@ function AuctionCard({ auction, onOpen, index }: { auction: Auction; onOpen: () 
             ) : (
               <Badge tone="green">Live</Badge>
             )}
+            <span className="inline-flex items-center rounded-full bg-white/90 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.18em] text-awash-blue border border-white/50">
+              {publicCode}
+            </span>
           </div>
         </div>
-        <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2.5">
-          {isClosed ? (
-            <span className="inline-flex items-center gap-1 rounded-md bg-neutral-100 px-1.5 py-0.5 text-[11px] font-bold text-neutral-500">
-              <Trophy className="size-3" /> Closed
+        <div className="flex flex-col gap-2 p-3">
+          <h3 className="truncate font-display text-sm font-bold text-foreground">{auction.name}</h3>
+          {auction.specSummary && <p className="truncate text-[10px] font-medium text-neutral-500">{auction.specSummary}</p>}
+          <p className="text-[10px] font-medium text-neutral-400 line-through">{formatCurrency(auction.marketPrice)}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center rounded-full bg-awash-gold/10 px-2.5 py-1 text-[10px] font-bold text-awash-gold-dark border border-primary/20">
+              Bid Amount: {formatCurrency(auction.bidFee)}
             </span>
-          ) : (
-            <TimePill seconds={auction.timeLeft} endingSoon={endingSoon} />
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700 border border-emerald-200/50">
+              <Users className="size-3" /> {auction.totalBids || auction.bidders} bidders
+            </span>
+          </div>
+          <div className="rounded-xl bg-awash-blue/5 px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-[0.18em] text-awash-blue/80">View more specs</div>
+          {!isClosed && (
+            <div className="flex justify-center pt-0.5">
+              <TimePill seconds={auction.timeLeft} endingSoon={endingSoon} />
+            </div>
           )}
-          <span className="inline-flex items-center gap-1 rounded-md bg-awash-blue/10 px-1.5 py-0.5 text-[10px] font-bold text-awash-blue">
-            <TrendingDown className="size-3" /> {auction.totalBids || auction.bidders} bids
-          </span>
         </div>
         {auction.maxBid && !isClosed && (
-          <div className="px-3 pt-2">
-            <div className="flex justify-between mb-0.5">
-              <span className="text-[9px] font-semibold text-neutral-400">Bids</span>
-              <span className="text-[9px] font-semibold text-neutral-400">{auction.totalBids || auction.bidders}/{auction.maxBid}</span>
-            </div>
+          <div className="px-3 pb-2">
             <div className="h-1.5 rounded-full bg-border overflow-hidden">
               <div className="h-full rounded-full transition-all duration-500" style={{ width: `${bidProgress * 100}%`, backgroundColor: bidProgress > 0.8 ? "#C8A642" : "#10B981" }} />
             </div>
           </div>
         )}
-        <div className="flex flex-col gap-2 p-3 pt-2">
-          <h3 className="truncate font-display text-sm font-bold text-foreground">{auction.name}</h3>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[10px] font-medium text-neutral-400 line-through">{CURRENCY} {formatETB(auction.marketPrice)}</p>
-              <p className="font-display text-base font-extrabold text-gradient-gold">{CURRENCY} {formatETB(auction.bidFee)} <span className="text-[10px] font-semibold text-neutral-400">bid</span></p>
-            </div>
-            {!isClosed && savings > 0 && (
-              <div className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 border border-emerald-200/50">
-                <Zap className="size-3 text-emerald-600" />
-                <span className="text-[10px] font-bold text-emerald-600">{savings}% off</span>
-              </div>
-            )}
-          </div>
-        </div>
       </button>
     </motion.div>
   )
@@ -129,9 +120,9 @@ const loveItems = [
 
 const PRICE_RANGES = [
   { label: "All", min: 0, max: Infinity },
-  { label: "Under ETB 30", min: 0, max: 30 },
-  { label: "ETB 30–50", min: 30, max: 50 },
-  { label: "ETB 50+", min: 50, max: Infinity },
+  { label: "Under 30 birr", min: 0, max: 30 },
+  { label: "30–50 birr", min: 30, max: 50 },
+  { label: "50+ birr", min: 50, max: Infinity },
 ]
 
 export function AuctionsScreen() {
@@ -293,8 +284,11 @@ export function AuctionsScreen() {
                   <div>
                     <h3 className="font-display text-base font-extrabold text-white drop-shadow-md">{a.name}</h3>
                     <div className="mt-1 flex items-center gap-2">
-                      <span className="text-sm font-bold text-primary">{CURRENCY} {formatETB(a.bidFee)} bid</span>
-                      <span className="text-xs font-medium text-white/60 line-through">{CURRENCY} {formatETB(a.marketPrice)}</span>
+                      <span className="text-sm font-bold text-primary">Service Fee: {formatCurrency(a.bidFee)}</span>
+                      <span className="text-xs font-medium text-white/60 line-through">{formatCurrency(a.marketPrice)}</span>
+                    </div>
+                    <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-100/90 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                      <Users className="size-3" /> {a.totalBids || a.bidders} bidders
                     </div>
                   </div>
                 </div>

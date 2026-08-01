@@ -97,4 +97,4 @@ export const fontFamily = {
   black: 'Inter_900Black',
 }
 
-export const CURRENCY = 'ETB'
+export const CURRENCY = 'birr'

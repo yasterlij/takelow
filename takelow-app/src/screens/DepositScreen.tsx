@@ -4,7 +4,7 @@ import { Wallet, ArrowDown, CheckCircle2, Loader2 } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { api } from '../api'
 import { AppBar, CTAButton, Card } from '../components/AuctionUI'
-import { CURRENCY, formatETB } from '../mockDataV0'
+import { CURRENCY, formatCurrency, formatETB } from '../mockDataV0'
 import { colors } from '../theme'
 
 const QUICK_AMOUNTS = [100, 500, 1000, 5000]
@@ -48,7 +48,7 @@ export function DepositScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={{ fontSize: 12, fontWeight: '500', color: colors.mutedForeground }}>Current Balance</Text>
-            <Text style={{ fontSize: 18, fontWeight: '800', color: colors.navy }}>{CURRENCY} {formatETB(walletBalance)}</Text>
+            <Text style={{ fontSize: 18, fontWeight: '800', color: colors.navy }}>{formatCurrency(walletBalance)}</Text>
           </View>
           <ArrowDown size={20} color={colors.emerald600} />
         </Card>
@@ -73,7 +73,7 @@ export function DepositScreen() {
               onPress={() => setAmount(String(a))}
               style={[s.quickBtn, numericAmount === a && s.quickBtnActive]}
             >
-              <Text style={[s.quickBtnText, numericAmount === a && s.quickBtnTextActive]}>{CURRENCY} {a}</Text>
+              <Text style={[s.quickBtnText, numericAmount === a && s.quickBtnTextActive]}>{formatCurrency(a)}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -86,11 +86,11 @@ export function DepositScreen() {
           <Card style={{ alignItems: 'center', padding: 24, marginTop: 24, borderColor: colors.emerald500, backgroundColor: colors.emerald50 + '80' }}>
             <CheckCircle2 size={40} color={colors.emerald600} />
             <Text style={{ fontSize: 16, fontWeight: '700', color: colors.emerald700, marginTop: 12 }}>Deposit Successful!</Text>
-            <Text style={{ fontSize: 12, color: colors.emerald600, marginTop: 4 }}>New balance: {CURRENCY} {formatETB(walletBalance)}</Text>
+            <Text style={{ fontSize: 12, color: colors.emerald600, marginTop: 4 }}>New balance: {formatCurrency(walletBalance)}</Text>
           </Card>
         ) : (
           <CTAButton disabled={!valid || loading} onPress={handleDeposit} style={{ marginTop: 24 }}>
-            {loading ? <Loader2 size={18} color="#fff" /> : `Deposit ${CURRENCY} ${formatETB(numericAmount || 0)}`}
+            {loading ? <Loader2 size={18} color="#fff" /> : `Deposit ${formatCurrency(numericAmount || 0)}`}
           </CTAButton>
         )}
       </ScrollView>

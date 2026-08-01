@@ -3,7 +3,7 @@ import { View, Text, ScrollView, StyleSheet, TextInput, TouchableOpacity, Modal,
 import { Shield, User, Search, X, ChevronRight, ArrowUpCircle, ArrowDownCircle, Phone, Wallet, Trophy, TrendingUp, AlertCircle } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { AppBar, Badge, CTAButton, Card } from '../components/AuctionUI'
-import { CURRENCY, formatETB } from '../mockDataV0'
+import { formatCurrency, formatETB } from '../mockDataV0'
 import { colors } from '../theme'
 import { api, type ApiUser } from '../api'
 
@@ -45,7 +45,7 @@ function UserDetailModal({ visible, user, onClose, onRoleChange }: { visible: bo
             <View style={{ flex: 1, backgroundColor: colors.secondary, borderRadius: 12, padding: 12 }}>
               <Wallet size={14} color={colors.mutedForeground} />
               <Text style={{ fontSize: 10, fontWeight: '500', color: colors.mutedForeground, marginTop: 4 }}>Wallet</Text>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.navy, marginTop: 2 }}>{CURRENCY} {formatETB(user.wallet_balance)}</Text>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.navy, marginTop: 2 }}>{formatCurrency(user.wallet_balance)}</Text>
             </View>
           </View>
 

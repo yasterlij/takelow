@@ -3,7 +3,7 @@ import { motion } from "framer-motion"
 import { Trophy, ArrowLeft, Users, Clock, CreditCard, Gavel, Sparkles, Loader2 } from "lucide-react"
 import { useApp } from "../AppContext"
 import { Card, Badge } from "../components/AuctionUI"
-import { CURRENCY, formatETB } from "../mockDataV0"
+import { formatCurrency, formatETB } from "../mockDataV0"
 
 export function ClosedAuctionsScreen() {
   const { go, selectAuction, auctions, auctionsLoading } = useApp()
@@ -153,7 +153,7 @@ export function ClosedAuctionsScreen() {
                             }`}
                           >
                             <Trophy className="size-2.5" />
-                            {CURRENCY} {formatETB(w.amount)}
+                            {formatCurrency(w.amount)}
                           </span>
                         ))}
                         {winners.length > 3 && (

@@ -88,8 +88,17 @@ export function onSessionExpired(handler: (() => void) | null) {
   _sessionExpiredHandler = handler
 }
 
+function expireSession() {
+  _token = null
+  _refreshToken = null
+  _sessionExpiredHandler?.()
+}
+
 async function refreshAuth(): Promise<void> {
-  if (!_refreshToken) throw new Error('No refresh token')
+  if (!_refreshToken) {
+    expireSession()
+    throw new Error('No refresh token')
+  }
   if (_refreshing) return _refreshing
   _refreshing = (async () => {
     const res = await fetch(`${IDENTITY_API}/auth/refresh`, {
@@ -98,9 +107,7 @@ async function refreshAuth(): Promise<void> {
       body: JSON.stringify({ refresh_token: _refreshToken }),
     })
     if (!res.ok) {
-      _token = null
-      _refreshToken = null
-      _sessionExpiredHandler?.()
+      expireSession()
       throw new Error('Token refresh failed')
     }
     const data = await res.json()
@@ -146,6 +153,10 @@ async function request<T>(method: string, path: string, body?: unknown, base?: s
         continue
       }
 
+      if (res.status === 401) {
+        expireSession()
+      }
+
       const { message, errorCode } = await parseErrorBody(res)
 
       if (res.status < 500) {
@@ -158,6 +169,9 @@ async function request<T>(method: string, path: string, body?: unknown, base?: s
       if (e instanceof ApiError) throw e
       if (e instanceof TypeError) {
         throw new ApiError(0, 'Unable to connect to the server. Please check your internet connection.', 'ERR_NETWORK')
+      }
+      if (e instanceof Error && (e.message === 'No refresh token' || e.message === 'Token refresh failed')) {
+        throw new ApiError(401, 'Your session has expired. Please sign in again.', 'ERR_AUTH_REQUIRED')
       }
       if (attempt === MAX_RETRIES) throw new ApiError(0, 'The server is not responding. Please try again later.', 'ERR_TIMEOUT')
       await new Promise((r) => setTimeout(r, RETRY_DELAY))
@@ -174,6 +188,7 @@ export type ApiProduct = {
   image_urls: string[] | null
   current_market_price: number
   brand: string | null
+  specs?: Record<string, string> | null
   created_at: string
 }
 
@@ -189,6 +204,7 @@ export type ApiWinnerInfo = {
 
 export type ApiAuction = {
   id: string
+  public_code?: string
   product_id: string
   product: ApiProduct | null
   start_time: string
@@ -320,10 +336,10 @@ export const api = {
     },
   },
 
-  createProduct(data: { name: string; description?: string; image_urls?: string[]; current_market_price: number; brand?: string }) {
+  createProduct(data: { name: string; description?: string; image_urls?: string[]; current_market_price: number; brand?: string; specs?: Record<string, string> }) {
     return request<ApiProduct>('POST', '/admin/products', data, ENGINE_API)
   },
-  updateProduct(id: string, data: Partial<{ name: string; description: string; image_urls: string[]; current_market_price: number; brand: string }>) {
+  updateProduct(id: string, data: Partial<{ name: string; description: string; image_urls: string[]; current_market_price: number; brand: string; specs: Record<string, string> }>) {
     return request<ApiProduct>('PATCH', `/admin/products/${id}`, data, ENGINE_API)
   },
   listProducts(page = 1, limit = 20) {

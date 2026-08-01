@@ -4,13 +4,13 @@ import { motion } from "framer-motion"
 import { X, Check, ArrowLeft, ExternalLink, RefreshCw, ShieldCheck } from "lucide-react"
 import { useApp } from "../AppContext"
 import { api, openSikinaPopup, closeSikinaPopup, isSikinaPopupOpen } from "../api"
-import { CURRENCY, formatETB } from "../mockDataV0"
+import { formatCurrency, formatETB } from "../mockDataV0"
 
 const POLL_INTERVAL = 2500
 const TIMEOUT_MS = 120_000
 
 export function SikinaPayCheckoutScreen() {
-  const { go, selectedId, sikinaPayUrl, setSikinaPayUrl, setSikinaProxyUrl, paymentContext, setFeePaid, userBid } = useApp()
+  const { go, selectedId, sikinaPayUrl, setSikinaPayUrl, setSikinaProxyUrl, paymentContext, setFeePaid, userBid, pendingBidAmount } = useApp()
   const [status, setStatus] = useState<"waiting" | "paid" | "failed">("waiting")
   const [popupBlocked, setPopupBlocked] = useState(false)
   const [popupClosed, setPopupClosed] = useState(false)
@@ -311,7 +311,9 @@ export function SikinaPayCheckoutScreen() {
             <h1 className="mt-6 font-display text-2xl font-extrabold text-awash-blue">Payment Successful!</h1>
             <p className="mt-2 max-w-xs text-sm font-medium text-neutral-400">
               {paymentContext === "winning" && userBid != null ? (
-                <>Your payment of <span className="font-bold text-awash-blue">{formatETB(userBid)} {CURRENCY}</span> was received.</>
+                <>Your payment of <span className="font-bold text-awash-blue">{formatCurrency(userBid)}</span> was received.</>
+              ) : paymentContext === "bid-fee" && selectedId ? (
+                <>Your service fee was received. {pendingBidAmount != null ? <span className="font-bold text-awash-blue">Saved bid {formatCurrency(pendingBidAmount)}</span> : 'Your saved bid'} will be submitted next.</>
               ) : (
                 "Your payment was received successfully."
               )}
@@ -320,7 +322,7 @@ export function SikinaPayCheckoutScreen() {
               onClick={handleContinuePaid}
               className="mt-8 flex items-center gap-2 rounded-xl bg-gradient-to-r from-awash-gold to-awash-gold-light px-8 py-3 text-sm font-bold text-awash-blue shadow-lg shadow-primary/30 transition-all hover:shadow-primary/40"
             >
-              {paymentContext === "bid-fee" ? "Continue to Place Bid" : "Track Delivery"}
+              {paymentContext === "bid-fee" ? "Submit Saved Bid" : "Track Delivery"}
             </button>
           </div>
         )}

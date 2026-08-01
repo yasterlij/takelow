@@ -5,16 +5,19 @@ import { useApp } from '../AppContext'
 import { api } from '../api'
 import { Card } from '../components/AuctionUI'
 import { colors } from '../theme'
-import { CURRENCY, formatETB } from '../mockDataV0'
+import { formatCurrency, formatETB } from '../mockDataV0'
 
 type ResultType = 'success' | 'failed' | 'pending'
 
 export function PaymentResultScreen() {
-  const { go, selectedId, userBid, getAuction } = useApp()
+  const { go, selectedId, userBid, pendingBidAmount, getAuction, sikinaPayContext, setFeePaid } = useApp()
   const auction = getAuction(selectedId)
   const [polling, setPolling] = useState(true)
   const [result, setResult] = useState<ResultType>('pending')
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const isBidFee = sikinaPayContext === 'bid-fee'
+  const amount = isBidFee ? (auction?.bidFee ?? 0) : (userBid ?? 0)
 
   useEffect(() => {
     let cancelled = false
@@ -22,7 +25,9 @@ export function PaymentResultScreen() {
     const check = async (): Promise<boolean> => {
       try {
         if (selectedId) {
-          const status = await api.getPaymentLinkStatus(selectedId)
+          const status = isBidFee
+            ? await api.getBidFeePaymentStatus(selectedId)
+            : await api.getPaymentLinkStatus(selectedId)
           if (!cancelled) {
             if (status.status === 'SUCCESSFUL') {
               setResult('success')
@@ -66,9 +71,7 @@ export function PaymentResultScreen() {
       cancelled = true
       if (pollRef.current) clearInterval(pollRef.current)
     }
-  }, [selectedId])
-
-  const amount = userBid ?? 0
+  }, [selectedId, isBidFee])
 
   if (polling && result === 'pending') {
     return (
@@ -87,8 +90,9 @@ export function PaymentResultScreen() {
         </View>
         <Text style={s.title}>Payment Successful!</Text>
         <Text style={s.subtitle}>
-          Your payment of <Text style={s.amount}>{formatETB(amount)} {CURRENCY}</Text> was received.
+          Your payment of <Text style={s.amount}>{formatCurrency(amount)}</Text> was received.
         </Text>
+        {pendingBidAmount != null ? <Text style={[s.subtitle, { marginTop: 6, color: colors.emerald700 }]}>Saved bid {formatCurrency(pendingBidAmount)} will be submitted next.</Text> : null}
         <Card style={{ width: '100%', maxWidth: 300, padding: 20, marginTop: 24 }}>
           <View style={s.row}>
             <Text style={s.label}>Product</Text>
@@ -96,16 +100,24 @@ export function PaymentResultScreen() {
           </View>
           <View style={s.row}>
             <Text style={s.label}>Amount</Text>
-            <Text style={s.value}>{CURRENCY} {formatETB(amount)}</Text>
+            <Text style={s.value}>{formatCurrency(amount)}</Text>
           </View>
+          {pendingBidAmount != null && (
+            <View style={s.row}>
+              <Text style={s.label}>Saved bid</Text>
+              <Text style={s.value}>{formatCurrency(pendingBidAmount)}</Text>
+            </View>
+          )}
           <View style={s.row}>
             <Text style={s.label}>Status</Text>
             <Text style={[s.value, { color: colors.emerald500 }]}>Completed</Text>
           </View>
         </Card>
-        <TouchableOpacity style={s.btn} onPress={() => go('delivery')} activeOpacity={0.8}>
+        <TouchableOpacity style={s.btn} onPress={() => {
+          if (isBidFee) { setFeePaid(true); go('place-bid') } else { go('delivery') }
+        }} activeOpacity={0.8}>
           <ArrowRight size={18} color={colors.primaryForeground} />
-          <Text style={s.btnText}>Track Delivery</Text>
+          <Text style={s.btnText}>{isBidFee ? 'Submit Saved Bid' : 'Track Delivery'}</Text>
         </TouchableOpacity>
       </View>
     )
@@ -120,7 +132,7 @@ export function PaymentResultScreen() {
       <Text style={s.subtitle}>
         The payment was not completed. You can try again or contact support.
       </Text>
-      <TouchableOpacity style={s.btn} onPress={() => go('pay-winning')} activeOpacity={0.8}>
+      <TouchableOpacity style={s.btn} onPress={() => go(isBidFee ? 'pay-fee' : 'pay-winning')} activeOpacity={0.8}>
         <RefreshCw size={18} color={colors.primaryForeground} />
         <Text style={s.btnText}>Try Again</Text>
       </TouchableOpacity>

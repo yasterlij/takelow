@@ -6,7 +6,7 @@ import { AdminLayout } from "../components/AdminLayout"
 import { api } from "../api"
 import { toast } from "../store/toast.store"
 import { useAuctionSocket, applySocketUpdate } from "../hooks/useAuctionSocket"
-import { CURRENCY, formatETB } from "../mockDataV0"
+import { formatCurrency, formatETB } from "../mockDataV0"
 import type { Auction } from "../mockDataV0"
 import { useCountdown } from "../components/Countdown"
 
@@ -151,7 +151,7 @@ function AuctionMonitorCard({ auction, delay, onMonitor }: { auction: AdminAucti
       <div className="p-4">
         <div className="flex items-start justify-between gap-2">
           <h3 className="truncate font-display text-sm font-bold text-awash-blue">{auction.name}</h3>
-          <span className="shrink-0 font-display text-xs font-bold text-primary">{CURRENCY} {formatETB(auction.marketPrice)}</span>
+          <span className="shrink-0 font-display text-xs font-bold text-primary">{formatCurrency(auction.marketPrice)}</span>
         </div>
         <p className="mt-0.5 text-[11px] font-medium text-neutral-400">{auction.category || "No category"}</p>
 

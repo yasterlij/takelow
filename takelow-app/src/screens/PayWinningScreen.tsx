@@ -3,7 +3,7 @@ import { View, Text, ScrollView, StyleSheet, TextInput, TouchableOpacity } from 
 import { ShieldCheck, Clock, Wallet, Building2, ChevronDown, ChevronUp } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { AppBar, CTAButton, Card } from '../components/AuctionUI'
-import { CURRENCY, formatETB } from '../mockDataV0'
+import { formatCurrency, formatETB } from '../mockDataV0'
 import { colors } from '../theme'
 
 export function PayWinningScreen() {
@@ -45,14 +45,14 @@ export function PayWinningScreen() {
 
         <Card style={{ alignItems: 'center', padding: 24, marginTop: 16 }}>
           <Text style={s.label}>Winning Bid</Text>
-          <Text style={s.amount}>{formatETB(amount)} {CURRENCY}</Text>
+          <Text style={s.amount}>{formatCurrency(amount)}</Text>
           <Text style={s.forProduct}>for {auction.name}</Text>
         </Card>
 
         <Card style={{ padding: 16, marginTop: 16 }}>
           <View style={s.summaryRow}>
             <Text style={s.summaryLabel}>Winning amount</Text>
-            <Text style={s.summaryValue}>{CURRENCY} {formatETB(amount)}</Text>
+            <Text style={s.summaryValue}>{formatCurrency(amount)}</Text>
           </View>
           <View style={[s.summaryRow, { marginTop: 8 }]}>
             <Text style={s.summaryLabel}>Delivery</Text>
@@ -61,7 +61,7 @@ export function PayWinningScreen() {
           <View style={s.summaryDivider} />
           <View style={[s.summaryRow, { marginTop: 12 }]}>
             <Text style={{ fontSize: 14, fontWeight: '700', color: colors.navy }}>Total</Text>
-            <Text style={{ fontSize: 14, fontWeight: '800', color: colors.primary }}>{CURRENCY} {formatETB(amount)}</Text>
+            <Text style={{ fontSize: 14, fontWeight: '800', color: colors.primary }}>{formatCurrency(amount)}</Text>
           </View>
         </Card>
 

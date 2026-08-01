@@ -4,7 +4,7 @@ import { Gavel, Trophy, Shield, Loader2, Sparkles, CheckCircle2, ArrowLeft } fro
 import { useApp } from "../AppContext"
 import { ConfettiOverlay } from "../components/AuctionUI"
 import { api } from "../api"
-import { CURRENCY, formatETB } from "../mockDataV0"
+import { formatCurrency, formatETB } from "../mockDataV0"
 
 export function ClosedScreen() {
   const { go, selectedId, user, getAuction } = useApp()
@@ -132,8 +132,8 @@ export function ClosedScreen() {
               </div>
               <div className="flex items-center gap-8">
                 <div className="text-center">
-                  <p className="text-[10px] font-medium uppercase tracking-wide text-neutral-400">Bid Fee</p>
-                  <p className="font-display text-xl font-extrabold text-primary">{CURRENCY} {formatETB(auction.bidFee)}</p>
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-neutral-400">Bid Amount</p>
+                  <p className="font-display text-xl font-extrabold text-primary">{formatCurrency(auction.bidFee)}</p>
                 </div>
                 <div className="text-center">
                   <p className="text-[10px] font-medium uppercase tracking-wide text-neutral-400">Savings</p>

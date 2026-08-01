@@ -7,7 +7,7 @@ import {
 import { useApp } from "../AppContext"
 import { AdminLayout } from "../components/AdminLayout"
 import { StatCard } from "../components/StatCard"
-import { CURRENCY, formatETB } from "../mockDataV0"
+import { formatCurrency, formatETB } from "../mockDataV0"
 import { api } from "../api"
 import { toast } from "../store/toast.store"
 
@@ -69,7 +69,7 @@ export function AdminDashboardScreen() {
           <StatCard icon={<Gavel className="size-5" />} label="Active Auctions" value={loading ? "—" : stats?.auctions.active ?? 0} accent="gold" delay={0} />
           <StatCard icon={<Users className="size-5" />} label="Total Users" value={loading ? "—" : stats?.users.total ?? 0} hint={`${stats?.users.active_today ?? 0} active today`} accent="blue" delay={0.06} />
           <StatCard icon={<TrendingUp className="size-5" />} label="Total Bids" value={loading ? "—" : stats?.bids.total ?? 0} hint={`${stats?.bids.last_24h ?? 0} in last 24h`} accent="emerald" delay={0.12} />
-          <StatCard icon={<DollarSign className="size-5" />} label="Revenue" value={loading ? "—" : `${CURRENCY} ${formatETB(stats?.finances.revenue_total ?? 0)}`} hint={`${CURRENCY} ${formatETB(stats?.finances.revenue_today ?? 0)} today`} accent="amber" delay={0.18} />
+          <StatCard icon={<DollarSign className="size-5" />} label="Revenue" value={loading ? "—" : formatCurrency(stats?.finances.revenue_total ?? 0)} hint={`${formatCurrency(stats?.finances.revenue_today ?? 0)} today`} accent="amber" delay={0.18} />
         </motion.div>
 
         {/* Charts + activity */}
@@ -237,7 +237,7 @@ export function AdminDashboardScreen() {
                 >
                   <div className="min-w-0">
                     <p className="truncate text-xs font-semibold text-awash-blue">{a.name}</p>
-                    <p className="text-[10px] font-medium text-neutral-400">{a.totalBids || a.bidders} bids · {CURRENCY} {formatETB(a.marketPrice)}</p>
+                    <p className="text-[10px] font-medium text-neutral-400">{a.totalBids || a.bidders} bids · {formatCurrency(a.marketPrice)}</p>
                   </div>
                   <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
                     a.status === "ending-soon" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"
@@ -309,7 +309,7 @@ function FinanceRow({ icon, label, value, accent }: { icon: React.ReactNode; lab
         <span className={accent}>{icon}</span>
         {label}
       </span>
-      <span className="font-display text-sm font-bold tabular-nums text-awash-blue">{CURRENCY} {formatETB(value)}</span>
+      <span className="font-display text-sm font-bold tabular-nums text-awash-blue">{formatCurrency(value)}</span>
     </div>
   )
 }

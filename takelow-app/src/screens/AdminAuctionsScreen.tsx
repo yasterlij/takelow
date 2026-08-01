@@ -6,7 +6,7 @@ import { Plus, X, Pencil, XCircle, Trash2, Eye, Calendar, ImageIcon, Search, Fil
 import { useApp } from '../AppContext'
 import { api } from '../api'
 import { AppBar, CTAButton, Badge, Card } from '../components/AuctionUI'
-import { CURRENCY, formatETB } from '../mockDataV0'
+import { formatCurrency, formatSpecSummary } from '../mockDataV0'
 import { colors } from '../theme'
 
 const { width } = Dimensions.get('window')
@@ -52,7 +52,7 @@ function BidChart({ amounts }: { amounts: number[] }) {
         const idx = Math.min(Math.floor((a - min) / bucketSize), count - 1)
         if (idx === i) cnt++
       })
-      return { label: `${CURRENCY}${formatETB(Math.round(start))}`, count: cnt }
+      return { label: formatCurrency(Math.round(start)), count: cnt }
     })
   }, [amounts])
 
@@ -171,6 +171,17 @@ export function AdminAuctionsScreen() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [name, setName] = useState('')
   const CATEGORIES = ['Computer', 'Electronics', 'Phone/Tablet', 'Car', 'Machinery']
+const emptySpecs = { storage: '', ram: '', edition: '', battery: '', camera: '', osVersion: '', display: '', chipset: '' }
+const specFields = [
+  { key: 'storage', label: 'Storage' },
+  { key: 'ram', label: 'RAM' },
+  { key: 'edition', label: 'Edition' },
+  { key: 'battery', label: 'Battery' },
+  { key: 'camera', label: 'Camera' },
+  { key: 'osVersion', label: 'OS Version' },
+  { key: 'display', label: 'Display' },
+  { key: 'chipset', label: 'Chipset' },
+] as const
 const [category, setCategory] = useState('Computer')
   const [marketPrice, setMarketPrice] = useState('')
   const [bidFee, setBidFee] = useState('10')
@@ -180,6 +191,7 @@ const [category, setCategory] = useState('Computer')
   const [description, setDescription] = useState('')
   const [highlights, setHighlights] = useState('')
   const [imageUrl, setImageUrl] = useState('')
+  const [specs, setSpecs] = useState(emptySpecs)
   const [startDate, setStartDate] = useState(new Date())
   const [endDate, setEndDate] = useState(new Date(Date.now() + 7 * 86400000))
   const [showStartPicker, setShowStartPicker] = useState(false)
@@ -192,7 +204,7 @@ const [category, setCategory] = useState('Computer')
   const resetForm = () => {
     setName(''); setCategory('Computer'); setMarketPrice(''); setBidFee('10')
     setMinBid(''); setMaxBid('')
-    setDescription(''); setHighlights(''); setImageUrl('')
+    setDescription(''); setHighlights(''); setImageUrl(''); setSpecs(emptySpecs)
     setStartDate(new Date()); setEndDate(new Date(Date.now() + 7 * 86400000))
   }
 
@@ -205,6 +217,7 @@ const [category, setCategory] = useState('Computer')
     setName(a.name); setCategory(a.category); setMarketPrice(String(a.marketPrice))
     setBidFee(String(a.bidFee || 10)); setDescription(a.description); setImageUrl(a.images?.[0] || '')
     setHighlights(Array.isArray(a.highlights) ? a.highlights.join(', ') : '')
+    setSpecs({ ...emptySpecs, ...(a.specs || {}) })
     setMinBid(a.minBid != null ? String(a.minBid) : '')
     setMaxBid(a.maxBid != null ? String(a.maxBid) : '')
     const end = a.endTime ? new Date(a.endTime) : new Date(Date.now() + 7 * 86400000)
@@ -250,6 +263,7 @@ const [category, setCategory] = useState('Computer')
     const hl = highlights ? highlights.split(',').map((h) => h.trim()).filter(Boolean) : []
     const payload = {
       name, category, marketPrice: Number(marketPrice), description, highlights: hl,
+      specs: Object.fromEntries(Object.entries(specs).filter(([, value]) => value.trim())),
       ...(imageUrl ? { images: [imageUrl] } : {}),
     }
     if (editingId) {
@@ -384,8 +398,8 @@ const [category, setCategory] = useState('Computer')
             </View>
 
             <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
-              <TextInput value={marketPrice} onChangeText={(t) => setMarketPrice(t.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1').replace(/(\.\d{2})\d+/g, '$1'))} placeholder="Market price" placeholderTextColor={colors.mutedForeground} style={[s.input, { flex: 1 }]} keyboardType="decimal-pad" />
-              <TextInput value={bidFee} onChangeText={(t) => setBidFee(t.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1').replace(/(\.\d{2})\d+/g, '$1'))} placeholder="Bid fee" placeholderTextColor={colors.mutedForeground} style={[s.input, { flex: 1 }]} keyboardType="decimal-pad" />
+              <TextInput value={marketPrice} onChangeText={(t) => setMarketPrice(t.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1').replace(/(\.\d{2})\d+/g, '$1'))} placeholder="Payment" placeholderTextColor={colors.mutedForeground} style={[s.input, { flex: 1 }]} keyboardType="decimal-pad" />
+              <TextInput value={bidFee} onChangeText={(t) => setBidFee(t.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1').replace(/(\.\d{2})\d+/g, '$1'))} placeholder="Bid Amount" placeholderTextColor={colors.mutedForeground} style={[s.input, { flex: 1 }]} keyboardType="decimal-pad" />
             </View>
             <Text style={{ fontSize: 10, fontWeight: '600', color: colors.mutedForeground, marginBottom: 4 }}>Category</Text>
             <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
@@ -416,6 +430,16 @@ const [category, setCategory] = useState('Computer')
             </View>
             <TextInput value={description} onChangeText={setDescription} placeholder="Description" placeholderTextColor={colors.mutedForeground} style={s.input} multiline numberOfLines={2} />
             <TextInput value={highlights} onChangeText={setHighlights} placeholder="Highlights (comma separated)" placeholderTextColor={colors.mutedForeground} style={s.input} />
+            {specFields.map((field) => (
+              <TextInput
+                key={field.key}
+                value={specs[field.key]}
+                onChangeText={(value) => setSpecs((prev) => ({ ...prev, [field.key]: value }))}
+                placeholder={field.label}
+                placeholderTextColor={colors.mutedForeground}
+                style={s.input}
+              />
+            ))}
             <Text style={{ fontSize: 10, fontWeight: '600', color: colors.mutedForeground, marginBottom: 4 }}>Start</Text>
             <TouchableOpacity style={s.dateBtn} onPress={() => { setStartPickerMode('date'); setShowStartPicker(true) }}>
               <Calendar size={14} color={colors.mutedForeground} />
@@ -465,16 +489,18 @@ const [category, setCategory] = useState('Computer')
                       <StatusBadge status={a.status} />
                     </View>
                     <Text style={s.meta}>
-                      {a.uniqueBidders} bidders · {CURRENCY} {formatETB(a.marketPrice)}
-                      {bidAmounts.length > 0 ? ` · Avg ${CURRENCY}${formatETB(avgBid)}` : ''}
+                      {a.uniqueBidders} bidders · {formatCurrency(a.marketPrice)}
+                      {bidAmounts.length > 0 ? ` · Avg ${formatCurrency(avgBid)}` : ''}
+                      {a.specSummary ? ` · ${a.specSummary}` : ''}
                     </Text>
                   </View>
+                  {a.publicCode ? <View style={s.statusChip}><Text style={s.statusChipText}>Code {a.publicCode}</Text></View> : null}
                   {a.status === 'closed' ? (
                     <TouchableOpacity onPress={async () => {
                       try {
                         const mod = await import('../api')
                         const res = await mod.api.drawWinner(a.id)
-                        Alert.alert('Winner Result', res.winner_name ? `Winner: ${res.winner_name}\nAmount: ${CURRENCY} ${formatETB(res.winning_bid_amount ?? 0)}` : 'No unique winner found')
+                        Alert.alert('Winner Result', res.winner_name ? `Winner: ${res.winner_name}\nAmount: ${formatCurrency(res.winning_bid_amount ?? 0)}` : 'No unique winner found')
                       } catch {
                         Alert.alert('Error', 'Failed to draw winner')
                       }
@@ -500,10 +526,10 @@ const [category, setCategory] = useState('Computer')
                       {bidAmounts.length > 1 && (
                         <View style={{ flexDirection: 'row', gap: 8 }}>
                           <Text style={{ fontSize: 9, color: colors.mutedForeground }}>
-                            <TrendingDown size={10} color={colors.mutedForeground} /> Min: {CURRENCY}{formatETB(Math.min(...bidAmounts))}
+                            <TrendingDown size={10} color={colors.mutedForeground} /> Min: {formatCurrency(Math.min(...bidAmounts))}
                           </Text>
                           <Text style={{ fontSize: 9, color: colors.mutedForeground }}>
-                            <ArrowUpRight size={10} color={colors.mutedForeground} /> Max: {CURRENCY}{formatETB(Math.max(...bidAmounts))}
+                            <ArrowUpRight size={10} color={colors.mutedForeground} /> Max: {formatCurrency(Math.max(...bidAmounts))}
                           </Text>
                         </View>
                       )}
@@ -524,7 +550,7 @@ const [category, setCategory] = useState('Computer')
                               {b.userName ? `${b.userName} (User ${(b.userId || '').slice(0, 8)})` : b.userId ? `User ${b.userId.slice(0, 8)}` : 'Anonymous'}
                             </Text>
                           </View>
-                          <Text style={{ fontSize: 11, fontWeight: '700', color: colors.navy }}>{CURRENCY} {formatETB(b.amount)}</Text>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: colors.navy }}>{formatCurrency(b.amount)}</Text>
                         </View>
                       ))
                     )}
@@ -587,6 +613,8 @@ const s = StyleSheet.create({
   thumbWrap: { width: 56, height: 56, borderRadius: 12, backgroundColor: colors.secondary, justifyContent: 'center', alignItems: 'center' },
   name: { fontSize: 14, fontWeight: '700', color: colors.navy },
   meta: { fontSize: 11, fontWeight: '500', color: colors.mutedForeground, marginTop: 2 },
+  statusChip: { borderRadius: 12, backgroundColor: colors.emerald50, borderWidth: 1, borderColor: colors.emerald200, paddingHorizontal: 8, paddingVertical: 4 },
+  statusChipText: { fontSize: 10, fontWeight: '700', color: colors.emerald700 },
   iconBtn: { borderRadius: 8, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 8, paddingVertical: 6 },
   closeBtn: { borderRadius: 8, borderWidth: 1, borderColor: colors.destructive + '4D', paddingHorizontal: 8, paddingVertical: 6 },
   bidsBox: { marginTop: -8, marginBottom: 12, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.secondary + '66', padding: 12 },

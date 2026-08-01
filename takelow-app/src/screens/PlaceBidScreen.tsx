@@ -1,42 +1,110 @@
-import React, { useState } from 'react'
-import { View, Text, TextInput, ScrollView, StyleSheet, ActivityIndicator } from 'react-native'
-import { Sparkles, TrendingDown, CheckCircle2 } from 'lucide-react-native'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { View, Text, TextInput, ScrollView, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native'
+import { Sparkles, TrendingDown, CheckCircle2, Minus, Plus } from 'lucide-react-native'
 import { useApp } from '../AppContext'
-import { AppBar, CTAButton, Card } from '../components/AuctionUI'
-import { CURRENCY } from '../mockDataV0'
+import { AppBar, CTAButton, Card, AwashMark } from '../components/AuctionUI'
+import { CURRENCY, formatCurrency } from '../mockDataV0'
 import { colors } from '../theme'
 
 export function PlaceBidScreen() {
-  const { go, selectedId, submitBid, getAuction, authError } = useApp()
+  const { go, selectedId, submitBid, getAuction, authError, feePaid, pendingBidAmount } = useApp()
   const auction = getAuction(selectedId)
   const [amountStr, setAmountStr] = useState('')
   const [loading, setLoading] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const autoSubmittedRef = useRef(false)
+  const [bidFlash, setBidFlash] = useState(false)
+  const STEP = 0.01
 
   if (!auction) return null
 
   const amount = parseFloat(amountStr || '0')
-  const valid = amount > 0 && !loading
+  const valid = amount >= 1 && !loading
+
+  useEffect(() => {
+    if (!bidFlash) return
+    const id = setTimeout(() => setBidFlash(false), 240)
+    return () => clearTimeout(id)
+  }, [bidFlash])
+
+  const updateBid = useCallback((next: number) => {
+    const safe = Math.max(1, Number(next.toFixed(2)))
+    setAmountStr(safe.toFixed(2))
+    setSubmitError(null)
+    setBidFlash(true)
+  }, [])
+
+  const adjustBid = useCallback((delta: number) => {
+    updateBid((amountStr ? Number(amountStr) : 1) + delta)
+  }, [amountStr, updateBid])
 
   const handleSubmit = async () => {
+    if (amount < 1) {
+      setSubmitError('Minimum bid is 1.00')
+      updateBid(1)
+      return
+    }
     if (!valid) return
     setLoading(true)
-    await submitBid(amount)
-    setLoading(false)
+    try {
+      await submitBid(amount)
+    } catch (e: any) {
+      setSubmitError(e?.message || 'Bid submission failed. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
+
+  useEffect(() => {
+    if (!auction || !feePaid || pendingBidAmount == null || autoSubmittedRef.current) return
+    autoSubmittedRef.current = true
+    setAmountStr(pendingBidAmount.toFixed(2))
+    setLoading(true)
+    setSubmitError(null)
+    Promise.resolve(submitBid(pendingBidAmount))
+      .catch((e: any) => {
+        autoSubmittedRef.current = false
+        setSubmitError(e?.message || 'Bid submission failed. Please try again.')
+      })
+      .finally(() => setLoading(false))
+  }, [auction, feePaid, pendingBidAmount, submitBid])
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={{ backgroundColor: colors.navy }}>
         <StatusBarCustom />
       </View>
-      <AppBar title="Place Your Bid" onBack={() => go('pay-fee')} />
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 120 }}>
+      <AppBar
+        title="Place Your Bid"
+        onBack={() => go('pay-fee')}
+        right={
+          <TouchableOpacity onPress={() => go('home')} style={{ width: 34, height: 34, justifyContent: 'center', alignItems: 'center' }}>
+            <AwashMark size={22} />
+          </TouchableOpacity>
+        }
+      />
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 120 }}>
+        <Card style={s.snapshotCard}>
+          <View style={s.snapshotHero}>
+            <Text style={s.snapshotEyebrow}>Auction snapshot</Text>
+            <Text style={s.snapshotTitle}>{auction.name}</Text>
+            <Text style={s.snapshotCode}>Code {auction.publicCode || auction.id.slice(0, 6).toUpperCase()}</Text>
+            {auction.specSummary ? <Text style={s.snapshotSummary}>{auction.specSummary}</Text> : null}
+          </View>
+        </Card>
+
         <View style={s.feePaidBanner}>
           <CheckCircle2 size={18} color={colors.emerald600} />
           <Text style={s.feePaidText}>Bid fee paid. You&apos;re in the auction for {auction.name}!</Text>
         </View>
 
-        <View style={{ flexDirection: 'row', gap: 8, marginTop: 16 }}>
+        {feePaid && pendingBidAmount != null && (
+          <Card style={{ padding: 12, marginTop: 12, backgroundColor: colors.awashBlue + '0D', borderWidth: 1, borderColor: colors.awashBlue + '1A' }}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.awashBlue }}>Saved bid {formatCurrency(pendingBidAmount)} detected. Submitting automatically after payment.</Text>
+          </Card>
+        )}
+
+        <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
           {auction.maxBid && (
             <View style={s.statChip}>
               <Text style={s.statChipText}>Max {auction.maxBid} bids</Text>
@@ -62,20 +130,41 @@ export function PlaceBidScreen() {
           </Card>
         )}
 
-        <View style={{ alignItems: 'center', marginTop: 16 }}>
+        <View style={{ alignItems: 'center', marginTop: 14 }}>
           <Text style={s.enterBidTitle}>Enter your bid amount</Text>
           <Text style={s.enterBidSub}>Your bid must be a unique lowest amount to win.</Text>
         </View>
 
-        <Card style={{ padding: 20, marginTop: 20 }}>
-          <View style={s.inputRow}>
-            <TextInput
-              value={amountStr}
-              onChangeText={(t) => setAmountStr(t.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1').replace(/(\.\d{2})\d+/g, '$1').slice(0, 8))}
-              keyboardType="number-pad"
-              style={s.inputAmount}
-            />
-            <Text style={s.currency}>{CURRENCY}</Text>
+        <Card style={{ padding: 18, marginTop: 16, borderRadius: 20 }}>
+          <View style={[s.bidControl, bidFlash && s.bidControlActive]}>
+            <TouchableOpacity onPress={() => adjustBid(-STEP)} disabled={amount <= 1} style={[s.bidAdjustBtn, amount <= 1 && s.bidAdjustBtnDisabled]}>
+              <Minus size={18} color={amount <= 1 ? colors.mutedForeground : colors.awashBlue} />
+            </TouchableOpacity>
+            <View style={{ flex: 1 }}>
+              <TextInput
+                value={amountStr}
+                onChangeText={(t) => {
+                  setAmountStr(t.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1').replace(/(\.\d{2})\d+/g, '$1').slice(0, 8))
+                  setSubmitError(null)
+                }}
+                onBlur={() => {
+                  if (!amountStr) return
+                  const normalized = Number(amountStr)
+                  if (normalized < 1) {
+                    setSubmitError('Minimum bid is 1.00')
+                    updateBid(1)
+                    return
+                  }
+                  updateBid(normalized)
+                }}
+                keyboardType="decimal-pad"
+                style={s.bidInput}
+              />
+              <Text style={s.bidCurrency}>{CURRENCY}</Text>
+            </View>
+            <TouchableOpacity onPress={() => adjustBid(STEP)} style={s.bidAdjustBtn}>
+              <Plus size={18} color={colors.awashBlue} />
+            </TouchableOpacity>
           </View>
 
           <View style={s.tip}>
@@ -91,17 +180,18 @@ export function PlaceBidScreen() {
           </Text>
         </View>
 
-        {authError && (
+        {(authError || submitError) && (
           <View style={s.error}>
-            <Text style={s.errorText}>{authError}</Text>
+            <Text style={s.errorText}>{submitError || authError}</Text>
           </View>
         )}
       </ScrollView>
 
       <View style={s.bottomCta}>
         <CTAButton disabled={!valid} onPress={handleSubmit}>
-          {loading ? <ActivityIndicator size={18} color="#fff" /> : 'Submit Bid'}
+          {loading ? <ActivityIndicator size={18} color="#fff" /> : 'Submit Bid Amount'}
         </CTAButton>
+        <Text style={s.footerNote}>Terms and conditions will apply</Text>
       </View>
     </View>
   )
@@ -116,21 +206,31 @@ function StatusBarCustom() {
 }
 
 const s = StyleSheet.create({
+  snapshotCard: { padding: 12, borderRadius: 24, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, shadowColor: colors.awashBlue, shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.08, shadowRadius: 24, elevation: 8 },
+  snapshotHero: { borderRadius: 18, padding: 16, backgroundColor: colors.awashBlue },
+  snapshotEyebrow: { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', color: 'rgba(255,255,255,0.7)' },
+  snapshotTitle: { fontSize: 22, fontWeight: '800', color: '#fff', marginTop: 8 },
+  snapshotCode: { fontSize: 13, fontWeight: '700', color: 'rgba(255,255,255,0.78)', marginTop: 6 },
+  snapshotSummary: { fontSize: 12, fontWeight: '600', lineHeight: 18, color: 'rgba(255,255,255,0.9)', marginTop: 10 },
   feePaidBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, backgroundColor: colors.emerald50, padding: 12 },
   feePaidText: { fontSize: 12, fontWeight: '600', color: colors.emerald700, flex: 1 },
   statChip: { borderRadius: 6, backgroundColor: colors.accent, paddingHorizontal: 8, paddingVertical: 4 },
   statChipText: { fontSize: 10, fontWeight: '600', color: colors.primary },
-  bidProgress: { borderRadius: 8, borderWidth: 1, borderColor: colors.border, padding: 8, marginTop: 8 },
+  bidProgress: { borderRadius: 12, borderWidth: 1, borderColor: colors.border, padding: 10, marginTop: 8 },
   enterBidTitle: { fontSize: 18, fontWeight: '800', color: colors.navy },
   enterBidSub: { fontSize: 12, fontWeight: '500', color: colors.mutedForeground, marginTop: 4, maxWidth: 256, textAlign: 'center' },
-  inputRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', gap: 8 },
-  inputAmount: { width: 160, borderRadius: 12, borderWidth: 2, borderColor: colors.border, backgroundColor: colors.secondary, paddingVertical: 12, textAlign: 'center', fontSize: 36, fontWeight: '800', color: colors.navy },
-  currency: { paddingBottom: 16, fontSize: 14, fontWeight: '700', color: colors.mutedForeground },
+  bidControl: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.white, padding: 8 },
+  bidControlActive: { borderColor: colors.emerald200, shadowColor: colors.emerald500, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.12, shadowRadius: 12, elevation: 2 },
+  bidAdjustBtn: { width: 48, height: 48, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.secondary, justifyContent: 'center', alignItems: 'center' },
+  bidAdjustBtnDisabled: { opacity: 0.45 },
+  bidInput: { width: '100%', textAlign: 'center', fontSize: 36, fontWeight: '800', color: colors.navy, paddingVertical: 8 },
+  bidCurrency: { textAlign: 'center', fontSize: 14, fontWeight: '700', color: colors.mutedForeground, paddingBottom: 4 },
   tip: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 8, backgroundColor: colors.accent, paddingHorizontal: 12, paddingVertical: 8, marginTop: 16 },
   tipText: { fontSize: 12, fontWeight: '600', color: colors.accentForeground },
   strategy: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, borderRadius: 12, backgroundColor: colors.navy + '0D', padding: 12, marginTop: 16 },
   strategyText: { fontSize: 12, fontWeight: '500', lineHeight: 18, color: colors.navy + 'CC', flex: 1 },
   bottomCta: { position: 'absolute', bottom: 0, left: 0, right: 0, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.card + 'F2', padding: 16 },
+  footerNote: { marginTop: 10, textAlign: 'center', fontSize: 10, fontWeight: '700', letterSpacing: 1.2, color: colors.mutedForeground, textTransform: 'uppercase' },
   error: { borderRadius: 12, backgroundColor: colors.destructive + '15', padding: 12, marginTop: 16 },
   errorText: { fontSize: 12, fontWeight: '600', color: colors.destructive, textAlign: 'center' },
 })

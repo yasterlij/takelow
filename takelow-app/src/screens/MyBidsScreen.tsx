@@ -6,7 +6,7 @@ import { AppBar, Badge, Card } from '../components/AuctionUI'
 import { useCountdown } from '../components/Countdown'
 import { EmptyState } from '../components/EmptyState'
 import { SkeletonRow } from '../components/SkeletonLoader'
-import { CURRENCY, formatETB, formatCountdown } from '../mockDataV0'
+import { CURRENCY, formatCurrency, formatETB, formatCountdown } from '../mockDataV0'
 import { colors } from '../theme'
 
 function TimeLeft({ seconds }: { seconds: number }) {
@@ -78,7 +78,7 @@ export function MyBidsScreen() {
                       <Text style={{ fontSize: 14, fontWeight: '700', color: colors.navy }} numberOfLines={1}>{auction.name}</Text>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
                         <Text style={{ fontSize: 11, fontWeight: '500', color: colors.mutedForeground }}>Your bid</Text>
-                        <Text style={{ fontSize: 14, fontWeight: '800', color: colors.primary, fontVariant: ['tabular-nums'] }}>{CURRENCY} {formatETB(bid.amount)}</Text>
+                        <Text style={{ fontSize: 14, fontWeight: '800', color: colors.primary, fontVariant: ['tabular-nums'] }}>{formatCurrency(bid.amount)}</Text>
                       </View>
                       {bid.ticketNumber && (
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 }}>

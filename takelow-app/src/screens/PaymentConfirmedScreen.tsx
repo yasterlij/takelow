@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native
 import { Check, Download, Truck, ArrowRight, Home } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { CTAButton, Card, AwashMark } from '../components/AuctionUI'
-import { CURRENCY, formatETB } from '../mockDataV0'
+import { formatCurrency, formatETB } from '../mockDataV0'
 import { colors } from '../theme'
 
 export function PaymentConfirmedScreen() {
@@ -43,7 +43,7 @@ export function PaymentConfirmedScreen() {
           </View>
         </View>
         <Text style={s.title}>Payment Successful!</Text>
-        <Text style={s.subtitle}>Your payment of {formatETB(userBid ?? 0)} {CURRENCY} for {auction.name} has been received.</Text>
+        <Text style={s.subtitle}>Your payment of {formatCurrency(userBid ?? 0)} for {auction.name} has been received.</Text>
 
         <Card style={{ width: '100%', maxWidth: 300, padding: 20, marginTop: 24 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
@@ -66,7 +66,7 @@ export function PaymentConfirmedScreen() {
           </View>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
             <Text style={s.receiptLabel}>Amount</Text>
-            <Text style={s.receiptValue}>{formatETB(userBid ?? 0)} {CURRENCY}</Text>
+            <Text style={s.receiptValue}>{formatCurrency(userBid ?? 0)}</Text>
           </View>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
             <Text style={s.receiptLabel}>Payment</Text>

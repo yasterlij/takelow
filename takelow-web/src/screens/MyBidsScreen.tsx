@@ -3,7 +3,7 @@ import { Gavel, Clock, TicketCheck, Trophy, ChevronRight, Hash, TrendingDown } f
 import { useApp } from "../AppContext"
 import { Badge } from "../components/AuctionUI"
 import { useCountdown } from "../components/Countdown"
-import { CURRENCY, formatETB, formatCountdown } from "../mockDataV0"
+import { formatCurrency, formatETB, formatCountdown } from "../mockDataV0"
 
 function TimeLeft({ seconds }: { seconds: number }) {
   const t = useCountdown(seconds)
@@ -99,7 +99,7 @@ export function MyBidsScreen() {
                     <div className="mt-0.5 flex items-center gap-1.5">
                       <span className="text-[11px] font-medium text-neutral-400">Your bid</span>
                       <span className="font-display text-sm font-extrabold text-gradient-gold tabular-nums">
-                        {CURRENCY} {formatETB(bid.amount)}
+                        {formatCurrency(bid.amount)}
                       </span>
                     </div>
                     {bid.ticketNumber && (

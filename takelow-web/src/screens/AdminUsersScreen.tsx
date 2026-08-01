@@ -5,7 +5,7 @@ import { useApp } from "../AppContext"
 import { AdminLayout } from "../components/AdminLayout"
 import { Badge, Card, CTAButton } from "../components/AuctionUI"
 import { api, type ApiUser } from "../api"
-import { CURRENCY, formatETB } from "../mockDataV0"
+import { formatCurrency, formatETB } from "../mockDataV0"
 
 function UserDetailModal({ user, onClose, onRoleChange, onNameChange }: { user: ApiUser; onClose: () => void; onRoleChange: (id: string, role: string) => void; onNameChange: (id: string, name: string) => void }) {
   const { allBids } = useApp()
@@ -85,7 +85,7 @@ function UserDetailModal({ user, onClose, onRoleChange, onNameChange }: { user: 
             <div className="rounded-xl bg-neutral-50 p-3">
               <Wallet className="size-3.5 text-neutral-400 mb-1" />
               <p className="text-xs font-medium text-neutral-400">Wallet</p>
-              <p className="text-sm font-bold text-awash-blue">{CURRENCY} {formatETB(user.wallet_balance)}</p>
+              <p className="text-sm font-bold text-awash-blue">{formatCurrency(user.wallet_balance)}</p>
             </div>
           </div>
 

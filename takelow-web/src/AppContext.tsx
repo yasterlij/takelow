@@ -3,7 +3,8 @@ import type { ReactNode } from "react"
 import { api, setApiToken, setRefreshToken, getApiToken, getRefreshToken, getUserFriendlyMessage } from "./api"
 import { toast } from "./store/toast.store"
 import { useAuctionSocket, applySocketUpdate } from "./hooks/useAuctionSocket"
-import type { Auction } from "./mockDataV0"
+import type { Auction, ProductSpecs } from "./mockDataV0"
+import { formatSpecSummary } from "./mockDataV0"
 
 export type View =
   | "login" | "register" | "home" | "auctions" | "my-bids"
@@ -36,6 +37,7 @@ type AppState = {
   view: View
   selectedId: string | null
   userBid: number | null
+  pendingBidAmount: number | null
   bidTicketNumber: string | null
   feePaid: boolean
   walletBalance: number
@@ -58,6 +60,7 @@ type AppState = {
   selectAuctionForMonitor: (id: string) => void
   setSelectedIdOnly: (id: string) => void
   setFeePaid: (paid: boolean) => void
+  setPendingBidAmount: (amount: number | null) => void
   payFee: (fee: number, paymentMethod?: 'SIKINAPAY' | 'AWASH') => Promise<void>
   submitBid: (amount: number) => Promise<void>
   payWinning: (amount: number, paymentMethod?: 'SIKINAPAY' | 'AWASH' | 'WALLET', customerPhone?: string) => Promise<void>
@@ -67,8 +70,8 @@ type AppState = {
   login: (phone: string, password: string) => Promise<boolean>
   register: (phone: string, password: string, name: string) => Promise<boolean>
   logout: () => void
-  addAuction: (a: { name: string; category: string; marketPrice: number; bidFee: number; description: string; highlights: string[]; startTime: string; endTime: string; images?: string[]; minBid?: number; maxBid?: number }) => Promise<void>
-  updateAuction: (id: string, data: Partial<Pick<Auction, "name" | "category" | "marketPrice" | "description" | "highlights" | "images">> & { startTime?: string; endTime?: string; minBid?: number; maxBid?: number }) => Promise<void>
+  addAuction: (a: { name: string; category: string; marketPrice: number; bidFee: number; description: string; highlights: string[]; specs?: ProductSpecs; startTime: string; endTime: string; images?: string[]; minBid?: number; maxBid?: number }) => Promise<void>
+  updateAuction: (id: string, data: Partial<Pick<Auction, "name" | "category" | "marketPrice" | "description" | "highlights" | "images" | "specs">> & { startTime?: string; endTime?: string; minBid?: number; maxBid?: number }) => Promise<void>
   deleteAuction: (id: string) => Promise<void>
   closeAuction: (id: string) => Promise<void>
   forceCloseAuction: (id: string) => Promise<void>
@@ -78,7 +81,14 @@ type AppState = {
   getAuction: (id: string | null | undefined) => Auction | undefined
 }
 
-const AppContext = createContext<AppState | null>(null)
+declare global {
+  interface Window {
+    __takelowAppContext?: ReturnType<typeof createContext<AppState | null>>
+  }
+}
+
+const AppContext = window.__takelowAppContext || createContext<AppState | null>(null)
+window.__takelowAppContext = AppContext
 
 const INITIAL_BALANCE = 0
 const STORAGE_KEY = "takelow_data"
@@ -87,6 +97,7 @@ function mapAuction(apiAuction: any): Auction {
   const timeLeft = Math.max(0, Math.floor((new Date(apiAuction.end_time).getTime() - Date.now()) / 1000))
   return {
     id: apiAuction.id,
+    publicCode: apiAuction.public_code,
     productId: apiAuction.product_id,
     name: apiAuction.product?.name || 'Unknown Product',
     category: apiAuction.product?.brand || '',
@@ -101,6 +112,8 @@ function mapAuction(apiAuction: any): Auction {
     status: (apiAuction.status === 'ACTIVE' ? (timeLeft < 3600 ? 'ending-soon' : 'live') : 'closed') as Auction['status'],
     description: apiAuction.product?.description || '',
     highlights: [],
+    specs: apiAuction.product?.specs || null,
+    specSummary: formatSpecSummary(apiAuction.product?.specs),
     minBid: apiAuction.min_bid ?? undefined,
     maxBid: apiAuction.max_bid ?? undefined,
     winners: apiAuction.winners?.map((w: any) => ({
@@ -127,10 +140,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [view, setView] = useState<View>('login')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [userBid, setUserBid] = useState<number | null>(null)
+  const [pendingBidAmount, setPendingBidAmount] = useState<number | null>(null)
   const [bidTicketNumber, setBidTicketNumber] = useState<string | null>(null)
   const [feePaid, setFeePaid] = useState(false)
   const [walletBalance, setWalletBalance] = useState(INITIAL_BALANCE)
-  const [paymentMethod, setPaymentMethodState] = useState<'SIKINAPAY' | 'AWASH' | 'WALLET'>('WALLET')
+  const [paymentMethod, setPaymentMethodState] = useState<'SIKINAPAY' | 'AWASH' | 'WALLET'>('AWASH')
   const [lastPaymentMethod, setLastPaymentMethod] = useState<'SIKINAPAY' | 'AWASH' | 'WALLET' | null>(null)
   const [paymentContext, setPaymentContextState] = useState<'bid-fee' | 'winning' | null>(null)
   const setPaymentContext = useCallback((ctx: 'bid-fee' | 'winning' | null) => setPaymentContextState(ctx), [])
@@ -150,34 +164,67 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const logoutRef = useRef<() => void>(() => {})
 
   useEffect(() => {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) {
-      try {
-        const saved = JSON.parse(raw)
-        if (saved.auctions?.length) {
-          const unique = Array.from(new Map<string, Auction>(saved.auctions.map((a: any) => [a.id, a])).values())
-          setAuctions(unique)
+    const hydrate = async () => {
+      const raw = localStorage.getItem(STORAGE_KEY)
+      if (raw) {
+        try {
+          const saved = JSON.parse(raw)
+          if (saved.auctions?.length) {
+            const unique = Array.from(new Map<string, Auction>(saved.auctions.map((a: any) => [a.id, a])).values())
+            setAuctions(unique)
+          }
+          if (saved.pendingBidAmount != null) setPendingBidAmount(saved.pendingBidAmount)
+          if (saved.allBids?.length) setAllBids(saved.allBids)
+          if (saved.myBids?.length) setMyBids(saved.myBids)
+          if (saved.walletBalance != null) setWalletBalance(saved.walletBalance)
+          if (saved.accessToken && saved.refreshToken && saved.user) {
+            setApiToken(saved.accessToken)
+            setRefreshToken(saved.refreshToken)
+            try {
+              const profile = await api.auth.profile()
+              setUser({
+                ...(saved.user as User),
+                id: profile.id,
+                name: profile.full_name || profile.phone_number,
+                phone: profile.phone_number,
+                role: profile.role as UserRole,
+              })
+              setView('home')
+            } catch {
+              try {
+                const refreshed = await api.auth.refresh(saved.refreshToken)
+                setApiToken(refreshed.access_token)
+                setRefreshToken(refreshed.refresh_token)
+                const profile = await api.auth.profile()
+                setUser({
+                  id: profile.id,
+                  name: profile.full_name || profile.phone_number,
+                  phone: profile.phone_number,
+                  role: profile.role as UserRole,
+                })
+                setView('home')
+              } catch {
+                setApiToken(null)
+                setRefreshToken(null)
+                setUser(null)
+              }
+            }
+          }
+        } catch {
+          // ignore corrupt data
         }
-        if (saved.allBids?.length) setAllBids(saved.allBids)
-        if (saved.myBids?.length) setMyBids(saved.myBids)
-        if (saved.walletBalance != null) setWalletBalance(saved.walletBalance)
-        if (saved.accessToken && saved.refreshToken && saved.user) {
-          setApiToken(saved.accessToken)
-          setRefreshToken(saved.refreshToken)
-          const appUser = saved.user as User
-          setUser(appUser)
-          setView('home')
-        }
-      } catch { /* ignore corrupt data */ }
+      }
+      setHydrated(true)
     }
-    setHydrated(true)
+
+    hydrate()
   }, [])
 
   useEffect(() => {
     if (!hydrated) return
     const tokens = user ? { accessToken: getApiToken(), refreshToken: getRefreshToken() } : {}
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ auctions, allBids, myBids, walletBalance, user, ...tokens }))
-  }, [auctions, allBids, myBids, walletBalance, user, hydrated])
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ auctions, allBids, myBids, walletBalance, pendingBidAmount, user, ...tokens }))
+  }, [auctions, allBids, myBids, walletBalance, pendingBidAmount, user, hydrated])
 
   useEffect(() => {
     const onSessionExpired = () => logoutRef.current()
@@ -206,6 +253,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const selectAuction = useCallback((id: string) => {
     setSelectedId(id)
     setFeePaid(false)
+    setPendingBidAmount(null)
     setUserBid(null)
     setBidTicketNumber(null)
     setPaymentContext(null)
@@ -260,6 +308,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setMyBids((prev) => [bid, ...prev])
       setAllBids((prev) => [bid, ...prev])
       setUserBid(amount)
+      setPendingBidAmount(null)
       setAuctions((prev) =>
         prev.map((a) => (a.id === selectedId ? { ...a, bidders: (a.bidders ?? 0) + 1, totalBids: (a.totalBids ?? 0) + 1 } : a)),
       )
@@ -267,7 +316,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       refreshWallet()
       setTimeout(() => refreshAuctions(), 3000)
       const name = auctions.find((a) => a.id === selectedId)?.name || 'Unknown'
-      const smsText = `Your bid of ETB ${amount} on '${name}' has been placed successfully. Your BID ticket: ${ticket || 'N/A'}`
+      const smsText = `Your bid of birr ${amount} on '${name}' has been placed successfully. Your BID ticket: ${ticket || 'N/A'}`
       toast(`📱 SMS: ${smsText}`, "success")
     } catch (e) {
       const msg = getUserFriendlyMessage(e)
@@ -323,8 +372,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setUserBid(null)
     setBidTicketNumber(null)
     setFeePaid(false)
+    setPendingBidAmount(null)
     setWalletBalance(INITIAL_BALANCE)
-    setPaymentMethodState('SIKINAPAY')
+    setPaymentMethodState('AWASH')
     setPaymentContext(null)
     setSikinaPayUrl(null)
     setMyBids([])
@@ -434,6 +484,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setUser(null)
     setSelectedId(null)
     setUserBid(null)
+    setPendingBidAmount(null)
     setBidTicketNumber(null)
     setFeePaid(false)
     setWalletBalance(INITIAL_BALANCE)
@@ -452,11 +503,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [])
   logoutRef.current = logout
 
-  const addAuction = useCallback(async (a: { name: string; category: string; marketPrice: number; bidFee: number; description: string; highlights: string[]; startTime: string; endTime: string; images?: string[]; minBid?: number; maxBid?: number }) => {
+  const addAuction = useCallback(async (a: { name: string; category: string; marketPrice: number; bidFee: number; description: string; highlights: string[]; specs?: ProductSpecs; startTime: string; endTime: string; images?: string[]; minBid?: number; maxBid?: number }) => {
     if (user?.role !== 'admin') return
     try {
       const product = await api.createProduct({
         name: a.name, description: a.description, current_market_price: a.marketPrice, brand: a.category,
+        ...(a.specs ? { specs: a.specs } : {}),
         ...(a.images?.length ? { image_urls: a.images } : {}),
       })
       await api.createAuction({
@@ -506,6 +558,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             ...(data.description !== undefined ? { description: data.description } : {}),
             ...(data.category !== undefined ? { brand: data.category } : {}),
             ...(data.images !== undefined ? { image_urls: data.images } : {}),
+            ...(data.specs !== undefined ? { specs: data.specs } : {}),
           })
         }
         if (data.startTime || data.endTime || data.minBid != null || data.maxBid != null) {
@@ -542,15 +595,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [auctions])
 
   const value = useMemo(() => ({
-    view, selectedId, userBid, bidTicketNumber, feePaid, walletBalance, paymentMethod, lastPaymentMethod, paymentContext, setPaymentContext, sikinaPayUrl, setSikinaPayUrl, sikinaProxyUrl, setSikinaProxyUrl, myBids, user, allBids,
+    view, selectedId, userBid, pendingBidAmount, bidTicketNumber, feePaid, walletBalance, paymentMethod, lastPaymentMethod, paymentContext, setPaymentContext, sikinaPayUrl, setSikinaPayUrl, sikinaProxyUrl, setSikinaProxyUrl, myBids, user, allBids,
     auctions, auctionsLoading, authError,
-    go, selectAuction, selectAuctionForMonitor, setSelectedIdOnly, setFeePaid, payFee, submitBid, payWinning, setPaymentMethod, checkPaymentStatus, reset,
+    go, selectAuction, selectAuctionForMonitor, setSelectedIdOnly, setFeePaid, setPendingBidAmount, payFee, submitBid, payWinning, setPaymentMethod, checkPaymentStatus, reset,
     login, register, logout, addAuction, updateAuction, deleteAuction, closeAuction, forceCloseAuction,
     refreshAuctions, refreshWallet, fetchAuctionById, getAuction,
   }), [
-    view, selectedId, userBid, bidTicketNumber, feePaid, walletBalance, paymentMethod, lastPaymentMethod, paymentContext, setPaymentContext, sikinaPayUrl, setSikinaPayUrl, sikinaProxyUrl, setSikinaProxyUrl, myBids, user, allBids,
+    view, selectedId, userBid, pendingBidAmount, bidTicketNumber, feePaid, walletBalance, paymentMethod, lastPaymentMethod, paymentContext, setPaymentContext, sikinaPayUrl, setSikinaPayUrl, sikinaProxyUrl, setSikinaProxyUrl, myBids, user, allBids,
     auctions, auctionsLoading, authError,
-    go, selectAuction, selectAuctionForMonitor, setSelectedIdOnly, setFeePaid, payFee, submitBid, payWinning, setPaymentMethod, checkPaymentStatus, reset,
+    go, selectAuction, selectAuctionForMonitor, setSelectedIdOnly, setFeePaid, setPendingBidAmount, payFee, submitBid, payWinning, setPaymentMethod, checkPaymentStatus, reset,
     login, register, logout, addAuction, updateAuction, deleteAuction, closeAuction, forceCloseAuction,
     refreshAuctions, refreshWallet, fetchAuctionById, getAuction,
   ])

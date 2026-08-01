@@ -25,6 +25,9 @@ export class Product {
   @Column({ type: "varchar", nullable: true })
   brand: string;
 
+  @Column({ type: "jsonb", nullable: true })
+  specs: Record<string, string> | null;
+
   @CreateDateColumn()
   created_at: Date;
 }

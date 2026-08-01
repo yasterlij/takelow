@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import { Check, Eye, Home, MessageSquareText, ArrowLeft } from "lucide-react"
 import { useApp } from "../AppContext"
-import { CURRENCY, formatETB } from "../mockDataV0"
+import { formatCurrency, formatETB } from "../mockDataV0"
 
 const particles = Array.from({ length: 16 }, (_, i) => ({
   id: i,
@@ -26,7 +26,7 @@ export function BidConfirmedScreen() {
   if (!auction) return null
 
   const smsMessage = bidTicketNumber
-    ? `Your bid of ${formatETB(userBid ?? 0)} ETB on '${auction.name}' has been placed successfully. Your BID ticket number is: ${bidTicketNumber}`
+    ? `Your bid of ${formatCurrency(userBid ?? 0)} on '${auction.name}' has been placed successfully. Your BID ticket number is: ${bidTicketNumber}`
     : null
 
   return (
@@ -114,7 +114,7 @@ export function BidConfirmedScreen() {
             Your Bid
           </span>
           <p className="mt-1 font-display text-4xl font-extrabold text-gradient-gold tabular-nums">
-            {formatETB(userBid ?? 0)} {CURRENCY}
+            {formatCurrency(userBid ?? 0)}
           </p>
           <div className="mt-4 border-t border-primary/10 pt-3 text-left">
             <div className="flex justify-between text-xs">

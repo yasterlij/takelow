@@ -1,12 +1,12 @@
 import React, { useState, useRef, useCallback } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Modal, Pressable, Dimensions, Image, RefreshControl } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
-import { Gavel, Wallet, ArrowRight, Eye, EyeOff, Shield, LogOut, Sparkles, Trophy, Timer, Zap } from 'lucide-react-native'
+import { Gavel, Wallet, ArrowRight, Eye, EyeOff, Shield, LogOut, Sparkles, Trophy, Timer } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { AwashMark, Badge } from '../components/AuctionUI'
 import { ImageCarousel } from '../components/ImageCarousel'
-import { colors, CURRENCY } from '../theme'
-import { formatETB, formatCountdown } from '../mockDataV0'
+import { colors } from '../theme'
+import { formatCurrency, formatETB, formatCountdown } from '../mockDataV0'
 import { useCountdown } from '../components/Countdown'
 
 const { width: SCREEN_W } = Dimensions.get('window')
@@ -23,6 +23,7 @@ function HeroSlide({ item, onJoin }: { item: any; onJoin: () => void }) {
   const { d, h, m, s } = formatCountdown(t)
   const urgent = item.status === 'ending-soon' || (t > 0 && t < 3600)
   const savings = Math.round((1 - item.bidFee / item.marketPrice) * 100)
+  const publicCode = item.publicCode || item.id.slice(0, 6).toUpperCase()
 
   if (!item.images?.length) {
     return (
@@ -50,10 +51,15 @@ function HeroSlide({ item, onJoin }: { item: any; onJoin: () => void }) {
         overlay={
           <>
             <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.35)' }]} />
-            <View style={{ position: 'absolute', top: 8, left: 10, right: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', zIndex: 10 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,43,92,0.75)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' }}>
-                <Gavel size={12} color="#FFF" />
-                <Text style={{ fontSize: 11, fontWeight: '700', color: '#FFF' }}>Live Auction</Text>
+            <View style={{ position: 'absolute', top: 8, left: 10, right: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', zIndex: 10 }}>
+              <View style={{ gap: 6 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,43,92,0.75)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' }}>
+                  <Gavel size={12} color="#FFF" />
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#FFF' }}>Live Auction</Text>
+                </View>
+                <View style={{ alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.14)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' }}>
+                  <Text style={{ fontSize: 10, fontWeight: '800', color: '#FFF', letterSpacing: 1 }}>CODE {publicCode}</Text>
+                </View>
               </View>
               <View style={{ backgroundColor: urgent ? colors.primary + '30' : 'rgba(255,255,255,0.8)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: urgent ? colors.primary + '40' : 'rgba(255,255,255,0.3)' }}>
                 <Text style={{ fontSize: 11, fontWeight: '800', color: urgent ? colors.primary : colors.awashBlue, fontVariant: ['tabular-nums'] }}>
@@ -65,9 +71,15 @@ function HeroSlide({ item, onJoin }: { item: any; onJoin: () => void }) {
               <Text style={{ color: '#FFF', fontFamily: 'System', fontSize: 18, fontWeight: '800', textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 }}>
                 {item.name}
               </Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
-                <Text style={{ color: '#FFF', fontSize: 13, fontWeight: '700' }}>{CURRENCY} {formatETB(item.bidFee)} bid</Text>
-                <Text style={{ color: '#34D399', fontSize: 11, fontWeight: '600', textDecorationLine: 'line-through' }}>{CURRENCY} {formatETB(item.marketPrice)}</Text>
+              {item.specSummary ? <Text style={{ color: 'rgba(255,255,255,0.84)', fontSize: 12, fontWeight: '600', marginTop: 4 }}>{item.specSummary}</Text> : null}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+                <View style={{ borderRadius: 999, backgroundColor: colors.primary + '33', paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: colors.primary + '40' }}>
+                  <Text style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>Bid Amount: {formatCurrency(item.bidFee)}</Text>
+                </View>
+                <Text style={{ color: '#34D399', fontSize: 11, fontWeight: '600', textDecorationLine: 'line-through' }}>{formatCurrency(item.marketPrice)}</Text>
+                <View style={{ backgroundColor: 'rgba(236,253,245,0.92)', borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: 'rgba(167,243,208,0.45)' }}>
+                  <Text style={{ color: colors.emerald700, fontSize: 10, fontWeight: '700' }}>{item.totalBids || item.bidders} bidders</Text>
+                </View>
                 <View style={{ backgroundColor: colors.primary + '33', borderRadius: 10, paddingHorizontal: 6, paddingVertical: 2 }}>
                   <Text style={{ color: colors.primary, fontSize: 10, fontWeight: '700' }}>-{savings}%</Text>
                 </View>
@@ -113,7 +125,7 @@ function WinnerSlide({ auction, index }: { auction: any; index: number }) {
       <Text style={{ fontSize: 12, fontWeight: '500', color: colors.mutedForeground, marginTop: 2 }} numberOfLines={1}>{auction.name}</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8, backgroundColor: colors.primary + '1A', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6, borderWidth: 1, borderColor: colors.primary + '33' }}>
         <Trophy size={14} color={colors.primary} />
-        <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>Won with {CURRENCY} {formatETB(bidAmount)}</Text>
+        <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>Won with {formatCurrency(bidAmount)}</Text>
       </View>
     </View>
   )
@@ -167,7 +179,7 @@ export function HomeScreen() {
             </View>
           </View>
           <Text style={{ fontFamily: 'System', fontSize: 28, fontWeight: '800', color: '#FFF', marginTop: 8, fontVariant: ['tabular-nums'] }}>
-            {showBalance ? `${CURRENCY} ${formatETB(walletBalance)}` : '••••••'}
+            {showBalance ? formatCurrency(walletBalance) : '••••••'}
           </Text>
           <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>Account ****091332</Text>
         </LinearGradient>
@@ -246,32 +258,24 @@ export function HomeScreen() {
                           ) : (
                             <Badge tone="green">Live</Badge>
                           )}
-                        </View>
-                      </View>
-                      <View style={s.statsRow}>
-                        <CountdownPill seconds={a.timeLeft} urgent={urgent} />
-                        <View style={s.bidCount}>
-                          <Text style={s.bidCountText}>{a.totalBids || a.bidders} bids</Text>
+                          <View style={s.codeBadge}><Text style={s.codeBadgeText}>{a.publicCode || a.id.slice(0, 6).toUpperCase()}</Text></View>
                         </View>
                       </View>
                       <View style={{ padding: 10, gap: 6 }}>
                         <Text style={s.cardName} numberOfLines={1}>{a.name}</Text>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <View>
-                            <Text style={{ fontSize: 9, fontWeight: '500', color: colors.mutedForeground, textDecorationLine: 'line-through' }}>
-                              {CURRENCY} {formatETB(a.marketPrice)}
-                            </Text>
-                            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 2 }}>
-                              <Text style={{ fontSize: 15, fontWeight: '800', color: colors.primary }}>
-                                {CURRENCY} {formatETB(a.bidFee)}
-                              </Text>
-                              <Text style={{ fontSize: 9, fontWeight: '500', color: colors.mutedForeground }}>bid</Text>
-                            </View>
+                        {a.specSummary ? <Text style={s.cardSpec} numberOfLines={1}>{a.specSummary}</Text> : null}
+                        <Text style={{ fontSize: 9, fontWeight: '500', color: colors.mutedForeground, textDecorationLine: 'line-through' }}>
+                          {formatCurrency(a.marketPrice)}
+                        </Text>
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                          <View style={s.feeTag}><Text style={s.feeTagText}>Service Fee: {formatCurrency(a.bidFee)}</Text></View>
+                          <View style={s.bidderBadge}>
+                            <Text style={s.bidderBadgeText}>{a.totalBids || a.bidders} bidders</Text>
                           </View>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, borderRadius: 20, backgroundColor: colors.emerald50, paddingHorizontal: 6, paddingVertical: 2 }}>
-                            <Zap size={9} color={colors.emerald600} />
-                            <Text style={{ fontSize: 9, fontWeight: '700', color: colors.emerald600 }}>{Math.round((1 - a.bidFee / a.marketPrice) * 100)}% off</Text>
-                          </View>
+                        </View>
+                        <View style={s.viewSpecsBar}><Text style={s.viewSpecsText}>View more specs</Text></View>
+                        <View style={{ alignItems: 'center', marginTop: 2 }}>
+                          <CountdownPill seconds={a.timeLeft} urgent={urgent} />
                         </View>
                       </View>
                     </TouchableOpacity>
@@ -424,10 +428,16 @@ const s = StyleSheet.create({
   cardImgOuter: { width: '100%', height: CARD_W * 0.75, position: 'relative' },
   cardImgWrap: { width: '100%', height: '100%' },
   cardImgTop: { position: 'absolute', top: 8, left: 8, right: 8, flexDirection: 'row', justifyContent: 'space-between' },
-  statsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.05)' },
-  bidCount: { backgroundColor: 'rgba(0,0,0,0.04)', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 3 },
-  bidCountText: { fontSize: 10, fontWeight: '700', color: colors.awashBlue },
+  codeBadge: { borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.92)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)', paddingHorizontal: 8, paddingVertical: 4 },
+  codeBadgeText: { fontSize: 9, fontWeight: '800', color: colors.awashBlue, letterSpacing: 1 },
+  cardSpec: { fontSize: 10, fontWeight: '500', color: colors.mutedForeground },
+  feeTag: { borderRadius: 999, backgroundColor: colors.primary + '14', borderWidth: 1, borderColor: colors.primary + '33', paddingHorizontal: 8, paddingVertical: 4 },
+  feeTagText: { fontSize: 10, fontWeight: '700', color: colors.primary },
+  bidderBadge: { borderRadius: 16, backgroundColor: colors.emerald50, paddingHorizontal: 8, paddingVertical: 4 },
+  bidderBadgeText: { fontSize: 10, fontWeight: '700', color: colors.emerald700 },
   cardName: { fontSize: 13, fontWeight: '700', color: colors.foreground },
+  viewSpecsBar: { marginTop: 2, borderRadius: 10, backgroundColor: colors.awashBlue + '0D', paddingVertical: 6, paddingHorizontal: 8, alignItems: 'center' },
+  viewSpecsText: { fontSize: 9, fontWeight: '700', color: colors.awashBlue, textTransform: 'uppercase', letterSpacing: 1 },
   timePill: { flexDirection: 'row', alignItems: 'center', gap: 2, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 3 },
   timePillText: { fontSize: 10, fontWeight: '800', fontVariant: ['tabular-nums'] },
 })

@@ -4,7 +4,7 @@ import { Trophy, CreditCard, PartyPopper, AlertTriangle, Users, Clock, ImageIcon
 import { useApp } from '../AppContext'
 import { CTAButton, Card } from '../components/AuctionUI'
 import { api, type ApiWinnerResult, type ApiAuctionResult } from '../api'
-import { CURRENCY, formatETB } from '../mockDataV0'
+import { formatCurrency, formatETB } from '../mockDataV0'
 import { colors } from '../theme'
 
 export function WinnerScreen() {
@@ -116,7 +116,7 @@ export function WinnerScreen() {
                   </View>
                   <View style={s.winningBidBox}>
                     <Text style={s.winLabel}>Winning Bid</Text>
-                    <Text style={s.winAmount}>{formatETB(winner.winning_bid_amount ?? 0)} {CURRENCY}</Text>
+                    <Text style={s.winAmount}>{formatCurrency(winner.winning_bid_amount ?? 0)}</Text>
                   </View>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
                     <Text style={{ fontSize: 12, color: colors.mutedForeground }}>Total Bids</Text>
@@ -135,7 +135,7 @@ export function WinnerScreen() {
                   {winner.lowest_unique_bid != null && (
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
                       <Text style={{ fontSize: 12, color: colors.mutedForeground }}>Lowest Unique Bid</Text>
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.emerald600 }}>{CURRENCY} {formatETB(winner.lowest_unique_bid ?? 0)}</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.emerald600 }}>{formatCurrency(winner.lowest_unique_bid ?? 0)}</Text>
                     </View>
                   )}
                   {deadlineHrs != null && (
@@ -151,7 +151,7 @@ export function WinnerScreen() {
                   )}
                   <View style={s.divider} />
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={{ fontSize: 13, color: colors.navy }}>Market Price</Text>
+                    <Text style={{ fontSize: 13, color: colors.navy }}>Payment</Text>
                     <Text style={{ fontSize: 13, fontWeight: '700', color: colors.mutedForeground, textDecorationLine: 'line-through' }}>{formatETB(auction.marketPrice ?? 0)}</Text>
                   </View>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
@@ -205,7 +205,7 @@ export function WinnerScreen() {
                           </View>
                         </View>
                         <View style={{ alignItems: 'flex-end' }}>
-                          <Text style={{ fontSize: 11, fontWeight: '700', color: colors.navy }}>{CURRENCY} {formatETB(w.amount ?? 0)}</Text>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: colors.navy }}>{formatCurrency(w.amount ?? 0)}</Text>
                           {wDeadlineHrs != null && w.payment_status !== 'PAID' && (
                             <Text style={{ fontSize: 8, color: wDeadlineHrs < 6 ? colors.destructive : colors.mutedForeground }}>
                               {wDeadlineHrs > 0 ? `${wDeadlineHrs}h left` : 'Expired'}
@@ -248,7 +248,7 @@ export function WinnerScreen() {
                   <Text style={{ fontSize: 12, fontWeight: '700', color: colors.navy, marginBottom: 8 }}>Your Bid</Text>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                     <Text style={{ fontSize: 13, color: colors.mutedForeground }}>Amount</Text>
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary }}>{CURRENCY} {formatETB(winner.my_bid.amount ?? 0)}</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary }}>{formatCurrency(winner.my_bid.amount ?? 0)}</Text>
                   </View>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
                     <Text style={{ fontSize: 13, color: colors.mutedForeground }}>Fee Paid</Text>
@@ -296,7 +296,7 @@ export function WinnerScreen() {
                             <Text style={{ fontSize: 9, fontWeight: '700', color: colors.emerald600 }}>Winner</Text>
                           </View>
                           <Text style={{ fontSize: 12, fontWeight: '700', color: colors.emerald600 }}>
-                            {CURRENCY} {formatETB(winningAmount ?? 0)}
+                            {formatCurrency(winningAmount ?? 0)}
                           </Text>
                         </View>
                       </View>
@@ -329,7 +329,7 @@ export function WinnerScreen() {
                               <Text style={{ fontSize: 9, fontWeight: '500', color: colors.mutedForeground }}>×{count}</Text>
                             )}
                             <Text style={{ fontSize: 11, fontWeight: '700', color: colors.navy }}>
-                              {CURRENCY} {formatETB(amount ?? 0)}
+                              {formatCurrency(amount ?? 0)}
                             </Text>
                           </View>
                         </View>
