@@ -16,6 +16,7 @@ export function PlaceBidScreen() {
   const autoSubmittedRef = useRef(false)
   const [bidFlash, setBidFlash] = useState(false)
   const [serverBidAmounts, setServerBidAmounts] = useState<number[]>([])
+  const [duplicateAmount, setDuplicateAmount] = useState<number | null>(null)
 
   const STEP = 0.01
 
@@ -46,8 +47,10 @@ export function PlaceBidScreen() {
   const [showDuplicateModal, setShowDuplicateModal] = useState(false)
 
   useEffect(() => {
-    if (isDuplicate) setShowDuplicateModal(true)
-  }, [isDuplicate])
+    if (!isDuplicate) return
+    setDuplicateAmount(form.values.amount)
+    setShowDuplicateModal(true)
+  }, [form.values.amount, isDuplicate])
 
   const adjustAmount = useCallback((delta: number) => {
     const current = form.values.amount
@@ -68,6 +71,7 @@ export function PlaceBidScreen() {
 
   const onSubmit = async (values: PlaceBidValues) => {
     if (hasPlacedBid(values.amount)) {
+      setDuplicateAmount(values.amount)
       setShowDuplicateModal(true)
       return
     }
@@ -85,12 +89,16 @@ export function PlaceBidScreen() {
   useEffect(() => {
     if (!auction || !feePaid || pendingBidAmount == null || autoSubmittedRef.current) return
     if (hasPlacedBid(pendingBidAmount)) {
+      setBidStr(pendingBidAmount.toFixed(2))
+      form.handleChange("amount", pendingBidAmount)
+      setDuplicateAmount(pendingBidAmount)
       setShowDuplicateModal(true)
       setPendingBidAmount(null)
       return
     }
     autoSubmittedRef.current = true
     setBidStr(pendingBidAmount.toFixed(2))
+    form.handleChange("amount", pendingBidAmount)
     setLoading(true)
     setSubmitError(null)
     submitBid(pendingBidAmount)
@@ -99,7 +107,9 @@ export function PlaceBidScreen() {
         setSubmitError(e?.message || "Bid submission failed. Please try again.")
       })
       .finally(() => setLoading(false))
-  }, [auction, feePaid, pendingBidAmount, submitBid, hasPlacedBid])
+  }, [auction, feePaid, pendingBidAmount, submitBid, hasPlacedBid, form.handleChange])
+
+  const displayedDuplicateAmount = duplicateAmount ?? form.values.amount
 
   const bidProgress = auction.maxBid ? Math.min((auction.totalBids || auction.bidders) / auction.maxBid, 1) : 0
   const isUrgent = bidProgress > 0.8
@@ -271,7 +281,7 @@ export function PlaceBidScreen() {
               className="mt-2 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-amber-700"
             >
               <AlertCircle className="size-3" />
-              You've already placed a bid of {formatCurrency(form.values.amount)}. Please enter a different amount.
+              You've already placed a bid of {formatCurrency(displayedDuplicateAmount)}. Please enter a different amount.
             </motion.p>
           )}
         </AnimatePresence>
@@ -366,7 +376,7 @@ export function PlaceBidScreen() {
                 <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-600" />
                 <div>
                   <p className="text-sm font-semibold text-neutral-800">
-                    You've already placed a bid of {formatCurrency(form.values.amount)} on this auction.
+                    You've already placed a bid of {formatCurrency(displayedDuplicateAmount)} on this auction.
                   </p>
                   <p className="mt-1 text-xs font-medium text-neutral-600">
                     Please enter a different bid amount.
