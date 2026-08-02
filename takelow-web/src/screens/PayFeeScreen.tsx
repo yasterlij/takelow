@@ -25,7 +25,7 @@ const paymentMethods = [
 ]
 
 export function PayFeeScreen() {
-  const { go, payFee, getAuction, selectedId, authError, paymentMethod, setPaymentMethod, walletBalance, pendingBidAmount, setPendingBidAmount } = useApp()
+  const { go, payFee, getAuction, selectedId, authError, paymentMethod, setPaymentMethod, walletBalance, pendingBidAmount, setPendingBidAmount, myBids } = useApp()
   const auction = getAuction(selectedId)
   const [loading, setLoading] = useState(false)
   const [showMethods, setShowMethods] = useState(false)
@@ -51,6 +51,28 @@ export function PayFeeScreen() {
   const [bidFlash, setBidFlash] = useState(false)
 
   const STEP = 0.01
+  const [serverBidAmounts, setServerBidAmounts] = useState<number[]>([])
+
+  useEffect(() => {
+    if (!selectedId) return
+    let active = true
+    api.bid
+      .myBids(selectedId)
+      .then((res) => {
+        if (active) setServerBidAmounts(res.bids.map((b) => b.amount))
+      })
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [selectedId])
+
+  const hasPlacedBid = useCallback(
+    (amount: number) =>
+      myBids.some((b) => b.auctionId === selectedId && b.amount === amount) ||
+      serverBidAmounts.some((a) => a === amount),
+    [myBids, serverBidAmounts, selectedId],
+  )
 
   useEffect(() => {
     if (!showPinModal) return
@@ -101,6 +123,7 @@ export function PayFeeScreen() {
 
   const bidAmount = bidStr ? Number(bidStr) : 0
   const hasValidBid = bidAmount >= 1 && /^\d+(\.\d{1,2})?$/.test(bidStr)
+  const isDuplicate = bidAmount > 0 && hasPlacedBid(bidAmount)
 
   const updateBid = useCallback((next: number) => {
     const safe = Math.max(1, Number(next.toFixed(2)))
@@ -117,6 +140,10 @@ export function PayFeeScreen() {
   const handlePayClick = useCallback(async () => {
     if (!hasValidBid) {
       setBidError("Enter a valid bid amount to continue")
+      return
+    }
+    if (isDuplicate) {
+      setBidError("Duplicate bid detected. Please enter a new amount.")
       return
     }
     setPendingBidAmount(bidAmount)
@@ -148,7 +175,7 @@ export function PayFeeScreen() {
     } finally {
       setCheckingPin(false)
     }
-  }, [auction.bidFee, bidAmount, hasValidBid, payFee, selected, setPaymentMethod, setPendingBidAmount])
+  }, [auction.bidFee, bidAmount, hasValidBid, payFee, selected, setPaymentMethod, setPendingBidAmount, isDuplicate])
 
   const handleVerifyPin = useCallback(async () => {
     if (!pinInput) {
@@ -321,7 +348,13 @@ export function PayFeeScreen() {
             </button>
           </div>
           {bidError && <p className="mt-2 text-xs font-semibold text-destructive">{bidError}</p>}
-          <p className="mt-2 text-[11px] font-medium text-neutral-500">Minimum bid is 1.00 {CURRENCY}. Uniqueness is finally checked when the bid is submitted.</p>
+          {isDuplicate && (
+            <p className="mt-2 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-amber-700">
+              <AlertTriangle className="size-3" />
+              You've already placed a bid of {formatCurrency(bidAmount)}. Please enter a different amount.
+            </p>
+          )}
+          <p className="mt-2 text-[11px] font-medium text-neutral-500">Minimum bid is 1.00 {CURRENCY}. Amounts you've already bid are blocked before payment.</p>
         </div>
       </div>
 
@@ -439,7 +472,7 @@ export function PayFeeScreen() {
 
       <button
         onClick={handlePayClick}
-        disabled={!hasValidBid || loading || checkingPin || (selected === "AWASH" && walletBalance < auction.bidFee)}
+        disabled={!hasValidBid || isDuplicate || loading || checkingPin || (selected === "AWASH" && walletBalance < auction.bidFee)}
         className="btn-primary animate-shine group"
       >
         {loading || checkingPin ? (

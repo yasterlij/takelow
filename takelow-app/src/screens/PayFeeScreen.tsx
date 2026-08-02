@@ -8,7 +8,7 @@ import { api } from '../api'
 import { colors, fontSize } from '../theme'
 
 export function PayFeeScreen() {
-  const { go, selectedId, walletBalance, payFee, getAuction, paymentMethod, setPaymentMethod, pendingBidAmount, setPendingBidAmount } = useApp()
+  const { go, selectedId, walletBalance, payFee, getAuction, paymentMethod, setPaymentMethod, pendingBidAmount, setPendingBidAmount, myBids } = useApp()
   const auction = getAuction(selectedId)
 
   const [showMethods, setShowMethods] = useState(false)
@@ -33,6 +33,28 @@ export function PayFeeScreen() {
   const [bidError, setBidError] = useState<string | null>(null)
   const [bidFlash, setBidFlash] = useState(false)
   const STEP = 0.01
+  const [serverBidAmounts, setServerBidAmounts] = useState<number[]>([])
+
+  useEffect(() => {
+    if (!selectedId) return
+    let active = true
+    api.bid
+      .myBids(selectedId)
+      .then((res) => {
+        if (active) setServerBidAmounts(res.bids.map((b) => b.amount))
+      })
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [selectedId])
+
+  const hasPlacedBid = useCallback(
+    (amount: number) =>
+      myBids.some((b) => b.auctionId === selectedId && b.amount === amount) ||
+      serverBidAmounts.some((a) => a === amount),
+    [myBids, serverBidAmounts, selectedId],
+  )
 
   useEffect(() => {
     if (showPinModal) {
@@ -43,6 +65,7 @@ export function PayFeeScreen() {
 
   const numericBid = bidAmount ? Number(bidAmount) : 0
   const hasValidBid = numericBid >= 1 && /^\d+(\.\d{1,2})?$/.test(bidAmount)
+  const isDuplicate = numericBid > 0 && hasPlacedBid(numericBid)
 
   useEffect(() => {
     if (!bidFlash) return
@@ -66,6 +89,10 @@ export function PayFeeScreen() {
     if (!auction) return
     if (!hasValidBid) {
       setBidError('Enter a valid bid amount to continue')
+      return
+    }
+    if (isDuplicate) {
+      setBidError('Duplicate bid detected. Please enter a new amount.')
       return
     }
     setPendingBidAmount(numericBid)
@@ -92,7 +119,7 @@ export function PayFeeScreen() {
     } finally {
       setCheckingPin(false)
     }
-  }, [selected, auction, hasValidBid, numericBid, payFee, setPaymentMethod, setPendingBidAmount])
+  }, [selected, auction, hasValidBid, numericBid, payFee, setPaymentMethod, setPendingBidAmount, isDuplicate])
 
   const handleVerifyPin = useCallback(async () => {
     if (!auction) return
@@ -245,7 +272,15 @@ export function PayFeeScreen() {
             </TouchableOpacity>
           </View>
           {bidError ? <Text style={s.pinError}>{bidError}</Text> : null}
-          <Text style={{ fontSize: 11, color: colors.mutedForeground, marginTop: 8 }}>Minimum bid is 1.00 {CURRENCY}. Uniqueness is checked when the bid is submitted.</Text>
+          {isDuplicate && (
+            <View style={s.duplicateWarning}>
+              <AlertTriangle size={14} color={colors.warning} />
+              <Text style={s.duplicateText}>
+                You've already placed a bid of {formatCurrency(numericBid)}. Please enter a different amount.
+              </Text>
+            </View>
+          )}
+          <Text style={{ fontSize: 11, color: colors.mutedForeground, marginTop: 8 }}>Minimum bid is 1.00 {CURRENCY}. Amounts you've already bid are blocked before payment.</Text>
         </Card>
 
         <Card style={{ alignItems: 'center', padding: 24, marginTop: 16 }}>
@@ -353,7 +388,7 @@ export function PayFeeScreen() {
             Insufficient balance — top up before paying
           </Text>
         )}
-        <CTAButton onPress={handlePayPress} disabled={!hasValidBid || (selected === 'AWASH' && (walletBalance < auction.bidFee || checkingPin))}>
+        <CTAButton onPress={handlePayPress} disabled={!hasValidBid || isDuplicate || (selected === 'AWASH' && (walletBalance < auction.bidFee || checkingPin))}>
           {checkingPin ? 'Checking...' : selected === 'SIKINAPAY' ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <ShieldCheck size={18} color={colors.primaryForeground} />
@@ -476,6 +511,8 @@ const s = StyleSheet.create({
   methodOptionTitle: { fontSize: 13, fontWeight: '700', color: colors.navy },
   methodOptionSub: { fontSize: 11, color: colors.mutedForeground, marginTop: 2 },
   bidControl: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.white, padding: 8 },
+  duplicateWarning: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, backgroundColor: colors.warning + '1A', borderWidth: 1, borderColor: colors.warning + '40', paddingHorizontal: 12, paddingVertical: 8, marginTop: 12 },
+  duplicateText: { fontSize: 12, fontWeight: '600', color: colors.warning, flex: 1 },
   bidControlActive: { borderColor: colors.emerald200, shadowColor: colors.emerald500, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.12, shadowRadius: 12, elevation: 2 },
   bidAdjustBtn: { width: 48, height: 48, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.secondary, justifyContent: 'center', alignItems: 'center' },
   bidAdjustBtnDisabled: { opacity: 0.45 },
