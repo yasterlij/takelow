@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, Modal, StyleSheet, Dimensions, TextInput, ActivityIndicator } from 'react-native'
+import { View, Text, ScrollView, TouchableOpacity, Modal, StyleSheet, Dimensions, TextInput, ActivityIndicator, Alert } from 'react-native'
 import { Users, CheckCircle2, TrendingDown, X, Zap, Minus, Plus, Wallet, ShieldCheck, Lock, ChevronDown, ChevronUp, Building2 } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { AppBar, Card, Badge, AwashMark } from '../components/AuctionUI'
@@ -32,7 +32,7 @@ function LightboxModal({ visible, images, idx, onClose }: { visible: boolean; im
 }
 
 export function ProductScreen() {
-  const { go, selectedId, getAuction, payFee, setPaymentMethod, walletBalance, pendingBidAmount, setPendingBidAmount, authError } = useApp()
+  const { go, selectedId, getAuction, payFee, setPaymentMethod, walletBalance, pendingBidAmount, setPendingBidAmount, authError, myBids } = useApp()
   const auction = getAuction(selectedId)
   const seconds = useCountdown(auction?.timeLeft ?? 0)
   const [lightboxVisible, setLightboxVisible] = useState(false)
@@ -58,12 +58,17 @@ export function ProductScreen() {
   const [bidAmount, setBidAmount] = useState(pendingBidAmount != null ? pendingBidAmount.toFixed(2) : '')
   const [bidError, setBidError] = useState<string | null>(null)
   const [bidFlash, setBidFlash] = useState(false)
+  const [serverBidAmounts, setServerBidAmounts] = useState<number[]>([])
 
   if (!auction) return null
 
   const STEP = 0.01
   const numericBid = bidAmount ? Number(bidAmount) : 0
   const hasValidBid = numericBid >= 1 && /^\d+(\.\d{1,2})?$/.test(bidAmount)
+  const isDuplicate = numericBid > 0 && (
+    myBids.some((b) => b.auctionId === selectedId && b.amount === numericBid) ||
+    serverBidAmounts.some((amount) => amount === numericBid)
+  )
 
   const images = auction.images || []
   const savings = auction.marketPrice > 0 ? Math.round((1 - auction.bidFee / auction.marketPrice) * 100) : 0
@@ -72,6 +77,20 @@ export function ProductScreen() {
   const auctionCode = auction.publicCode || auction.id.slice(0, 6).toUpperCase()
   const specSummary = auction.specSummary || formatSpecSummary(auction.specs)
   const specEntries = getSpecEntries(auction.specs)
+
+  useEffect(() => {
+    if (!selectedId) return
+    let active = true
+    api.bid
+      .myBids(selectedId)
+      .then((res) => {
+        if (active) setServerBidAmounts(res.bids.map((b) => b.amount))
+      })
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [selectedId])
 
   useEffect(() => {
     if (showPinModal) {
@@ -120,6 +139,15 @@ export function ProductScreen() {
     return () => clearTimeout(id)
   }, [bidFlash])
 
+  useEffect(() => {
+    if (!isDuplicate) return
+    Alert.alert(
+      'Duplicate Bid',
+      `You've already placed a bid of ${formatCurrency(numericBid)} on this auction. Please enter a different bid amount. No payment has been charged.`,
+      [{ text: 'Change Bid Amount' }],
+    )
+  }, [isDuplicate, numericBid])
+
   const updateBid = useCallback((next: number) => {
     const safe = Math.max(1, Number(next.toFixed(2)))
     setBidAmount(safe.toFixed(2))
@@ -135,6 +163,15 @@ export function ProductScreen() {
   const handlePayment = useCallback(async (method: 'SIKINAPAY' | 'AWASH') => {
     if (!hasValidBid) {
       setBidError('Enter a valid bid amount to continue')
+      return
+    }
+
+    if (isDuplicate) {
+      Alert.alert(
+        'Duplicate Bid',
+        `You've already placed a bid of ${formatCurrency(numericBid)} on this auction. Please enter a different bid amount. No payment has been charged.`,
+        [{ text: 'Change Bid Amount' }],
+      )
       return
     }
 
@@ -167,7 +204,7 @@ export function ProductScreen() {
     } finally {
       setCheckingPin(false)
     }
-  }, [auction.bidFee, hasValidBid, numericBid, payFee, setPaymentMethod, setPendingBidAmount])
+  }, [auction.bidFee, hasValidBid, isDuplicate, numericBid, payFee, setPaymentMethod, setPendingBidAmount])
 
   const handleVerifyPin = useCallback(async () => {
     if (!pinInput) {

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react"
 import { motion } from "framer-motion"
-import { Users, CheckCircle2, TrendingDown, ZoomIn, Bell, ArrowLeft, Eye, ShieldCheck, Wallet, Loader2, Minus, Plus, Lock, ChevronDown, ChevronUp, Building2 } from "lucide-react"
+import { Users, CheckCircle2, TrendingDown, ZoomIn, Bell, ArrowLeft, Eye, ShieldCheck, Wallet, Loader2, Minus, Plus, Lock, ChevronDown, ChevronUp, Building2, AlertTriangle, X } from "lucide-react"
 import { useApp } from "../AppContext"
 import { Badge } from "../components/AuctionUI"
 import { useCountdown } from "../components/Countdown"
@@ -42,7 +42,7 @@ function Lightbox({ images, idx, onClose }: { images: string[]; idx: number; onC
 }
 
 export function ProductScreen() {
-  const { go, selectedId, getAuction, payFee, authError, setPaymentMethod, walletBalance, pendingBidAmount, setPendingBidAmount } = useApp()
+  const { go, selectedId, getAuction, payFee, authError, setPaymentMethod, walletBalance, pendingBidAmount, setPendingBidAmount, myBids } = useApp()
   const auction = getAuction(selectedId)
   const seconds = useCountdown(auction?.timeLeft ?? 0)
   const [lightboxOpen, setLightboxOpen] = useState(false)
@@ -68,6 +68,8 @@ export function ProductScreen() {
   const [bidStr, setBidStr] = useState(pendingBidAmount != null ? pendingBidAmount.toFixed(2) : "")
   const [bidError, setBidError] = useState<string | null>(null)
   const [bidFlash, setBidFlash] = useState(false)
+  const [serverBidAmounts, setServerBidAmounts] = useState<number[]>([])
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false)
 
   if (!auction) return null
 
@@ -75,6 +77,10 @@ export function ProductScreen() {
 
   const bidAmount = bidStr ? Number(bidStr) : 0
   const hasValidBid = bidAmount >= 1 && /^\d+(\.\d{1,2})?$/.test(bidStr)
+  const isDuplicate = bidAmount > 0 && (
+    myBids.some((b) => b.auctionId === selectedId && b.amount === bidAmount) ||
+    serverBidAmounts.some((amount) => amount === bidAmount)
+  )
 
   const images = auction.images || []
   const isEnding = seconds > 0 && seconds < 3600
@@ -82,6 +88,20 @@ export function ProductScreen() {
   const auctionCode = auction.publicCode || auction.productId || auction.id.slice(0, 6).toUpperCase()
   const countdown = formatCountdown(seconds)
   const specEntries = getSpecEntries(auction.specs)
+
+  useEffect(() => {
+    if (!selectedId) return
+    let active = true
+    api.bid
+      .myBids(selectedId)
+      .then((res) => {
+        if (active) setServerBidAmounts(res.bids.map((b) => b.amount))
+      })
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [selectedId])
 
   useEffect(() => {
     if (!showPinModal) return
@@ -132,6 +152,10 @@ export function ProductScreen() {
     return () => window.clearTimeout(id)
   }, [bidFlash])
 
+  useEffect(() => {
+    if (isDuplicate) setShowDuplicateModal(true)
+  }, [isDuplicate])
+
   const updateBid = useCallback((next: number) => {
     const safe = Math.max(1, Number(next.toFixed(2)))
     setBidStr(safe.toFixed(2))
@@ -147,6 +171,11 @@ export function ProductScreen() {
   const handlePayment = useCallback(async (method: "SIKINAPAY" | "AWASH") => {
     if (!hasValidBid) {
       setBidError("Enter a valid bid amount to continue")
+      return
+    }
+
+    if (isDuplicate) {
+      setShowDuplicateModal(true)
       return
     }
 
@@ -179,7 +208,7 @@ export function ProductScreen() {
     } finally {
       setCheckingPin(false)
     }
-  }, [auction.bidFee, bidAmount, hasValidBid, payFee, setPaymentMethod, setPendingBidAmount])
+  }, [auction.bidFee, bidAmount, hasValidBid, isDuplicate, payFee, setPaymentMethod, setPendingBidAmount])
 
   const handleVerifyPin = useCallback(async () => {
     if (!pinInput) {
@@ -628,6 +657,40 @@ export function ProductScreen() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {showDuplicateModal && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-white p-5 shadow-2xl">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="font-display text-lg font-bold text-amber-700">Duplicate Bid</h3>
+              <button
+                onClick={() => setShowDuplicateModal(false)}
+                className="rounded-lg p-1 text-neutral-500 hover:bg-neutral-100"
+                aria-label="Close"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+            <div className="flex items-start gap-3 rounded-xl border border-amber-200/60 bg-amber-50 p-4">
+              <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-600" />
+              <div>
+                <p className="text-sm font-semibold text-neutral-800">
+                  You've already placed a bid of {formatCurrency(bidAmount)} on this auction.
+                </p>
+                <p className="mt-1 text-xs font-medium text-neutral-600">
+                  Please enter a different bid amount. No payment has been charged.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowDuplicateModal(false)}
+              className="btn-primary mt-4 w-full"
+            >
+              Change Bid Amount
+            </button>
           </div>
         </div>
       )}
