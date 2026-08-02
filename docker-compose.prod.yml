@@ -118,6 +118,45 @@ services:
     networks:
       - frontend
 
+  migrate:
+    image: node:20-alpine
+    restart: "no"
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://admin:${POSTGRES_PASSWORD:-secret}@postgres-primary:5432/takelow_db
+    volumes:
+      - ./scripts:/app/scripts
+      - ./database:/app/database
+    networks:
+      - backend
+    command: >
+      sh -c "apk add --no-cache postgresql-client &&
+             /app/scripts/migrate-raw.sh"
+
+  seed:
+    image: node:20-alpine
+    restart: "no"
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://admin:${POSTGRES_PASSWORD:-secret}@postgres-primary:5432/takelow_db
+      DB_DIRECT: "1"
+    volumes:
+      - ./scripts:/app/scripts
+    networks:
+      - backend
+    command: >
+      sh -c "test -f /app/scripts/seed.js &&
+             apk add --no-cache postgresql-client &&
+             mkdir -p /app/identity-service &&
+             cd /app/identity-service &&
+             (test -f package.json || npm init -y >/dev/null 2>&1) &&
+             npm install bcryptjs --no-audit --no-fund &&
+             node /app/scripts/seed.js"
+
 volumes:
   postgres_data:
 
