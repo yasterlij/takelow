@@ -358,12 +358,6 @@ export function PayFeeScreen() {
             </button>
           </div>
           {bidError && <p className="mt-2 text-xs font-semibold text-destructive">{bidError}</p>}
-          {isDuplicate && (
-            <p className="mt-2 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-amber-700">
-              <AlertTriangle className="size-3" />
-              You've already placed a bid of {formatCurrency(bidAmount)}. Please enter a different amount.
-            </p>
-          )}
           <p className="mt-2 text-[11px] font-medium text-neutral-500">Minimum bid is 1.00 {CURRENCY}. Amounts you've already bid are blocked before payment.</p>
         </div>
       </div>

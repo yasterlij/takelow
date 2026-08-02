@@ -272,20 +272,6 @@ export function PlaceBidScreen() {
           )}
         </AnimatePresence>
 
-        <AnimatePresence>
-          {isDuplicate && (
-            <motion.p
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="mt-2 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-amber-700"
-            >
-              <AlertCircle className="size-3" />
-              You've already placed a bid of {formatCurrency(displayedDuplicateAmount)}. Please enter a different amount.
-            </motion.p>
-          )}
-        </AnimatePresence>
-
         <div className="mt-3 flex items-center justify-center gap-2 rounded-lg bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20 px-3 py-2">
           <TrendingDown className="size-4 text-primary" />
           <span className="text-xs font-semibold text-awash-gold-dark">Lower & unique = better chance to win</span>
