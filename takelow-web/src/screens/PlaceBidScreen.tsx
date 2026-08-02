@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Sparkles, TrendingDown, CheckCircle2, Loader2, AlertCircle, Target, Minus, Plus, ArrowLeft } from "lucide-react"
+import { Sparkles, TrendingDown, CheckCircle2, Loader2, AlertCircle, AlertTriangle, Target, Minus, Plus, ArrowLeft, X } from "lucide-react"
 import { useApp } from "../AppContext"
 import { useForm } from "../hooks/useForm"
 import { placeBidSchema, type PlaceBidValues } from "../lib/validation"
@@ -43,6 +43,11 @@ export function PlaceBidScreen() {
   )
 
   const isDuplicate = form.values.amount > 0 && hasPlacedBid(form.values.amount)
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false)
+
+  useEffect(() => {
+    if (isDuplicate) setShowDuplicateModal(true)
+  }, [isDuplicate])
 
   const adjustAmount = useCallback((delta: number) => {
     const current = form.values.amount
@@ -63,7 +68,7 @@ export function PlaceBidScreen() {
 
   const onSubmit = async (values: PlaceBidValues) => {
     if (hasPlacedBid(values.amount)) {
-      setSubmitError("Duplicate bid detected. Please enter a new amount.")
+      setShowDuplicateModal(true)
       return
     }
     setLoading(true)
@@ -80,7 +85,7 @@ export function PlaceBidScreen() {
   useEffect(() => {
     if (!auction || !feePaid || pendingBidAmount == null || autoSubmittedRef.current) return
     if (hasPlacedBid(pendingBidAmount)) {
-      setSubmitError("Duplicate bid detected. Please enter a new amount.")
+      setShowDuplicateModal(true)
       setPendingBidAmount(null)
       return
     }
@@ -332,6 +337,52 @@ export function PlaceBidScreen() {
       <p className="mt-3 text-center text-[11px] font-semibold uppercase tracking-[0.25em] text-neutral-400">
         Terms and conditions will apply
       </p>
+
+      <AnimatePresence>
+        {showDuplicateModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center"
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.96 }}
+              className="w-full max-w-md rounded-2xl border border-border bg-white p-5 shadow-2xl"
+            >
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="font-display text-lg font-bold text-amber-700">Duplicate Bid</h3>
+                <button
+                  onClick={() => setShowDuplicateModal(false)}
+                  className="rounded-lg p-1 text-neutral-500 hover:bg-neutral-100"
+                  aria-label="Close"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+              <div className="flex items-start gap-3 rounded-xl bg-amber-50 border border-amber-200/60 p-4">
+                <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-600" />
+                <div>
+                  <p className="text-sm font-semibold text-neutral-800">
+                    You've already placed a bid of {formatCurrency(form.values.amount)} on this auction.
+                  </p>
+                  <p className="mt-1 text-xs font-medium text-neutral-600">
+                    Please enter a different bid amount.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowDuplicateModal(false)}
+                className="btn-primary mt-4 w-full"
+              >
+                Change Bid Amount
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   )
 }

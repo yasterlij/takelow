@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { View, Text, TextInput, ScrollView, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native'
+import { View, Text, TextInput, ScrollView, StyleSheet, ActivityIndicator, TouchableOpacity, Alert } from 'react-native'
 import { Sparkles, TrendingDown, CheckCircle2, Minus, Plus, AlertTriangle } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { AppBar, CTAButton, Card, AwashMark } from '../components/AuctionUI'
@@ -28,6 +28,15 @@ export function PlaceBidScreen() {
   const amount = parseFloat(amountStr || '0')
   const isDuplicate = amount > 0 && hasPlacedBid(amount)
   const valid = amount >= 1 && !loading && !isDuplicate
+
+  useEffect(() => {
+    if (!isDuplicate) return
+    Alert.alert(
+      'Duplicate Bid',
+      `You've already placed a bid of ${formatCurrency(amount)} on this auction. Please enter a different bid amount.`,
+      [{ text: 'Change Bid Amount' }],
+    )
+  }, [isDuplicate, amount])
 
   if (!auction) return null
 
@@ -69,7 +78,11 @@ export function PlaceBidScreen() {
       return
     }
     if (hasPlacedBid(amount)) {
-      setSubmitError('Duplicate bid detected. Please enter a new amount.')
+      Alert.alert(
+        'Duplicate Bid',
+        `You've already placed a bid of ${formatCurrency(amount)} on this auction. Please enter a different bid amount.`,
+        [{ text: 'Change Bid Amount' }],
+      )
       return
     }
     if (!valid) return
@@ -86,7 +99,11 @@ export function PlaceBidScreen() {
   useEffect(() => {
     if (!auction || !feePaid || pendingBidAmount == null || autoSubmittedRef.current) return
     if (hasPlacedBid(pendingBidAmount)) {
-      setSubmitError('Duplicate bid detected. Please enter a new amount.')
+      Alert.alert(
+        'Duplicate Bid',
+        `You've already placed a bid of ${formatCurrency(pendingBidAmount)} on this auction. Please enter a different bid amount.`,
+        [{ text: 'Change Bid Amount' }],
+      )
       setPendingBidAmount(null)
       return
     }

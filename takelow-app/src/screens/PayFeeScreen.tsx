@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { View, Text, ScrollView, StyleSheet, Modal, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, Linking } from 'react-native'
+import { View, Text, ScrollView, StyleSheet, Modal, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, Linking, Alert } from 'react-native'
 import { Wallet, ShieldCheck, Info, Lock, X, AlertTriangle, Building2, ChevronDown, ChevronUp, Minus, Plus } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { AppBar, CTAButton, Card, AwashMark } from '../components/AuctionUI'
@@ -68,6 +68,15 @@ export function PayFeeScreen() {
   const isDuplicate = numericBid > 0 && hasPlacedBid(numericBid)
 
   useEffect(() => {
+    if (!isDuplicate) return
+    Alert.alert(
+      'Duplicate Bid',
+      `You've already placed a bid of ${formatCurrency(numericBid)} on this auction. Please enter a different bid amount. No payment has been charged.`,
+      [{ text: 'Change Bid Amount' }],
+    )
+  }, [isDuplicate, numericBid])
+
+  useEffect(() => {
     if (!bidFlash) return
     const id = setTimeout(() => setBidFlash(false), 240)
     return () => clearTimeout(id)
@@ -92,7 +101,11 @@ export function PayFeeScreen() {
       return
     }
     if (isDuplicate) {
-      setBidError('Duplicate bid detected. Please enter a new amount.')
+      Alert.alert(
+        'Duplicate Bid',
+        `You've already placed a bid of ${formatCurrency(numericBid)} on this auction. Please enter a different bid amount. No payment has been charged.`,
+        [{ text: 'Change Bid Amount' }],
+      )
       return
     }
     setPendingBidAmount(numericBid)
