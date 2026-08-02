@@ -1,31 +1,55 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { View, Text, TextInput, ScrollView, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native'
-import { Sparkles, TrendingDown, CheckCircle2, Minus, Plus } from 'lucide-react-native'
+import { Sparkles, TrendingDown, CheckCircle2, Minus, Plus, AlertTriangle } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { AppBar, CTAButton, Card, AwashMark } from '../components/AuctionUI'
 import { CURRENCY, formatCurrency } from '../mockDataV0'
 import { colors } from '../theme'
+import { api } from '../api'
 
 export function PlaceBidScreen() {
-  const { go, selectedId, submitBid, getAuction, authError, feePaid, pendingBidAmount } = useApp()
+  const { go, selectedId, submitBid, getAuction, authError, feePaid, pendingBidAmount, setPendingBidAmount, myBids } = useApp()
   const auction = getAuction(selectedId)
   const [amountStr, setAmountStr] = useState('')
   const [loading, setLoading] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const autoSubmittedRef = useRef(false)
   const [bidFlash, setBidFlash] = useState(false)
+  const [serverBidAmounts, setServerBidAmounts] = useState<number[]>([])
   const STEP = 0.01
 
-  if (!auction) return null
+  const hasPlacedBid = useCallback(
+    (amount: number) =>
+      myBids.some((b) => b.auctionId === selectedId && b.amount === amount) ||
+      serverBidAmounts.some((a) => a === amount),
+    [myBids, serverBidAmounts, selectedId],
+  )
 
   const amount = parseFloat(amountStr || '0')
-  const valid = amount >= 1 && !loading
+  const isDuplicate = amount > 0 && hasPlacedBid(amount)
+  const valid = amount >= 1 && !loading && !isDuplicate
+
+  if (!auction) return null
 
   useEffect(() => {
     if (!bidFlash) return
     const id = setTimeout(() => setBidFlash(false), 240)
     return () => clearTimeout(id)
   }, [bidFlash])
+
+  useEffect(() => {
+    if (!selectedId) return
+    let active = true
+    api.bid
+      .myBids(selectedId)
+      .then((res) => {
+        if (active) setServerBidAmounts(res.bids.map((b) => b.amount))
+      })
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [selectedId])
 
   const updateBid = useCallback((next: number) => {
     const safe = Math.max(1, Number(next.toFixed(2)))
@@ -44,6 +68,10 @@ export function PlaceBidScreen() {
       updateBid(1)
       return
     }
+    if (hasPlacedBid(amount)) {
+      setSubmitError('Duplicate bid detected. Please enter a new amount.')
+      return
+    }
     if (!valid) return
     setLoading(true)
     try {
@@ -57,6 +85,11 @@ export function PlaceBidScreen() {
 
   useEffect(() => {
     if (!auction || !feePaid || pendingBidAmount == null || autoSubmittedRef.current) return
+    if (hasPlacedBid(pendingBidAmount)) {
+      setSubmitError('Duplicate bid detected. Please enter a new amount.')
+      setPendingBidAmount(null)
+      return
+    }
     autoSubmittedRef.current = true
     setAmountStr(pendingBidAmount.toFixed(2))
     setLoading(true)
@@ -67,7 +100,7 @@ export function PlaceBidScreen() {
         setSubmitError(e?.message || 'Bid submission failed. Please try again.')
       })
       .finally(() => setLoading(false))
-  }, [auction, feePaid, pendingBidAmount, submitBid])
+  }, [auction, feePaid, pendingBidAmount, submitBid, hasPlacedBid])
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -167,6 +200,15 @@ export function PlaceBidScreen() {
             </TouchableOpacity>
           </View>
 
+          {isDuplicate && (
+            <View style={s.duplicateWarning}>
+              <AlertTriangle size={14} color={colors.warning} />
+              <Text style={s.duplicateText}>
+                You've already placed a bid of {formatCurrency(amount)}. Please enter a different amount.
+              </Text>
+            </View>
+          )}
+
           <View style={s.tip}>
             <TrendingDown size={16} color={colors.primary} />
             <Text style={s.tipText}>Lower & unique = better chance to win</Text>
@@ -225,6 +267,8 @@ const s = StyleSheet.create({
   bidAdjustBtnDisabled: { opacity: 0.45 },
   bidInput: { width: '100%', textAlign: 'center', fontSize: 36, fontWeight: '800', color: colors.navy, paddingVertical: 8 },
   bidCurrency: { textAlign: 'center', fontSize: 14, fontWeight: '700', color: colors.mutedForeground, paddingBottom: 4 },
+  duplicateWarning: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, backgroundColor: colors.warning + '1A', borderWidth: 1, borderColor: colors.warning + '40', paddingHorizontal: 12, paddingVertical: 8, marginTop: 12 },
+  duplicateText: { fontSize: 12, fontWeight: '600', color: colors.warning, flex: 1 },
   tip: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 8, backgroundColor: colors.accent, paddingHorizontal: 12, paddingVertical: 8, marginTop: 16 },
   tipText: { fontSize: 12, fontWeight: '600', color: colors.accentForeground },
   strategy: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, borderRadius: 12, backgroundColor: colors.navy + '0D', padding: 12, marginTop: 16 },

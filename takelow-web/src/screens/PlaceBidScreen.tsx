@@ -5,19 +5,44 @@ import { useApp } from "../AppContext"
 import { useForm } from "../hooks/useForm"
 import { placeBidSchema, type PlaceBidValues } from "../lib/validation"
 import { CURRENCY, formatCurrency, formatETB } from "../mockDataV0"
+import { api } from "../api"
 
 export function PlaceBidScreen() {
-  const { go, selectedId, submitBid, getAuction, authError, feePaid, pendingBidAmount } = useApp()
+  const { go, selectedId, submitBid, getAuction, authError, feePaid, pendingBidAmount, setPendingBidAmount, myBids } = useApp()
   const auction = getAuction(selectedId)
   const [bidStr, setBidStr] = useState("")
   const [loading, setLoading] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const autoSubmittedRef = useRef(false)
   const [bidFlash, setBidFlash] = useState(false)
+  const [serverBidAmounts, setServerBidAmounts] = useState<number[]>([])
 
   const STEP = 0.01
 
   const form = useForm<PlaceBidValues>(placeBidSchema, { amount: 0 })
+
+  useEffect(() => {
+    if (!selectedId) return
+    let active = true
+    api.bid
+      .myBids(selectedId)
+      .then((res) => {
+        if (active) setServerBidAmounts(res.bids.map((b) => b.amount))
+      })
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [selectedId])
+
+  const hasPlacedBid = useCallback(
+    (amount: number) =>
+      myBids.some((b) => b.auctionId === selectedId && b.amount === amount) ||
+      serverBidAmounts.some((a) => a === amount),
+    [myBids, serverBidAmounts, selectedId],
+  )
+
+  const isDuplicate = form.values.amount > 0 && hasPlacedBid(form.values.amount)
 
   const adjustAmount = useCallback((delta: number) => {
     const current = form.values.amount
@@ -37,6 +62,10 @@ export function PlaceBidScreen() {
   if (!auction) return null
 
   const onSubmit = async (values: PlaceBidValues) => {
+    if (hasPlacedBid(values.amount)) {
+      setSubmitError("Duplicate bid detected. Please enter a new amount.")
+      return
+    }
     setLoading(true)
     setSubmitError(null)
     try {
@@ -50,6 +79,11 @@ export function PlaceBidScreen() {
 
   useEffect(() => {
     if (!auction || !feePaid || pendingBidAmount == null || autoSubmittedRef.current) return
+    if (hasPlacedBid(pendingBidAmount)) {
+      setSubmitError("Duplicate bid detected. Please enter a new amount.")
+      setPendingBidAmount(null)
+      return
+    }
     autoSubmittedRef.current = true
     setBidStr(pendingBidAmount.toFixed(2))
     setLoading(true)
@@ -60,7 +94,7 @@ export function PlaceBidScreen() {
         setSubmitError(e?.message || "Bid submission failed. Please try again.")
       })
       .finally(() => setLoading(false))
-  }, [auction, feePaid, pendingBidAmount, submitBid])
+  }, [auction, feePaid, pendingBidAmount, submitBid, hasPlacedBid])
 
   const bidProgress = auction.maxBid ? Math.min((auction.totalBids || auction.bidders) / auction.maxBid, 1) : 0
   const isUrgent = bidProgress > 0.8
@@ -188,7 +222,9 @@ export function PlaceBidScreen() {
              aria-label="Bid amount"
              placeholder="0.00"
              className={`w-40 rounded-xl border-2 bg-white/80 px-3 py-3 text-center font-display text-4xl font-extrabold text-foreground outline-none transition-all focus:ring-2 tabular-nums ${
-               form.errors.amount && form.touched.amount
+               isDuplicate
+                 ? "border-amber-400 focus:border-amber-400 focus:ring-amber-400/20"
+                 : form.errors.amount && form.touched.amount
                  ? "border-destructive focus:border-destructive focus:ring-destructive/20"
                  : "border-primary/20 focus:border-primary focus:ring-primary/20"
              }`}
@@ -217,6 +253,20 @@ export function PlaceBidScreen() {
             >
               <AlertCircle className="size-3" />
               {form.errors.amount}
+            </motion.p>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {isDuplicate && (
+            <motion.p
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mt-2 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-amber-700"
+            >
+              <AlertCircle className="size-3" />
+              You've already placed a bid of {formatCurrency(form.values.amount)}. Please enter a different amount.
             </motion.p>
           )}
         </AnimatePresence>
@@ -272,7 +322,7 @@ export function PlaceBidScreen() {
 
       {/* ── Submit ── */}
       <button
-        disabled={loading || !form.isValid}
+        disabled={loading || !form.isValid || isDuplicate}
         onClick={() => form.handleSubmit(onSubmit)}
         className="btn-primary animate-shine group"
       >

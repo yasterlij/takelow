@@ -77,6 +77,23 @@ export class BiddingController {
     };
   }
 
+  @Get(":id/my-bids")
+  @UseGuards(AuthGuard("jwt"))
+  async getMyBids(@Param("id") auctionId: string, @Req() req: any) {
+    const bids = await this.bidRepository.find({
+      where: { auction_id: auctionId, user_id: req.user.id },
+      order: { bid_time: "DESC" },
+    });
+    return {
+      auction_id: auctionId,
+      bids: bids.map((b) => ({
+        amount: this.resolveBidAmount(b),
+        bid_time: b.bid_time,
+        ticket_number: b.ticket_number,
+      })),
+    };
+  }
+
   @Get(":id/result")
   @UseGuards(AuthGuard("jwt"))
   async getAuctionResult(@Param("id") auctionId: string, @Req() req: any) {

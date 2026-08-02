@@ -410,6 +410,11 @@ export const api = {
         { 'x-bid-nonce': nonce, 'x-bid-timestamp': timestamp },
       )
     },
+    myBids(auctionId: string) {
+      return request<{ auction_id: string; bids: { amount: number; bid_time: string; ticket_number: string }[] }>(
+        'GET', `/auctions/${auctionId}/my-bids`, undefined, ENGINE_API,
+      )
+    },
   },
 
   createProduct(data: { name: string; description?: string; image_urls?: string[]; current_market_price: number; brand?: string; specs?: Record<string, string> }) {

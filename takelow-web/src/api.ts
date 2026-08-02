@@ -380,6 +380,11 @@ export const api = {
         { 'x-bid-nonce': nonce, 'x-bid-timestamp': timestamp },
       )
     },
+    myBids(auctionId: string) {
+      return request<{ auction_id: string; bids: { amount: number; bid_time: string; ticket_number: string }[] }>(
+        'GET', `/auctions/${auctionId}/my-bids`, undefined, ENGINE_API,
+      )
+    },
   },
 
   // Queries
