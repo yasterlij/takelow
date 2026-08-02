@@ -25,12 +25,15 @@ export class AuctionsService {
     private bidEncryptionService: BidEncryptionService,
   ) {}
 
-  private isMissingColumnError(error: unknown): boolean {
+  private isRecoverableSchemaError(error: unknown): boolean {
     const message = error instanceof Error ? error.message : String(error);
     return (
+      message.includes('does not exist') ||
       message.includes('public_code') ||
       message.includes('specs') ||
-      message.includes('bid_fee')
+      message.includes('bid_fee') ||
+      message.includes('current_market_price') ||
+      message.includes('created_at')
     );
   }
 
@@ -54,6 +57,18 @@ export class AuctionsService {
     const auctionCols = await this.getExistingColumns('auctions');
     const productCols = await this.getExistingColumns('products');
 
+    if (auctionCols.size === 0) {
+      return [];
+    }
+
+    const hasProductsTable = productCols.size > 0;
+    const rankedOrder = auctionCols.has('created_at')
+      ? 'created_at ASC'
+      : 'start_time ASC, id ASC';
+    const finalOrder = auctionCols.has('created_at')
+      ? 'a.created_at DESC'
+      : 'a.start_time DESC';
+
     const auctionSelect = [
       'a.id',
       'ranked.public_code',
@@ -69,18 +84,31 @@ export class AuctionsService {
       ...(auctionCols.has('created_at') ? ['a.created_at'] : []),
     ].join(',\n        ');
 
-    const productSelect = [
-      'p.id AS product_ref_id',
-      'p.name AS product_name',
-      'p.description AS product_description',
-      'p.image_urls AS product_image_urls',
-      'p.current_market_price AS product_current_market_price',
-      ...(productCols.has('brand') ? ['p.brand AS product_brand'] : []),
-    ].join(',\n        ');
+    const productSelect = hasProductsTable
+      ? [
+          'p.id AS product_ref_id',
+          'p.name AS product_name',
+          'p.description AS product_description',
+          'p.image_urls AS product_image_urls',
+          ...(productCols.has('current_market_price')
+            ? ['p.current_market_price AS product_current_market_price']
+            : ['NULL::numeric AS product_current_market_price']),
+          ...(productCols.has('brand')
+            ? ['p.brand AS product_brand']
+            : ['NULL::text AS product_brand']),
+        ].join(',\n        ')
+      : [
+          'NULL::uuid AS product_ref_id',
+          'NULL::text AS product_name',
+          'NULL::text AS product_description',
+          'NULL::text[] AS product_image_urls',
+          'NULL::numeric AS product_current_market_price',
+          'NULL::text AS product_brand',
+        ].join(',\n        ');
 
     return this.auctionRepository.query(
       `WITH ranked AS (
-        SELECT id, LPAD(ROW_NUMBER() OVER (ORDER BY created_at ASC)::text, 5, '0') AS public_code
+        SELECT id, LPAD(ROW_NUMBER() OVER (ORDER BY ${rankedOrder})::text, 5, '0') AS public_code
         FROM auctions
       )
       SELECT
@@ -88,9 +116,9 @@ export class AuctionsService {
         ${productSelect}
       FROM auctions a
       LEFT JOIN ranked ON ranked.id = a.id
-      LEFT JOIN products p ON p.id = a.product_id
+      ${hasProductsTable ? 'LEFT JOIN products p ON p.id = a.product_id' : ''}
       WHERE ${where}
-      ORDER BY a.created_at DESC
+      ORDER BY ${finalOrder}
       LIMIT 50`,
       params,
     );
@@ -134,7 +162,7 @@ export class AuctionsService {
         take: 50,
       });
     } catch (error) {
-      if (!this.isMissingColumnError(error)) throw error;
+      if (!this.isRecoverableSchemaError(error)) throw error;
       const rows = await this.loadAuctionRows([AuctionStatus.ACTIVE], true);
       auctions = rows.map((row) => this.toAuctionRecord(row));
     }
@@ -143,25 +171,31 @@ export class AuctionsService {
 
     const auctionIds = auctions.map((a) => a.id);
 
-    const [bidCounts, uniqueBidderRows] = await Promise.all([
-      this.bidRepository
-        .createQueryBuilder('bid')
-        .select('bid.auction_id', 'auction_id')
-        .addSelect('COUNT(*)', 'count')
-        .where('bid.auction_id IN (:...ids)', { ids: auctionIds })
-        .groupBy('bid.auction_id')
-        .getRawMany(),
-      this.bidRepository
-        .createQueryBuilder('bid')
-        .select('bid.auction_id', 'auction_id')
-        .addSelect('COUNT(DISTINCT bid.user_id)', 'count')
-        .where('bid.auction_id IN (:...ids)', { ids: auctionIds })
-        .groupBy('bid.auction_id')
-        .getRawMany(),
-    ]);
+    let bidCountMap = new Map<string, number>();
+    let uniqueBidderMap = new Map<string, number>();
+    try {
+      const [bidCounts, uniqueBidderRows] = await Promise.all([
+        this.bidRepository
+          .createQueryBuilder('bid')
+          .select('bid.auction_id', 'auction_id')
+          .addSelect('COUNT(*)', 'count')
+          .where('bid.auction_id IN (:...ids)', { ids: auctionIds })
+          .groupBy('bid.auction_id')
+          .getRawMany(),
+        this.bidRepository
+          .createQueryBuilder('bid')
+          .select('bid.auction_id', 'auction_id')
+          .addSelect('COUNT(DISTINCT bid.user_id)', 'count')
+          .where('bid.auction_id IN (:...ids)', { ids: auctionIds })
+          .groupBy('bid.auction_id')
+          .getRawMany(),
+      ]);
 
-    const bidCountMap = new Map(bidCounts.map((r: any) => [r.auction_id, parseInt(r.count, 10)]));
-    const uniqueBidderMap = new Map(uniqueBidderRows.map((r: any) => [r.auction_id, parseInt(r.count, 10)]));
+      bidCountMap = new Map(bidCounts.map((r: any) => [r.auction_id, parseInt(r.count, 10)]));
+      uniqueBidderMap = new Map(uniqueBidderRows.map((r: any) => [r.auction_id, parseInt(r.count, 10)]));
+    } catch (error) {
+      if (!this.isRecoverableSchemaError(error)) throw error;
+    }
 
     return auctions.map((auction) => ({
       id: auction.id,
@@ -188,7 +222,7 @@ export class AuctionsService {
         relations: ['product'],
       });
     } catch (error) {
-      if (!this.isMissingColumnError(error)) throw error;
+      if (!this.isRecoverableSchemaError(error)) throw error;
       const auctionCols = await this.getExistingColumns('auctions');
       const productCols = await this.getExistingColumns('products');
       const auctionSelect = [
@@ -280,7 +314,7 @@ export class AuctionsService {
         take: 50,
       });
     } catch (error) {
-      if (!this.isMissingColumnError(error)) throw error;
+      if (!this.isRecoverableSchemaError(error)) throw error;
       const rows = await this.loadAuctionRows([AuctionStatus.CLOSED, AuctionStatus.EXPIRED]);
       auctions = rows.map((row) => this.toAuctionRecord(row));
     }
@@ -444,7 +478,7 @@ export class AuctionsService {
         take: 50,
       });
     } catch (error) {
-      if (!this.isMissingColumnError(error)) throw error;
+      if (!this.isRecoverableSchemaError(error)) throw error;
       auctions = (await this.loadAuctionRows([AuctionStatus.CLOSED])).filter(
         (a) => a.winner_user_id === userId,
       );
