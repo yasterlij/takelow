@@ -27,7 +27,19 @@ export class AuctionsService {
 
   private isMissingColumnError(error: unknown): boolean {
     const message = error instanceof Error ? error.message : String(error);
-    return message.includes('public_code') || message.includes('specs');
+    return (
+      message.includes('public_code') ||
+      message.includes('specs') ||
+      message.includes('bid_fee')
+    );
+  }
+
+  private async getExistingColumns(table: string): Promise<Set<string>> {
+    const rows: any[] = await this.auctionRepository.query(
+      'SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = $1',
+      [table],
+    );
+    return new Set(rows.map((r) => r.column_name));
   }
 
   private async loadAuctionRows(statuses: AuctionStatus[], activeOnly = false): Promise<any[]> {
@@ -39,30 +51,41 @@ export class AuctionsService {
       where += ` AND a.end_time > $${params.length}`;
     }
 
+    const auctionCols = await this.getExistingColumns('auctions');
+    const productCols = await this.getExistingColumns('products');
+
+    const auctionSelect = [
+      'a.id',
+      'ranked.public_code',
+      'a.product_id',
+      'a.start_time',
+      'a.end_time',
+      'a.status',
+      ...(auctionCols.has('bid_fee') ? ['a.bid_fee'] : []),
+      ...(auctionCols.has('winner_user_id') ? ['a.winner_user_id'] : []),
+      ...(auctionCols.has('winning_bid_amount') ? ['a.winning_bid_amount'] : []),
+      ...(auctionCols.has('payment_status') ? ['a.payment_status'] : []),
+      ...(auctionCols.has('payment_deadline') ? ['a.payment_deadline'] : []),
+      ...(auctionCols.has('created_at') ? ['a.created_at'] : []),
+    ].join(',\n        ');
+
+    const productSelect = [
+      'p.id AS product_ref_id',
+      'p.name AS product_name',
+      'p.description AS product_description',
+      'p.image_urls AS product_image_urls',
+      'p.current_market_price AS product_current_market_price',
+      ...(productCols.has('brand') ? ['p.brand AS product_brand'] : []),
+    ].join(',\n        ');
+
     return this.auctionRepository.query(
       `WITH ranked AS (
         SELECT id, LPAD(ROW_NUMBER() OVER (ORDER BY created_at ASC)::text, 5, '0') AS public_code
         FROM auctions
       )
       SELECT
-        a.id,
-        ranked.public_code,
-        a.product_id,
-        a.start_time,
-        a.end_time,
-        a.status,
-        a.bid_fee,
-        a.winner_user_id,
-        a.winning_bid_amount,
-        a.payment_status,
-        a.payment_deadline,
-        a.created_at,
-        p.id AS product_ref_id,
-        p.name AS product_name,
-        p.description AS product_description,
-        p.image_urls AS product_image_urls,
-        p.current_market_price AS product_current_market_price,
-        p.brand AS product_brand
+        ${auctionSelect},
+        ${productSelect}
       FROM auctions a
       LEFT JOIN ranked ON ranked.id = a.id
       LEFT JOIN products p ON p.id = a.product_id
@@ -166,30 +189,38 @@ export class AuctionsService {
       });
     } catch (error) {
       if (!this.isMissingColumnError(error)) throw error;
+      const auctionCols = await this.getExistingColumns('auctions');
+      const productCols = await this.getExistingColumns('products');
+      const auctionSelect = [
+        'a.id',
+        'ranked.public_code',
+        'a.product_id',
+        'a.start_time',
+        'a.end_time',
+        'a.status',
+        ...(auctionCols.has('bid_fee') ? ['a.bid_fee'] : []),
+        ...(auctionCols.has('winner_user_id') ? ['a.winner_user_id'] : []),
+        ...(auctionCols.has('winning_bid_amount') ? ['a.winning_bid_amount'] : []),
+        ...(auctionCols.has('payment_status') ? ['a.payment_status'] : []),
+        ...(auctionCols.has('payment_deadline') ? ['a.payment_deadline'] : []),
+        ...(auctionCols.has('created_at') ? ['a.created_at'] : []),
+      ].join(',\n          ');
+      const productSelect = [
+        'p.id AS product_ref_id',
+        'p.name AS product_name',
+        'p.description AS product_description',
+        'p.image_urls AS product_image_urls',
+        'p.current_market_price AS product_current_market_price',
+        ...(productCols.has('brand') ? ['p.brand AS product_brand'] : []),
+      ].join(',\n          ');
       const rows = await this.auctionRepository.query(
         `WITH ranked AS (
           SELECT id, LPAD(ROW_NUMBER() OVER (ORDER BY created_at ASC)::text, 5, '0') AS public_code
           FROM auctions
         )
         SELECT
-          a.id,
-          ranked.public_code,
-          a.product_id,
-          a.start_time,
-          a.end_time,
-          a.status,
-          a.bid_fee,
-          a.winner_user_id,
-          a.winning_bid_amount,
-          a.payment_status,
-          a.payment_deadline,
-          a.created_at,
-          p.id AS product_ref_id,
-          p.name AS product_name,
-          p.description AS product_description,
-          p.image_urls AS product_image_urls,
-          p.current_market_price AS product_current_market_price,
-          p.brand AS product_brand
+          ${auctionSelect},
+          ${productSelect}
         FROM auctions a
         LEFT JOIN ranked ON ranked.id = a.id
         LEFT JOIN products p ON p.id = a.product_id
@@ -401,15 +432,23 @@ export class AuctionsService {
   }
 
   async getUserWonAuctions(userId: string): Promise<any[]> {
-    const auctions = await this.auctionRepository.find({
-      where: {
-        winner_user_id: userId,
-        status: AuctionStatus.CLOSED,
-      },
-      relations: ['product'],
-      order: { created_at: 'DESC' },
-      take: 50,
-    });
+    let auctions: any[];
+    try {
+      auctions = await this.auctionRepository.find({
+        where: {
+          winner_user_id: userId,
+          status: AuctionStatus.CLOSED,
+        },
+        relations: ['product'],
+        order: { created_at: 'DESC' },
+        take: 50,
+      });
+    } catch (error) {
+      if (!this.isMissingColumnError(error)) throw error;
+      auctions = (await this.loadAuctionRows([AuctionStatus.CLOSED])).filter(
+        (a) => a.winner_user_id === userId,
+      );
+    }
 
     const auctionIds = auctions.map((a) => a.id);
     let winnersByAuction: Map<string, WinnerRow[]> = new Map();
