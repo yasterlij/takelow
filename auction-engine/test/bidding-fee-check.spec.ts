@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { Redis } from 'ioredis';
 import { BiddingService } from '../src/modules/bidding/bidding.service';
 import { Auction } from '../src/modules/winner/entities/auction.entity';
@@ -126,6 +126,26 @@ describe('BiddingService - Bid Fee Payment Check', () => {
           status: PaymentTransactionStatus.SUCCESSFUL,
         },
       });
+    });
+
+    it('should reject a duplicate bid amount for the same auction', async () => {
+      mockPaymentTransactionRepo.findOne.mockResolvedValue({
+        status: PaymentTransactionStatus.SUCCESSFUL,
+      });
+      mockBidRepo.findOne.mockResolvedValue({
+        id: 'bid-dup',
+        auction_id: auctionId,
+        user_id: userId,
+        amount,
+      });
+
+      await expect(
+        service.placeBid(auctionId, userId, amount, endTime, "test-ticket")
+      ).rejects.toThrow(ConflictException);
+
+      await expect(
+        service.placeBid(auctionId, userId, amount, endTime, "test-ticket")
+      ).rejects.toThrow('Duplicate bid detected. Please enter a new amount.');
     });
 
     it('should reject bid when bid fee has NOT been paid', async () => {

@@ -3,6 +3,7 @@ import {
   Injectable,
   ForbiddenException,
   BadRequestException,
+  ConflictException,
   Logger,
 } from "@nestjs/common";
 import { Redis } from "ioredis";
@@ -83,6 +84,15 @@ export class BiddingService {
       if (!feePaid) {
         throw new BadRequestException(
           "Bid fee not paid. Please pay the bid fee via SikinaPay before placing a bid.",
+        );
+      }
+
+      const existingBid = await this.bidRepository.findOne({
+        where: { auction_id: auctionId, user_id: userId, amount },
+      });
+      if (existingBid) {
+        throw new ConflictException(
+          "Duplicate bid detected. Please enter a new amount.",
         );
       }
 
