@@ -81,6 +81,11 @@ export function ProductScreen() {
   }, [showPinModal])
 
   useEffect(() => {
+    const nextBid = pendingBidAmount != null ? pendingBidAmount.toFixed(2) : ''
+    setBidAmount((current) => (current === nextBid ? current : nextBid))
+  }, [pendingBidAmount])
+
+  useEffect(() => {
     if (!pinLocked || !pinLockedUntil) {
       setLockCountdown('')
       return

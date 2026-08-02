@@ -49,6 +49,11 @@ export function PayFeeScreen() {
     }
   }, [selectedId])
 
+  useEffect(() => {
+    const nextBid = pendingBidAmount != null ? pendingBidAmount.toFixed(2) : ''
+    setBidAmount((current) => (current === nextBid ? current : nextBid))
+  }, [pendingBidAmount])
+
   const hasPlacedBid = useCallback(
     (amount: number) =>
       myBids.some((b) => b.auctionId === selectedId && b.amount === amount) ||
