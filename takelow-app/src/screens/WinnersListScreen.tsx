@@ -65,7 +65,7 @@ export function WinnersListScreen() {
             </View>
 
             {closedAuctions.map((a) => {
-              const savings = a.winning_bid_amount != null ? Math.round((1 - a.winning_bid_amount / a.marketPrice) * 100) : 0
+              const savings = a.winning_bid_amount != null && a.marketPrice > 0 ? Math.round((1 - a.winning_bid_amount / a.marketPrice) * 100) : 0
               const winnerCount = a.winnersCount ?? a.winners?.length ?? 0
               const paidCount = a.winners?.filter((w) => w.payment_status === 'PAID').length ?? 0
               return (
@@ -90,9 +90,11 @@ export function WinnersListScreen() {
                           <Text style={{ color: colors.primary, fontSize: 15, fontWeight: '800' }}>
                             {formatCurrency(a.winning_bid_amount ?? a.bidFee)}
                           </Text>
-                          <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10, fontWeight: '500', textDecorationLine: 'line-through' }}>
-                            {formatCurrency(a.marketPrice)}
-                          </Text>
+                          {a.marketPrice > 0 ? (
+                            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10, fontWeight: '500', textDecorationLine: 'line-through' }}>
+                              {formatCurrency(a.marketPrice)}
+                            </Text>
+                          ) : null}
                         </View>
                       </View>
                     </View>

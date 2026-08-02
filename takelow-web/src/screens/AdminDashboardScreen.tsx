@@ -237,7 +237,7 @@ export function AdminDashboardScreen() {
                 >
                   <div className="min-w-0">
                     <p className="truncate text-xs font-semibold text-awash-blue">{a.name}</p>
-                    <p className="text-[10px] font-medium text-neutral-400">{a.totalBids || a.bidders} bids · {formatCurrency(a.marketPrice)}</p>
+                    <p className="text-[10px] font-medium text-neutral-400">{a.totalBids || a.bidders} bids{a.marketPrice > 0 ? ` · ${formatCurrency(a.marketPrice)}` : ""}</p>
                   </div>
                   <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
                     a.status === "ending-soon" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"

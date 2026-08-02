@@ -53,7 +53,7 @@ export function ClosedScreen() {
 
   if (!auction) return null
 
-  const savings = Math.round((1 - auction.bidFee / auction.marketPrice) * 100)
+  const savings = auction.marketPrice > 0 ? Math.round((1 - auction.bidFee / auction.marketPrice) * 100) : 0
 
   return (
     <motion.div

@@ -201,7 +201,7 @@ function mapAdminAuction(a: any): AdminAuction {
     category: a.product?.brand || "",
     images: a.product?.image_urls || [],
     marketPrice: Number(a.product?.current_market_price || 0),
-    bidFee: 1,
+    bidFee: a.bid_fee != null ? Number(a.bid_fee) : 1,
     bidders: a.stats?.total_bids ?? 0,
     uniqueBidders: a.stats?.unique_bidders ?? 0,
     totalBids: a.stats?.total_bids ?? 0,

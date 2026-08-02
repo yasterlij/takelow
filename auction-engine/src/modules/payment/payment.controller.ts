@@ -132,13 +132,14 @@ export class PaymentController {
       throw new BadRequestException("Auction has already ended");
     }
 
-    if (this.bidFee < 1) {
+    const bidFee = Number(auction.bid_fee ?? this.bidFee);
+    if (bidFee < 1) {
       throw new BadRequestException("Bid fee must be at least 1.00");
     }
     const result = await this.paymentService.createBidFeePaymentLink(
       auctionId,
       user.id,
-      this.bidFee,
+      bidFee,
     );
     return {
       payment_url: result.paymentUrl,
@@ -197,13 +198,14 @@ export class PaymentController {
       throw new BadRequestException("Auction has already ended");
     }
 
-    if (this.bidFee < 1) {
+    const bidFee = Number(auction.bid_fee ?? this.bidFee);
+    if (bidFee < 1) {
       throw new BadRequestException("Bid fee must be at least 1.00");
     }
     await this.paymentService.createBidFeeWalletPayment(
       auctionId,
       user.id,
-      this.bidFee,
+      bidFee,
     );
     return { paid: true };
   }

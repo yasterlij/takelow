@@ -26,7 +26,7 @@ export const registerSchema = z.object({
     .regex(/^\d+$/, "Phone number must contain only digits"),
   password: z
     .string()
-    .min(4, "Password must be at least 4 characters")
+    .min(8, "Password must be at least 8 characters")
     .max(128, "Password is too long"),
 })
 export type RegisterValues = z.infer<typeof registerSchema>

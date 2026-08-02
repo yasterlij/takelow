@@ -11,7 +11,7 @@ const POLL_INTERVAL = 3000
 const POLL_TIMEOUT = 120000
 
 export function SikinaPayCheckout() {
-  const { go, selectedId, sikinaPayUrl, setSikinaPayUrl, sikinaPayContext, setFeePaid, pendingBidAmount } = useApp()
+  const { go, selectedId, sikinaPayUrl, setSikinaPayUrl, sikinaProxyUrl, setSikinaProxyUrl, sikinaPayContext, setFeePaid, pendingBidAmount } = useApp()
   const [status, setStatus] = useState<'loading' | 'paid' | 'failed'>('loading')
   const [webviewLoading, setWebviewLoading] = useState(true)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -165,14 +165,14 @@ export function SikinaPayCheckout() {
           </View>
         )}
         {sikinaPayUrl && (
-          <WebView
-            source={{ uri: sikinaPayUrl }}
-            style={s.webview}
-            onLoad={() => setWebviewLoading(false)}
-            onError={() => setWebviewLoading(false)}
-            javaScriptEnabled
-            domStorageEnabled
-            startInLoadingState
+<WebView
+  source={{ uri: sikinaProxyUrl ?? sikinaPayUrl }}
+  style={s.webview}
+  onLoad={() => setWebviewLoading(false)}
+  onError={() => setWebviewLoading(false)}
+  javaScriptEnabled
+  domStorageEnabled
+  startInLoadingState
           />
         )}
       </View>

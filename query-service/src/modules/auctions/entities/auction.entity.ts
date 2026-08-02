@@ -54,6 +54,9 @@ export class Auction {
   @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
   winning_bid_amount: number;
 
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  bid_fee: number;
+
   @Column({ type: 'varchar', length: 20, nullable: true })
   payment_status: string;
 

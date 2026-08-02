@@ -82,6 +82,11 @@ export class CreateAuctionDto {
   @IsNumber()
   max_bid?: number;
 
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  bid_fee?: number;
+
 }
 
 export class UpdateAuctionDto {
@@ -104,6 +109,11 @@ export class UpdateAuctionDto {
   @IsOptional()
   @IsNumber()
   max_bid?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  bid_fee?: number;
 
   @IsOptional()
   @IsEnum(AuctionStatus)

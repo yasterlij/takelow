@@ -5,19 +5,9 @@ import { useApp } from "../AppContext"
 import { api } from "../api"
 import { AdminLayout } from "../components/AdminLayout"
 import { CTAButton, Badge, Card } from "../components/AuctionUI"
+import { usePagination, PaginationBar } from "../components/Pagination"
 import { formatCurrency, formatETB, formatMaskedCurrency } from "../mockDataV0"
-import type { Auction } from "../mockDataV0"
-
-const specFields = [
-  { key: "storage", label: "Storage" },
-  { key: "ram", label: "RAM" },
-  { key: "edition", label: "Edition" },
-  { key: "battery", label: "Battery" },
-  { key: "camera", label: "Camera" },
-  { key: "osVersion", label: "OS Version" },
-  { key: "display", label: "Display" },
-  { key: "chipset", label: "Chipset" },
-] as const
+import type { Auction, ProductSpecs } from "../mockDataV0"
 
 const emptySpecs = { storage: "", ram: "", edition: "", battery: "", camera: "", osVersion: "", display: "", chipset: "" }
 
@@ -156,7 +146,7 @@ function toDatetimeLocal(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
-const emptyForm = { name: "", category: "Computer", marketPrice: "", bidFee: "10", description: "", highlights: "", imageUrl: "", startTime: "", endTime: "", minBid: "", maxBid: "", ...emptySpecs }
+const emptyForm = { name: "", category: "Computer", marketPrice: "", bidFee: "10", description: "", highlights: "", specText: "", imageUrl: "", startTime: "", endTime: "", minBid: "", maxBid: "" }
 
 export function AdminAuctionsScreen() {
   const { go, auctions, addAuction, updateAuction, deleteAuction, closeAuction } = useApp()
@@ -204,33 +194,34 @@ export function AdminAuctionsScreen() {
     const startDate = a.endTime ? new Date(new Date(a.endTime).getTime() - 7 * 86400000) : now
     const endDate = a.endTime ? new Date(a.endTime) : new Date(now.getTime() + 7 * 86400000)
     setForm({
-      name: a.name, category: a.category, marketPrice: String(a.marketPrice), bidFee: "10",
+      name: a.name, category: a.category, marketPrice: String(a.marketPrice), bidFee: a.bidFee != null ? String(a.bidFee) : "10",
       description: a.description, highlights: a.highlights.join(", "),
+      specText: Object.keys(emptySpecs).map((key) => (a.specs || {})[key as keyof ProductSpecs]).filter(Boolean).join(", "),
       imageUrl: a.images?.[0] || "", startTime: toDatetimeLocal(startDate), endTime: toDatetimeLocal(endDate),
       minBid: a.minBid != null ? String(a.minBid) : "",
       maxBid: a.maxBid != null ? String(a.maxBid) : "",
-      ...emptySpecs,
-      ...(a.specs || {}),
     })
     setImgPreviewErr(false)
     setShowForm(true)
   }
 
   const handleSubmit = async () => {
-    if (!form.name || !form.marketPrice) return
+    if (!form.name) return
     setSubmitting(true)
     const highlights = form.highlights ? form.highlights.split(",").map((h) => h.trim()).filter(Boolean) : []
+    const specValues = form.specText ? form.specText.split(",").map((s) => s.trim()).filter(Boolean) : []
     const minBid = form.minBid ? Number(form.minBid) : undefined
     const maxBid = form.maxBid ? Number(form.maxBid) : undefined
     const base = {
-      name: form.name, category: form.category, marketPrice: Number(form.marketPrice),
+      name: form.name, category: form.category, marketPrice: Number(form.marketPrice || 0),
       description: form.description, highlights,
-      specs: Object.fromEntries(Object.keys(emptySpecs).map((key) => [key, (form as any)[key]?.trim()]).filter(([, value]) => value)),
+      specs: Object.fromEntries(Object.keys(emptySpecs).map((key, i) => [key, specValues[i]]).filter(([, value]) => value)),
       ...(form.imageUrl ? { images: [form.imageUrl] } : {}),
       ...(form.startTime ? { startTime: new Date(form.startTime).toISOString() } : {}),
       ...(form.endTime ? { endTime: new Date(form.endTime).toISOString() } : {}),
       ...(minBid != null ? { minBid } : {}),
       ...(maxBid != null ? { maxBid } : {}),
+      ...(form.bidFee ? { bidFee: Number(form.bidFee) } : {}),
     }
     if (editingId) {
       await updateAuction(editingId, base)
@@ -274,6 +265,7 @@ export function AdminAuctionsScreen() {
     return true
   })
   const activeCount = auctions.filter((a) => a.status !== "closed").length
+  const { page, setPage, perPage, setPerPage, totalPages, paginated, resetPage } = usePagination(filtered, 10)
 
   return (
     <AdminLayout
@@ -303,14 +295,14 @@ export function AdminAuctionsScreen() {
             <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-neutral-400" />
             <input
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); resetPage() }}
               placeholder="Search auctions..."
               className="w-full rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm py-2 pl-8 pr-3 text-xs font-medium outline-none transition-all placeholder:text-neutral-400/50 focus:border-awash-gold focus:bg-white focus:shadow-lg"
             />
           </div>
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(e) => { setStatusFilter(e.target.value); resetPage() }}
             className="rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm px-3 py-2 text-xs font-semibold text-awash-blue outline-none transition-all focus:border-awash-gold focus:bg-white"
           >
             <option value="all">All</option>
@@ -351,10 +343,7 @@ export function AdminAuctionsScreen() {
                   </div>
                 </div>
 
-                <div className="flex gap-3">
-                  <input value={form.marketPrice} onChange={(e) => setForm((f) => ({ ...f, marketPrice: e.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1").replace(/(\.\d{2})\d+/g, "$1") }))} placeholder="Payment" className="input-full" />
-                  <input value={form.bidFee} onChange={(e) => setForm((f) => ({ ...f, bidFee: e.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1").replace(/(\.\d{2})\d+/g, "$1") }))} placeholder="Bid Amount" className="input-full" />
-                </div>
+                <input value={form.bidFee} onChange={(e) => setForm((f) => ({ ...f, bidFee: e.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1").replace(/(\.\d{2})\d+/g, "$1") }))} placeholder="Bid Amount" className="input-full" />
                 <div className="flex gap-3">
                   <label className="flex-1">
                     <span className="mb-1 block text-[10px] font-semibold text-neutral-400">Min Bids (optional)</span>
@@ -367,19 +356,7 @@ export function AdminAuctionsScreen() {
                 </div>
                 <textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="Description" className="input-full" rows={2} />
                 <input value={form.highlights} onChange={(e) => setForm((f) => ({ ...f, highlights: e.target.value }))} placeholder="Highlights (comma separated)" className="input-full" />
-                <div className="grid grid-cols-2 gap-3">
-                  {specFields.map((field) => (
-                    <label key={field.key}>
-                      <span className="mb-1 block text-[10px] font-semibold text-neutral-400">{field.label}</span>
-                      <input
-                        value={(form as any)[field.key] || ""}
-                        onChange={(e) => setForm((f) => ({ ...f, [field.key]: e.target.value }))}
-                        placeholder={field.label}
-                        className="input-full"
-                      />
-                    </label>
-                  ))}
-                </div>
+                <input value={form.specText} onChange={(e) => setForm((f) => ({ ...f, specText: e.target.value }))} placeholder="Product specs (comma separated)" className="input-full" />
                 <div className="flex gap-3">
                   <label className="flex-1">
                     <span className="mb-1 block text-[10px] font-semibold text-neutral-400">Start</span>
@@ -390,7 +367,7 @@ export function AdminAuctionsScreen() {
                     <input type="datetime-local" value={form.endTime} onChange={(e) => setForm((f) => ({ ...f, endTime: e.target.value }))} className="input-full" />
                   </label>
                 </div>
-                <CTAButton onClick={handleSubmit} disabled={submitting || !form.name || !form.marketPrice}>
+                <CTAButton onClick={handleSubmit} disabled={submitting || !form.name}>
                   {submitting ? "Saving..." : editingId ? "Update Auction" : "Create Auction"}
                 </CTAButton>
               </Card>
@@ -435,7 +412,7 @@ export function AdminAuctionsScreen() {
             }}
             className="flex flex-col gap-2"
           >
-            {filtered.map((a: Auction) => {
+            {paginated.map((a: Auction) => {
               const bids = viewBidsId === a.id ? (bidsByAuction[a.id] ?? []) : []
               const isEncrypted = bids.some((b: any) => b.amount_encrypted)
               const bidAmounts = isEncrypted ? [] : bids.map((b) => b.amount)
@@ -560,6 +537,15 @@ export function AdminAuctionsScreen() {
             })}
           </motion.div>
         )}
+
+        <PaginationBar
+          page={page}
+          totalPages={totalPages}
+          totalItems={filtered.length}
+          perPage={perPage}
+          onPageChange={setPage}
+          onPerPageChange={setPerPage}
+        />
       </motion.div>
     </AdminLayout>
   )

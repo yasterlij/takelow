@@ -84,8 +84,6 @@ export class BiddingController {
     });
     if (!auction) throw new NotFoundException("Auction not found");
 
-    const isActive = auction.status === AuctionStatus.ACTIVE;
-
     const stats = await this.winnerService.getAuctionStats(auctionId);
     const { winners } = await this.winnerService.calculateWinners(auctionId);
 
@@ -105,7 +103,7 @@ export class BiddingController {
           const info = await this.resolveWinnerUserInfo(w.user_id || w.userId);
           return {
             user_id: w.user_id || w.userId,
-            amount: isActive ? 0 : w.amount,
+            amount: w.amount,
             rank: w.rank,
             payment_status: w.payment_status,
             payment_deadline: w.payment_deadline,
@@ -127,17 +125,18 @@ export class BiddingController {
       winner_user_id: auction.winner_user_id,
       winner_name: primaryWinnerInfo?.name || null,
       winner_phone: primaryWinnerInfo?.phone || null,
-      winning_bid_amount: isActive ? null : auction.winning_bid_amount,
+      winning_bid_amount:
+        auction.winning_bid_amount ?? (winners.length > 0 ? winners[0].amount : null),
       total_bids: stats.totalBids,
       unique_bidders: stats.uniqueBidders,
-      lowest_unique_bid: isActive ? null : stats.lowestUniqueBid,
+      lowest_unique_bid: stats.lowestUniqueBid,
       all_winners: allWinners,
       winners_count: allWinners.length,
       my_bid: userBid
         ? {
-            amount: isActive ? 0 : this.resolveBidAmount(userBid),
-            encrypted_amount: isActive ? userBid.encrypted_amount : null,
-            amount_encrypted: isActive,
+            amount: this.resolveBidAmount(userBid),
+            encrypted_amount: null,
+            amount_encrypted: false,
             bid_time: userBid.bid_time,
             service_fee_paid: userBid.service_fee_paid,
           }

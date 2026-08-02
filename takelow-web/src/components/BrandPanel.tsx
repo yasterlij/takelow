@@ -19,8 +19,7 @@ export function BrandPanel({ className }: { className?: string }) {
         <span className="text-primary">Awash Bank</span> Mobile Money
       </h1>
       <p className="mt-5 max-w-md text-lg font-medium text-white/70 text-pretty">
-        Bid Low. Be Unique. Win Big! Place the lowest unique bid and take home premium
-        products for a fraction of their market price.
+        Bid Low. Be Unique. Win Big! Place the lowest unique bid.
       </p>
       <div className="mt-9 inline-flex items-center gap-3 rounded-2xl bg-primary px-5 py-3 text-primary-foreground shadow-lg shadow-primary/30 w-fit">
         <Trophy className="size-6" />

@@ -1,14 +1,21 @@
 import { useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Smartphone, Lock, AlertCircle, Loader2, Sparkles } from "lucide-react"
+import { Smartphone, Lock, AlertCircle, Loader2, Sparkles, LogOut } from "lucide-react"
 import { useApp } from "../AppContext"
 import { AwashLogo } from "../components/AuctionUI"
 import { FormField, FormPasswordInput } from "../components/FormField"
 import { useForm } from "../hooks/useForm"
 import { loginSchema, type LoginValues } from "../lib/validation"
 
+const SESSION_END_MESSAGES: Record<string, string> = {
+  idle: "Your session ended because you were inactive. Please sign in to continue.",
+  absolute: "Your session expired after 12 hours. Please sign in again.",
+  "refresh-failed": "Your session has expired. Please sign in again.",
+  expired: "Your session has expired. Please sign in again.",
+}
+
 export function LoginScreen() {
-  const { login, go, authError } = useApp()
+  const { login, go, authError, sessionEndReason } = useApp()
   const phoneRef = useRef<HTMLInputElement>(null)
   const pwRef = useRef<HTMLInputElement>(null)
 
@@ -78,6 +85,20 @@ export function LoginScreen() {
             >
               <AlertCircle className="size-4 shrink-0" />
               <span>{displayError}</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {sessionEndReason && SESSION_END_MESSAGES[sessionEndReason] && (
+            <motion.div
+              initial={{ opacity: 0, height: 0, y: -8 }}
+              animate={{ opacity: 1, height: "auto", y: 0 }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mt-6 flex w-full max-w-xs items-center gap-2 rounded-xl border border-primary/40 bg-primary/10 p-3 text-xs font-semibold text-awash-gold-light backdrop-blur-sm"
+            >
+              <LogOut className="size-4 shrink-0" />
+              <span>{SESSION_END_MESSAGES[sessionEndReason]}</span>
             </motion.div>
           )}
         </AnimatePresence>

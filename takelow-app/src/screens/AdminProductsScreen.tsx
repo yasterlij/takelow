@@ -4,6 +4,7 @@ import { Package, Plus, Search, Edit3, Trash2, ImageIcon, X, ArrowLeft } from 'l
 import { useApp } from '../AppContext'
 import { api } from '../api'
 import { CTAButton, Card } from '../components/AuctionUI'
+import { usePagination, PaginationBar } from '../components/Pagination'
 import { formatCurrency, formatSpecSummary } from '../mockDataV0'
 import { colors } from '../theme'
 
@@ -86,6 +87,8 @@ export function AdminProductsScreen() {
     !search || p.name?.toLowerCase().includes(search.toLowerCase()) || p.brand?.toLowerCase().includes(search.toLowerCase())
   )
 
+  const { page, setPage, perPage, setPerPage, totalPages, paginated, resetPage } = usePagination(filtered, 10)
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={s.header}>
@@ -130,7 +133,7 @@ export function AdminProductsScreen() {
         <>
           <Card style={s.searchRow}>
             <Search size={16} color={colors.mutedForeground} />
-            <TextInput value={search} onChangeText={setSearch} placeholder="Search products..." style={s.searchInput} placeholderTextColor={colors.mutedForeground} />
+            <TextInput value={search} onChangeText={(t) => { setSearch(t); resetPage() }} placeholder="Search products..." style={s.searchInput} placeholderTextColor={colors.mutedForeground} />
             {search ? <TouchableOpacity onPress={() => setSearch('')}><X size={16} color={colors.mutedForeground} /></TouchableOpacity> : null}
           </Card>
           {loading ? (
@@ -139,7 +142,7 @@ export function AdminProductsScreen() {
             <ScrollView style={{ flex: 1, padding: 16 }}>
               {filtered.length === 0 ? (
                 <Text style={{ textAlign: 'center', color: colors.mutedForeground, marginTop: 40 }}>No products found</Text>
-              ) : filtered.map((p: any) => (
+              ) : paginated.map((p: any) => (
                 <Card key={p.id} style={s.productRow}>
                   <View style={s.productIcon}>
                     {p.image_urls?.[0] ? <Image source={{ uri: p.image_urls[0] }} style={s.productThumb} resizeMode="cover" /> : <Package size={20} color={colors.mutedForeground} />}
@@ -153,6 +156,14 @@ export function AdminProductsScreen() {
                   <TouchableOpacity onPress={() => remove(p.id, p.name)} style={s.actionBtn}><Trash2 size={16} color={colors.destructive} /></TouchableOpacity>
                 </Card>
               ))}
+              <PaginationBar
+                page={page}
+                totalPages={totalPages}
+                totalItems={filtered.length}
+                perPage={perPage}
+                onPageChange={setPage}
+                onPerPageChange={setPerPage}
+              />
             </ScrollView>
           )}
         </>

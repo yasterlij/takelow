@@ -176,7 +176,7 @@ export function PayFeeScreen() {
         setPinLocked(true)
         setPinLockedUntil(res.lockedUntil)
         setAttemptsRemaining(0)
-        setPinError("Too many incorrect attempts. Your wallet PIN has been locked for 30 minutes.")
+        setPinError("Too many incorrect attempts. Your wallet PIN has been locked for 5 minutes.")
       } else {
         setAttemptsRemaining(res.attemptsRemaining)
         if (res.attemptsRemaining <= 2) {
@@ -514,7 +514,7 @@ export function PayFeeScreen() {
                   <AlertTriangle className="mx-auto size-9 text-destructive" />
                   <p className="text-sm font-semibold text-destructive">PIN Locked</p>
                   <p className="text-xs text-neutral-600">
-                    Too many incorrect attempts. Try again in {lockCountdown || "30:00s"}.
+                    Too many incorrect attempts. Try again in {lockCountdown || "05:00s"}.
                   </p>
                   <button onClick={() => setShowPinModal(false)} className="w-full rounded-xl border border-border bg-neutral-100 px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-neutral-200">
                     Close

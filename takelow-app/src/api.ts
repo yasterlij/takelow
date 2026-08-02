@@ -8,8 +8,81 @@ const ENGINE_API = `http://${HOST}:3002/api/v1`
 let _token: string | null = null
 let _refreshToken: string | null = null
 
+export type SessionExpireReason = 'expired' | 'idle' | 'absolute' | 'refresh-failed' | 'logout'
+
+const ACCESS_REFRESH_MARGIN_MS = 60_000
+
+function base64UrlDecode(input: string): string {
+  const b64 = input.replace(/-/g, '+').replace(/_/g, '/')
+  const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4)
+  if (typeof atob === 'function') {
+    try { return atob(padded) } catch { /* fall through */ }
+  }
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+  const lookup: Record<string, number> = {}
+  for (let i = 0; i < chars.length; i++) lookup[chars[i]] = i
+  let out = ''
+  let buffer = 0
+  let bits = 0
+  for (let i = 0; i < padded.length; i++) {
+    const c = padded[i]
+    if (c === '=') break
+    const v = lookup[c]
+    if (v === undefined) continue
+    buffer = (buffer << 6) | v
+    bits += 6
+    if (bits >= 8) {
+      bits -= 8
+      out += String.fromCharCode((buffer >> bits) & 0xff)
+    }
+  }
+  return out
+}
+
+function decodeJwtPayload(token: string): { exp?: number } | null {
+  try {
+    const part = token.split('.')[1]
+    if (!part) return null
+    return JSON.parse(base64UrlDecode(part)) as { exp?: number }
+  } catch {
+    return null
+  }
+}
+
+export function getAccessTokenExpiry(): number | null {
+  if (!_token) return null
+  const payload = decodeJwtPayload(_token)
+  if (typeof payload?.exp !== 'number') return null
+  return payload.exp * 1000
+}
+
+let _accessRefreshTimer: ReturnType<typeof setTimeout> | null = null
+
+function clearAccessRefreshTimer() {
+  if (_accessRefreshTimer != null) {
+    clearTimeout(_accessRefreshTimer)
+    _accessRefreshTimer = null
+  }
+}
+
+function scheduleAccessRefresh() {
+  clearAccessRefreshTimer()
+  if (!_token || !_refreshToken) return
+  const exp = getAccessTokenExpiry()
+  if (exp == null) return
+  const delay = Math.max(0, exp - Date.now() - ACCESS_REFRESH_MARGIN_MS)
+  _accessRefreshTimer = setTimeout(async () => {
+    try {
+      await refreshAuth('refresh-failed')
+    } catch {
+      expireSession('refresh-failed')
+    }
+  }, Math.min(delay, 2_147_000_000))
+}
+
 export function setApiToken(token: string | null) {
   _token = token
+  scheduleAccessRefresh()
 }
 
 export function getApiToken() {
@@ -18,6 +91,7 @@ export function getApiToken() {
 
 export function setRefreshToken(token: string | null) {
   _refreshToken = token
+  scheduleAccessRefresh()
 }
 
 export function getRefreshToken() {
@@ -82,21 +156,22 @@ const MAX_RETRIES = 2
 const RETRY_DELAY = 1000
 
 let _refreshing: Promise<void> | null = null
-let _sessionExpiredHandler: (() => void) | null = null
+let _sessionExpiredHandler: ((reason: SessionExpireReason) => void) | null = null
 
-export function onSessionExpired(handler: (() => void) | null) {
+export function onSessionExpired(handler: ((reason: SessionExpireReason) => void) | null) {
   _sessionExpiredHandler = handler
 }
 
-function expireSession() {
+function expireSession(reason: SessionExpireReason = 'expired') {
+  clearAccessRefreshTimer()
   _token = null
   _refreshToken = null
-  _sessionExpiredHandler?.()
+  _sessionExpiredHandler?.(reason)
 }
 
-async function refreshAuth(): Promise<void> {
+async function refreshAuth(failReason: SessionExpireReason = 'expired'): Promise<void> {
   if (!_refreshToken) {
-    expireSession()
+    expireSession(failReason)
     throw new Error('No refresh token')
   }
   if (_refreshing) return _refreshing
@@ -107,12 +182,13 @@ async function refreshAuth(): Promise<void> {
       body: JSON.stringify({ refresh_token: _refreshToken }),
     })
     if (!res.ok) {
-      expireSession()
+      expireSession(failReason)
       throw new Error('Token refresh failed')
     }
     const data = await res.json()
     _token = data.access_token
     _refreshToken = data.refresh_token
+    scheduleAccessRefresh()
   })()
   try {
     await _refreshing
@@ -348,7 +424,7 @@ export const api = {
   deleteProduct(id: string) {
     return request<{ deleted: boolean; id: string }>('DELETE', `/admin/products/${id}`, undefined, ENGINE_API)
   },
-  createAuction(data: { product_id: string; start_time: string; end_time: string; min_bid?: number; max_bid?: number }) {
+  createAuction(data: { product_id: string; start_time: string; end_time: string; min_bid?: number; max_bid?: number; bid_fee?: number }) {
     return request<ApiAuction>('POST', '/admin/auctions', data, ENGINE_API)
   },
   async listAuctions() {
@@ -362,7 +438,7 @@ export const api = {
   adminListAuctions(page = 1, limit = 100) {
     return request<{ data: ApiAuction[]; meta: any }>('GET', `/admin/auctions?page=${page}&limit=${limit}`, undefined, ENGINE_API)
   },
-  updateAuction(id: string, data: Partial<{ product_id: string; start_time: string; end_time: string; status: string; min_bid: number; max_bid: number }>) {
+  updateAuction(id: string, data: Partial<{ product_id: string; start_time: string; end_time: string; status: string; min_bid: number; max_bid: number; bid_fee: number }>) {
     return request<ApiAuction>('PATCH', `/admin/auctions/${id}`, data, ENGINE_API)
   },
   deleteAuction(id: string) {
@@ -403,7 +479,7 @@ export const api = {
     if (customerPhone) params.push(`customer_phone=${encodeURIComponent(customerPhone)}`)
     const qs = params.join('&')
     if (qs) path += `?${qs}`
-    return request<{ payment_url: string; transaction_id: string; gateway: string }>('POST', path, undefined, ENGINE_API)
+    return request<{ payment_url: string; proxy_url: string; transaction_id: string; gateway: string }>('POST', path, undefined, ENGINE_API)
   },
   getPaymentLinkStatus(auctionId: string) {
     return request<{ status: string; payment_url: string | null; gateway?: string }>('GET', `/payments/${auctionId}/status`, undefined, ENGINE_API)
@@ -415,7 +491,7 @@ export const api = {
     return request<{ paid: boolean }>('POST', `/payments/${auctionId}/wallet-pay`, undefined, ENGINE_API)
   },
   createBidFeePaymentLink(auctionId: string) {
-    return request<{ payment_url: string; transaction_id: string }>('POST', `/payments/bid-fee/${auctionId}/link`, undefined, ENGINE_API)
+    return request<{ payment_url: string; proxy_url: string; transaction_id: string }>('POST', `/payments/bid-fee/${auctionId}/link`, undefined, ENGINE_API)
   },
   getBidFeePaymentStatus(auctionId: string) {
     return request<{ status: string; payment_url: string | null }>('GET', `/payments/bid-fee/${auctionId}/status`, undefined, ENGINE_API)

@@ -34,7 +34,7 @@ function TimePill({ seconds, endingSoon }: { seconds: number; endingSoon: boolea
   )
 }
 
-function AuctionCard({ auction, onOpen, index }: { auction: Auction; onOpen: () => void; index: number }) {
+export function AuctionCard({ auction, onOpen, index }: { auction: Auction; onOpen: () => void; index: number }) {
   const endingSoon = auction.status === "ending-soon"
   const bidProgress = auction.maxBid ? Math.min((auction.totalBids || auction.bidders) / auction.maxBid, 1) : 0
   const isClosed = auction.status === "closed"
@@ -71,7 +71,7 @@ function AuctionCard({ auction, onOpen, index }: { auction: Auction; onOpen: () 
         <div className="flex flex-col gap-2 p-3">
           <h3 className="truncate font-display text-sm font-bold text-foreground">{auction.name}</h3>
           {auction.specSummary && <p className="truncate text-[10px] font-medium text-neutral-500">{auction.specSummary}</p>}
-          <p className="text-[10px] font-medium text-neutral-400 line-through">{formatCurrency(auction.marketPrice)}</p>
+          {auction.marketPrice > 0 && <p className="text-[10px] font-medium text-neutral-400 line-through">{formatCurrency(auction.marketPrice)}</p>}
           <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center rounded-full bg-awash-gold/10 px-2.5 py-1 text-[10px] font-bold text-awash-gold-dark border border-primary/20">
               Bid Amount: {formatCurrency(auction.bidFee)}
@@ -99,7 +99,7 @@ function AuctionCard({ auction, onOpen, index }: { auction: Auction; onOpen: () 
   )
 }
 
-function SkeletonCard() {
+export function SkeletonCard() {
   return (
     <div className="flex flex-col overflow-hidden rounded-2xl border border-border bg-white shadow-sm">
       <div className="aspect-[4/3] w-full skeleton" />
@@ -285,7 +285,7 @@ export function AuctionsScreen() {
                     <h3 className="font-display text-base font-extrabold text-white drop-shadow-md">{a.name}</h3>
                     <div className="mt-1 flex items-center gap-2">
                       <span className="text-sm font-bold text-primary">Service Fee: {formatCurrency(a.bidFee)}</span>
-                      <span className="text-xs font-medium text-white/60 line-through">{formatCurrency(a.marketPrice)}</span>
+                      <span className="text-xs font-medium text-white/60 line-through">{a.marketPrice > 0 ? formatCurrency(a.marketPrice) : null}</span>
                     </div>
                     <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-100/90 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
                       <Users className="size-3" /> {a.totalBids || a.bidders} bidders

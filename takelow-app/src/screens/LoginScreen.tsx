@@ -1,12 +1,19 @@
 import React, { useState, useRef } from 'react'
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
-import { Eye, EyeOff, Smartphone, Lock, AlertCircle } from 'lucide-react-native'
+import { Eye, EyeOff, Smartphone, Lock, AlertCircle, LogOut } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { AwashLogo } from '../components/AuctionUI'
 import { colors } from '../theme'
 
+const SESSION_END_MESSAGES: Record<string, string> = {
+  idle: 'Your session ended because you were inactive. Please sign in to continue.',
+  absolute: 'Your session expired after 12 hours. Please sign in again.',
+  'refresh-failed': 'Your session has expired. Please sign in again.',
+  expired: 'Your session has expired. Please sign in again.',
+}
+
 export function LoginScreen() {
-  const { login, go, authError } = useApp()
+  const { login, go, authError, sessionEndReason } = useApp()
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [showPw, setShowPw] = useState(false)
@@ -45,6 +52,13 @@ export function LoginScreen() {
           <View style={s.errorBox}>
             <AlertCircle size={16} color={colors.destructive} />
             <Text style={s.errorText}>{displayError}</Text>
+          </View>
+        ) : null}
+
+        {sessionEndReason && SESSION_END_MESSAGES[sessionEndReason] ? (
+          <View style={s.sessionBox}>
+            <LogOut size={16} color={colors.primary} />
+            <Text style={s.sessionText}>{SESSION_END_MESSAGES[sessionEndReason]}</Text>
           </View>
         ) : null}
 
@@ -117,6 +131,8 @@ const s = StyleSheet.create({
   subtitle: { fontSize: 14, fontWeight: '500', color: colors.navyForeground + '99', marginTop: 4 },
   errorBox: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 24, borderRadius: 12, backgroundColor: colors.destructive + '26', padding: 12, width: '100%', maxWidth: 320 },
   errorText: { fontSize: 12, fontWeight: '600', color: colors.destructive, textAlign: 'center', flex: 1 },
+  sessionBox: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 24, borderRadius: 12, backgroundColor: colors.primary + '1A', padding: 12, width: '100%', maxWidth: 320 },
+  sessionText: { fontSize: 12, fontWeight: '600', color: colors.primary, textAlign: 'center', flex: 1 },
   form: { marginTop: 32, width: '100%', maxWidth: 320 },
   label: { fontSize: 12, fontWeight: '600', color: colors.navyForeground + 'B3', marginBottom: 6 },
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.navyForeground + '4D', backgroundColor: colors.white + '1A', paddingHorizontal: 16, paddingVertical: 12 },

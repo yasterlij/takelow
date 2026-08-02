@@ -202,7 +202,7 @@ export function ProductScreen() {
         setPinLocked(true)
         setPinLockedUntil(res.lockedUntil)
         setAttemptsRemaining(0)
-        setPinError("Too many incorrect attempts. Your wallet PIN has been locked for 30 minutes.")
+        setPinError("Too many incorrect attempts. Your wallet PIN has been locked for 5 minutes.")
       } else {
         setAttemptsRemaining(res.attemptsRemaining)
         setPinError(

@@ -113,7 +113,7 @@ export function PayFeeScreen() {
         setPinLockedUntil(res.lockedUntil)
         setAttemptsRemaining(0)
         setPinError(
-          'Too many incorrect attempts. Your wallet PIN has been locked for 30 minutes.'
+          'Too many incorrect attempts. Your wallet PIN has been locked for 5 minutes.'
         )
       } else {
         setAttemptsRemaining(res.attemptsRemaining)
@@ -415,7 +415,7 @@ export function PayFeeScreen() {
                   <AlertTriangle size={40} color={colors.destructive} />
                   <Text style={s.modalTitle}>PIN Locked</Text>
                   <Text style={s.modalDesc}>
-                    Too many incorrect attempts. Your wallet PIN has been locked for security. Try again in {lockCountdown || '30:00s'}.
+                    Too many incorrect attempts. Your wallet PIN has been locked for security. Try again in {lockCountdown || '05:00s'}.
                   </Text>
                 </View>
                 <CTAButton variant="outline" onPress={() => setShowPinModal(false)}>

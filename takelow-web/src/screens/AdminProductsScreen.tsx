@@ -5,6 +5,7 @@ import { useApp } from "../AppContext"
 import { api } from "../api"
 import { AdminLayout } from "../components/AdminLayout"
 import { CTAButton, Badge, Card } from "../components/AuctionUI"
+import { usePagination, PaginationBar } from "../components/Pagination"
 import { formatCurrency, formatETB, formatSpecSummary } from "../mockDataV0"
 
 const specFields = [
@@ -109,14 +110,12 @@ export function AdminProductsScreen() {
   const [form, setForm] = useState(emptyForm)
   const [submitting, setSubmitting] = useState(false)
   const [lightboxImg, setLightboxImg] = useState<string | null>(null)
-  const [page, setPage] = useState(1)
-  const perPage = 20
 
   const loadProducts = async () => {
     setLoading(true)
     setError(null)
     try {
-      const res = await api.listProducts(page, perPage)
+      const res = await api.listProducts(1, 500)
       const list = (res as any).data || res || []
       setProducts(list)
     } catch (e: any) {
@@ -126,7 +125,7 @@ export function AdminProductsScreen() {
     setLoading(false)
   }
 
-  useEffect(() => { loadProducts() }, [page])
+  useEffect(() => { loadProducts() }, [])
 
   const resetForm = () => {
     setForm(emptyForm)
@@ -193,6 +192,8 @@ export function AdminProductsScreen() {
     return true
   })
 
+  const { page, setPage, perPage, setPerPage, totalPages, paginated, resetPage } = usePagination(filtered, 10)
+
   const totalValue = products.reduce((sum, p) => sum + Number(p.current_market_price || 0), 0)
   const inUseCount = products.filter((p) => auctions.some((a) => a.productId === p.id)).length
 
@@ -224,7 +225,7 @@ export function AdminProductsScreen() {
             <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-neutral-400" />
             <input
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); resetPage() }}
               placeholder="Search products..."
               className="w-full rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm py-2 pl-8 pr-3 text-xs font-medium outline-none transition-all placeholder:text-neutral-400/50 focus:border-awash-gold focus:bg-white focus:shadow-lg"
             />
@@ -232,7 +233,7 @@ export function AdminProductsScreen() {
           {brands.length > 0 && (
             <select
               value={brandFilter}
-              onChange={(e) => setBrandFilter(e.target.value)}
+              onChange={(e) => { setBrandFilter(e.target.value); resetPage() }}
               className="rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm px-3 py-2 text-xs font-semibold text-awash-blue outline-none transition-all focus:border-awash-gold focus:bg-white"
             >
               <option value="all">All Brands</option>
@@ -375,7 +376,7 @@ export function AdminProductsScreen() {
             }}
             className="space-y-2"
           >
-            {filtered.map((p: any) => (
+            {paginated.map((p: any) => (
               <motion.div
                 key={p.id}
                 variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}
@@ -406,28 +407,14 @@ export function AdminProductsScreen() {
           </motion.div>
         )}
 
-        {products.length > 0 && (
-          <motion.div
-            variants={{ hidden: { opacity: 0 }, visible: { opacity: 1 } }}
-            className="mt-4 flex items-center justify-center gap-2"
-          >
-            <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1}
-              className="rounded-lg border border-border/60 px-3 py-1.5 text-xs font-semibold text-awash-blue transition-colors hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95"
-            >
-              Previous
-            </button>
-            <span className="text-xs font-medium text-neutral-400">Page {page}</span>
-            <button
-              onClick={() => setPage((p) => p + 1)}
-              disabled={products.length < perPage}
-              className="rounded-lg border border-border/60 px-3 py-1.5 text-xs font-semibold text-awash-blue transition-colors hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95"
-            >
-              Next
-            </button>
-          </motion.div>
-        )}
+        <PaginationBar
+          page={page}
+          totalPages={totalPages}
+          totalItems={filtered.length}
+          perPage={perPage}
+          onPageChange={setPage}
+          onPerPageChange={setPerPage}
+        />
       </motion.div>
     </AdminLayout>
   )

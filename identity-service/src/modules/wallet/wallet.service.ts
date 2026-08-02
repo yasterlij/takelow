@@ -167,7 +167,7 @@ export class WalletService {
   }
 
   private readonly MAX_PIN_ATTEMPTS = 5;
-  private readonly PIN_LOCKOUT_MINUTES = 30;
+  private readonly PIN_LOCKOUT_MINUTES = 5;
 
   async verifyPin(userId: string, pin: string): Promise<{ valid: boolean; attemptsRemaining: number; locked: boolean; lockedUntil: Date | null }> {
     const user = await this.userRepository.findOne({

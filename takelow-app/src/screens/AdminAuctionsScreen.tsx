@@ -6,6 +6,7 @@ import { Plus, X, Pencil, XCircle, Trash2, Eye, Calendar, ImageIcon, Search, Fil
 import { useApp } from '../AppContext'
 import { api } from '../api'
 import { AppBar, CTAButton, Badge, Card } from '../components/AuctionUI'
+import { usePagination, PaginationBar } from '../components/Pagination'
 import { formatCurrency, formatSpecSummary } from '../mockDataV0'
 import { colors } from '../theme'
 
@@ -172,16 +173,6 @@ export function AdminAuctionsScreen() {
   const [name, setName] = useState('')
   const CATEGORIES = ['Computer', 'Electronics', 'Phone/Tablet', 'Car', 'Machinery']
 const emptySpecs = { storage: '', ram: '', edition: '', battery: '', camera: '', osVersion: '', display: '', chipset: '' }
-const specFields = [
-  { key: 'storage', label: 'Storage' },
-  { key: 'ram', label: 'RAM' },
-  { key: 'edition', label: 'Edition' },
-  { key: 'battery', label: 'Battery' },
-  { key: 'camera', label: 'Camera' },
-  { key: 'osVersion', label: 'OS Version' },
-  { key: 'display', label: 'Display' },
-  { key: 'chipset', label: 'Chipset' },
-] as const
 const [category, setCategory] = useState('Computer')
   const [marketPrice, setMarketPrice] = useState('')
   const [bidFee, setBidFee] = useState('10')
@@ -191,7 +182,7 @@ const [category, setCategory] = useState('Computer')
   const [description, setDescription] = useState('')
   const [highlights, setHighlights] = useState('')
   const [imageUrl, setImageUrl] = useState('')
-  const [specs, setSpecs] = useState(emptySpecs)
+  const [specText, setSpecText] = useState('')
   const [startDate, setStartDate] = useState(new Date())
   const [endDate, setEndDate] = useState(new Date(Date.now() + 7 * 86400000))
   const [showStartPicker, setShowStartPicker] = useState(false)
@@ -204,7 +195,7 @@ const [category, setCategory] = useState('Computer')
   const resetForm = () => {
     setName(''); setCategory('Computer'); setMarketPrice(''); setBidFee('10')
     setMinBid(''); setMaxBid('')
-    setDescription(''); setHighlights(''); setImageUrl(''); setSpecs(emptySpecs)
+    setDescription(''); setHighlights(''); setImageUrl(''); setSpecText('')
     setStartDate(new Date()); setEndDate(new Date(Date.now() + 7 * 86400000))
   }
 
@@ -217,7 +208,7 @@ const [category, setCategory] = useState('Computer')
     setName(a.name); setCategory(a.category); setMarketPrice(String(a.marketPrice))
     setBidFee(String(a.bidFee || 10)); setDescription(a.description); setImageUrl(a.images?.[0] || '')
     setHighlights(Array.isArray(a.highlights) ? a.highlights.join(', ') : '')
-    setSpecs({ ...emptySpecs, ...(a.specs || {}) })
+    setSpecText(Object.keys(emptySpecs).map((key) => (a.specs || {})[key]).filter(Boolean).join(', '))
     setMinBid(a.minBid != null ? String(a.minBid) : '')
     setMaxBid(a.maxBid != null ? String(a.maxBid) : '')
     const end = a.endTime ? new Date(a.endTime) : new Date(Date.now() + 7 * 86400000)
@@ -258,12 +249,13 @@ const [category, setCategory] = useState('Computer')
   }
 
   const handleSubmit = async () => {
-    if (!name || !marketPrice) return
+    if (!name) return
     setSubmitting(true)
     const hl = highlights ? highlights.split(',').map((h) => h.trim()).filter(Boolean) : []
+    const specValues = specText ? specText.split(',').map((s) => s.trim()).filter(Boolean) : []
     const payload = {
-      name, category, marketPrice: Number(marketPrice), description, highlights: hl,
-      specs: Object.fromEntries(Object.entries(specs).filter(([, value]) => value.trim())),
+      name, category, marketPrice: Number(marketPrice || 0), description, highlights: hl,
+      specs: Object.fromEntries(Object.keys(emptySpecs).map((key, i) => [key, specValues[i]]).filter(([, value]) => value)),
       ...(imageUrl ? { images: [imageUrl] } : {}),
     }
     if (editingId) {
@@ -273,6 +265,7 @@ const [category, setCategory] = useState('Computer')
         endTime: endDate.toISOString(),
         minBid: minBid ? Number(minBid) : undefined,
         maxBid: maxBid ? Number(maxBid) : undefined,
+        bidFee: bidFee ? Number(bidFee) : undefined,
       })
     } else {
       await addAuction({
@@ -334,6 +327,7 @@ const [category, setCategory] = useState('Computer')
 
   const activeCount = auctions.filter((a) => a.status === 'live' || a.status === 'ending-soon').length
   const closedCount = auctions.filter((a) => a.status === 'closed').length
+  const { page, setPage, perPage, setPerPage, totalPages, paginated, resetPage } = usePagination(filtered, 10)
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -351,7 +345,7 @@ const [category, setCategory] = useState('Computer')
             <Search size={14} color={colors.mutedForeground} />
             <TextInput
               value={search}
-              onChangeText={setSearch}
+              onChangeText={(t) => { setSearch(t); resetPage() }}
               placeholder="Search auctions..."
               placeholderTextColor={colors.mutedForeground + '80'}
               style={s.searchInput}
@@ -363,7 +357,7 @@ const [category, setCategory] = useState('Computer')
           {['all', 'live', 'ending-soon', 'closed'].map((st) => (
             <TouchableOpacity
               key={st}
-              onPress={() => setStatusFilter(st)}
+              onPress={() => { setStatusFilter(st); resetPage() }}
               style={[s.filterChip, { backgroundColor: statusFilter === st ? colors.navy : colors.card, borderColor: statusFilter === st ? colors.navy : colors.border }]}
             >
               <Text style={{ fontSize: 10, fontWeight: '600', color: statusFilter === st ? colors.navyForeground : colors.mutedForeground }}>
@@ -397,9 +391,8 @@ const [category, setCategory] = useState('Computer')
               <ImagePickerBox value={imageUrl} onChange={setImageUrl} onPreview={() => setShowLightbox(true)} />
             </View>
 
-            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
-              <TextInput value={marketPrice} onChangeText={(t) => setMarketPrice(t.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1').replace(/(\.\d{2})\d+/g, '$1'))} placeholder="Payment" placeholderTextColor={colors.mutedForeground} style={[s.input, { flex: 1 }]} keyboardType="decimal-pad" />
-              <TextInput value={bidFee} onChangeText={(t) => setBidFee(t.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1').replace(/(\.\d{2})\d+/g, '$1'))} placeholder="Bid Amount" placeholderTextColor={colors.mutedForeground} style={[s.input, { flex: 1 }]} keyboardType="decimal-pad" />
+            <View style={{ marginBottom: 12 }}>
+              <TextInput value={bidFee} onChangeText={(t) => setBidFee(t.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1').replace(/(\.\d{2})\d+/g, '$1'))} placeholder="Bid Amount" placeholderTextColor={colors.mutedForeground} style={s.input} keyboardType="decimal-pad" />
             </View>
             <Text style={{ fontSize: 10, fontWeight: '600', color: colors.mutedForeground, marginBottom: 4 }}>Category</Text>
             <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
@@ -430,16 +423,7 @@ const [category, setCategory] = useState('Computer')
             </View>
             <TextInput value={description} onChangeText={setDescription} placeholder="Description" placeholderTextColor={colors.mutedForeground} style={s.input} multiline numberOfLines={2} />
             <TextInput value={highlights} onChangeText={setHighlights} placeholder="Highlights (comma separated)" placeholderTextColor={colors.mutedForeground} style={s.input} />
-            {specFields.map((field) => (
-              <TextInput
-                key={field.key}
-                value={specs[field.key]}
-                onChangeText={(value) => setSpecs((prev) => ({ ...prev, [field.key]: value }))}
-                placeholder={field.label}
-                placeholderTextColor={colors.mutedForeground}
-                style={s.input}
-              />
-            ))}
+            <TextInput value={specText} onChangeText={setSpecText} placeholder="Product specs (comma separated)" placeholderTextColor={colors.mutedForeground} style={s.input} />
             <Text style={{ fontSize: 10, fontWeight: '600', color: colors.mutedForeground, marginBottom: 4 }}>Start</Text>
             <TouchableOpacity style={s.dateBtn} onPress={() => { setStartPickerMode('date'); setShowStartPicker(true) }}>
               <Calendar size={14} color={colors.mutedForeground} />
@@ -456,7 +440,7 @@ const [category, setCategory] = useState('Computer')
             {showEndPicker && (
               <DateTimePicker value={endDate} mode={endPickerMode} display={Platform.OS === 'ios' ? 'spinner' : 'default'} onChange={onEndChange} />
             )}
-            <CTAButton onPress={handleSubmit} disabled={submitting || !name || !marketPrice}>
+            <CTAButton onPress={handleSubmit} disabled={submitting || !name}>
               {submitting ? 'Saving...' : editingId ? 'Update Auction' : 'Create Auction'}
             </CTAButton>
           </Card>
@@ -475,7 +459,7 @@ const [category, setCategory] = useState('Computer')
             )}
           </View>
         ) : (
-          filtered.map((a) => {
+          paginated.map((a) => {
             const bids = allBids.filter((b) => b.auctionId === a.id)
             const bidAmounts = bids.map((b) => b.amount)
             const avgBid = bidAmounts.length > 0 ? Math.round(bidAmounts.reduce((s, v) => s + v, 0) / bidAmounts.length) : 0
@@ -560,6 +544,15 @@ const [category, setCategory] = useState('Computer')
             )
           })
         )}
+
+        <PaginationBar
+          page={page}
+          totalPages={totalPages}
+          totalItems={filtered.length}
+          perPage={perPage}
+          onPageChange={setPage}
+          onPerPageChange={setPerPage}
+        />
       </ScrollView>
 
       <Modal visible={!!showForceCloseConfirm} transparent animationType="fade" onRequestClose={() => setShowForceCloseConfirm(null)}>

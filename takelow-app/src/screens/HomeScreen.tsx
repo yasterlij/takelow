@@ -1,13 +1,14 @@
 import React, { useState, useRef, useCallback } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Modal, Pressable, Dimensions, Image, RefreshControl } from 'react-native'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Modal, Pressable, Dimensions, RefreshControl } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
-import { Gavel, Wallet, ArrowRight, Eye, EyeOff, Shield, LogOut, Sparkles, Trophy, Timer } from 'lucide-react-native'
+import { Gavel, Wallet, ArrowRight, Eye, EyeOff, Shield, LogOut, Sparkles, Trophy } from 'lucide-react-native'
 import { useApp } from '../AppContext'
-import { AwashMark, Badge } from '../components/AuctionUI'
+import { AwashMark } from '../components/AuctionUI'
 import { ImageCarousel } from '../components/ImageCarousel'
 import { colors } from '../theme'
 import { formatCurrency, formatETB, formatCountdown } from '../mockDataV0'
 import { useCountdown } from '../components/Countdown'
+import { AuctionCard } from './AuctionsScreen'
 
 const { width: SCREEN_W } = Dimensions.get('window')
 const CARD_W = (SCREEN_W - 20 * 2 - 12) / 2
@@ -20,11 +21,10 @@ const SCREEN_W_ACTUAL = Dimensions.get('window').width
 const HERO_W = SCREEN_W_ACTUAL * 0.75
 const HERO_H = HERO_W * (3 / 4)
 
-function HeroSlide({ item, onJoin }: { item: any; onJoin: () => void }) {
+function HeroSlide({ item, onJoin, counter }: { item: any; onJoin: () => void; counter?: string }) {
   const t = useCountdown(item.timeLeft)
   const { d, h, m, s } = formatCountdown(t)
   const urgent = item.status === 'ending-soon' || (t > 0 && t < 3600)
-  const savings = Math.round((1 - item.bidFee / item.marketPrice) * 100)
   const publicCode = item.publicCode || item.id.slice(0, 6).toUpperCase()
 
   if (!item.images?.length) {
@@ -55,19 +55,26 @@ function HeroSlide({ item, onJoin }: { item: any; onJoin: () => void }) {
             <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.35)' }]} />
             <View style={{ position: 'absolute', top: 8, left: 10, right: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', zIndex: 10 }}>
               <View style={{ gap: 6 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,43,92,0.75)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' }}>
-                  <Gavel size={12} color="#FFF" />
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#FFF' }}>Live Auction</Text>
-                </View>
-                <View style={{ alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.14)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' }}>
-                  <Text style={{ fontSize: 10, fontWeight: '800', color: '#FFF', letterSpacing: 1 }}>CODE {publicCode}</Text>
-                </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,43,92,0.75)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' }}>
+                <Gavel size={12} color="#FFF" />
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#FFF' }}>Live Auction</Text>
               </View>
+              <View style={{ alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.14)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' }}>
+                <Text style={{ fontSize: 10, fontWeight: '800', color: '#FFF', letterSpacing: 1 }}>CODE {publicCode}</Text>
+              </View>
+            </View>
+            <View style={{ alignItems: 'flex-end', gap: 6 }}>
+              {counter && (
+                <View style={{ backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}>
+                  <Text style={{ fontSize: 10, fontWeight: '800', color: '#FFF', fontVariant: ['tabular-nums'] }}>{counter}</Text>
+                </View>
+              )}
               <View style={{ backgroundColor: urgent ? colors.primary + '30' : 'rgba(255,255,255,0.8)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: urgent ? colors.primary + '40' : 'rgba(255,255,255,0.3)' }}>
                 <Text style={{ fontSize: 11, fontWeight: '800', color: urgent ? colors.primary : colors.awashBlue, fontVariant: ['tabular-nums'] }}>
                   {d !== '00' ? `${parseInt(d)}d ` : ''}{h}:{m}:{s}
                 </Text>
               </View>
+            </View>
             </View>
             <View style={{ position: 'absolute', bottom: 10, left: 10, right: 10, zIndex: 10 }}>
               <Text style={{ color: '#FFF', fontFamily: 'System', fontSize: 18, fontWeight: '800', textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 }}>
@@ -78,12 +85,8 @@ function HeroSlide({ item, onJoin }: { item: any; onJoin: () => void }) {
                 <View style={{ borderRadius: 999, backgroundColor: colors.primary + '33', paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: colors.primary + '40' }}>
                   <Text style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>Bid Amount: {formatCurrency(item.bidFee)}</Text>
                 </View>
-                <Text style={{ color: '#34D399', fontSize: 11, fontWeight: '600', textDecorationLine: 'line-through' }}>{formatCurrency(item.marketPrice)}</Text>
                 <View style={{ backgroundColor: 'rgba(236,253,245,0.92)', borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: 'rgba(167,243,208,0.45)' }}>
                   <Text style={{ color: colors.emerald700, fontSize: 10, fontWeight: '700' }}>{item.totalBids || item.bidders} bidders</Text>
-                </View>
-                <View style={{ backgroundColor: colors.primary + '33', borderRadius: 10, paddingHorizontal: 6, paddingVertical: 2 }}>
-                  <Text style={{ color: colors.primary, fontSize: 10, fontWeight: '700' }}>-{savings}%</Text>
                 </View>
               </View>
               <TouchableOpacity onPress={onJoin} activeOpacity={0.85} style={{ marginTop: 8, borderRadius: 12, overflow: 'hidden' }}>
@@ -139,7 +142,9 @@ export function HomeScreen() {
   const [showBalance, setShowBalance] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const [heroIndex, setHeroIndex] = useState(0)
   const winnerScrollRef = useRef<ScrollView>(null)
+  const heroScrollRef = useRef<ScrollView>(null)
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
@@ -151,6 +156,20 @@ export function HomeScreen() {
   const closedAuctions = auctions.filter((a) => a.status === 'closed')
   const endingSoon = activeAuctions.filter((a) => a.status === 'ending-soon' || a.timeLeft < 3600)
   const displayHero = endingSoon.length > 0 ? endingSoon : activeAuctions
+  const heroCount = displayHero.length
+  const heroSlides = Math.min(heroCount, 5)
+  const allAuctions = [...auctions].sort((a, b) => Number(a.status === 'closed') - Number(b.status === 'closed'))
+
+  const onHeroScroll = useCallback((e: any) => {
+    const x = e.nativeEvent.contentOffset.x
+    const step = HERO_W + 12
+    setHeroIndex(Math.max(0, Math.min(Math.round(x / step), Math.max(heroSlides - 1, 0))))
+  }, [heroSlides])
+
+  const scrollToHero = useCallback((i: number) => {
+    heroScrollRef.current?.scrollTo({ x: i * (HERO_W + 12), animated: true })
+  }, [])
+
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.neutralGray50 }}>
@@ -165,7 +184,9 @@ export function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        <LinearGradient colors={['#003366', '#001F3F']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ marginHorizontal: 16, marginTop: 8, borderRadius: 16, borderWidth: 1, borderColor: colors.primary + '33', padding: 16 }}>
+        <LinearGradient colors={['#003366', '#001F3F']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ marginHorizontal: 16, marginTop: 8, borderRadius: 16, borderWidth: 1, borderColor: colors.primary + '33', padding: 16, overflow: 'hidden' }}>
+          <View style={{ position: 'absolute', top: -40, right: -30, width: 140, height: 140, borderRadius: 70, backgroundColor: colors.primary + '14' }} />
+          <View style={{ position: 'absolute', bottom: -50, left: -40, width: 120, height: 120, borderRadius: 60, backgroundColor: colors.primary + '0D' }} />
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <Wallet size={14} color="#FFF" />
@@ -193,7 +214,7 @@ export function HomeScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}
       >
-        {/* ── Section A: Live Auctions ── */}
+        {/* ── All Auctions ── */}
         <View style={{ paddingHorizontal: 16, paddingTop: 20 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -201,8 +222,8 @@ export function HomeScreen() {
                 <Gavel size={18} color={colors.awashBlue} />
               </View>
               <View>
-                <Text style={{ fontFamily: 'System', fontWeight: '700', fontSize: 17, color: colors.foreground }}>Live Auctions</Text>
-                <Text style={{ fontSize: 11, fontWeight: '500', color: colors.mutedForeground }}>{activeAuctions.length} auctions live now</Text>
+                <Text style={{ fontFamily: 'System', fontWeight: '700', fontSize: 17, color: colors.foreground }}>All Auctions</Text>
+                <Text style={{ fontSize: 11, fontWeight: '500', color: colors.mutedForeground }}>{activeAuctions.length} live · {closedAuctions.length} closed</Text>
               </View>
             </View>
             <TouchableOpacity onPress={() => go('auctions')} activeOpacity={0.85} style={{ borderRadius: 20, overflow: 'hidden' }}>
@@ -214,15 +235,20 @@ export function HomeScreen() {
           </View>
 
           <ScrollView
+            ref={heroScrollRef}
             horizontal
             showsHorizontalScrollIndicator={false}
-            style={{ marginBottom: 16, marginHorizontal: -16, paddingHorizontal: 16 }}
+            style={{ marginBottom: 12, marginHorizontal: -16, paddingHorizontal: 16 }}
+            onScroll={onHeroScroll}
+            scrollEventThrottle={16}
+            snapToInterval={HERO_W + 12}
+            decelerationRate="fast"
           >
             {auctionsLoading ? (
               <View style={{ width: HERO_W, height: HERO_H, borderRadius: 16, backgroundColor: colors.neutralGray200, marginRight: 12 }} />
             ) : displayHero.length > 0 ? (
-              displayHero.slice(0, 5).map((a) => (
-                <HeroSlide key={a.id} item={a} onJoin={() => selectAuction(a.id)} />
+              displayHero.slice(0, 5).map((a, i) => (
+                <HeroSlide key={a.id} item={a} onJoin={() => selectAuction(a.id)} counter={`${i + 1} / ${heroSlides}`} />
               ))
             ) : (
               <View style={{ width: SCREEN_W - 32, height: 140, borderRadius: 16, borderWidth: 2, borderColor: 'rgba(0,0,0,0.08)', borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.6)' }}>
@@ -232,75 +258,37 @@ export function HomeScreen() {
             )}
           </ScrollView>
 
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-            {auctionsLoading
-              ? [1, 2, 3, 4].map((i) => (
-                  <View key={i} style={{ width: CARD_W, height: CARD_W * 0.75, borderTopLeftRadius: 16, borderTopRightRadius: 16, backgroundColor: colors.neutralGray200 }} />
-                ))
-              : activeAuctions.slice(0, 4).map((a) => {
-                  const urgent = a.status === 'ending-soon' || (a.timeLeft > 0 && a.timeLeft < 3600)
-                  return (
-                    <TouchableOpacity key={a.id} onPress={() => selectAuction(a.id)} activeOpacity={0.85} style={s.card}>
-                      <View style={s.cardImgOuter}>
-                        {a.images?.[0] ? (
-                          <Image source={{ uri: a.images[0] }} style={s.cardImgWrap} resizeMode="cover" />
-                        ) : (
-                          <View style={[s.cardImgWrap, { backgroundColor: colors.neutralGray100 }]} />
-                        )}
-                        <LinearGradient
-                          colors={['rgba(0,43,92,0.06)', 'transparent', 'rgba(200,166,66,0.05)']}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 1 }}
-                          style={StyleSheet.absoluteFill}
-                          pointerEvents="none"
-                        />
-                        {a.images?.length > 1 && (
-                          <View style={{ position: 'absolute', top: 6, right: 6, flexDirection: 'row', gap: 2 }}>
-                            {a.images.slice(0, 3).map((_: string, i: number) => (
-                              <View key={i} style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: i === 0 ? '#FFF' : 'rgba(255,255,255,0.4)' }} />
-                            ))}
-                          </View>
-                        )}
-                        <View style={s.cardImgTop}>
-                          {urgent ? (
-                            <Badge tone="gold"><Timer size={10} /> Ending Soon</Badge>
-                          ) : (
-                            <Badge tone="green">Live</Badge>
-                          )}
-                          <View style={s.codeBadge}><Text style={s.codeBadgeText}>{a.publicCode || a.id.slice(0, 6).toUpperCase()}</Text></View>
-                        </View>
-                      </View>
-                      <View style={{ padding: 10, gap: 6 }}>
-                        <Text style={s.cardName} numberOfLines={1}>{a.name}</Text>
-                        {a.specSummary ? <Text style={s.cardSpec} numberOfLines={1}>{a.specSummary}</Text> : null}
-                        <Text style={{ fontSize: 9, fontWeight: '500', color: colors.mutedForeground, textDecorationLine: 'line-through' }}>
-                          {formatCurrency(a.marketPrice)}
-                        </Text>
-                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-                          <View style={s.feeTag}><Text style={s.feeTagText}>Service Fee: {formatCurrency(a.bidFee)}</Text></View>
-                          <View style={s.bidderBadge}>
-                            <Text style={s.bidderBadgeText}>{a.totalBids || a.bidders} bidders</Text>
-                          </View>
-                        </View>
-                        <View style={s.viewSpecsBar}><Text style={s.viewSpecsText}>View more specs</Text></View>
-                        <View style={{ alignItems: 'center', marginTop: 2 }}>
-                          <CountdownPill seconds={a.timeLeft} urgent={urgent} />
-                        </View>
-                      </View>
-                    </TouchableOpacity>
-                  )
-                })}
-          </View>
-
-          {activeAuctions.length > 4 && (
-            <TouchableOpacity onPress={() => go('auctions')} activeOpacity={0.85} style={{ marginTop: 12, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: colors.primary + '50' }}>
-              <LinearGradient colors={['#C8A642', '#D4B85E', '#C8A642']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ paddingVertical: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
-                <Sparkles size={14} color={colors.primaryForeground} />
-                <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primaryForeground }}>View All Live Auctions</Text>
-                <ArrowRight size={14} color={colors.primaryForeground} />
-              </LinearGradient>
-            </TouchableOpacity>
+          {!auctionsLoading && displayHero.length > 1 && (
+            <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              {displayHero.slice(0, 5).map((a, i) => (
+                <TouchableOpacity key={a.id} onPress={() => scrollToHero(i)} activeOpacity={0.7}>
+                  <View
+                    style={{
+                      width: i === heroIndex ? 22 : 6,
+                      height: 6,
+                      borderRadius: 3,
+                      backgroundColor: i === heroIndex ? colors.primary : colors.neutralGray300,
+                    }}
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
           )}
+
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+            {auctionsLoading && auctions.length === 0 ? (
+              [1, 2, 3, 4].map((i) => (
+                <View key={i} style={{ width: CARD_W, height: CARD_W * 0.75, borderTopLeftRadius: 16, borderTopRightRadius: 16, backgroundColor: colors.neutralGray200 }} />
+              ))
+            ) : auctions.length > 0 ? (
+              allAuctions.map((a) => <AuctionCard key={a.id} auction={a} onOpen={() => selectAuction(a.id)} />)
+            ) : (
+              <View style={{ width: '100%', borderRadius: 16, borderWidth: 2, borderColor: 'rgba(0,0,0,0.08)', borderStyle: 'dashed', paddingVertical: 40, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.6)' }}>
+                <Gavel size={28} color={colors.neutralGray300} />
+                <Text style={{ fontSize: 13, fontWeight: '500', color: colors.neutralGray400, marginTop: 6 }}>No auctions yet</Text>
+              </View>
+            )}
+          </View>
         </View>
 
         {/* ── Section B: Winners ── */}
@@ -345,14 +333,22 @@ export function HomeScreen() {
 
         {/* ── Promo ── */}
         <View style={{ paddingHorizontal: 16, paddingTop: 24 }}>
-          <LinearGradient colors={['#002B5C', '#001A3A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ borderRadius: 16, padding: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }}>
+          <LinearGradient colors={['#002B5C', '#001A3A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ borderRadius: 16, padding: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+            <View style={{ position: 'absolute', top: -50, right: -30, width: 160, height: 160, borderRadius: 80, backgroundColor: colors.primary + '12' }} />
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Sparkles size={16} color={colors.primary} />
+              <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: colors.primary + '20', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.primary + '40' }}>
+                <Sparkles size={13} color={colors.primary} />
+              </View>
               <Text style={{ fontFamily: 'System', fontWeight: '700', fontSize: 12, color: colors.primary }}>Awash Bank Reverse Auction</Text>
             </View>
             <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', marginTop: 8, lineHeight: 18 }}>
-              Premium phones, TVs, and laptops waiting for their lowest unique bid.
+              Premium phones, TVs, and laptops waiting for their lowest unique bid. The lower your bid, the better your chance to win.
             </Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 10 }}>
+              <Text style={{ fontSize: 10, fontWeight: '700', color: 'rgba(255,255,255,0.6)' }}>{activeAuctions.length} live auctions</Text>
+              <Text style={{ fontSize: 10, fontWeight: '700', color: 'rgba(255,255,255,0.6)' }}>{closedAuctions.length} winners crowned</Text>
+              <Text style={{ fontSize: 10, fontWeight: '700', color: 'rgba(255,255,255,0.6)' }}>Lowest unique bid wins</Text>
+            </View>
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
               <TouchableOpacity onPress={() => go('auctions')} activeOpacity={0.85} style={{ flex: 1, borderRadius: 10, overflow: 'hidden' }}>
                 <LinearGradient colors={['#C8A642', '#D4B85E', '#C8A642']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ paddingVertical: 10, alignItems: 'center' }}>
@@ -400,18 +396,6 @@ export function HomeScreen() {
   )
 }
 
-function CountdownPill({ seconds, urgent }: { seconds: number; urgent: boolean }) {
-  const t = useCountdown(seconds)
-  const { d, h, m, s: secs } = formatCountdown(t)
-  return (
-    <View style={[s.timePill, { backgroundColor: urgent ? colors.primary + '20' : colors.awashBlue }]}>
-      <Text style={[s.timePillText, { color: urgent ? colors.primary : '#FFF' }]}>
-        {d !== '00' ? `${parseInt(d)}d ` : ''}{h}:{m}:{secs}
-      </Text>
-    </View>
-  )
-}
-
 const s = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
   dropdown: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(255,255,255,0.92)', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 40, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.2, shadowRadius: 24, elevation: 20 },
@@ -421,32 +405,4 @@ const s = StyleSheet.create({
   menuName: { fontSize: 16, fontWeight: '700', color: colors.foreground },
   menuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 14 },
   menuItemText: { fontSize: 14, fontWeight: '600', color: colors.foreground },
-  card: {
-    width: CARD_W,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.06)',
-    backgroundColor: 'rgba(255,255,255,0.75)',
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  cardImgOuter: { width: '100%', height: CARD_W * 0.75, position: 'relative' },
-  cardImgWrap: { width: '100%', height: '100%' },
-  cardImgTop: { position: 'absolute', top: 8, left: 8, right: 8, flexDirection: 'row', justifyContent: 'space-between' },
-  codeBadge: { borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.92)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)', paddingHorizontal: 8, paddingVertical: 4 },
-  codeBadgeText: { fontSize: 9, fontWeight: '800', color: colors.awashBlue, letterSpacing: 1 },
-  cardSpec: { fontSize: 10, fontWeight: '500', color: colors.mutedForeground },
-  feeTag: { borderRadius: 999, backgroundColor: colors.primary + '14', borderWidth: 1, borderColor: colors.primary + '33', paddingHorizontal: 8, paddingVertical: 4 },
-  feeTagText: { fontSize: 10, fontWeight: '700', color: colors.primary },
-  bidderBadge: { borderRadius: 16, backgroundColor: colors.emerald50, paddingHorizontal: 8, paddingVertical: 4 },
-  bidderBadgeText: { fontSize: 10, fontWeight: '700', color: colors.emerald700 },
-  cardName: { fontSize: 13, fontWeight: '700', color: colors.foreground },
-  viewSpecsBar: { marginTop: 2, borderRadius: 10, backgroundColor: colors.awashBlue + '0D', paddingVertical: 6, paddingHorizontal: 8, alignItems: 'center' },
-  viewSpecsText: { fontSize: 9, fontWeight: '700', color: colors.awashBlue, textTransform: 'uppercase', letterSpacing: 1 },
-  timePill: { flexDirection: 'row', alignItems: 'center', gap: 2, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 3 },
-  timePillText: { fontSize: 10, fontWeight: '800', fontVariant: ['tabular-nums'] },
 })

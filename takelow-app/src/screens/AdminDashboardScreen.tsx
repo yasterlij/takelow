@@ -1,9 +1,9 @@
 import React from 'react'
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native'
-import { Gavel, Users, TrendingUp, DollarSign, Clock, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react-native'
+import { Gavel, Users, TrendingUp, DollarSign, Clock, CheckCircle2, XCircle, AlertTriangle, Radio, Eye, ArrowUpRight } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { CTAButton, Badge, Card } from '../components/AuctionUI'
-import { formatCurrency, formatETB } from '../mockDataV0'
+import { formatCurrency } from '../mockDataV0'
 import { colors } from '../theme'
 
 export function AdminDashboardScreen() {
@@ -72,6 +72,38 @@ export function AdminDashboardScreen() {
           </Card>
         )}
 
+        {active.length > 0 && (
+          <Card style={s2.section}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Radio size={14} color={colors.emerald600} />
+                <Text style={s2.sectionTitle}>Monitor Live ({active.length})</Text>
+              </View>
+              <TouchableOpacity onPress={() => go('admin-monitor')} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>Monitor Live</Text>
+                <ArrowUpRight size={12} color={colors.primary} />
+              </TouchableOpacity>
+            </View>
+            {active.slice(0, 5).map((a) => (
+              <TouchableOpacity key={a.id} onPress={() => go('admin-monitor')} activeOpacity={0.7}>
+                <View style={s2.auctionRow}>
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={s2.auctionName}>{a.name}</Text>
+                      <Badge tone={a.status === 'ending-soon' ? 'orange' : 'green'}>{a.status === 'ending-soon' ? 'Ending' : 'Live'}</Badge>
+                    </View>
+                    <Text style={s2.auctionMeta}>
+                      {a.totalBids || a.bidders} bids · {a.uniqueBidders} bidders
+                      {a.maxBid ? ` · max ${a.maxBid}` : ''}
+                    </Text>
+                  </View>
+                  <Eye size={14} color={colors.mutedForeground} />
+                </View>
+              </TouchableOpacity>
+            ))}
+          </Card>
+        )}
+
         <Card style={s2.section}>
           <Text style={s2.sectionTitle}>All Auctions ({auctions.length})</Text>
           {auctions.slice(0, 10).map((a) => {
@@ -101,7 +133,7 @@ export function AdminDashboardScreen() {
         </Card>
 
         <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
-          <View style={{ flex: 1 }}><CTAButton variant="navy" onPress={() => go('admin-auctions')}>Manage Auctions</CTAButton></View>
+          <View style={{ flex: 1 }}><CTAButton variant="navy" onPress={() => go('admin-monitor')}>Monitor Live</CTAButton></View>
           <View style={{ flex: 1 }}><CTAButton variant="outline" onPress={() => go('admin-users')}>Manage Users</CTAButton></View>
         </View>
         <View style={{ marginTop: 12, flexDirection: 'row', gap: 12 }}>

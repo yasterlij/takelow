@@ -4,7 +4,7 @@ import { Trophy, CreditCard, PartyPopper, AlertTriangle, Users, Clock, ImageIcon
 import { useApp } from '../AppContext'
 import { CTAButton, Card } from '../components/AuctionUI'
 import { api, type ApiWinnerResult, type ApiAuctionResult } from '../api'
-import { formatCurrency, formatETB } from '../mockDataV0'
+import { formatCurrency } from '../mockDataV0'
 import { colors } from '../theme'
 
 export function WinnerScreen() {
@@ -40,8 +40,6 @@ export function WinnerScreen() {
 
   if (!auction) return null
 
-  const savings = winner?.winning_bid_amount != null ? (auction.marketPrice - winner.winning_bid_amount) : 0
-  const savingsPct = auction.marketPrice > 0 ? Math.round((savings / auction.marketPrice) * 100) : 0
   const winnerPhone = winner?.winner_phone || null
   const maskPhone = (p: string | null) => p ? p.slice(0, 4) + 'XXXX' + p.slice(-2) : null
   const maskedPhone = winnerPhone ? maskPhone(winnerPhone) : null
@@ -106,7 +104,7 @@ export function WinnerScreen() {
                 </View>
               )}
 
-              {winner.winner_user_id && (
+              {(winner.winner_user_id || winner.winning_bid_amount != null) && (
                 <Card style={{ width: '100%', maxWidth: 320, padding: 20, marginTop: 24 }}>
                   <View style={{ alignItems: 'center' }}>
                     <View style={s.productImageWrap}>
@@ -149,15 +147,6 @@ export function WinnerScreen() {
                       </Text>
                     </View>
                   )}
-                  <View style={s.divider} />
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={{ fontSize: 13, color: colors.navy }}>Payment</Text>
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: colors.mutedForeground, textDecorationLine: 'line-through' }}>{formatETB(auction.marketPrice ?? 0)}</Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
-                    <Text style={{ fontSize: 13, color: colors.navy }}>Amount Saved</Text>
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: colors.emerald600 }}>{formatETB(savings)} ({savingsPct}%)</Text>
-                  </View>
                 </Card>
               )}
 
@@ -397,6 +386,5 @@ const s = StyleSheet.create({
   winningBidBox: { borderRadius: 12, backgroundColor: colors.accent, paddingVertical: 12, paddingHorizontal: 20, alignItems: 'center', marginTop: 16 },
   winLabel: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1, color: colors.mutedForeground },
   winAmount: { fontSize: 28, fontWeight: '800', color: colors.primary, fontVariant: ['tabular-nums'] },
-  divider: { height: 1, backgroundColor: colors.border, marginVertical: 12 },
   bottomCta: { borderTopWidth: 1, borderTopColor: colors.border, padding: 16 },
 })

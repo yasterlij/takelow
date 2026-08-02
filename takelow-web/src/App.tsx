@@ -133,7 +133,7 @@ function Navbar() {
               {user?.name || user?.phone}
             </span>
             <button
-              onClick={logout}
+              onClick={() => logout()}
               className="hidden sm:flex items-center gap-1.5 rounded-lg border border-border/60 bg-white/50 backdrop-blur-sm px-3 py-1.5 text-xs font-medium text-neutral-500 transition-all duration-300 hover:bg-red-50 hover:border-red-200 hover:text-red-600 hover:shadow-sm"
             >
               <LogOut className="size-3.5" />

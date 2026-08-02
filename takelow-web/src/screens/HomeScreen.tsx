@@ -1,146 +1,138 @@
-import { useState, useRef, useEffect } from "react"
-import { motion } from "framer-motion"
-import { Gavel, Wallet, ArrowRight, Eye, EyeOff, Trophy, Timer, Sparkles, ChevronLeft, ChevronRight, TrendingDown, Users } from "lucide-react"
+import { useState, useRef, useEffect, useCallback } from "react"
+import { AnimatePresence, motion } from "framer-motion"
+import { Gavel, Wallet, ArrowRight, Eye, EyeOff, Trophy, Sparkles, ChevronLeft, ChevronRight, TrendingDown, Users, Flame } from "lucide-react"
 import { useApp } from "../AppContext"
-import { CURRENCY, formatCurrency, formatETB, formatCountdown } from "../mockDataV0"
+import { formatCurrency, formatCountdown } from "../mockDataV0"
 import { useCountdown } from "../components/Countdown"
-import { ImageCarousel } from "../components/ImageCarousel"
+import { AuctionCard, SkeletonCard } from "./AuctionsScreen"
 
 
 function maskPhone(p: string | null): string | null {
   return p ? p.slice(0, 4) + "XXXX" + p.slice(-2) : null
 }
 
-function useCountdownInternal(seconds: number) {
-  const [remaining, setRemaining] = useState(seconds)
+function FeaturedHero({ auctions, onJoin }: { auctions: any[]; onJoin: (id: string) => void }) {
+  const [index, setIndex] = useState(0)
+  const [paused, setPaused] = useState(false)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const total = auctions.length
+  const safeIndex = total === 0 ? 0 : Math.min(index, total - 1)
+  const auction = auctions[safeIndex]
+
+  const goTo = useCallback((i: number) => {
+    setIndex(((i % total) + total) % total)
+  }, [total])
+
+  const next = useCallback(() => setIndex((i) => (i + 1) % total), [total])
+  const prev = useCallback(() => setIndex((i) => (i - 1 + total) % total), [total])
+
   useEffect(() => {
-    if (remaining <= 0) return
-    const id = setInterval(() => setRemaining((p) => (p <= 1 ? (clearInterval(id), 0) : p - 1)), 1000)
-    return () => clearInterval(id)
-  }, [remaining])
-  const hrs = Math.floor(remaining / 3600)
-  const mins = Math.floor((remaining % 3600) / 60)
-  const secs = remaining % 60
-  return { d: "0", h: String(hrs).padStart(2, "0"), m: String(mins).padStart(2, "0"), s: String(secs).padStart(2, "0") }
-}
+    if (paused || total <= 1) return
+    timerRef.current = setTimeout(next, 6000)
+    return () => { if (timerRef.current) clearTimeout(timerRef.current) }
+  }, [index, paused, total, next])
 
-function HeroAuctionSlide({ auction, onJoin }: { auction: any; onJoin: () => void }) {
-  const t = useCountdown(auction.timeLeft)
+  const t = useCountdown(auction?.timeLeft ?? 0)
   const { d, h, m, s } = formatCountdown(t)
-  const urgent = auction.status === "ending-soon" || (t > 0 && t < 3600)
-  const publicCode = auction.publicCode || auction.productId || auction.id.slice(0, 6).toUpperCase()
+  const urgent = auction?.status === "ending-soon" || (t > 0 && t < 3600)
+  const publicCode = auction?.publicCode || auction?.productId || auction?.id?.slice(0, 6).toUpperCase()
 
-  if (!auction.images?.length) {
-    return (
-      <div className="relative h-full w-full flex items-center justify-center bg-gradient-to-br from-awash-blue via-awash-blue-dark to-[#001224]">
-        <div className="text-center">
-          <Gavel className="mx-auto size-12 text-white/20" />
-          <p className="mt-2 text-sm font-medium text-white/40">{auction.name}</p>
-        </div>
-      </div>
-    )
-  }
+  if (total === 0 || !auction) return null
 
   return (
-    <ImageCarousel
-      images={auction.images}
-      alt={auction.name}
-      aspectRatio="aspect-[4/3]"
-      autoPlayInterval={5000}
-      overlay={
-        <div className="absolute inset-0 z-20 bg-gradient-to-t from-black/80 via-black/10 to-transparent pointer-events-none">
-          <div className="absolute inset-0 flex flex-col justify-between p-5">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex flex-col gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-awash-blue/70 backdrop-blur-md px-3 py-1.5 text-xs font-bold text-white border border-white/10 pointer-events-auto">
-                  <Gavel className="size-3" /> Live Auction
-                </span>
-                <span className="inline-flex items-center rounded-full bg-white/14 backdrop-blur-md px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-white border border-white/10 pointer-events-auto">
-                  Code {publicCode}
-                </span>
+    <div
+      className="group relative h-full w-full overflow-hidden rounded-3xl shadow-[0_20px_60px_rgba(0,43,92,0.25)] ring-1 ring-awash-blue/10"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+    >
+      <div className="absolute inset-0">
+        <AnimatePresence mode="sync">
+          <motion.div
+            key={auction.id}
+            initial={{ opacity: 0, scale: 1.05 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 1.02 }}
+            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+            className="absolute inset-0"
+          >
+            {auction.images?.length ? (
+              <img src={auction.images[0]} alt={auction.name} className="h-full w-full object-cover" loading="eager" decoding="async" />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-awash-blue via-awash-blue-dark to-[#001224]">
+                <Gavel className="size-14 text-white/20" />
               </div>
-              <span className={`inline-flex items-center gap-1.5 rounded-full backdrop-blur-md px-3 py-1.5 text-xs font-bold tabular-nums border pointer-events-auto ${urgent ? "bg-primary/20 text-primary border-primary/30 animate-glow-pulse" : "bg-white/70 text-awash-blue border-white/20"}`}>
-                {d !== "00" ? `${parseInt(d)}d ` : ""}{h}:{m}:{s}
-              </span>
-            </div>
-            <div className="translate-y-0 transition-transform duration-300 group-hover:-translate-y-1">
-              <h3 className="font-display text-xl font-extrabold text-white drop-shadow-lg">{auction.name}</h3>
-              {auction.specSummary && <p className="mt-1 text-sm font-semibold text-white/80">{auction.specSummary}</p>}
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center rounded-full bg-awash-gold/20 px-3 py-1 text-[11px] font-bold text-awash-gold-light border border-awash-gold/25">
-                  Bid Amount: {formatCurrency(auction.bidFee)}
-                </span>
-                <span className="text-xs font-bold text-emerald-300 line-through">{formatCurrency(auction.marketPrice)}</span>
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100/90 px-2.5 py-1 text-[10px] font-bold text-emerald-700 border border-emerald-300/40">
-                  <Users className="size-3" /> {auction.totalBids || auction.bidders} bidders
-                </span>
-              </div>
-              <div className="mt-3 flex items-center justify-between gap-3">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/70">View more specs</span>
-                <button onClick={onJoin} className="auction-hero-btn pointer-events-auto">
-                  Join Auction
-                </button>
-              </div>
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-black/10" />
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      <div className="relative z-10 flex h-full flex-col justify-between p-6 sm:p-8">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-col gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-awash-gold/20 px-3 py-1.5 text-xs font-bold text-awash-gold-light border border-awash-gold/30 backdrop-blur-md">
+              <Flame className="size-3.5" /> Featured
+            </span>
+            <span className="inline-flex items-center rounded-full bg-white/14 backdrop-blur-md px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-white border border-white/10">
+              Code {publicCode}
+            </span>
+          </div>
+          <span className={`inline-flex items-center gap-1.5 rounded-full backdrop-blur-md px-3 py-1.5 text-xs font-bold tabular-nums border ${urgent ? "bg-primary/25 text-primary border-primary/40 animate-glow-pulse" : "bg-white/70 text-awash-blue border-white/20"}`}>
+            {d !== "00" ? `${parseInt(d)}d ` : ""}{h}:{m}:{s}
+          </span>
+        </div>
+
+        <div>
+          <h2 className="font-display text-2xl font-extrabold text-white drop-shadow-lg sm:text-3xl">{auction.name}</h2>
+          {auction.specSummary && <p className="mt-1.5 text-sm font-semibold text-white/85 sm:text-base">{auction.specSummary}</p>}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center rounded-full bg-awash-gold/20 px-3 py-1.5 text-xs font-bold text-awash-gold-light border border-awash-gold/30">
+              Bid Amount: {formatCurrency(auction.bidFee)}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-bold text-emerald-700 border border-emerald-300/40">
+              <Users className="size-3.5" /> {auction.totalBids || auction.bidders} bidders
+            </span>
+          </div>
+          <div className="mt-5 flex flex-wrap items-center gap-4">
+            <button onClick={() => onJoin(auction.id)} className="auction-hero-btn !w-auto px-7">
+              Join Auction <ArrowRight className="size-4" />
+            </button>
+            <div className="flex items-center gap-2">
+              {auctions.map((a, i) => (
+                <button
+                  key={a.id}
+                  onClick={() => goTo(i)}
+                  aria-label={`Show auction ${i + 1}`}
+                  className={`h-2 rounded-full transition-all duration-500 ${i === index ? "w-8 bg-awash-gold shadow-[0_0_10px_rgba(200,166,66,0.6)]" : "w-2 bg-white/40 hover:bg-white/70"}`}
+                />
+              ))}
+              <span className="ml-1 text-[11px] font-bold tabular-nums text-white/60">{index + 1} / {total}</span>
             </div>
           </div>
         </div>
-      }
-    />
-  )
-}
-
-function ActiveAuctionCard({ auction, onSelect }: { auction: any; onSelect: () => void }) {
-  const t = useCountdownInternal(auction.timeLeft)
-  const urgent = auction.status === "ending-soon" || (auction.timeLeft > 0 && auction.timeLeft < 3600)
-  const publicCode = auction.publicCode || auction.productId || auction.id.slice(0, 6).toUpperCase()
-
-  return (
-    <button onClick={onSelect} className="group flex w-[240px] flex-shrink-0 snap-start flex-col overflow-hidden rounded-2xl border border-border/60 bg-white shadow-[0_4px_20px_rgba(0,43,92,0.04)] text-left transition-all duration-500 hover:-translate-y-2 hover:border-primary/20 hover:shadow-[0_16px_48px_rgba(200,166,66,0.12)] active:scale-[0.98]">
-      <div className="relative aspect-[4/3] w-full overflow-hidden bg-gradient-to-br from-awash-blue/10 via-neutral-100 to-awash-gold/10 ring-1 ring-awash-blue/10">
-        {auction.images?.[0] ? (
-          <img src={auction.images[0]} alt={auction.name} loading="lazy" decoding="async" className="h-full w-full object-cover transition-all duration-700 group-hover:scale-110 group-hover:rotate-[2deg]" />
-        ) : (
-          <div className="flex h-full items-center justify-center bg-neutral-100"><Gavel className="size-8 text-neutral-300" /></div>
-        )}
-        {auction.images?.length > 1 && (
-          <div className="absolute top-2 right-2 z-10 flex gap-1">
-            {auction.images.slice(0, 3).map((_: string, i: number) => (
-              <div key={i} className={`size-1.5 rounded-full ${i === 0 ? "bg-white" : "bg-white/40"}`} />
-            ))}
-          </div>
-        )}
-        <div className="absolute inset-x-0 top-0 flex items-start justify-between p-2">
-          {urgent ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-primary/80 backdrop-blur-sm px-2 py-1 text-[10px] font-bold text-white border border-primary/30"><Timer className="size-3" /> Ending Soon</span>
-          ) : (
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600/80 backdrop-blur-sm px-2 py-1 text-[10px] font-bold text-white border border-emerald-400/30">Live</span>
-          )}
-          <span className="inline-flex items-center rounded-full bg-white/90 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.18em] text-awash-blue border border-white/50">
-            {publicCode}
-          </span>
-        </div>
       </div>
-      <div className="flex flex-col gap-2 p-3">
-        <h3 className="truncate font-display text-sm font-bold text-foreground">{auction.name}</h3>
-        {auction.specSummary && <p className="truncate text-[10px] font-medium text-neutral-500">{auction.specSummary}</p>}
-        <p className="text-[10px] font-medium text-neutral-400 line-through">{formatCurrency(auction.marketPrice)}</p>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center rounded-full bg-awash-gold/10 px-2.5 py-1 text-[10px] font-bold text-awash-gold-dark border border-primary/20">
-            Bid Amount: {formatCurrency(auction.bidFee)}
-          </span>
-          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50/80 backdrop-blur-sm px-2 py-1 border border-emerald-200/50">
-            <Users className="size-3 text-emerald-700" />
-            <span className="text-[10px] font-bold text-emerald-700">{auction.totalBids || auction.bidders} bidders</span>
-          </span>
-        </div>
-        <div className="mt-1 rounded-xl bg-awash-blue/5 px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-[0.18em] text-awash-blue/80">View more specs</div>
-        <div className="flex justify-center pt-1">
-          <span className={`countdown-pill ${urgent ? "bg-primary/20 text-awash-gold border border-primary/30" : "bg-awash-blue/80 text-white border border-white/10"}`}>
-            {t.d !== "00" ? `${parseInt(t.d)}d ` : ""}{t.h}:{t.m}:{t.s}
-          </span>
-        </div>
+
+      <div className="absolute inset-y-0 left-2 flex items-center z-20">
+        <button onClick={prev} aria-label="Previous featured auction" className="hidden sm:flex size-9 items-center justify-center rounded-full bg-black/30 text-white backdrop-blur-md border border-white/15 opacity-0 group-hover:opacity-100 transition-opacity duration-300 hover:bg-black/50">
+          <ChevronLeft className="size-5" />
+        </button>
       </div>
-    </button>
+      <div className="absolute inset-y-0 right-2 flex items-center z-20">
+        <button onClick={next} aria-label="Next featured auction" className="hidden sm:flex size-9 items-center justify-center rounded-full bg-black/30 text-white backdrop-blur-md border border-white/15 opacity-0 group-hover:opacity-100 transition-opacity duration-300 hover:bg-black/50">
+          <ChevronRight className="size-5" />
+        </button>
+      </div>
+
+      <div className="absolute bottom-0 left-0 right-0 z-10 h-1 bg-white/10">
+        <motion.div
+          key={`${auction.id}-${index}`}
+          className="h-full bg-gradient-to-r from-awash-gold to-awash-gold-light"
+          initial={{ width: "0%" }}
+          animate={{ width: "100%" }}
+          transition={{ duration: paused ? 60 : 6, ease: "linear" }}
+        />
+      </div>
+    </div>
   )
 }
 
@@ -207,16 +199,15 @@ function WinnerShowcaseSlide({ auction, index }: { auction: any; index: number }
 }
 
 export function HomeScreen() {
-  const { go, walletBalance, user, auctions, auctionsLoading, selectAuction } = useApp()
+  const { go, walletBalance, auctions, auctionsLoading, selectAuction } = useApp()
   const [showBalance, setShowBalance] = useState(true)
-  const heroScrollRef = useRef<HTMLDivElement>(null)
-  const auctionScrollRef = useRef<HTMLDivElement>(null)
   const winnerScrollRef = useRef<HTMLDivElement>(null)
 
   const activeAuctions = auctions.filter((a) => a.status !== "closed")
   const closedAuctions = auctions.filter((a) => a.status === "closed")
   const endingSoon = activeAuctions.filter((a) => a.status === "ending-soon" || a.timeLeft < 3600)
   const displayHero = endingSoon.length > 0 ? endingSoon : activeAuctions
+  const allAuctions = [...auctions].sort((a, b) => Number(a.status === "closed") - Number(b.status === "closed"))
 
   const scroll = (ref: React.RefObject<HTMLDivElement | null>, dir: "left" | "right", amount: number) => {
     ref.current?.scrollBy({ left: dir === "left" ? -amount : amount, behavior: "smooth" })
@@ -230,10 +221,11 @@ export function HomeScreen() {
       className="flex flex-1 flex-col gap-8 pb-8 stagger-enter"
     >
       {/* ── Wallet Banner ── */}
-      <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-awash-blue via-awash-blue-dark to-[#001224] p-6 shadow-[0_8px_32px_rgba(0,43,92,0.2)] relative overflow-hidden">
+      <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-awash-blue via-awash-blue-dark to-[#001224] p-6 shadow-[0_8px_32px_rgba(0,43,92,0.2)]">
         <div className="absolute top-0 right-0 w-64 h-64 bg-awash-gold/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
         <div className="absolute bottom-0 left-0 w-48 h-48 bg-awash-gold/5 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
-        <div className="flex items-center justify-between relative z-10">
+        <div className="absolute -top-8 -right-8 size-40 rounded-full border-[10px] border-white/[0.03]" />
+        <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <div className="flex size-12 items-center justify-center rounded-xl bg-white/10 backdrop-blur-sm border border-white/10">
               <Wallet className="size-6 text-awash-gold" />
@@ -256,14 +248,14 @@ export function HomeScreen() {
         </div>
       </div>
 
-      {/* ── Section A: Live Auctions ── */}
+      {/* ── All Auctions ── */}
       <section>
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <span className="flex size-11 items-center justify-center rounded-xl bg-awash-blue/10 backdrop-blur-sm border border-awash-blue/20 text-awash-blue"><Gavel className="size-5" /></span>
             <div>
-              <h2 className="font-display text-xl font-extrabold tracking-tight text-foreground">Live Auctions</h2>
-              <p className="text-sm font-medium text-neutral-500">{activeAuctions.length} auctions live now — bid low, be unique!</p>
+              <h2 className="font-display text-xl font-extrabold tracking-tight text-foreground">All Auctions</h2>
+              <p className="text-sm font-medium text-neutral-500">{activeAuctions.length} live · {closedAuctions.length} closed — bid low, be unique!</p>
             </div>
           </div>
           <button onClick={() => go("auctions")} className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-bold text-primary-foreground transition-all hover:bg-primary/90 hover:shadow-md hover:shadow-primary/30 hover:scale-105 active:scale-[0.97]">
@@ -272,40 +264,26 @@ export function HomeScreen() {
         </div>
 
         {displayHero.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mb-6">
-            {displayHero.slice(0, 3).map((a) => (
-              <div key={a.id} className="overflow-hidden rounded-2xl shadow-lg transition-all duration-500 hover:shadow-[0_16px_48px_rgba(200,166,66,0.15)] hover:-translate-y-1">
-                <HeroAuctionSlide auction={a} onJoin={() => selectAuction(a.id)} />
-              </div>
+          <div className="mb-6 aspect-[16/9] sm:aspect-[21/9]">
+            <FeaturedHero auctions={displayHero.slice(0, 5)} onJoin={(id) => selectAuction(id)} />
+          </div>
+        )}
+
+        {auctionsLoading && auctions.length === 0 ? (
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+            {[1, 2, 3, 4, 5, 6].map((i) => <SkeletonCard key={i} />)}
+          </div>
+        ) : auctions.length > 0 ? (
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+            {allAuctions.map((a, i) => (
+              <AuctionCard key={a.id} auction={a} index={i} onOpen={() => selectAuction(a.id)} />
             ))}
           </div>
-        )}
-
-        {activeAuctions.length > 0 && (
-          <div className="relative">
-            {activeAuctions.length > 4 && (
-              <>
-                <button onClick={() => scroll(auctionScrollRef, "left", 260)} className="absolute -left-3 top-1/2 z-10 -translate-y-1/2 flex size-10 items-center justify-center rounded-full bg-white/80 backdrop-blur-md shadow-lg border border-white/30 text-awash-blue hover:bg-white transition-all opacity-0 hover:opacity-100">
-                  <ChevronLeft className="size-5" />
-                </button>
-                <button onClick={() => scroll(auctionScrollRef, "right", 260)} className="absolute -right-3 top-1/2 z-10 -translate-y-1/2 flex size-10 items-center justify-center rounded-full bg-white/80 backdrop-blur-md shadow-lg border border-white/30 text-awash-blue hover:bg-white transition-all opacity-0 hover:opacity-100">
-                  <ChevronRight className="size-5" />
-                </button>
-              </>
-            )}
-            <div ref={auctionScrollRef} className="flex gap-4 overflow-x-auto pb-2 snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden scroll-smooth">
-              {auctionsLoading
-                ? Array.from({ length: 4 }).map((_, i) => <div key={i} className="w-[240px] flex-shrink-0 snap-start overflow-hidden rounded-2xl skeleton"><div className="aspect-[4/3] w-full" /></div>)
-                : activeAuctions.slice(0, 8).map((a) => <ActiveAuctionCard key={a.id} auction={a} onSelect={() => selectAuction(a.id)} />)}
-            </div>
-          </div>
-        )}
-
-        {activeAuctions.length === 0 && !auctionsLoading && (
+        ) : (
           <div className="flex h-[200px] items-center justify-center rounded-2xl border-2 border-dashed border-border/50 glass-card-solid">
             <div className="text-center">
               <Gavel className="mx-auto size-10 text-neutral-300" />
-              <p className="mt-2 text-sm font-medium text-neutral-400">No live auctions yet</p>
+              <p className="mt-2 text-sm font-medium text-neutral-400">No auctions yet</p>
             </div>
           </div>
         )}
@@ -355,17 +333,28 @@ export function HomeScreen() {
 
       {/* ── Promo ── */}
       <section>
-        <div className="rounded-2xl bg-gradient-to-br from-awash-blue via-awash-blue-dark to-[#001224] p-7 text-white shadow-[0_8px_32px_rgba(0,43,92,0.2)] border border-white/5 relative overflow-hidden">
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-awash-blue via-awash-blue-dark to-[#001224] p-7 text-white shadow-[0_8px_32px_rgba(0,43,92,0.2)] border border-white/5">
           <div className="absolute top-0 right-0 w-96 h-96 bg-awash-gold/5 rounded-full blur-3xl -translate-y-1/3 translate-x-1/3" />
-          <div className="relative z-10">
-            <div className="flex items-center gap-2 mb-2">
-              <Sparkles className="size-5 text-awash-gold" />
-              <p className="font-display text-base font-bold text-gradient-gold">Awash Bank Reverse Auction</p>
+          <div className="absolute -bottom-16 -left-10 size-56 rounded-full border-[12px] border-white/[0.03]" />
+          <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-awash-gold/60 to-transparent" />
+          <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+            <div className="max-w-2xl">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="flex size-8 items-center justify-center rounded-full bg-awash-gold/20 border border-awash-gold/30">
+                  <Sparkles className="size-4 text-awash-gold" />
+                </span>
+                <p className="font-display text-base font-bold text-gradient-gold">Awash Bank Reverse Auction</p>
+              </div>
+              <p className="text-sm text-white/70 leading-relaxed">
+                Premium phones, TVs, and laptops waiting for their lowest unique bid. The lower your bid, the better your chance to win.
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px] font-semibold text-white/60">
+                <span className="inline-flex items-center gap-1.5"><Users className="size-3.5 text-awash-gold" /> {activeAuctions.length} live auctions</span>
+                <span className="inline-flex items-center gap-1.5"><Trophy className="size-3.5 text-awash-gold" /> {closedAuctions.length} winners crowned</span>
+                <span className="inline-flex items-center gap-1.5"><TrendingDown className="size-3.5 text-awash-gold" /> Lowest unique bid wins</span>
+              </div>
             </div>
-            <p className="text-sm text-white/70 leading-relaxed max-w-2xl">
-              Premium phones, TVs, and laptops waiting for their lowest unique bid. The lower your bid, the better your chance to win.
-            </p>
-            <div className="mt-5 flex gap-3">
+            <div className="flex gap-3 lg:shrink-0">
               <button onClick={() => go("auctions")} className="rounded-xl bg-gradient-to-r from-awash-gold to-awash-gold-light px-6 py-2.5 text-sm font-bold text-awash-blue shadow-lg shadow-primary/20 transition-all hover:shadow-primary/30 hover:scale-105 active:scale-[0.97]">
                 Browse Auctions
               </button>

@@ -7,16 +7,30 @@ const ADMIN_PHONE = '0911111111';
 const ADMIN_PASSWORD = '1234';
 
 const PRODUCTS = [
-  { name: 'iPhone 15 Pro Max', market_price: 1599, brand: 'Apple', description: '256GB Natural Titanium. A17 Pro chip, 48MP camera system, titanium design.', images: ['https://upload.wikimedia.org/wikipedia/commons/a/a7/IPhone_15_pro_max.jpg', 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/IPhone_15_pro_max.jpg/800px-IPhone_15_pro_max.jpg'] },
-  { name: 'Samsung Galaxy S24 Ultra', market_price: 1399, brand: 'Samsung', description: '512GB Titanium Gray. Galaxy AI, S Pen, 200MP camera, Snapdragon 8 Gen 3.', images: ['https://upload.wikimedia.org/wikipedia/commons/8/8e/Samsung_Galaxy_S24_Ultra.jpg'] },
-  { name: 'Sony WH-1000XM5', market_price: 399, brand: 'Sony', description: 'Industry-leading noise cancellation with Auto NC Optimizer. 30-hour battery life.', images: ['https://www.classic-phones.com/cdn/shop/files/image_e0fd1474-6c62-43a8-916f-7c118e375ed6_large.jpg?v=1715270049'] },
-  { name: 'MacBook Air M3', market_price: 1299, brand: 'Apple', description: '15-inch, 16GB RAM, 512GB SSD. Midnight finish. Up to 18 hours of battery life.', images: ['https://platform.theverge.com/wp-content/uploads/sites/2/chorus/uploads/chorus_asset/file/25317236/Apple_MacBook_Air_lifestyle_display_support_240304.jpg'] },
-  { name: 'PlayStation 5 Slim', market_price: 499, brand: 'Sony', description: 'Disc edition. 1TB SSD, DualSense wireless controller, 4K gaming.', images: ['https://upload.wikimedia.org/wikipedia/commons/1/1b/PlayStation_5_and_DualSense_with_transparent_background.png'] },
-  { name: 'Apple Watch Ultra 2', market_price: 799, brand: 'Apple', description: '49mm titanium case, Precision dual-frequency GPS, Action button, 36hr battery.', images: ['https://upload.wikimedia.org/wikipedia/commons/3/33/Apple_Watch_Ultra_2.jpg'] },
-  { name: 'Dyson V15 Detect', market_price: 749, brand: 'Dyson', description: 'Cordless vacuum with laser slim fluffy cleaner head. Piezo sensor shows particle count.', images: ['https://cdn.mos.cms.futurecdn.net/hwLcUhuTrjQgVVonHTjafM.jpg'] },
-  { name: 'Nintendo Switch OLED', market_price: 349, brand: 'Nintendo', description: '7-inch OLED screen, wide adjustable stand, 64GB internal storage, enhanced audio.', images: ['https://upload.wikimedia.org/wikipedia/commons/f/fe/Nintendo_Switch_OLED.png'] },
-  { name: 'Bose QuietComfort Earbuds II', market_price: 279, brand: 'Bose', description: 'World-class noise cancellation, CustomTune technology, 6hr battery with 24hr case.', images: ['https://upload.wikimedia.org/wikipedia/commons/7/75/Bose_QuietComfort_Earbuds_II.jpg'] },
-  { name: 'Canon EOS R50', market_price: 899, brand: 'Canon', description: '24.2MP APS-C CMOS sensor, 4K video, RF-S18-45mm lens kit, compact mirrorless.', images: ['https://upload.wikimedia.org/wikipedia/commons/d/dd/Canon_EOS_R50_%2852694437103%29.jpg'] },
+  { name: 'iPhone 15 Pro Max', bid_fee: 5, brand: 'Apple', description: '256GB Natural Titanium. A17 Pro chip, 48MP camera system, titanium design.', images: ['https://upload.wikimedia.org/wikipedia/commons/a/a7/IPhone_15_pro_max.jpg', 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/IPhone_15_pro_max.jpg/800px-IPhone_15_pro_max.jpg'] },
+  { name: 'Samsung Galaxy S24 Ultra', bid_fee: 4, brand: 'Samsung', description: '512GB Titanium Gray. Galaxy AI, S Pen, 200MP camera, Snapdragon 8 Gen 3.', images: ['https://upload.wikimedia.org/wikipedia/commons/8/8e/Samsung_Galaxy_S24_Ultra.jpg'] },
+  { name: 'Sony WH-1000XM5', bid_fee: 3, brand: 'Sony', description: 'Industry-leading noise cancellation with Auto NC Optimizer. 30-hour battery life.', images: ['https://www.classic-phones.com/cdn/shop/files/image_e0fd1474-6c62-43a8-916f-7c118e375ed6_large.jpg?v=1715270049'] },
+  { name: 'MacBook Air M3', bid_fee: 8, brand: 'Apple', description: '15-inch, 16GB RAM, 512GB SSD. Midnight finish. Up to 18 hours of battery life.', images: ['https://platform.theverge.com/wp-content/uploads/sites/2/chorus/uploads/chorus_asset/file/25317236/Apple_MacBook_Air_lifestyle_display_support_240304.jpg'] },
+  { name: 'PlayStation 5 Slim', bid_fee: 5, brand: 'Sony', description: 'Disc edition. 1TB SSD, DualSense wireless controller, 4K gaming.', images: ['https://upload.wikimedia.org/wikipedia/commons/1/1b/PlayStation_5_and_DualSense_with_transparent_background.png'] },
+  { name: 'Apple Watch Ultra 2', bid_fee: 2, brand: 'Apple', description: '49mm titanium case, Precision dual-frequency GPS, Action button, 36hr battery.', images: ['https://upload.wikimedia.org/wikipedia/commons/3/33/Apple_Watch_Ultra_2.jpg'] },
+  { name: 'Nintendo Switch OLED', bid_fee: 1, brand: 'Nintendo', description: '7-inch OLED screen, wide adjustable stand, 64GB internal storage, enhanced audio.', images: ['https://upload.wikimedia.org/wikipedia/commons/f/fe/Nintendo_Switch_OLED.png'] },
+  { name: 'Bose QuietComfort Earbuds II', bid_fee: 1, brand: 'Bose', description: 'World-class noise cancellation, CustomTune technology, 6hr battery with 24hr case.', images: ['https://upload.wikimedia.org/wikipedia/commons/7/75/Bose_QuietComfort_Earbuds_II.jpg'] },
+  { name: 'Canon EOS R50', bid_fee: 1, brand: 'Canon', description: '24.2MP APS-C CMOS sensor, 4K video, RF-S18-45mm lens kit, compact mirrorless.', images: ['https://upload.wikimedia.org/wikipedia/commons/d/dd/Canon_EOS_R50_%2852694437103%29.jpg'] },
+  { name: 'iPad Pro 13-inch M4', bid_fee: 2, brand: 'Apple', description: 'Ultra Retina XDR display, M4 chip, Wi-Fi 6E, Apple Pencil Pro support, up to 1TB storage.', images: ['https://upload.wikimedia.org/wikipedia/commons/thumb/7/75/IPad_Pro_13-inch_backside.jpg/500px-IPad_Pro_13-inch_backside.jpg'] },
+  { name: 'AirPods Pro (2nd Gen)', bid_fee: 1, brand: 'Apple', description: 'Active noise cancellation, Adaptive Audio, USB-C MagSafe charging case, up to 6hr listening.', images: ['https://upload.wikimedia.org/wikipedia/commons/thumb/b/b9/AirPods_Pro_3_with_case.jpg/500px-AirPods_Pro_3_with_case.jpg'] },
+  { name: 'Google Pixel 9 Pro', bid_fee: 2, brand: 'Google', description: '6.3-inch Super Actua display, Tensor G4, 50MP triple camera, 7 years of OS updates.', images: ['https://upload.wikimedia.org/wikipedia/commons/thumb/a/ae/Google_Pixel_9_%28Obsidian%29_front.svg/500px-Google_Pixel_9_%28Obsidian%29_front.svg.png'] },
+  { name: 'Xbox Series X', bid_fee: 1, brand: 'Microsoft', description: '1TB SSD, 12 teraflops GPU, 4K 120fps gaming, 8K HDR support, quick resume.', images: ['https://upload.wikimedia.org/wikipedia/commons/thumb/2/25/Xbox_Series_X_2_%28transparent_background%29.png/500px-Xbox_Series_X_2_%28transparent_background%29.png'] },
+  { name: 'Kindle Paperwhite (2024)', bid_fee: 1, brand: 'Amazon', description: '7-inch 300ppi display, adjustable warm light, 12-week battery, 32GB storage, waterproof.', images: ['https://upload.wikimedia.org/wikipedia/commons/thumb/3/37/2023_Amazon_Kindle_Paperwhite_%281%29.jpg/500px-2023_Amazon_Kindle_Paperwhite_%281%29.jpg'] },
+  { name: 'GoPro HERO12 Black', bid_fee: 1, brand: 'GoPro', description: '5.3K60 video, 27MP photos, HyperSmooth 6.0 stabilization, waterproof to 10m.', images: ['https://upload.wikimedia.org/wikipedia/commons/thumb/4/40/GoPro_Hero_%288009036215%29.jpg/500px-GoPro_Hero_%288009036215%29.jpg'] },
+  { name: 'DJI Mini 4 Pro', bid_fee: 1, brand: 'DJI', description: 'Under 249g, 4K/60fps HDR, omnidirectional obstacle sensing, up to 34min flight time.', images: ['https://upload.wikimedia.org/wikipedia/commons/thumb/9/9b/2024_Dron_DJI_Mini_4_Pro_%2818%29.jpg/500px-2024_Dron_DJI_Mini_4_Pro_%2818%29.jpg'] },
+  { name: 'Samsung Galaxy Watch 6', bid_fee: 1, brand: 'Samsung', description: '44mm, AMOLED display, advanced sleep coaching, body composition analysis, 40hr battery.', images: ['https://upload.wikimedia.org/wikipedia/commons/thumb/b/b9/Samsung_Galaxy_Watch_6.jpg/500px-Samsung_Galaxy_Watch_6.jpg'] },
+  { name: 'MacBook Pro 14-inch M3 Pro', bid_fee: 2, brand: 'Apple', description: 'Liquid Retina XDR display, M3 Pro chip, 18GB RAM, 512GB SSD, up to 18hr battery.', images: ['https://upload.wikimedia.org/wikipedia/commons/thumb/4/40/Apple_MacBook_Pro_%28M3%29.jpg/500px-Apple_MacBook_Pro_%28M3%29.jpg'] },
+  { name: 'Meta Quest 3', bid_fee: 1, brand: 'Meta', description: 'Mixed reality headset, 4K+ infinite display, Snapdragon XR2 Gen 2, 128GB storage.', images: ['https://upload.wikimedia.org/wikipedia/commons/thumb/a/af/Meta_Quest_3_display_unit.jpg/500px-Meta_Quest_3_display_unit.jpg'] },
+  { name: 'Sony Alpha A7 IV', bid_fee: 2, brand: 'Sony', description: '33MP full-frame sensor, 4K60 video, real-time tracking AF, 10fps burst shooting.', images: ['https://upload.wikimedia.org/wikipedia/commons/thumb/8/8b/Sony_A7_IV_%28ILCE-7M4%29_-_by_Henry_S%C3%B6derlund_%2851739988735%29.jpg/500px-Sony_A7_IV_%28ILCE-7M4%29_-_by_Henry_S%C3%B6derlund_%2851739988735%29.jpg'] },
+  { name: 'Fitbit Charge 6', bid_fee: 2.50, brand: 'Fitbit', description: 'AMOLED display, built-in GPS, 40+ exercise modes, 7-day battery, heart rate tracking.', images: ['https://upload.wikimedia.org/wikipedia/commons/thumb/4/4c/Fitbit_Charge_HR.jpg/500px-Fitbit_Charge_HR.jpg'] },
+  { name: 'Anker 737 Power Bank', bid_fee: 1, brand: 'Anker', description: 'PowerCore 24K, 140W USB-C PD fast charging, 24000mAh, charges a laptop in 2 hours.', images: ['https://upload.wikimedia.org/wikipedia/commons/thumb/c/c2/2023_Powerbank_Anker_Powercore_5000mAh.jpg/500px-2023_Powerbank_Anker_Powercore_5000mAh.jpg'] },
+  { name: 'Logitech MX Master 3S', bid_fee: 1, brand: 'Logitech', description: '8K DPI sensor, silent clicks, MagSpeed scroll wheel, USB-C, connects to 3 devices.', images: ['https://upload.wikimedia.org/wikipedia/commons/thumb/d/da/Logitech_MX_Master_3S_HS05.jpg/500px-Logitech_MX_Master_3S_HS05.jpg'] },
+  { name: 'JBL Flip 6', bid_fee: 1.50, brand: 'JBL', description: 'Portable Bluetooth speaker, 12hr playtime, IP67 waterproof, PartyBoost pairing.', images: ['https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/JBL_Flip_4.jpg/500px-JBL_Flip_4.jpg'] },
 ];
 
 const USERS = [
@@ -129,7 +143,7 @@ async function seedViaApi() {
       const res = await fetch(`${PROXY}/admin/products`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
-        body: JSON.stringify({ name: p.name, current_market_price: p.market_price, brand: p.brand, description: p.description, image_urls: p.images }),
+        body: JSON.stringify({ name: p.name, current_market_price: 0, brand: p.brand, description: p.description, image_urls: p.images }),
       });
       if (res.ok) { count.products++; process.stdout.write('.'); }
       else process.stdout.write('x');
@@ -145,7 +159,7 @@ async function seedViaApi() {
         const res = await fetch(`${PROXY}/admin/auctions`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
-          body: JSON.stringify({ product_id: items[i].id, start_time: new Date(Date.now() - 86400000 * 3).toISOString(), end_time: new Date(Date.now() + 86400000 * days).toISOString() }),
+          body: JSON.stringify({ product_id: items[i].id, start_time: new Date(Date.now() - 86400000 * 3).toISOString(), end_time: new Date(Date.now() + 86400000 * days).toISOString(), bid_fee: PRODUCTS[i]?.bid_fee || 1 }),
         });
         if (res.ok) count.auctions++;
       }
@@ -162,7 +176,7 @@ function seedViaDb() {
   for (const p of PRODUCTS) {
     const pid = toUuid(`product-${p.name}`);
     const images = JSON.stringify(p.images);
-    const ok = psql(`INSERT INTO products (id, name, description, image_urls, current_market_price, brand) VALUES ('${pid}', '${p.name.replace(/'/g, "''")}', '${p.description.replace(/'/g, "''")}', '${images.replace(/'/g, "''")}'::jsonb, ${p.market_price}, '${p.brand}') ON CONFLICT (id) DO NOTHING`);
+    const ok = psql(`INSERT INTO products (id, name, description, image_urls, current_market_price, brand) VALUES ('${pid}', '${p.name.replace(/'/g, "''")}', '${p.description.replace(/'/g, "''")}', '${images.replace(/'/g, "''")}'::jsonb, 0, '${p.brand}') ON CONFLICT (id) DO NOTHING`);
     if (ok) count.products++;
     else process.stdout.write('x');
   }
@@ -171,7 +185,7 @@ function seedViaDb() {
     const pid = toUuid(`product-${PRODUCTS[i].name}`);
     const aid = toUuid(`auction-${i}`);
     const days = Math.floor(Math.random() * 5) + 1;
-    const ok = psql(`INSERT INTO auctions (id, product_id, start_time, end_time, status, created_at) VALUES ('${aid}', '${pid}', NOW() - INTERVAL '3 days', NOW() + INTERVAL '${days} days', 'ACTIVE', NOW()) ON CONFLICT (id) DO NOTHING`);
+    const ok = psql(`INSERT INTO auctions (id, product_id, start_time, end_time, status, bid_fee, created_at) VALUES ('${aid}', '${pid}', NOW() - INTERVAL '3 days', NOW() + INTERVAL '${days} days', 'ACTIVE', ${PRODUCTS[i]?.bid_fee || 1}, NOW()) ON CONFLICT (id) DO NOTHING`);
     if (ok) count.auctions++;
   }
 
@@ -188,9 +202,14 @@ async function main() {
   if (process.env.DB_DIRECT) {
     count = seedViaDb();
   } else {
-    count = await seedViaApi();
+    try {
+      count = await seedViaApi();
+    } catch (e) {
+      console.log(`\n  API unavailable (${e?.cause?.code || e?.message || 'error'}), falling back to direct DB...`);
+      count = seedViaDb();
+    }
     if (count.products === 0) {
-      console.log('\n  API unavailable, falling back to direct DB...');
+      console.log('\n  API returned no products, falling back to direct DB...');
       count = seedViaDb();
     }
   }

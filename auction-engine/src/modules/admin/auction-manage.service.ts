@@ -349,15 +349,16 @@ export class AuctionManageService {
     entity.status = AuctionStatus.ACTIVE;
     if (dto.min_bid != null) entity.min_bid = dto.min_bid;
     if (dto.max_bid != null) entity.max_bid = dto.max_bid;
+    if (dto.bid_fee != null) entity.bid_fee = dto.bid_fee;
     try {
       return await this.auctionRepository.save(entity);
     } catch (error) {
       if (!this.isMissingColumnError(error)) throw error;
       const rows = await this.auctionRepository.query(
-        `INSERT INTO auctions (product_id, start_time, end_time, status, min_bid, max_bid)
-         VALUES ($1, $2, $3, $4, $5, $6)
+        `INSERT INTO auctions (product_id, start_time, end_time, status, min_bid, max_bid, bid_fee)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          RETURNING *`,
-        [entity.product_id, entity.start_time, entity.end_time, entity.status, entity.min_bid ?? null, entity.max_bid ?? null],
+        [entity.product_id, entity.start_time, entity.end_time, entity.status, entity.min_bid ?? null, entity.max_bid ?? null, entity.bid_fee ?? null],
       );
       return rows[0];
     }
@@ -395,16 +396,17 @@ export class AuctionManageService {
     if (dto.status != null) auction.status = dto.status;
     if (dto.min_bid != null) auction.min_bid = dto.min_bid;
     if (dto.max_bid != null) auction.max_bid = dto.max_bid;
+    if (dto.bid_fee != null) auction.bid_fee = dto.bid_fee;
     try {
       return await this.auctionRepository.save(auction);
     } catch (error) {
       if (!this.isMissingColumnError(error)) throw error;
       const rows = await this.auctionRepository.query(
         `UPDATE auctions
-         SET product_id = $2, start_time = $3, end_time = $4, status = $5, min_bid = $6, max_bid = $7
+         SET product_id = $2, start_time = $3, end_time = $4, status = $5, min_bid = $6, max_bid = $7, bid_fee = $8
          WHERE id = $1
          RETURNING *`,
-        [id, auction.product_id, auction.start_time, auction.end_time, auction.status, auction.min_bid ?? null, auction.max_bid ?? null],
+        [id, auction.product_id, auction.start_time, auction.end_time, auction.status, auction.min_bid ?? null, auction.max_bid ?? null, auction.bid_fee ?? null],
       );
       return rows[0];
     }
@@ -509,18 +511,20 @@ export class AuctionManageService {
     });
 
     const allWinners = await Promise.all(
-      persistedWinners.map(async (w) => {
-        const info = await this.resolveWinnerUserInfo(w.user_id);
-        return {
-          user_id: w.user_id,
-          amount: w.amount,
-          rank: w.rank,
-          payment_status: w.payment_status,
-          payment_deadline: w.payment_deadline,
-          name: info?.name || null,
-          phone: info?.phone || null,
-        };
-      }),
+      (persistedWinners.length > 0 ? persistedWinners : winners).map(
+        async (w: any) => {
+          const info = await this.resolveWinnerUserInfo(w.user_id || w.userId);
+          return {
+            user_id: w.user_id || w.userId,
+            amount: w.amount,
+            rank: w.rank,
+            payment_status: w.payment_status,
+            payment_deadline: w.payment_deadline,
+            name: info?.name || null,
+            phone: info?.phone || null,
+          };
+        },
+      ),
     );
 
     return {
@@ -532,7 +536,8 @@ export class AuctionManageService {
       winner_user_id: auction.winner_user_id,
       winner_name: winnerName,
       winner_phone: winnerPhone,
-      winning_bid_amount: auction.winning_bid_amount,
+      winning_bid_amount:
+        auction.winning_bid_amount ?? (winners.length > 0 ? winners[0].amount : null),
       total_bids: stats.totalBids,
       unique_bidders: stats.uniqueBidders,
       lowest_unique_bid: stats.lowestUniqueBid,

@@ -20,13 +20,10 @@ export function RegisterScreen() {
   })
 
   const onSubmit = async (values: RegisterValues) => {
-    const ok = await register(values.phone_number, values.password, values.full_name)
-    if (!ok) {
-      form.setErrors({ _form: "Unable to create account. This phone may already be registered." } as any)
-    }
+    await register(values.phone_number, values.password, values.full_name)
   }
 
-  const displayError = (form.errors as any)._form || authError
+  const displayError = authError || (form.errors as any)._form
   const strength = passwordStrength(form.values.password)
   const showStrength = form.values.password.length > 0
 

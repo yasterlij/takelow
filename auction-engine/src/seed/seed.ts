@@ -13,7 +13,6 @@ const MOCK_AUCTIONS = [
       "6.7-inch Super Retina XDR display, A17 Pro chip, titanium design and a pro camera system. The most advanced iPhone, up for grabs at the lowest unique bid.",
     image:
       "https://upload.wikimedia.org/wikipedia/commons/a/a7/IPhone_15_pro_max.jpg",
-    marketPrice: 85000,
     timeLeft: 2 * 3600 + 15 * 60 + 30,
     status: "live",
   },
@@ -24,7 +23,6 @@ const MOCK_AUCTIONS = [
       "Crystal UHD 4K smart TV with vivid color, slim bezels and built-in streaming. Bring the cinema home for a fraction of the price.",
     image:
       "https://upload.wikimedia.org/wikipedia/commons/1/1d/Samsung_LED_TV.jpg",
-    marketPrice: 65000,
     timeLeft: 1 * 3600 + 45 * 60 + 10,
     status: "live",
   },
@@ -35,7 +33,6 @@ const MOCK_AUCTIONS = [
       "Ultra-thin Dell XPS with a stunning InfinityEdge display, Intel Core processor and all-day battery. Built for work and play.",
     image:
       "https://platform.theverge.com/wp-content/uploads/sites/2/chorus/uploads/chorus_asset/file/3405340/dell-xps-0212.0.jpg",
-    marketPrice: 50000,
     timeLeft: 3 * 3600 + 30 * 60 + 45,
     status: "live",
   },
@@ -46,7 +43,6 @@ const MOCK_AUCTIONS = [
       "Premium noise-cancelling over-ear headphones with up to 30 hours of battery and crystal-clear sound.",
     image:
       "https://www.classic-phones.com/cdn/shop/files/image_e0fd1474-6c62-43a8-916f-7c118e375ed6_large.jpg?v=1715270049",
-    marketPrice: 18000,
     timeLeft: 40 * 60 + 12,
     status: "ending-soon",
   },
@@ -57,7 +53,6 @@ const MOCK_AUCTIONS = [
       "Lightning-fast next-generation console with ultra-high-speed SSD, ray tracing and one wireless controller included.",
     image:
       "https://upload.wikimedia.org/wikipedia/commons/1/1b/PlayStation_5_and_DualSense_with_transparent_background.png",
-    marketPrice: 42000,
     timeLeft: 5 * 3600 + 5 * 60,
     status: "live",
   },
@@ -90,7 +85,7 @@ async function seed() {
         name: item.name,
         description: item.description,
         image_urls: [item.image],
-        current_market_price: item.marketPrice,
+        current_market_price: 0,
         brand: item.brand,
       });
       await productRepo.save(product);

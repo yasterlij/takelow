@@ -1,7 +1,8 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { api, setApiToken, setRefreshToken, getApiToken, getRefreshToken, getUserFriendlyMessage, onSessionExpired } from './api'
+import { AppState as RNAppState, type AppStateStatus } from 'react-native'
+import { api, setApiToken, setRefreshToken, getApiToken, getRefreshToken, getUserFriendlyMessage, onSessionExpired, type SessionExpireReason } from './api'
 import { useToast } from './components/Toast'
 import { useAuctionSocket, applySocketUpdate } from './hooks/useAuctionSocket'
 import { registerForPushNotifications, useNotificationObserver } from './hooks/usePushNotifications'
@@ -12,6 +13,7 @@ export type View =
   | 'pay-fee' | 'place-bid' | 'bid-confirmed' | 'monitor' | 'closed'
   | 'winner' | 'pay-winning' | 'payment-confirmed' | 'delivery'
   | 'admin-dashboard' | 'admin-auctions' | 'admin-products' | 'admin-users'
+  | 'admin-monitor' | 'admin-auction-monitor'
   | 'deposit'
   | 'payment-success' | 'payment-failed'
   | 'winners-list'
@@ -50,14 +52,18 @@ type AppState = {
   auctions: Auction[]
   auctionsLoading: boolean
   authError: string | null
+  sessionEndReason: SessionExpireReason | null
   paymentMethod: 'SIKINAPAY' | 'AWASH'
   sikinaPayUrl: string | null
   setSikinaPayUrl: (url: string | null) => void
+  sikinaProxyUrl: string | null
+  setSikinaProxyUrl: (url: string | null) => void
   sikinaPayContext: 'bid-fee' | 'winning' | null
   setFeePaid: (paid: boolean) => void
   setPendingBidAmount: (amount: number | null) => void
   go: (view: View) => void
   selectAuction: (id: string) => void
+  selectAuctionForMonitor: (id: string) => void
   payFee: (fee: number, paymentMethod?: 'SIKINAPAY' | 'AWASH') => void
   submitBid: (amount: number) => void
   payWinning: (paymentMethod?: 'SIKINAPAY' | 'AWASH', customerPhone?: string) => void
@@ -66,9 +72,9 @@ type AppState = {
   reset: () => void
   login: (phone: string, password: string) => Promise<string | null>
   register: (name: string, phone: string, password: string) => Promise<string | null>
-  logout: () => void
+  logout: (reason?: SessionExpireReason) => void
   addAuction: (a: { name: string; category: string; marketPrice: number; bidFee: number; description: string; highlights: string[]; specs?: ProductSpecs; startTime: string; endTime: string; images?: string[]; minBid?: number; maxBid?: number }) => Promise<void>
-  updateAuction: (id: string, data: Partial<Pick<Auction, "name" | "category" | "marketPrice" | "description" | "highlights" | "images" | "specs">> & { startTime?: string; endTime?: string; minBid?: number; maxBid?: number }) => Promise<void>
+  updateAuction: (id: string, data: Partial<Pick<Auction, "name" | "category" | "marketPrice" | "description" | "highlights" | "images" | "specs">> & { startTime?: string; endTime?: string; minBid?: number; maxBid?: number; bidFee?: number }) => Promise<void>
   deleteAuction: (id: string) => Promise<void>
   closeAuction: (id: string) => Promise<void>
   forceCloseAuction: (id: string) => Promise<void>
@@ -83,6 +89,8 @@ const AppContext = createContext<AppState | null>(null)
 const BID_FEE = 1
 const STORAGE_KEY = 'takelow_data'
 const INITIAL_BALANCE = 0
+const IDLE_TIMEOUT_MS = 30 * 60 * 1000
+const ABSOLUTE_TIMEOUT_MS = 12 * 60 * 60 * 1000
 
 function mapAuction(apiAuction: any): Auction {
   const timeLeft = Math.max(0, Math.floor((new Date(apiAuction.end_time).getTime() - Date.now()) / 1000))
@@ -93,7 +101,7 @@ function mapAuction(apiAuction: any): Auction {
     category: apiAuction.product?.brand || '',
     images: apiAuction.product?.image_urls || [],
     marketPrice: Number(apiAuction.product?.current_market_price || 0),
-    bidFee: BID_FEE,
+    bidFee: apiAuction.bid_fee != null ? Number(apiAuction.bid_fee) : BID_FEE,
     bidders: apiAuction.stats?.total_bids ?? 0,
     uniqueBidders: apiAuction.stats?.unique_bidders ?? 0,
     totalBids: apiAuction.stats?.total_bids ?? 0,
@@ -129,6 +137,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [walletBalance, setWalletBalance] = useState(INITIAL_BALANCE)
   const [paymentMethod, setPaymentMethodState] = useState<'SIKINAPAY' | 'AWASH'>('AWASH')
   const [sikinaPayUrl, setSikinaPayUrl] = useState<string | null>(null)
+  const [sikinaProxyUrl, setSikinaProxyUrl] = useState<string | null>(null)
   const [sikinaPayContext, setSikinaPayContext] = useState<'bid-fee' | 'winning' | null>(null)
   const [myBids, setMyBids] = useState<PlacedBid[]>([])
   const [user, setUser] = useState<User | null>(null)
@@ -139,6 +148,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [hydrated, setHydrated] = useState(false)
   const users: User[] = []
   const refreshing = useRef(false)
+  const logoutRef = useRef<(reason?: SessionExpireReason) => void>(() => {})
+  const sessionStartedAtRef = useRef<number | null>(null)
+  const idleWarnTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [sessionEndReason, setSessionEndReason] = useState<SessionExpireReason | null>(null)
 
   useAuctionSocket(selectedId, (payload) => {
     setAuctions((prev) => applySocketUpdate(prev, payload))
@@ -151,6 +165,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .then(async (raw) => {
         if (!raw) return
         const saved = JSON.parse(raw)
+        if (typeof saved.sessionStartedAt === 'number') sessionStartedAtRef.current = saved.sessionStartedAt
         if (saved.auctions?.length) {
           const unique = Array.from(new Map<string, Auction>(saved.auctions.map((a: any) => [a.id, a])).values())
           setAuctions(unique)
@@ -189,7 +204,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!hydrated) return
     const tokens = user ? { accessToken: getApiToken(), refreshToken: getRefreshToken() } : {}
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({
-      auctions, allBids, myBids, walletBalance, pendingBidAmount, user, ...tokens,
+      auctions, allBids, myBids, walletBalance, pendingBidAmount, user, sessionStartedAt: sessionStartedAtRef.current, ...tokens,
     })).catch(() => {})
   }, [auctions, allBids, myBids, walletBalance, pendingBidAmount, user, hydrated])
 
@@ -227,10 +242,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [hydrated, user, view, refreshAuctions])
 
   const go = useCallback((next: View) => {
-    const adminViews: View[] = ['admin-dashboard', 'admin-auctions', 'admin-users', 'monitor']
+    const adminViews: View[] = ['admin-dashboard', 'admin-auctions', 'admin-users', 'admin-monitor', 'admin-auction-monitor', 'monitor']
     if (adminViews.includes(next) && user?.role !== 'admin') return
     setView(next)
   }, [user])
+
+  const selectAuctionForMonitor = useCallback((id: string) => {
+    setSelectedId(id)
+    setView('admin-auction-monitor')
+  }, [])
 
   const selectAuction = useCallback((id: string) => {
     setSelectedId(id)
@@ -250,9 +270,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!selectedId) return
     if (paymentMethod === 'SIKINAPAY') {
       try {
-        const { payment_url } = await api.createBidFeePaymentLink(selectedId)
+        const { payment_url, proxy_url } = await api.createBidFeePaymentLink(selectedId)
         setSikinaPayContext('bid-fee')
         setSikinaPayUrl(payment_url)
+        setSikinaProxyUrl(proxy_url || null)
         setView('sikina-pay-checkout')
       } catch {
         setAuthError('Failed to create payment link. Please try again.')
@@ -320,9 +341,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       setAuthError(null)
       const pm = method || paymentMethod
-      const { payment_url } = await api.createPaymentLink(selectedId, pm, customerPhone)
+      const { payment_url, proxy_url } = await api.createPaymentLink(selectedId, pm, customerPhone)
       setSikinaPayContext('winning')
       setSikinaPayUrl(payment_url)
+      setSikinaProxyUrl(proxy_url || null)
       setView('sikina-pay-checkout')
       toast.show(`Payment link opened via ${pm}`, 'success')
     } catch (e: any) {
@@ -355,6 +377,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (phone: string, password: string): Promise<string | null> => {
     try {
       setAuthError(null)
+      setSessionEndReason(null)
+      sessionStartedAtRef.current = Date.now()
       const res = await api.auth.login(phone, password)
       setApiToken(res.access_token)
       setRefreshToken(res.refresh_token)
@@ -386,6 +410,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const register = useCallback(async (name: string, phone: string, password: string): Promise<string | null> => {
     try {
       setAuthError(null)
+      setSessionEndReason(null)
+      sessionStartedAtRef.current = Date.now()
       const res = await api.auth.register(phone, password, name)
       setApiToken(res.access_token)
       setRefreshToken(res.refresh_token)
@@ -407,7 +433,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const logout = useCallback(() => {
+  const logout = useCallback((reason: SessionExpireReason = 'logout') => {
+    setSessionEndReason(reason)
+    sessionStartedAtRef.current = null
     setApiToken(null)
     setRefreshToken(null)
     setUser(null)
@@ -423,16 +451,66 @@ export function AppProvider({ children }: { children: ReactNode }) {
     AsyncStorage.getItem(STORAGE_KEY)
       .then((raw) => {
         const saved = raw ? JSON.parse(raw) : {}
-        AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ ...saved, user: null, accessToken: null, refreshToken: null })).catch(() => {})
+        AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ ...saved, user: null, accessToken: null, refreshToken: null, sessionStartedAt: null })).catch(() => {})
       })
       .catch(() => {})
     setView('login')
   }, [])
 
   useEffect(() => {
-    onSessionExpired(() => logout())
-    return () => onSessionExpired(null)
+    logoutRef.current = logout
   }, [logout])
+
+  useEffect(() => {
+    onSessionExpired((reason) => logoutRef.current(reason))
+    return () => onSessionExpired(null)
+  }, [])
+
+  useEffect(() => {
+    if (!user) return
+    const resetIdleTimer = () => {
+      if (idleWarnTimerRef.current) clearTimeout(idleWarnTimerRef.current)
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
+      if (IDLE_TIMEOUT_MS > 60 * 1000) {
+        idleWarnTimerRef.current = setTimeout(() => {
+          toast.show('You will be signed out in 1 minute due to inactivity', 'warning')
+        }, IDLE_TIMEOUT_MS - 60 * 1000)
+      }
+      idleTimerRef.current = setTimeout(() => logoutRef.current('idle'), IDLE_TIMEOUT_MS)
+    }
+    const onAppStateChange = (next: AppStateStatus) => {
+      if (next === 'active') {
+        const started = sessionStartedAtRef.current
+        if (started != null && Date.now() - started > ABSOLUTE_TIMEOUT_MS) {
+          logoutRef.current('absolute')
+          return
+        }
+        resetIdleTimer()
+      }
+    }
+    const sub = RNAppState.addEventListener('change', onAppStateChange)
+    resetIdleTimer()
+    return () => {
+      sub.remove()
+      if (idleWarnTimerRef.current) clearTimeout(idleWarnTimerRef.current)
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
+      idleWarnTimerRef.current = null
+      idleTimerRef.current = null
+    }
+  }, [user, toast])
+
+  useEffect(() => {
+    if (!hydrated || !user) return
+    const checkAbsoluteTimeout = () => {
+      const started = sessionStartedAtRef.current
+      if (started != null && Date.now() - started > ABSOLUTE_TIMEOUT_MS) {
+        logoutRef.current('absolute')
+      }
+    }
+    checkAbsoluteTimeout()
+    const interval = setInterval(checkAbsoluteTimeout, 60_000)
+    return () => clearInterval(interval)
+  }, [hydrated, user])
 
   const addAuction = useCallback(async (a: { name: string; category: string; marketPrice: number; bidFee: number; description: string; highlights: string[]; specs?: ProductSpecs; startTime: string; endTime: string; images?: string[]; minBid?: number; maxBid?: number }) => {
     if (user?.role !== 'admin') return
@@ -451,7 +529,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         end_time: a.endTime,
         min_bid: a.minBid,
         max_bid: a.maxBid,
-
+        bid_fee: a.bidFee,
       })
       await refreshAuctions()
       toast.show('Auction created successfully', 'success')
@@ -499,12 +577,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
             ...(data.specs !== undefined ? { specs: data.specs } : {}),
           })
         }
-        if (data.startTime || data.endTime || data.minBid != null || data.maxBid != null) {
+        if (data.startTime || data.endTime || data.minBid != null || data.maxBid != null || data.bidFee != null) {
           await api.updateAuction(id, {
             ...(data.startTime ? { start_time: data.startTime } : {}),
             ...(data.endTime ? { end_time: data.endTime } : {}),
             ...(data.minBid != null ? { min_bid: data.minBid } : {}),
             ...(data.maxBid != null ? { max_bid: data.maxBid } : {}),
+            ...(data.bidFee != null ? { bid_fee: data.bidFee } : {}),
 
           })
         }
@@ -551,14 +630,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(
     () => ({
-      view, selectedId, userBid, bidTicketNumber, feePaid, walletBalance, paymentMethod, sikinaPayUrl, setSikinaPayUrl, sikinaPayContext, setFeePaid, myBids, user, users, allBids,
-      pendingBidAmount, auctions, auctionsLoading, authError,
-      go, selectAuction, setPendingBidAmount, payFee, submitBid, payWinning, setPaymentMethod, checkPaymentStatus, reset,
+      view, selectedId, userBid, bidTicketNumber, feePaid, walletBalance, paymentMethod, sikinaPayUrl, setSikinaPayUrl, sikinaProxyUrl, setSikinaProxyUrl, sikinaPayContext, setFeePaid, myBids, user, users, allBids,
+      pendingBidAmount, auctions, auctionsLoading, authError, sessionEndReason,
+      go, selectAuction, selectAuctionForMonitor, setPendingBidAmount, payFee, submitBid, payWinning, setPaymentMethod, checkPaymentStatus, reset,
       login, register, logout, addAuction, updateAuction, deleteAuction, closeAuction, forceCloseAuction, refreshAuctions, refreshWallet, getAuction, fetchAuctionById,
     }),
     [view, selectedId, userBid, bidTicketNumber, feePaid, walletBalance, paymentMethod, sikinaPayUrl, sikinaPayContext, setFeePaid, pendingBidAmount, myBids, user, users, allBids,
-     auctions, auctionsLoading, authError,
-     go, selectAuction, setPendingBidAmount, payFee, submitBid, payWinning, setPaymentMethod, checkPaymentStatus, reset,
+     auctions, auctionsLoading, authError, sessionEndReason,
+     go, selectAuction, selectAuctionForMonitor, setPendingBidAmount, payFee, submitBid, payWinning, setPaymentMethod, checkPaymentStatus, reset,
      login, register, logout, addAuction, updateAuction, deleteAuction, closeAuction, forceCloseAuction, refreshAuctions, refreshWallet, getAuction, fetchAuctionById],
   )
 

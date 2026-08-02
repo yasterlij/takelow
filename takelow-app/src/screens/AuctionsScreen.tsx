@@ -41,8 +41,9 @@ function TimePill({ seconds, endingSoon }: { seconds: number; endingSoon: boolea
   )
 }
 
-function AuctionCard({ auction, onOpen }: { auction: Auction; onOpen: () => void }) {
+export function AuctionCard({ auction, onOpen }: { auction: Auction; onOpen: () => void }) {
   const endingSoon = auction.status === 'ending-soon'
+  const isClosed = auction.status === 'closed'
   const bidProgress = auction.maxBid ? Math.min(auction.totalBids / auction.maxBid, 1) : 0
   const publicCode = auction.publicCode || auction.id.slice(0, 6).toUpperCase()
   return (
@@ -57,7 +58,9 @@ function AuctionCard({ auction, onOpen }: { auction: Auction; onOpen: () => void
           pointerEvents="none"
         />
         <View style={s.cardImgTop}>
-          {endingSoon ? (
+          {isClosed ? (
+            <Badge tone="muted">Closed</Badge>
+          ) : endingSoon ? (
             <Badge tone="orange"><Flame size={10} /> Ending Soon</Badge>
           ) : (
             <Badge tone="green">Live</Badge>
@@ -68,9 +71,11 @@ function AuctionCard({ auction, onOpen }: { auction: Auction; onOpen: () => void
       <View style={{ padding: 10, gap: 6 }}>
         <Text style={s.cardName} numberOfLines={1}>{auction.name}</Text>
         {auction.specSummary ? <Text style={s.cardSpec} numberOfLines={1}>{auction.specSummary}</Text> : null}
-        <Text style={{ fontSize: 9, fontWeight: '500', color: colors.mutedForeground, textDecorationLine: 'line-through' }}>
-          {formatCurrency(auction.marketPrice)}
-        </Text>
+        {auction.marketPrice > 0 ? (
+          <Text style={{ fontSize: 9, fontWeight: '500', color: colors.mutedForeground, textDecorationLine: 'line-through' }}>
+            {formatCurrency(auction.marketPrice)}
+          </Text>
+        ) : null}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
           <View style={s.feeTag}><Text style={s.feeTagText}>Bid Amount: {formatCurrency(auction.bidFee)}</Text></View>
           <View style={s.bidderBadge}>
@@ -79,10 +84,18 @@ function AuctionCard({ auction, onOpen }: { auction: Auction; onOpen: () => void
         </View>
         <View style={s.viewSpecsBar}><Text style={s.viewSpecsText}>View more specs</Text></View>
         <View style={{ alignItems: 'center', marginTop: 2 }}>
-          <TimePill seconds={auction.timeLeft} endingSoon={endingSoon} />
+          {isClosed ? (
+            <View style={[s.timePill, { backgroundColor: colors.muted + '40' }]}>
+              <Text style={[s.timePillText, { color: colors.mutedForeground }]}>
+                {auction.winning_bid_amount != null ? `Won at ${formatCurrency(auction.winning_bid_amount)}` : 'Ended'}
+              </Text>
+            </View>
+          ) : (
+            <TimePill seconds={auction.timeLeft} endingSoon={endingSoon} />
+          )}
         </View>
       </View>
-      {auction.maxBid && (
+      {!isClosed && auction.maxBid && (
         <View style={{ paddingHorizontal: 10, paddingTop: 6 }}>
           <View style={{ height: 3, borderRadius: 2, backgroundColor: colors.border, overflow: 'hidden' }}>
             <View style={{ width: `${bidProgress * 100}%`, height: '100%', borderRadius: 2, backgroundColor: bidProgress > 0.8 ? colors.primary : colors.emerald500 }} />

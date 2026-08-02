@@ -50,6 +50,9 @@ export class Auction {
   @Column({ type: "decimal", precision: 12, scale: 2, nullable: true })
   max_bid: number;
 
+  @Column({ type: "decimal", precision: 12, scale: 2, nullable: true })
+  bid_fee: number;
+
   @Column({ type: "int", default: 1 })
   num_winners: number;
 

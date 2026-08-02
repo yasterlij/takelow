@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Trophy, Loader2, AlertTriangle, Users, Clock, CreditCard, ArrowLeft, Info, CheckCircle2, PartyPopper, Sparkles } from "lucide-react"
 import { useApp } from "../AppContext"
 import { api, type ApiWinnerResult, type ApiAuctionResult, type ApiWinnerInfo, type ApiBid } from "../api"
-import { formatCurrency, formatETB, formatMaskedCurrency } from "../mockDataV0"
+import { formatCurrency, formatMaskedCurrency } from "../mockDataV0"
 
 const confettiParticles = Array.from({ length: 20 }, (_, i) => ({
   id: i,
@@ -36,8 +36,6 @@ export function WinnerScreen() {
 
   if (!auction) return null
 
-  const savings = winner?.winning_bid_amount != null ? (auction.marketPrice - winner.winning_bid_amount) : 0
-  const savingsPct = auction.marketPrice > 0 ? Math.round((savings / auction.marketPrice) * 100) : 0
   const winnerPhone = winner?.winner_phone || null
   const maskPhone = (p: string | null) => p ? p.slice(0, 4) + 'XXXX' + p.slice(-2) : null
   const maskedPhone = winnerPhone ? maskPhone(winnerPhone) : null
@@ -147,7 +145,7 @@ const winnersCount = (winner as any)?.winners_count as number | undefined
           </div>
 
           {/* ── Winner Card ── */}
-          {winner?.winner_user_id && (
+          {(winner?.winner_user_id || winner?.winning_bid_amount != null) && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -173,15 +171,6 @@ const winnersCount = (winner as any)?.winners_count as number | undefined
                   {deadlineHrs != null && (
                     <div className="rounded-lg bg-white/60 p-2.5 col-span-2"><span className="flex items-center gap-1 text-xs text-neutral-400"><Clock className="size-3" /> Payment Deadline</span><p className={`font-bold ${deadlineHrs < 6 ? "text-red-500" : "text-foreground"}`}>{deadlineHrs > 0 ? `${deadlineHrs}h remaining` : "Expired"}</p></div>
                   )}
-                </div>
-                <div className="my-3 border-t border-primary/10" />
-                <div className="flex justify-between text-sm">
-                  <span className="text-neutral-400">Payment</span>
-                  <span className="font-semibold text-neutral-400 line-through">{formatCurrency(auction.marketPrice)}</span>
-                </div>
-                <div className="mt-1 flex justify-between text-sm">
-                  <span className="text-neutral-400">Amount Saved</span>
-                  <span className="font-bold text-emerald-600">{formatCurrency(savings)} ({savingsPct}%)</span>
                 </div>
               </div>
             </motion.div>

@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, useRef } from "react"
 import type { ReactNode } from "react"
-import { api, setApiToken, setRefreshToken, getApiToken, getRefreshToken, getUserFriendlyMessage } from "./api"
+import { api, setApiToken, setRefreshToken, getApiToken, getRefreshToken, getUserFriendlyMessage, getAccessTokenExpiry, type SessionExpireReason } from "./api"
 import { toast } from "./store/toast.store"
 import { useAuctionSocket, applySocketUpdate } from "./hooks/useAuctionSocket"
 import type { Auction, ProductSpecs } from "./mockDataV0"
@@ -55,6 +55,7 @@ type AppState = {
   auctions: Auction[]
   auctionsLoading: boolean
   authError: string | null
+  sessionEndReason: SessionExpireReason | null
   go: (view: View) => void
   selectAuction: (id: string) => void
   selectAuctionForMonitor: (id: string) => void
@@ -69,9 +70,9 @@ type AppState = {
   reset: () => void
   login: (phone: string, password: string) => Promise<boolean>
   register: (phone: string, password: string, name: string) => Promise<boolean>
-  logout: () => void
+  logout: (reason?: SessionExpireReason) => void
   addAuction: (a: { name: string; category: string; marketPrice: number; bidFee: number; description: string; highlights: string[]; specs?: ProductSpecs; startTime: string; endTime: string; images?: string[]; minBid?: number; maxBid?: number }) => Promise<void>
-  updateAuction: (id: string, data: Partial<Pick<Auction, "name" | "category" | "marketPrice" | "description" | "highlights" | "images" | "specs">> & { startTime?: string; endTime?: string; minBid?: number; maxBid?: number }) => Promise<void>
+  updateAuction: (id: string, data: Partial<Pick<Auction, "name" | "category" | "marketPrice" | "description" | "highlights" | "images" | "specs">> & { startTime?: string; endTime?: string; minBid?: number; maxBid?: number; bidFee?: number }) => Promise<void>
   deleteAuction: (id: string) => Promise<void>
   closeAuction: (id: string) => Promise<void>
   forceCloseAuction: (id: string) => Promise<void>
@@ -92,6 +93,9 @@ window.__takelowAppContext = AppContext
 
 const INITIAL_BALANCE = 0
 const STORAGE_KEY = "takelow_data"
+const IDLE_TIMEOUT_MS = 30 * 60 * 1000
+const ABSOLUTE_TIMEOUT_MS = 12 * 60 * 60 * 1000
+const IDLE_WARNING_MS = 60 * 1000
 
 function mapAuction(apiAuction: any): Auction {
   const timeLeft = Math.max(0, Math.floor((new Date(apiAuction.end_time).getTime() - Date.now()) / 1000))
@@ -103,7 +107,7 @@ function mapAuction(apiAuction: any): Auction {
     category: apiAuction.product?.brand || '',
     images: apiAuction.product?.image_urls || [],
     marketPrice: Number(apiAuction.product?.current_market_price || 0),
-    bidFee: 1,
+    bidFee: apiAuction.bid_fee != null ? Number(apiAuction.bid_fee) : 1,
     bidders: apiAuction.stats?.total_bids ?? 0,
     uniqueBidders: apiAuction.stats?.unique_bidders ?? 0,
     totalBids: apiAuction.stats?.total_bids ?? 0,
@@ -161,7 +165,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [authError, setAuthError] = useState<string | null>(null)
   const [hydrated, setHydrated] = useState(false)
   const refreshing = useRef(false)
-  const logoutRef = useRef<() => void>(() => {})
+  const logoutRef = useRef<(reason?: SessionExpireReason) => void>(() => {})
+  const sessionStartedAtRef = useRef<number | null>(null)
+  const sessionChannelRef = useRef<BroadcastChannel | null>(null)
+  const idleWarnTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [sessionEndReason, setSessionEndReason] = useState<SessionExpireReason | null>(null)
 
   useEffect(() => {
     const hydrate = async () => {
@@ -169,6 +178,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (raw) {
         try {
           const saved = JSON.parse(raw)
+          if (typeof saved.sessionStartedAt === "number") sessionStartedAtRef.current = saved.sessionStartedAt
           if (saved.auctions?.length) {
             const unique = Array.from(new Map<string, Auction>(saved.auctions.map((a: any) => [a.id, a])).values())
             setAuctions(unique)
@@ -223,14 +233,70 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!hydrated) return
     const tokens = user ? { accessToken: getApiToken(), refreshToken: getRefreshToken() } : {}
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ auctions, allBids, myBids, walletBalance, pendingBidAmount, user, ...tokens }))
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ auctions, allBids, myBids, walletBalance, pendingBidAmount, user, sessionStartedAt: sessionStartedAtRef.current, ...tokens }))
   }, [auctions, allBids, myBids, walletBalance, pendingBidAmount, user, hydrated])
 
   useEffect(() => {
-    const onSessionExpired = () => logoutRef.current()
+    const onSessionExpired = (e: Event) => {
+      const reason = (e as CustomEvent<{ reason?: SessionExpireReason }>).detail?.reason ?? 'expired'
+      logoutRef.current(reason)
+    }
     window.addEventListener('session-expired', onSessionExpired)
     return () => window.removeEventListener('session-expired', onSessionExpired)
   }, [])
+
+  useEffect(() => {
+    if (typeof BroadcastChannel === 'undefined') return
+    const channel = new BroadcastChannel('takelow-session')
+    sessionChannelRef.current = channel
+    channel.onmessage = (ev: MessageEvent) => {
+      if (ev.data?.type === 'session-expired' && ev.data?.reason) {
+        logoutRef.current(ev.data.reason)
+      }
+    }
+    return () => {
+      sessionChannelRef.current = null
+      channel.close()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!user) return
+    const resetIdleTimer = () => {
+      if (idleWarnTimerRef.current) clearTimeout(idleWarnTimerRef.current)
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
+      if (IDLE_TIMEOUT_MS > IDLE_WARNING_MS) {
+        idleWarnTimerRef.current = setTimeout(() => {
+          toast('You will be signed out in 1 minute due to inactivity', 'warning')
+        }, IDLE_TIMEOUT_MS - IDLE_WARNING_MS)
+      }
+      idleTimerRef.current = setTimeout(() => logoutRef.current('idle'), IDLE_TIMEOUT_MS)
+    }
+    resetIdleTimer()
+    const events = ['pointerdown', 'keydown', 'touchstart', 'scroll', 'mousemove']
+    const onActivity = () => resetIdleTimer()
+    events.forEach((evt) => window.addEventListener(evt, onActivity, { passive: true }))
+    return () => {
+      events.forEach((evt) => window.removeEventListener(evt, onActivity))
+      if (idleWarnTimerRef.current) clearTimeout(idleWarnTimerRef.current)
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
+      idleWarnTimerRef.current = null
+      idleTimerRef.current = null
+    }
+  }, [user])
+
+  useEffect(() => {
+    if (!hydrated || !user) return
+    const checkAbsoluteTimeout = () => {
+      const started = sessionStartedAtRef.current
+      if (started != null && Date.now() - started > ABSOLUTE_TIMEOUT_MS) {
+        logoutRef.current('absolute')
+      }
+    }
+    checkAbsoluteTimeout()
+    const interval = setInterval(checkAbsoluteTimeout, 60_000)
+    return () => clearInterval(interval)
+  }, [hydrated, user])
 
   useEffect(() => {
     if (!hydrated) return
@@ -429,6 +495,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (phone: string, password: string): Promise<boolean> => {
     try {
       setAuthError(null)
+      setSessionEndReason(null)
+      sessionStartedAtRef.current = Date.now()
       const res = await api.auth.login(phone, password)
       setApiToken(res.access_token)
       setRefreshToken(res.refresh_token)
@@ -458,6 +526,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const register = useCallback(async (phone: string, password: string, name: string): Promise<boolean> => {
     try {
       setAuthError(null)
+      setSessionEndReason(null)
+      sessionStartedAtRef.current = Date.now()
       const res = await api.auth.register(phone, password, name)
       setApiToken(res.access_token)
       setRefreshToken(res.refresh_token)
@@ -478,7 +548,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const logout = useCallback(() => {
+  const logout = useCallback((reason: SessionExpireReason = 'logout') => {
+    setSessionEndReason(reason)
+    sessionStartedAtRef.current = null
     setApiToken(null)
     setRefreshToken(null)
     setUser(null)
@@ -496,8 +568,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (raw) {
       try {
         const saved = JSON.parse(raw)
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...saved, user: null, accessToken: null, refreshToken: null }))
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...saved, user: null, accessToken: null, refreshToken: null, sessionStartedAt: null }))
       } catch { /* ignore */ }
+    }
+    if (reason !== 'logout') {
+      sessionChannelRef.current?.postMessage({ type: 'session-expired', reason })
     }
     setView('login')
   }, [])
@@ -513,7 +588,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       })
       await api.createAuction({
         product_id: product.id, start_time: a.startTime, end_time: a.endTime,
-        min_bid: a.minBid, max_bid: a.maxBid,
+        min_bid: a.minBid, max_bid: a.maxBid, bid_fee: a.bidFee,
       })
       await refreshAuctions()
       toast("Auction created successfully", "success")
@@ -561,12 +636,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
             ...(data.specs !== undefined ? { specs: data.specs } : {}),
           })
         }
-        if (data.startTime || data.endTime || data.minBid != null || data.maxBid != null) {
+        if (data.startTime || data.endTime || data.minBid != null || data.maxBid != null || data.bidFee != null) {
           await api.updateAuction(id, {
             ...(data.startTime ? { start_time: data.startTime } : {}),
             ...(data.endTime ? { end_time: data.endTime } : {}),
             ...(data.minBid != null ? { min_bid: data.minBid } : {}),
             ...(data.maxBid != null ? { max_bid: data.maxBid } : {}),
+            ...(data.bidFee != null ? { bid_fee: data.bidFee } : {}),
 
           })
         }
@@ -596,13 +672,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(() => ({
     view, selectedId, userBid, pendingBidAmount, bidTicketNumber, feePaid, walletBalance, paymentMethod, lastPaymentMethod, paymentContext, setPaymentContext, sikinaPayUrl, setSikinaPayUrl, sikinaProxyUrl, setSikinaProxyUrl, myBids, user, allBids,
-    auctions, auctionsLoading, authError,
+    auctions, auctionsLoading, authError, sessionEndReason,
     go, selectAuction, selectAuctionForMonitor, setSelectedIdOnly, setFeePaid, setPendingBidAmount, payFee, submitBid, payWinning, setPaymentMethod, checkPaymentStatus, reset,
     login, register, logout, addAuction, updateAuction, deleteAuction, closeAuction, forceCloseAuction,
     refreshAuctions, refreshWallet, fetchAuctionById, getAuction,
   }), [
     view, selectedId, userBid, pendingBidAmount, bidTicketNumber, feePaid, walletBalance, paymentMethod, lastPaymentMethod, paymentContext, setPaymentContext, sikinaPayUrl, setSikinaPayUrl, sikinaProxyUrl, setSikinaProxyUrl, myBids, user, allBids,
-    auctions, auctionsLoading, authError,
+    auctions, auctionsLoading, authError, sessionEndReason,
     go, selectAuction, selectAuctionForMonitor, setSelectedIdOnly, setFeePaid, setPendingBidAmount, payFee, submitBid, payWinning, setPaymentMethod, checkPaymentStatus, reset,
     login, register, logout, addAuction, updateAuction, deleteAuction, closeAuction, forceCloseAuction,
     refreshAuctions, refreshWallet, fetchAuctionById, getAuction,

@@ -22,6 +22,8 @@ import { SikinaPayCheckout } from './src/screens/SikinaPayCheckout'
 import { DeliveryScreen } from './src/screens/DeliveryScreen'
 import { WinnersListScreen } from './src/screens/WinnersListScreen'
 import { AdminDashboardScreen } from './src/screens/AdminDashboardScreen'
+import { AdminMonitorListScreen } from './src/screens/AdminMonitorListScreen'
+import { AdminAuctionMonitorScreen } from './src/screens/AdminAuctionMonitorScreen'
 import { AdminAuctionsScreen } from './src/screens/AdminAuctionsScreen'
 import { AdminUsersScreen } from './src/screens/AdminUsersScreen'
 import { AdminProductsScreen } from './src/screens/AdminProductsScreen'
@@ -72,6 +74,8 @@ function ScreenRouter() {
       case 'delivery': return <DeliveryScreen />
       case 'admin-dashboard': return isAdmin ? <AdminDashboardScreen /> : <HomeScreen />
       case 'admin-auctions': return isAdmin ? <AdminAuctionsScreen /> : <HomeScreen />
+      case 'admin-monitor': return isAdmin ? <AdminMonitorListScreen /> : <HomeScreen />
+      case 'admin-auction-monitor': return isAdmin ? <AdminAuctionMonitorScreen /> : <HomeScreen />
       case 'admin-users': return isAdmin ? <AdminUsersScreen /> : <HomeScreen />
       case 'admin-products': return isAdmin ? <AdminProductsScreen /> : <HomeScreen />
       case 'winners-list': return <WinnersListScreen />
@@ -122,7 +126,7 @@ function BottomTabBar() {
           )
         })}
       </View>
-      <TouchableOpacity style={s.logoutBtn} onPress={logout} activeOpacity={0.7}>
+      <TouchableOpacity style={s.logoutBtn} onPress={() => logout()} activeOpacity={0.7}>
         <LogOut size={16} color={colors.destructive} />
       </TouchableOpacity>
     </View>
