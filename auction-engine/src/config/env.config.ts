@@ -1,8 +1,13 @@
 import { registerAs } from "@nestjs/config";
 
 export const appConfig = registerAs("app", () => {
-  if (!process.env.JWT_SECRET || process.env.JWT_SECRET === "takelow-jwt-secret") {
-    throw new Error("JWT_SECRET environment variable is required and must not be the default value");
+  if (
+    !process.env.JWT_SECRET ||
+    process.env.JWT_SECRET === "takelow-jwt-secret"
+  ) {
+    throw new Error(
+      "JWT_SECRET environment variable is required and must not be the default value",
+    );
   }
   return {
     port: parseInt(process.env.PORT || "3000", 10),
@@ -14,7 +19,8 @@ export const appConfig = registerAs("app", () => {
     bidFee: parseFloat(process.env.BID_FEE || "1"),
     sikinaSecretKey: process.env.SIKINA_SECRET_KEY || "",
     sikinaWebhookSecret: process.env.SIKINA_WEBHOOK_SECRET || "",
-    sikinaBaseUrl: process.env.SIKINA_BASE_URL || "https://sandbox.sikinapay.com",
+    sikinaBaseUrl:
+      process.env.SIKINA_BASE_URL || "https://sandbox.sikinapay.com",
     sikinaSuccessRedirectUrl: process.env.SIKINA_SUCCESS_REDIRECT_URL || "",
     sikinaFailedRedirectUrl: process.env.SIKINA_FAILED_REDIRECT_URL || "",
     sikinaWebhookUrl: process.env.SIKINA_WEBHOOK_URL || "",

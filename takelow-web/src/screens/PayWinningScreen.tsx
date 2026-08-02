@@ -1,38 +1,205 @@
-import { useState } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Clock, ShieldCheck, Wallet, Building2, ChevronDown, ChevronUp, CheckCircle2, AlertTriangle, ArrowLeft, Trophy, Sparkles } from "lucide-react"
+import { Clock, ShieldCheck, Info, Loader2, Wallet, Building2, ChevronDown, ChevronUp, ArrowLeft, AlertTriangle, X, Lock, Trophy } from "lucide-react"
 import { useApp } from "../AppContext"
-import { formatCurrency, formatETB } from "../mockDataV0"
+import { formatCurrency } from "../mockDataV0"
+import { api } from "../api"
 
-const methods = [
-  { id: "WALLET" as const, label: "Wallet", desc: "Pay instantly from your wallet balance", icon: Wallet, gradient: "from-emerald-500/10 to-emerald-500/5 border-emerald-200/50" },
-  { id: "SIKINAPAY" as const, label: "SikinaPay", desc: "Pay via Mobile Money, USSD, or card", icon: ShieldCheck, gradient: "from-indigo-500/10 to-purple-500/5 border-indigo-200/50" },
-  { id: "AWASH" as const, label: "Awash Bank", desc: "Pay via Awash Bank secure checkout", icon: Building2, gradient: "from-awash-blue/10 to-awash-blue/5 border-awash-blue/20" },
+const paymentMethods = [
+  {
+    id: "AWASH" as const,
+    label: "Awash Bank Mobile Wallet",
+    desc: "Pay from your Awash wallet after PIN confirmation",
+    icon: Building2,
+    gradient: "from-awash-blue/10 to-awash-blue/5 border-awash-blue/20",
+    iconBg: "bg-awash-blue/10 text-awash-blue",
+  },
+  {
+    id: "SIKINAPAY" as const,
+    label: "SikinaPay",
+    desc: "Pay via Mobile Money, USSD, or card",
+    icon: ShieldCheck,
+    gradient: "from-indigo-500/10 to-purple-500/5 border-indigo-200/50",
+    iconBg: "bg-indigo-100 text-indigo-600",
+  },
 ]
 
 export function PayWinningScreen() {
-  const { go, selectedId, userBid, payWinning, getAuction, authError, paymentMethod, setPaymentMethod, walletBalance } = useApp()
+  const { go, selectedId, userBid, payWinning, getAuction, authError, setPaymentMethod, walletBalance, refreshWallet } = useApp()
   const auction = getAuction(selectedId)
+  const [loading, setLoading] = useState(false)
   const [showMethods, setShowMethods] = useState(false)
-  const [customerPhone, setCustomerPhone] = useState("")
-  const [selected, setSelected] = useState<'SIKINAPAY' | 'AWASH' | 'WALLET'>(paymentMethod)
-  const [paying, setPaying] = useState(false)
+  const [selected, setSelected] = useState<'SIKINAPAY' | 'AWASH'>('AWASH')
+  const [checkingPin, setCheckingPin] = useState(false)
+
+  useEffect(() => {
+    refreshWallet()
+  }, [refreshWallet])
+
+  const [showPinModal, setShowPinModal] = useState(false)
+  const [pinInput, setPinInput] = useState("")
+  const [pinError, setPinError] = useState<string | null>(null)
+  const [pinLoading, setPinLoading] = useState(false)
+  const [attemptsRemaining, setAttemptsRemaining] = useState<number | null>(null)
+  const [pinLocked, setPinLocked] = useState(false)
+  const [pinLockedUntil, setPinLockedUntil] = useState<string | null>(null)
+  const [lockCountdown, setLockCountdown] = useState("")
+
+  const [needsPinSetup, setNeedsPinSetup] = useState(false)
+  const [setupPin, setSetupPin] = useState("")
+  const [setupConfirm, setSetupConfirm] = useState("")
+  const [setupError, setSetupError] = useState<string | null>(null)
+  const [setupLoading, setSetupLoading] = useState(false)
+
+  useEffect(() => {
+    if (!showPinModal) return
+    setPinInput("")
+    setPinError(null)
+  }, [showPinModal])
+
+  useEffect(() => {
+    if (!pinLocked || !pinLockedUntil) {
+      setLockCountdown("")
+      return
+    }
+
+    const update = () => {
+      const ms = new Date(pinLockedUntil).getTime() - Date.now()
+      if (ms <= 0) {
+        setLockCountdown("")
+        setPinLocked(false)
+        setPinLockedUntil(null)
+        setAttemptsRemaining(5)
+        return
+      }
+
+      const totalSec = Math.ceil(ms / 1000)
+      const h = Math.floor(totalSec / 3600)
+      const m = Math.floor((totalSec % 3600) / 60)
+      const s = totalSec % 60
+
+      if (h > 0) {
+        setLockCountdown(`${h}h ${String(m).padStart(2, "0")}m ${String(s).padStart(2, "0")}s`)
+      } else {
+        setLockCountdown(`${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}s`)
+      }
+    }
+
+    update()
+    const id = setInterval(update, 1000)
+    return () => clearInterval(id)
+  }, [pinLocked, pinLockedUntil])
 
   if (!auction) return null
 
-  const amount = userBid ?? 0
+  const amount = auction.winning_bid_amount ?? userBid ?? 0
   const deadlineHrs = 24
   const deadlineMins = 1440
   const urgent = deadlineHrs < 6
   const hasSufficientBalance = walletBalance >= amount
-  const SelectedIcon = methods.find((m) => m.id === selected)?.icon || Wallet
+  const SelectedIcon = paymentMethods.find((m) => m.id === selected)?.icon || ShieldCheck
 
-  const handlePay = async () => {
-    setPaying(true)
-    setPaymentMethod(selected)
-    await payWinning(amount, selected, selected === 'AWASH' ? customerPhone || undefined : undefined)
-    setPaying(false)
-  }
+  const handlePayClick = useCallback(async () => {
+    if (selected === "SIKINAPAY") {
+      setPaymentMethod("SIKINAPAY")
+      setLoading(true)
+      try {
+        await payWinning(amount, "SIKINAPAY")
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
+
+    setPaymentMethod("AWASH")
+    setCheckingPin(true)
+    try {
+      const status = await api.wallet.pinStatus()
+      setPinLocked(status.locked)
+      setPinLockedUntil(status.lockedUntil)
+      setAttemptsRemaining(status.locked ? 0 : status.attemptsRemaining)
+      setNeedsPinSetup(!status.hasPin)
+      setShowPinModal(true)
+    } catch (err: any) {
+      setPinError(err?.message || "Failed to check wallet PIN status")
+      setNeedsPinSetup(false)
+      setPinLocked(false)
+      setShowPinModal(true)
+    } finally {
+      setCheckingPin(false)
+    }
+  }, [amount, payWinning, selected, setPaymentMethod])
+
+  const handleVerifyPin = useCallback(async () => {
+    if (!pinInput) {
+      setPinError("Please enter your wallet PIN")
+      return
+    }
+    if (pinLocked) return
+
+    setPinLoading(true)
+    setPinError(null)
+    try {
+      const res = await api.wallet.verifyPin(pinInput)
+      if (res.valid) {
+        setShowPinModal(false)
+        setLoading(true)
+        try {
+          await payWinning(amount, "AWASH")
+        } finally {
+          setLoading(false)
+        }
+        return
+      }
+
+      if (res.locked) {
+        setPinLocked(true)
+        setPinLockedUntil(res.lockedUntil)
+        setAttemptsRemaining(0)
+        setPinError("Too many incorrect attempts. Your wallet PIN has been locked for 5 minutes.")
+      } else {
+        setAttemptsRemaining(res.attemptsRemaining)
+        if (res.attemptsRemaining <= 2) {
+          setPinError(`Invalid PIN - ${res.attemptsRemaining} attempt${res.attemptsRemaining !== 1 ? "s" : ""} remaining before lockout`)
+        } else {
+          setPinError("Invalid wallet PIN")
+        }
+      }
+    } catch (err: any) {
+      setPinError(err?.message || "Unable to verify PIN. Please try again.")
+    } finally {
+      setPinLoading(false)
+    }
+  }, [amount, payWinning, pinInput, pinLocked])
+
+  const handleSetupPin = useCallback(async () => {
+    if (!setupPin || setupPin.length < 4 || setupPin.length > 6 || !/^\d+$/.test(setupPin)) {
+      setSetupError("PIN must be 4-6 digits")
+      return
+    }
+    if (setupPin !== setupConfirm) {
+      setSetupError("PINs do not match")
+      return
+    }
+
+    setSetupLoading(true)
+    setSetupError(null)
+    try {
+      await api.wallet.setPin(setupPin)
+      setShowPinModal(false)
+      setNeedsPinSetup(false)
+      setLoading(true)
+      try {
+        await payWinning(amount, "AWASH")
+      } finally {
+        setLoading(false)
+      }
+    } catch {
+      setSetupError("Failed to set wallet PIN. Please try again.")
+    } finally {
+      setSetupLoading(false)
+    }
+  }, [amount, payWinning, setupConfirm, setupPin])
 
   return (
     <motion.div
@@ -75,7 +242,7 @@ export function PayWinningScreen() {
       >
         <div className="flex items-center justify-center gap-2 mb-1">
           <Trophy className="size-4 text-awash-gold" />
-          <span className="text-xs font-semibold uppercase tracking-wide text-awash-gold-dark">Winning Bid</span>
+          <span className="text-xs font-semibold uppercase tracking-wide text-awash-gold-dark">Primary Winning Bid</span>
         </div>
         <p className="mt-1 font-display text-4xl font-extrabold text-gradient-gold tabular-nums">{formatCurrency(amount)}</p>
         <span className="mt-2 inline-block text-xs font-medium text-neutral-500">for {auction.name}</span>
@@ -102,40 +269,7 @@ export function PayWinningScreen() {
         </div>
       </motion.div>
 
-      {/* ── Wallet Balance ── */}
-      <AnimatePresence>
-        {selected === "WALLET" && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className={`rounded-xl border p-4 ${
-              hasSufficientBalance ? "border-emerald-200 bg-emerald-50/80" : "border-amber-200 bg-amber-50/80"
-            }`}
-          >
-            <div className="flex items-start gap-3">
-              {hasSufficientBalance ? (
-                <CheckCircle2 className="size-5 text-emerald-600 mt-0.5" />
-              ) : (
-                <AlertTriangle className="size-5 text-amber-600 mt-0.5" />
-              )}
-              <div>
-                <p className="text-sm font-bold text-foreground">Wallet Balance</p>
-                <p className={`text-lg font-extrabold tabular-nums ${hasSufficientBalance ? "text-emerald-700" : "text-amber-700"}`}>
-                  {formatCurrency(walletBalance)}
-                </p>
-                <p className="mt-1 text-xs font-medium text-neutral-500">
-                  {hasSufficientBalance
-                    ? "You have enough balance to pay directly from your wallet."
-                    : `Insufficient balance. You need ${formatCurrency(amount - walletBalance)} more.`}
-                </p>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* ── Payment Method ── */}
+      {/* ── Payment Method Selector ── */}
       <div>
         <button
           onClick={() => setShowMethods(!showMethods)}
@@ -147,7 +281,7 @@ export function PayWinningScreen() {
             </span>
             <div>
               <p className="text-sm font-bold text-foreground">
-                {methods.find((m) => m.id === selected)?.label}
+                {paymentMethods.find((m) => m.id === selected)?.label}
               </p>
               <p className="text-xs text-neutral-500">Change payment method</p>
             </div>
@@ -161,10 +295,10 @@ export function PayWinningScreen() {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
-              className="mt-2 overflow-hidden"
+              className="mt-2 space-y-2 overflow-hidden"
             >
               <div className="rounded-2xl border border-border/60 bg-white/80 backdrop-blur-sm p-2">
-                {methods.map((method) => {
+                {paymentMethods.map((method) => {
                   const isActive = selected === method.id
                   const Icon = method.icon
                   return (
@@ -172,19 +306,18 @@ export function PayWinningScreen() {
                       key={method.id}
                       onClick={() => { setSelected(method.id); setShowMethods(false) }}
                       className={`flex w-full items-center gap-3 rounded-xl p-3 text-left transition-all duration-300 ${
-                        isActive ? "bg-primary/10 ring-1 ring-primary shadow-sm" : "hover:bg-neutral-50"
+                        isActive
+                          ? "bg-primary/10 ring-1 ring-primary shadow-sm"
+                          : "hover:bg-neutral-50"
                       }`}
                     >
-                      <span className={`flex size-10 items-center justify-center rounded-xl ${isActive ? "bg-primary/20 text-primary" : "bg-neutral-100 text-neutral-500"}`}>
+                      <span className={`flex size-10 items-center justify-center rounded-xl ${isActive ? method.iconBg : "bg-neutral-100 text-neutral-500"}`}>
                         <Icon className="size-5" />
                       </span>
                       <div className="flex-1">
                         <p className={`text-sm font-bold ${isActive ? "text-primary" : "text-foreground"}`}>{method.label}</p>
                         <p className="text-xs text-neutral-500">{method.desc}</p>
                       </div>
-                      {method.id === "WALLET" && (
-                        <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">{formatCurrency(walletBalance)}</span>
-                      )}
                     </button>
                   )
                 })}
@@ -194,45 +327,45 @@ export function PayWinningScreen() {
         </AnimatePresence>
       </div>
 
-      {/* ── Phone Input for Awash ── */}
-      <AnimatePresence>
-        {selected === "AWASH" && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-          >
-            <label className="text-xs font-semibold text-neutral-500">Phone Number (optional)</label>
-            <input
-              type="tel"
-              value={customerPhone}
-              onChange={(e) => setCustomerPhone(e.target.value)}
-              placeholder="+251..."
-              className="input-full mt-1"
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* ── Method Info ── */}
-      <AnimatePresence>
-        {selected === "SIKINAPAY" && (
-          <motion.div
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            className="flex items-start gap-3 rounded-2xl bg-gradient-to-br from-primary/5 to-primary/10 backdrop-blur-sm border border-primary/20 p-4"
-          >
-            <ShieldCheck className="mt-0.5 size-5 flex-shrink-0 text-primary" />
+      {/* ── Awash Wallet Balance ── */}
+      {selected === "AWASH" && (
+        <div className="rounded-2xl border border-awash-blue/20 bg-awash-blue/5 p-4">
+          <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-bold text-foreground">SikinaPay Checkout</p>
-              <p className="mt-1 text-xs font-medium leading-relaxed text-neutral-500">
-                Complete your payment securely within the app using SikinaPay checkout via Mobile Money, USSD, or card.
-              </p>
+              <p className="text-sm font-bold text-awash-blue">Awash Wallet Balance</p>
+              <p className="text-xs font-medium text-neutral-500">{formatCurrency(walletBalance)}</p>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            <span className="inline-flex items-center gap-1 rounded-lg bg-white/80 px-2.5 py-1 text-[11px] font-semibold text-awash-blue border border-awash-blue/20">
+              <Lock className="size-3" /> PIN required
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* ── SikinaPay Info ── */}
+      {selected === "SIKINAPAY" && (
+        <div className="flex items-start gap-3 rounded-2xl bg-gradient-to-br from-primary/5 to-primary/10 backdrop-blur-sm border border-primary/20 p-4">
+          <ShieldCheck className="mt-0.5 size-5 flex-shrink-0 text-primary" />
+          <div>
+            <p className="text-sm font-bold text-foreground">SikinaPay Checkout</p>
+            <p className="mt-1 text-xs font-medium leading-relaxed text-neutral-500">
+              Complete your payment securely within the app using SikinaPay checkout via Mobile Money, USSD, or card.
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-start gap-2.5 rounded-2xl bg-awash-blue/5 backdrop-blur-sm border border-awash-blue/10 p-3.5">
+        <Info className="mt-0.5 size-4 flex-shrink-0 text-awash-blue/60" />
+        <p className="text-xs font-medium leading-relaxed text-foreground/70">
+          Complete payment before the deadline to claim your prize. A payment receipt will be issued instantly.
+        </p>
+      </div>
+
+      <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-neutral-500">
+        <ShieldCheck className="size-4 text-emerald-600" />
+        Secured by {paymentMethods.find((m) => m.id === selected)?.label}
+      </div>
 
       {authError && (
         <div className="rounded-xl bg-destructive/10 border border-destructive/20 p-3 text-center">
@@ -241,21 +374,127 @@ export function PayWinningScreen() {
       )}
 
       {/* ── CTA ── */}
+      {selected === "AWASH" && !hasSufficientBalance && (
+        <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-center">
+          <p className="text-xs font-semibold text-destructive">
+            Insufficient wallet balance. Top up your wallet before paying with Awash Mobile Wallet.
+          </p>
+        </div>
+      )}
+
       <button
-        onClick={handlePay}
-        disabled={paying || (selected === "WALLET" && !hasSufficientBalance)}
+        onClick={handlePayClick}
+        disabled={loading || checkingPin || (selected === "AWASH" && !hasSufficientBalance)}
         className="btn-primary animate-shine group"
       >
-        {paying ? (
-          "Processing..."
-        ) : selected === "WALLET" ? (
-          <><Wallet className="size-[18px] group-hover:scale-110 transition-transform" /> Pay from Wallet</>
+        {loading || checkingPin ? (
+          <Loader2 className="size-[18px] animate-spin" />
         ) : selected === "SIKINAPAY" ? (
-          <><ShieldCheck className="size-[18px] group-hover:scale-110 transition-transform" /> Pay with SikinaPay</>
+          <ShieldCheck className="size-[18px] group-hover:scale-110 transition-transform" />
         ) : (
-          <><Building2 className="size-[18px] group-hover:scale-110 transition-transform" /> Pay with Awash Bank</>
+          <Wallet className="size-[18px] group-hover:scale-110 transition-transform" />
         )}
+        {loading
+          ? "Processing..."
+          : checkingPin
+          ? "Checking wallet PIN status..."
+            : `Proceed to Payment · ${formatCurrency(amount)}`}
       </button>
+
+      <AnimatePresence>
+        {showPinModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center"
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              className="w-full max-w-md rounded-2xl border border-border bg-white p-5 shadow-2xl"
+            >
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="font-display text-lg font-bold text-awash-blue">
+                  {needsPinSetup ? "Set Wallet PIN" : "Enter Wallet PIN"}
+                </h3>
+                <button
+                  onClick={() => setShowPinModal(false)}
+                  className="rounded-lg p-1 text-neutral-500 hover:bg-neutral-100"
+                  aria-label="Close"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+
+              {needsPinSetup ? (
+                <div className="space-y-3">
+                  <p className="text-sm text-neutral-600">Create a 4-6 digit PIN to secure your Awash wallet payments.</p>
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={setupPin}
+                    onChange={(e) => setSetupPin(e.target.value)}
+                    placeholder="New PIN"
+                    className="input-full text-center tracking-[0.35em]"
+                  />
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={setupConfirm}
+                    onChange={(e) => setSetupConfirm(e.target.value)}
+                    placeholder="Confirm PIN"
+                    className="input-full text-center tracking-[0.35em]"
+                  />
+                  {setupError && <p className="text-center text-xs font-semibold text-destructive">{setupError}</p>}
+                  <button onClick={handleSetupPin} disabled={setupLoading} className="btn-primary w-full">
+                    {setupLoading ? <Loader2 className="size-4 animate-spin" /> : "Set PIN & Pay"}
+                  </button>
+                </div>
+              ) : pinLocked ? (
+                <div className="space-y-3 text-center">
+                  <AlertTriangle className="mx-auto size-9 text-destructive" />
+                  <p className="text-sm font-semibold text-destructive">PIN Locked</p>
+                  <p className="text-xs text-neutral-600">
+                    Too many incorrect attempts. Try again in {lockCountdown || "05:00s"}.
+                  </p>
+                  <button onClick={() => setShowPinModal(false)} className="w-full rounded-xl border border-border bg-neutral-100 px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-neutral-200">
+                    Close
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm text-neutral-600">
+                    Enter your wallet PIN to confirm payment of {formatCurrency(amount)}.
+                  </p>
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={pinInput}
+                    onChange={(e) => setPinInput(e.target.value)}
+                    placeholder="Enter PIN"
+                    autoFocus
+                    className="input-full text-center tracking-[0.35em]"
+                  />
+                  {pinError && <p className="text-center text-xs font-semibold text-destructive">{pinError}</p>}
+                  {attemptsRemaining != null && attemptsRemaining <= 3 && (
+                    <p className="text-center text-xs font-medium text-amber-600">
+                      {attemptsRemaining} attempt{attemptsRemaining !== 1 ? "s" : ""} remaining
+                    </p>
+                  )}
+                  <button onClick={handleVerifyPin} disabled={pinLoading || !pinInput.trim()} className="btn-primary w-full">
+                    {pinLoading ? <Loader2 className="size-4 animate-spin" /> : "Confirm Payment"}
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   )
 }

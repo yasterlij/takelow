@@ -27,7 +27,11 @@ export class Auction {
   id: string;
 
   @Index({ unique: true })
-  @Column({ type: "varchar", length: 5, default: () => "LPAD(nextval('auction_public_code_seq')::text, 5, '0')" })
+  @Column({
+    type: "varchar",
+    length: 5,
+    default: () => "LPAD(nextval('auction_public_code_seq')::text, 5, '0')",
+  })
   public_code: string;
 
   @Index()

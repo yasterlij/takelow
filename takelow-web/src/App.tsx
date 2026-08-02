@@ -15,6 +15,7 @@ import { ClosedScreen } from "./screens/ClosedScreen"
 import { ClosedAuctionsScreen } from "./screens/ClosedAuctionsScreen"
 import { WinnerScreen } from "./screens/WinnerScreen"
 import { PayWinningScreen } from "./screens/PayWinningScreen"
+import { ProfileScreen } from "./screens/ProfileScreen"
 import { PaymentConfirmedScreen } from "./screens/PaymentConfirmedScreen"
 import { PaymentResultScreen } from "./screens/PaymentResultScreen"
 
@@ -33,7 +34,7 @@ import { AwashMark, BottomTabBar } from "./components/AuctionUI"
 import { ErrorBoundary } from "./components/ErrorBoundary"
 import { ToastContainer } from "./components/Toast"
 import { ShimmerProvider } from "./components/SkeletonLoader"
-import { Gavel, Wallet, TicketCheck, Shield, LogOut, Trophy, Menu, X } from "lucide-react"
+import { Gavel, Wallet, Shield, LogOut, Trophy, Menu, X, User } from "lucide-react"
 
 function ScreenRouter() {
   const { view, user } = useApp()
@@ -56,6 +57,7 @@ function ScreenRouter() {
     case "closed": screen = <ClosedScreen />; break
     case "closed-auctions": screen = <ClosedAuctionsScreen />; break
     case "winner": screen = <WinnerScreen />; break
+    case "profile": screen = <ProfileScreen />; break
     case "pay-winning": screen = <PayWinningScreen />; break
     case "payment-confirmed": screen = <PaymentConfirmedScreen />; break
     case "delivery": screen = <DeliveryScreen />; break
@@ -89,9 +91,9 @@ function Navbar() {
 
   const navItems = [
     { id: "home", label: "Home", icon: Wallet },
-    { id: "auctions", label: "Auctions", icon: Gavel },
+    { id: "auctions", label: "Live Auctions", icon: Gavel },
     { id: "closed-auctions", label: "Winners", icon: Trophy },
-    { id: "my-bids", label: "My Bids", icon: TicketCheck },
+    { id: "profile", label: "Profile", icon: User },
     ...(user?.role === "admin" ? [{ id: "admin-dashboard", label: "Admin", icon: Shield }] : []),
   ]
 
@@ -202,7 +204,7 @@ function BottomNav() {
   if (!user) return null
 
   const showBottomBar = [
-    "home", "auctions", "closed-auctions", "my-bids",
+    "home", "auctions", "closed-auctions", "my-bids", "profile",
     "admin-dashboard", "admin-auctions", "admin-products", "admin-users",
   ].includes(view)
 
@@ -212,7 +214,7 @@ function BottomNav() {
     { id: "home", label: "Home", icon: Wallet },
     { id: "auctions", label: "Auctions", icon: Gavel },
     { id: "closed-auctions", label: "Winners", icon: Trophy },
-    { id: "my-bids", label: "My Bids", icon: TicketCheck },
+    { id: "profile", label: "Profile", icon: User },
     ...(user?.role === "admin" ? [{ id: "admin-dashboard", label: "Admin", icon: Shield }] : []),
   ]
 

@@ -1,41 +1,207 @@
-import React, { useState } from 'react'
-import { View, Text, ScrollView, StyleSheet, TextInput, TouchableOpacity } from 'react-native'
-import { ShieldCheck, Clock, Wallet, Building2, ChevronDown, ChevronUp } from 'lucide-react-native'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
+import { View, Text, ScrollView, StyleSheet, Modal, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native'
+import { ShieldCheck, Info, Lock, X, AlertTriangle, Building2, ChevronDown, ChevronUp, Wallet, Trophy } from 'lucide-react-native'
 import { useApp } from '../AppContext'
-import { AppBar, CTAButton, Card } from '../components/AuctionUI'
-import { formatCurrency, formatETB } from '../mockDataV0'
+import { AppBar, CTAButton, Card, AwashMark } from '../components/AuctionUI'
+import { formatCurrency } from '../mockDataV0'
+import { api } from '../api'
 import { colors } from '../theme'
 
 export function PayWinningScreen() {
-  const { go, selectedId, userBid, payWinning, getAuction, authError, paymentMethod, setPaymentMethod } = useApp()
+  const { go, selectedId, userBid, payWinning, getAuction, authError, setPaymentMethod, walletBalance, refreshWallet } = useApp()
   const auction = getAuction(selectedId)
 
-  const amount = userBid ?? 0
+  const [showMethods, setShowMethods] = useState(false)
+  const [selected, setSelected] = useState<'SIKINAPAY' | 'AWASH'>('AWASH')
+
+  useEffect(() => {
+    refreshWallet()
+  }, [refreshWallet])
+
+  const [showPinModal, setShowPinModal] = useState(false)
+  const [pinInput, setPinInput] = useState('')
+  const [pinError, setPinError] = useState<string | null>(null)
+  const [pinLoading, setPinLoading] = useState(false)
+  const [attemptsRemaining, setAttemptsRemaining] = useState<number | null>(null)
+  const [pinLocked, setPinLocked] = useState(false)
+  const [pinLockedUntil, setPinLockedUntil] = useState<string | null>(null)
+
+  const [needsPinSetup, setNeedsPinSetup] = useState(false)
+  const [setupPin, setSetupPin] = useState('')
+  const [setupConfirm, setSetupConfirm] = useState('')
+  const [setupError, setSetupError] = useState<string | null>(null)
+  const [setupLoading, setSetupLoading] = useState(false)
+
+  const [checkingPin, setCheckingPin] = useState(false)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (showPinModal) {
+      setPinInput('')
+      setPinError(null)
+    }
+  }, [showPinModal])
+
+  const [lockCountdown, setLockCountdown] = useState('')
+  const tickRef = useRef<ReturnType<typeof setInterval>>(undefined)
+
+  useEffect(() => {
+    if (!pinLocked || !pinLockedUntil) {
+      setLockCountdown('')
+      return
+    }
+    const update = () => {
+      const ms = new Date(pinLockedUntil).getTime() - Date.now()
+      if (ms <= 0) {
+        setLockCountdown('')
+        setPinLocked(false)
+        setPinLockedUntil(null)
+        setAttemptsRemaining(5)
+        return
+      }
+      const totalSec = Math.ceil(ms / 1000)
+      const h = Math.floor(totalSec / 3600)
+      const m = Math.floor((totalSec % 3600) / 60)
+      const s = totalSec % 60
+      if (h > 0) {
+        setLockCountdown(`${h}h ${m.toString().padStart(2, '0')}m ${s.toString().padStart(2, '0')}s`)
+      } else {
+        setLockCountdown(`${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}s`)
+      }
+    }
+    update()
+    tickRef.current = setInterval(update, 1000)
+    return () => clearInterval(tickRef.current)
+  }, [pinLocked, pinLockedUntil])
+
+  if (!auction) return null
+
+  const amount = auction.winning_bid_amount ?? userBid ?? 0
   const deadline = (auction as any).payment_deadline ? new Date((auction as any).payment_deadline) : null
   const deadlineHrs = deadline ? Math.max(0, Math.round((deadline.getTime() - Date.now()) / 3600000)) : 24
   const deadlineMins = deadline ? Math.max(0, Math.round((deadline.getTime() - Date.now()) / 60000)) : 1440
   const urgent = deadlineHrs < 6
 
-  const [showMethods, setShowMethods] = useState(false)
-  const [selected, setSelected] = useState<'SIKINAPAY' | 'AWASH'>(paymentMethod)
-  const [customerPhone, setCustomerPhone] = useState('')
+  const handlePayPress = useCallback(async () => {
+    if (selected === 'SIKINAPAY') {
+      setPaymentMethod('SIKINAPAY')
+      setLoading(true)
+      try {
+        await Promise.resolve(payWinning(amount, 'SIKINAPAY'))
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
 
-  if (!auction) return null
+    setPaymentMethod('AWASH')
+    setCheckingPin(true)
+    try {
+      const status = await api.wallet.pinStatus()
+      setPinLocked(status.locked)
+      setPinLockedUntil(status.lockedUntil)
+      setAttemptsRemaining(status.locked ? 0 : status.attemptsRemaining)
+      setNeedsPinSetup(!status.hasPin)
+      setShowPinModal(true)
+    } catch (err: any) {
+      setPinError(err?.message || 'Failed to check wallet PIN status')
+      setNeedsPinSetup(false)
+      setPinLocked(false)
+      setShowPinModal(true)
+    } finally {
+      setCheckingPin(false)
+    }
+  }, [amount, payWinning, selected, setPaymentMethod])
 
-  const handlePay = () => {
-    setPaymentMethod(selected)
-    payWinning(selected, customerPhone || undefined)
-  }
+  const handleVerifyPin = useCallback(async () => {
+    if (!pinInput) {
+      setPinError('Please enter your wallet PIN')
+      return
+    }
+    if (pinLocked) return
+    setPinLoading(true)
+    setPinError(null)
+    try {
+      const res = await api.wallet.verifyPin(pinInput)
+      if (res.valid) {
+        setShowPinModal(false)
+        setLoading(true)
+        try {
+          await Promise.resolve(payWinning(amount, 'AWASH'))
+        } finally {
+          setLoading(false)
+        }
+      } else if (res.locked) {
+        setPinLocked(true)
+        setPinLockedUntil(res.lockedUntil)
+        setAttemptsRemaining(0)
+        setPinError(
+          'Too many incorrect attempts. Your wallet PIN has been locked for 5 minutes.'
+        )
+      } else {
+        setAttemptsRemaining(res.attemptsRemaining)
+        if (res.attemptsRemaining <= 2) {
+          setPinError(`Invalid PIN — ${res.attemptsRemaining} attempt${res.attemptsRemaining !== 1 ? 's' : ''} remaining before lockout`)
+        } else {
+          setPinError('Invalid wallet PIN')
+        }
+      }
+    } catch (err: any) {
+      setPinError(err?.message || 'Unable to verify PIN. Please try again.')
+    } finally {
+      setPinLoading(false)
+    }
+  }, [amount, payWinning, pinInput, pinLocked])
+
+  const handleSetupPin = useCallback(async () => {
+    if (!setupPin || setupPin.length < 4 || setupPin.length > 6 || !/^\d+$/.test(setupPin)) {
+      setSetupError('PIN must be 4–6 digits')
+      return
+    }
+    if (setupPin !== setupConfirm) {
+      setSetupError('PINs do not match')
+      return
+    }
+    setSetupLoading(true)
+    setSetupError(null)
+    try {
+      await api.wallet.setPin(setupPin)
+      setShowPinModal(false)
+      setNeedsPinSetup(false)
+      setLoading(true)
+      try {
+        await Promise.resolve(payWinning(amount, 'AWASH'))
+      } finally {
+        setLoading(false)
+      }
+    } catch (err: any) {
+      setSetupError('Failed to set wallet PIN. Please try again.')
+    } finally {
+      setSetupLoading(false)
+    }
+  }, [amount, payWinning, setupPin, setupConfirm])
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={{ backgroundColor: colors.navy }}>
         <StatusBarCustom />
       </View>
-      <AppBar title="Pay Winning Amount" onBack={() => go('winner')} />
+      <AppBar
+        title="Pay Winning Amount"
+        onBack={() => go('winner')}
+        right={
+          <TouchableOpacity onPress={() => go('home')} style={{ width: 34, height: 34, justifyContent: 'center', alignItems: 'center' }}>
+            <AwashMark size={22} />
+          </TouchableOpacity>
+        }
+      />
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 120 }}>
+        <Text style={{ fontSize: 14, fontWeight: '500', color: colors.mutedForeground }}>
+          Pay the primary winning bid to claim your prize.
+        </Text>
+
         <View style={[s.deadline, urgent && { backgroundColor: colors.destructive + '22' }]}>
-          <Clock size={18} color={urgent ? colors.destructive : colors.primary} />
+          <Info size={16} color={urgent ? colors.destructive : colors.primary} />
           <Text style={s.deadlineText}>
             {deadlineHrs > 0
               ? `Complete payment within ${deadlineHrs}h ${deadlineMins % 60}m to claim your prize.`
@@ -43,10 +209,13 @@ export function PayWinningScreen() {
           </Text>
         </View>
 
-        <Card style={{ alignItems: 'center', padding: 24, marginTop: 16 }}>
-          <Text style={s.label}>Winning Bid</Text>
+        <Card style={{ alignItems: 'center', padding: 24, marginTop: 16, borderWidth: 1, borderColor: colors.primary + '1A', backgroundColor: colors.primary + '0D' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Trophy size={14} color={colors.primary} />
+            <Text style={{ fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', color: colors.primary }}>Primary Winning Bid</Text>
+          </View>
           <Text style={s.amount}>{formatCurrency(amount)}</Text>
-          <Text style={s.forProduct}>for {auction.name}</Text>
+          <Text style={{ fontSize: 12, fontWeight: '500', color: colors.mutedForeground, marginTop: 8 }}>for {auction.name}</Text>
         </Card>
 
         <Card style={{ padding: 16, marginTop: 16 }}>
@@ -56,7 +225,7 @@ export function PayWinningScreen() {
           </View>
           <View style={[s.summaryRow, { marginTop: 8 }]}>
             <Text style={s.summaryLabel}>Delivery</Text>
-            <Text style={[s.summaryValue, { color: colors.emerald600 }]}>Free</Text>
+            <Text style={[s.summaryValue, { color: colors.emerald600 }]}>Free ✓</Text>
           </View>
           <View style={s.summaryDivider} />
           <View style={[s.summaryRow, { marginTop: 12 }]}>
@@ -64,6 +233,8 @@ export function PayWinningScreen() {
             <Text style={{ fontSize: 14, fontWeight: '800', color: colors.primary }}>{formatCurrency(amount)}</Text>
           </View>
         </Card>
+
+        <Text style={{ fontSize: 14, fontWeight: '700', color: colors.navy, marginTop: 24, marginBottom: 8 }}>Pay with</Text>
 
         <TouchableOpacity
           onPress={() => setShowMethods(!showMethods)}
@@ -88,65 +259,57 @@ export function PayWinningScreen() {
         {showMethods && (
           <Card style={s.methodsList}>
             <TouchableOpacity
+              onPress={() => { setSelected('AWASH'); setShowMethods(false) }}
+              style={[s.methodOption, selected === 'AWASH' && s.methodOptionSelected]}
+            >
+              <View style={{ width: 20, height: 20, justifyContent: 'center', alignItems: 'center' }}>
+                <AwashMark size={18} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.methodOptionTitle}>Awash Bank Wallet</Text>
+                <Text style={s.methodOptionSub}>Pay using your wallet balance</Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
               onPress={() => { setSelected('SIKINAPAY'); setShowMethods(false) }}
               style={[s.methodOption, selected === 'SIKINAPAY' && s.methodOptionSelected]}
             >
               <ShieldCheck size={20} color={colors.primary} />
               <View style={{ flex: 1 }}>
                 <Text style={s.methodOptionTitle}>SikinaPay</Text>
-                <Text style={s.methodOptionSub}>Pay via Mobile Money, USSD, or card</Text>
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => { setSelected('AWASH'); setShowMethods(false) }}
-              style={[s.methodOption, selected === 'AWASH' && s.methodOptionSelected]}
-            >
-              <Building2 size={20} color={colors.primary} />
-              <View style={{ flex: 1 }}>
-                <Text style={s.methodOptionTitle}>Awash Bank Wallet</Text>
-                <Text style={s.methodOptionSub}>Pay directly from your Awash Bank account</Text>
+                <Text style={s.methodOptionSub}>Pay via online payment gateway</Text>
               </View>
             </TouchableOpacity>
           </Card>
         )}
 
-        {selected === 'AWASH' && (
-          <View style={{ marginTop: 12 }}>
-            <Text style={{ fontSize: 12, fontWeight: '600', color: colors.mutedForeground, marginBottom: 4 }}>Phone Number (optional)</Text>
-            <TextInput
-              value={customerPhone}
-              onChangeText={setCustomerPhone}
-              placeholder="+251..."
-              placeholderTextColor={colors.mutedForeground}
-              style={s.phoneInput}
-              keyboardType="phone-pad"
-            />
-          </View>
-        )}
-
         {selected === 'SIKINAPAY' && (
           <View style={s.infoBox}>
-            <ShieldCheck size={20} color={colors.primary} />
-            <View style={{ flex: 1 }}>
-              <Text style={s.infoTitle}>SikinaPay Checkout</Text>
-              <Text style={s.infoText}>
-                Complete your payment securely within the app using SikinaPay checkout via Mobile Money, USSD, or card.
-              </Text>
-            </View>
+            <ShieldCheck size={16} color={colors.primary} />
+            <Text style={s.infoText}>Complete your payment securely within the app using SikinaPay checkout via Mobile Money, USSD, or card.</Text>
           </View>
         )}
 
         {selected === 'AWASH' && (
-          <View style={s.infoBox}>
-            <Wallet size={20} color={colors.primary} />
-            <View style={{ flex: 1 }}>
-              <Text style={s.infoTitle}>Awash Bank Secure Checkout</Text>
-              <Text style={s.infoText}>
-                You will be redirected to Awash Bank's secure payment page to complete the transaction.
-              </Text>
+          <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 12, borderColor: colors.primary + '66', padding: 16, marginTop: 12 }}>
+            <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: colors.navy, justifyContent: 'center', alignItems: 'center' }}>
+              <AwashMark size={32} />
             </View>
-          </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: colors.navy }}>Awash Bank Wallet</Text>
+              <Text style={{ fontSize: 12, fontWeight: '500', color: colors.mutedForeground }}><Wallet size={14} /> Balance: {formatCurrency(walletBalance)}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 8, backgroundColor: colors.navy + '0D', paddingHorizontal: 8, paddingVertical: 4 }}>
+              <Lock size={12} color={colors.primary} />
+              <Text style={{ fontSize: 10, fontWeight: '700', color: colors.primary }}>PIN required</Text>
+            </View>
+          </Card>
         )}
+
+        <View style={s.infoBox}>
+          <Info size={16} color={colors.navy + '99'} />
+          <Text style={s.infoText}>Complete payment before the deadline to claim your prize. A payment receipt will be issued instantly.</Text>
+        </View>
 
         <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, marginTop: 16 }}>
           <ShieldCheck size={16} color={colors.emerald600} />
@@ -162,21 +325,111 @@ export function PayWinningScreen() {
         )}
       </ScrollView>
 
-      <View style={s.bottomCta}>
-        <CTAButton onPress={handlePay}>
-          {selected === 'SIKINAPAY' ? (
+      <Card style={s.bottomCta}>
+        {walletBalance < amount && (
+          <Text style={{ fontSize: 12, fontWeight: '600', color: colors.destructive, textAlign: 'center', marginBottom: 8 }}>
+            Insufficient balance — top up before paying
+          </Text>
+        )}
+        <CTAButton onPress={handlePayPress} disabled={selected === 'AWASH' && (walletBalance < amount || checkingPin)}>
+          {loading || checkingPin ? 'Processing...' : selected === 'SIKINAPAY' ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <ShieldCheck size={18} color={colors.primaryForeground} />
-              <Text style={{ color: colors.primaryForeground, fontWeight: '700', fontSize: 14 }}>Pay with SikinaPay</Text>
+              <Text style={{ color: colors.primaryForeground, fontWeight: '700', fontSize: 14 }}>Proceed to Payment · {formatCurrency(amount)}</Text>
             </View>
           ) : (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <Wallet size={18} color={colors.primaryForeground} />
-              <Text style={{ color: colors.primaryForeground, fontWeight: '700', fontSize: 14 }}>Pay with Awash Bank</Text>
+              <Text style={{ color: colors.primaryForeground, fontWeight: '700', fontSize: 14 }}>Proceed to Payment · {formatCurrency(amount)}</Text>
             </View>
           )}
         </CTAButton>
-      </View>
+      </Card>
+
+      <Modal visible={showPinModal} transparent animationType="fade" onRequestClose={() => setShowPinModal(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+          <TouchableOpacity style={s.backdrop} activeOpacity={1} onPress={() => setShowPinModal(false)}>
+            <View />
+          </TouchableOpacity>
+          <Card style={s.modalSheet}>
+            <View style={s.modalHeader}>
+              <Text style={s.modalTitle}>{needsPinSetup ? 'Set Wallet PIN' : 'Enter Wallet PIN'}</Text>
+              <TouchableOpacity onPress={() => setShowPinModal(false)}>
+                <X size={20} color={colors.mutedForeground} />
+              </TouchableOpacity>
+            </View>
+
+            {needsPinSetup ? (
+              <>
+                <Text style={s.modalDesc}>Create a 4–6 digit PIN to secure your wallet payments.</Text>
+                <TextInput
+                  style={s.pinInput}
+                  placeholder="New PIN"
+                  placeholderTextColor={colors.mutedForeground}
+                  keyboardType="number-pad"
+                  secureTextEntry
+                  maxLength={6}
+                  value={setupPin}
+                  onChangeText={setSetupPin}
+                />
+                <TextInput
+                  style={s.pinInput}
+                  placeholder="Confirm PIN"
+                  placeholderTextColor={colors.mutedForeground}
+                  keyboardType="number-pad"
+                  secureTextEntry
+                  maxLength={6}
+                  value={setupConfirm}
+                  onChangeText={setSetupConfirm}
+                />
+                {setupError && <Text style={s.pinError}>{setupError}</Text>}
+                <CTAButton onPress={handleSetupPin} disabled={setupLoading}>
+                  {setupLoading ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : 'Set PIN & Pay'}
+                </CTAButton>
+              </>
+            ) : pinLocked ? (
+              <>
+                <View style={{ alignItems: 'center', gap: 12, paddingVertical: 8 }}>
+                  <AlertTriangle size={40} color={colors.destructive} />
+                  <Text style={s.modalTitle}>PIN Locked</Text>
+                  <Text style={s.modalDesc}>
+                    Too many incorrect attempts. Your wallet PIN has been locked for security. Try again in {lockCountdown || '05:00s'}.
+                  </Text>
+                </View>
+                <CTAButton variant="outline" onPress={() => setShowPinModal(false)}>
+                  Close
+                </CTAButton>
+              </>
+            ) : (
+              <>
+                <Text style={s.modalDesc}>Enter your wallet PIN to confirm payment of {formatCurrency(amount)}.</Text>
+                <TextInput
+                  style={s.pinInput}
+                  placeholder="Enter PIN"
+                  placeholderTextColor={colors.mutedForeground}
+                  keyboardType="number-pad"
+                  secureTextEntry
+                  maxLength={6}
+                  value={pinInput}
+                  onChangeText={setPinInput}
+                  autoFocus
+                />
+                {pinError && <Text style={s.pinError}>{pinError}</Text>}
+                {attemptsRemaining != null && attemptsRemaining <= 3 && (
+                  <View style={{ alignItems: 'center' }}>
+                    <Text style={{ fontSize: 12, fontWeight: '500', color: colors.warning }}>
+                      {attemptsRemaining} attempt{attemptsRemaining !== 1 ? 's' : ''} remaining
+                    </Text>
+                  </View>
+                )}
+                <CTAButton onPress={handleVerifyPin} disabled={pinLoading || !pinInput.trim()}>
+                  {pinLoading ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : 'Confirm Payment'}
+                </CTAButton>
+              </>
+            )}
+          </Card>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   )
 }
@@ -190,17 +443,15 @@ function StatusBarCustom() {
 }
 
 const s = StyleSheet.create({
-  deadline: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, backgroundColor: colors.accent, padding: 12 },
+  deadline: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, backgroundColor: colors.accent, padding: 12, marginTop: 16 },
   deadlineText: { fontSize: 13, fontWeight: '600', color: colors.navy + 'CC', flex: 1 },
-  label: { fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1, color: colors.mutedForeground },
   amount: { fontSize: 36, fontWeight: '800', color: colors.navy, marginTop: 8, fontVariant: ['tabular-nums'] },
-  forProduct: { fontSize: 12, fontWeight: '500', color: colors.mutedForeground, marginTop: 8 },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   summaryLabel: { fontSize: 13, color: colors.mutedForeground },
   summaryValue: { fontSize: 13, fontWeight: '600', color: colors.navy },
   summaryDivider: { height: 1, backgroundColor: colors.border, marginTop: 12 },
-  bottomCta: { position: 'absolute', bottom: 0, left: 0, right: 0, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.card + 'F2', padding: 16 },
-  methodSelector: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 16, marginTop: 16 },
+  bottomCta: { position: 'absolute', bottom: 0, left: 0, right: 0, borderTopWidth: 1, borderTopColor: colors.border, padding: 16 },
+  methodSelector: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 16, marginTop: 12 },
   methodSelectorTitle: { fontSize: 14, fontWeight: '700', color: colors.navy },
   methodSelectorSub: { fontSize: 12, color: colors.mutedForeground, marginTop: 2 },
   methodsList: { borderRadius: 12, borderWidth: 1, borderColor: colors.border, padding: 8, marginTop: 8 },
@@ -208,8 +459,13 @@ const s = StyleSheet.create({
   methodOptionSelected: { backgroundColor: colors.primary + '1A' },
   methodOptionTitle: { fontSize: 13, fontWeight: '700', color: colors.navy },
   methodOptionSub: { fontSize: 11, color: colors.mutedForeground, marginTop: 2 },
-  phoneInput: { borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, fontSize: 14, fontWeight: '500', color: colors.navy },
-  infoBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderRadius: 12, backgroundColor: colors.accent, padding: 16, marginTop: 16 },
-  infoTitle: { fontSize: 14, fontWeight: '700', color: colors.navy },
-  infoText: { fontSize: 12, fontWeight: '500', color: colors.mutedForeground, marginTop: 4, lineHeight: 18 },
+  infoBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, borderRadius: 12, backgroundColor: colors.navy + '0D', padding: 12, marginTop: 16 },
+  infoText: { fontSize: 12, fontWeight: '500', lineHeight: 18, color: colors.navy + 'B3', flex: 1 },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
+  modalSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, gap: 16 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: colors.navy },
+  modalDesc: { fontSize: 13, fontWeight: '500', color: colors.mutedForeground, lineHeight: 20 },
+  pinInput: { height: 48, borderRadius: 12, borderWidth: 1, borderColor: colors.input, paddingHorizontal: 16, fontSize: 18, fontWeight: '700', color: colors.navy, backgroundColor: colors.muted, textAlign: 'center', letterSpacing: 8 },
+  pinError: { fontSize: 13, fontWeight: '600', color: colors.destructive, textAlign: 'center' },
 })

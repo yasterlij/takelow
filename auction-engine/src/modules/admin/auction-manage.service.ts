@@ -68,7 +68,11 @@ export class AuctionManageService {
     };
   }
 
-  private async listAuctionsFallback(page = 1, limit = 20, status?: AuctionStatus) {
+  private async listAuctionsFallback(
+    page = 1,
+    limit = 20,
+    status?: AuctionStatus,
+  ) {
     const offset = (page - 1) * limit;
     const params: any[] = [];
     let where = "";
@@ -98,7 +102,7 @@ export class AuctionManageService {
       params,
     );
     const countRows = await this.auctionRepository.query(
-      `SELECT COUNT(*)::int AS total FROM auctions a ${status ? 'WHERE a.status = $1' : ''}`,
+      `SELECT COUNT(*)::int AS total FROM auctions a ${status ? "WHERE a.status = $1" : ""}`,
       status ? [status] : [],
     );
     const total = countRows[0]?.total || 0;
@@ -143,18 +147,28 @@ export class AuctionManageService {
   async createProduct(dto: CreateProductDto) {
     const data = { ...dto };
     if (data.image_urls?.length) {
-      data.image_urls = await this.imageService.processImageUrls(data.image_urls);
+      data.image_urls = await this.imageService.processImageUrls(
+        data.image_urls,
+      );
     }
     data.specs = this.normalizeSpecs(data.specs) ?? undefined;
     try {
-      return await this.productRepository.save(this.productRepository.create(data));
+      return await this.productRepository.save(
+        this.productRepository.create(data),
+      );
     } catch (error) {
       if (!this.isMissingColumnError(error)) throw error;
       const rows = await this.productRepository.query(
         `INSERT INTO products (name, description, image_urls, current_market_price, brand)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING id, name, description, image_urls, current_market_price, brand, created_at`,
-        [data.name, data.description || null, data.image_urls || null, data.current_market_price, data.brand || null],
+        [
+          data.name,
+          data.description || null,
+          data.image_urls || null,
+          data.current_market_price,
+          data.brand || null,
+        ],
       );
       return { ...rows[0], specs: null };
     }
@@ -175,7 +189,9 @@ export class AuctionManageService {
     if (!product) throw new NotFoundException("Product not found");
     const data = { ...dto };
     if (data.image_urls?.length) {
-      data.image_urls = await this.imageService.processImageUrls(data.image_urls);
+      data.image_urls = await this.imageService.processImageUrls(
+        data.image_urls,
+      );
     }
     if (data.specs !== undefined) {
       data.specs = this.normalizeSpecs(data.specs) ?? undefined;
@@ -190,7 +206,14 @@ export class AuctionManageService {
          SET name = $2, description = $3, image_urls = $4, current_market_price = $5, brand = $6
          WHERE id = $1
          RETURNING id, name, description, image_urls, current_market_price, brand, created_at`,
-        [id, product.name, product.description || null, product.image_urls || null, product.current_market_price, product.brand || null],
+        [
+          id,
+          product.name,
+          product.description || null,
+          product.image_urls || null,
+          product.current_market_price,
+          product.brand || null,
+        ],
       );
       return { ...rows[0], specs: null };
     }
@@ -209,10 +232,14 @@ export class AuctionManageService {
     if (!product.image_urls?.length) {
       return { downloaded: 0, message: "No images to download" };
     }
-    const localUrls = await this.imageService.processImageUrls(product.image_urls);
+    const localUrls = await this.imageService.processImageUrls(
+      product.image_urls,
+    );
     product.image_urls = localUrls;
     await this.productRepository.save(product);
-    const downloaded = localUrls.filter((u) => u.startsWith("/uploads/")).length;
+    const downloaded = localUrls.filter((u) =>
+      u.startsWith("/uploads/"),
+    ).length;
     return { downloaded, total: product.image_urls.length };
   }
 
@@ -221,7 +248,9 @@ export class AuctionManageService {
     let total = 0;
     for (const product of products) {
       if (!product.image_urls?.length) continue;
-      const localUrls = await this.imageService.processImageUrls(product.image_urls);
+      const localUrls = await this.imageService.processImageUrls(
+        product.image_urls,
+      );
       product.image_urls = localUrls;
       await this.productRepository.save(product);
       total += localUrls.filter((u) => u.startsWith("/uploads/")).length;
@@ -251,7 +280,8 @@ export class AuctionManageService {
       const fallback = await this.listProductsFallback(1, 100000, search);
       products = fallback.data;
     }
-    const header = "id,name,description,brand,current_market_price,specs,created_at";
+    const header =
+      "id,name,description,brand,current_market_price,specs,created_at";
     const rows = products.map((p) =>
       [
         p.id,
@@ -292,7 +322,9 @@ export class AuctionManageService {
               name: row.product_name,
               description: row.product_description,
               image_urls: row.product_image_urls,
-              current_market_price: Number(row.product_current_market_price || 0),
+              current_market_price: Number(
+                row.product_current_market_price || 0,
+              ),
               brand: row.product_brand,
               specs: null,
             }
@@ -338,7 +370,10 @@ export class AuctionManageService {
       });
     } catch (error) {
       if (!this.isMissingColumnError(error)) throw error;
-      const rows = await this.productRepository.query(`SELECT id FROM products WHERE id = $1 LIMIT 1`, [dto.product_id]);
+      const rows = await this.productRepository.query(
+        `SELECT id FROM products WHERE id = $1 LIMIT 1`,
+        [dto.product_id],
+      );
       product = rows[0] || null;
     }
     if (!product) throw new NotFoundException("Product not found");
@@ -358,7 +393,15 @@ export class AuctionManageService {
         `INSERT INTO auctions (product_id, start_time, end_time, status, min_bid, max_bid, bid_fee)
          VALUES ($1, $2, $3, $4, $5, $6, $7)
          RETURNING *`,
-        [entity.product_id, entity.start_time, entity.end_time, entity.status, entity.min_bid ?? null, entity.max_bid ?? null, entity.bid_fee ?? null],
+        [
+          entity.product_id,
+          entity.start_time,
+          entity.end_time,
+          entity.status,
+          entity.min_bid ?? null,
+          entity.max_bid ?? null,
+          entity.bid_fee ?? null,
+        ],
       );
       return rows[0];
     }
@@ -366,11 +409,14 @@ export class AuctionManageService {
 
   private normalizeSpecs(specs?: Record<string, string>) {
     if (!specs || typeof specs !== "object") return null;
-    const normalized = this.specKeys.reduce<Record<string, string>>((acc, key) => {
-      const value = specs[key];
-      if (typeof value === "string" && value.trim()) acc[key] = value.trim();
-      return acc;
-    }, {});
+    const normalized = this.specKeys.reduce<Record<string, string>>(
+      (acc, key) => {
+        const value = specs[key];
+        if (typeof value === "string" && value.trim()) acc[key] = value.trim();
+        return acc;
+      },
+      {},
+    );
     return Object.keys(normalized).length ? normalized : null;
   }
 
@@ -380,7 +426,10 @@ export class AuctionManageService {
       auction = await this.auctionRepository.findOne({ where: { id } });
     } catch (error) {
       if (!this.isMissingColumnError(error)) throw error;
-      const rows = await this.auctionRepository.query(`SELECT * FROM auctions WHERE id = $1 LIMIT 1`, [id]);
+      const rows = await this.auctionRepository.query(
+        `SELECT * FROM auctions WHERE id = $1 LIMIT 1`,
+        [id],
+      );
       auction = rows[0] || null;
     }
     if (!auction) throw new NotFoundException("Auction not found");
@@ -406,7 +455,16 @@ export class AuctionManageService {
          SET product_id = $2, start_time = $3, end_time = $4, status = $5, min_bid = $6, max_bid = $7, bid_fee = $8
          WHERE id = $1
          RETURNING *`,
-        [id, auction.product_id, auction.start_time, auction.end_time, auction.status, auction.min_bid ?? null, auction.max_bid ?? null, auction.bid_fee ?? null],
+        [
+          id,
+          auction.product_id,
+          auction.start_time,
+          auction.end_time,
+          auction.status,
+          auction.min_bid ?? null,
+          auction.max_bid ?? null,
+          auction.bid_fee ?? null,
+        ],
       );
       return rows[0];
     }
@@ -454,7 +512,8 @@ export class AuctionManageService {
   ): Promise<{ name: string | null; phone: string | null } | null> {
     if (!userId) return null;
     try {
-      const identityBase = process.env.IDENTITY_SERVICE_URL || "http://localhost:3001";
+      const identityBase =
+        process.env.IDENTITY_SERVICE_URL || "http://localhost:3001";
       const headers: Record<string, string> = {};
       const internalApiKey = process.env.INTERNAL_API_KEY || "";
       if (internalApiKey) headers["x-internal-api-key"] = internalApiKey;
@@ -493,7 +552,8 @@ export class AuctionManageService {
 
     const { winningAmounts, totalBids, winners } =
       await this.winnerService.calculateWinners(auctionId);
-    const uniqueBidders = await this.winnerService.getUniqueBiddersCount(auctionId);
+    const uniqueBidders =
+      await this.winnerService.getUniqueBiddersCount(auctionId);
     const stats = {
       totalBids,
       uniqueBidders,
@@ -537,7 +597,8 @@ export class AuctionManageService {
       winner_name: winnerName,
       winner_phone: winnerPhone,
       winning_bid_amount:
-        auction.winning_bid_amount ?? (winners.length > 0 ? winners[0].amount : null),
+        auction.winning_bid_amount ??
+        (winners.length > 0 ? winners[0].amount : null),
       total_bids: stats.totalBids,
       unique_bidders: stats.uniqueBidders,
       lowest_unique_bid: stats.lowestUniqueBid,

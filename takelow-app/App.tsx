@@ -1,7 +1,7 @@
 import React from 'react'
 import { StatusBar } from 'expo-status-bar'
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
-import { Gavel, TicketCheck, LogOut, Wallet, Trophy } from 'lucide-react-native'
+import { Gavel, LogOut, Wallet, Trophy, UserRound } from 'lucide-react-native'
 import { AppProvider, useApp } from './src/AppContext'
 import { LoginScreen } from './src/screens/LoginScreen'
 import { RegisterScreen } from './src/screens/RegisterScreen'
@@ -16,6 +16,7 @@ import { MonitorScreen } from './src/screens/MonitorScreen'
 import { ClosedScreen } from './src/screens/ClosedScreen'
 import { WinnerScreen } from './src/screens/WinnerScreen'
 import { PayWinningScreen } from './src/screens/PayWinningScreen'
+import { ProfileScreen } from './src/screens/ProfileScreen'
 import { PaymentConfirmedScreen } from './src/screens/PaymentConfirmedScreen'
 import { PaymentResultScreen } from './src/screens/PaymentResultScreen'
 import { SikinaPayCheckout } from './src/screens/SikinaPayCheckout'
@@ -66,6 +67,7 @@ function ScreenRouter() {
       case 'monitor': return isAdmin ? <MonitorScreen /> : <HomeScreen />
       case 'closed': return <ClosedScreen />
       case 'winner': return <WinnerScreen />
+      case 'profile': return <ProfileScreen />
       case 'pay-winning': return <PayWinningScreen />
       case 'payment-confirmed': return <PaymentConfirmedScreen />
       case 'payment-success': return <PaymentResultScreen />
@@ -84,7 +86,7 @@ function ScreenRouter() {
     }
   })()
 
-  const showTabBar = user && ['home', 'auctions', 'my-bids', 'winners-list'].includes(view)
+  const showTabBar = user && ['home', 'auctions', 'my-bids', 'winners-list', 'profile'].includes(view)
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.neutralGray50 }}>
@@ -96,12 +98,12 @@ function ScreenRouter() {
 }
 
 function BottomTabBar() {
-  const { view, go, myBids, logout } = useApp()
+  const { view, go, logout } = useApp()
   const tabs = [
     { key: 'home', label: 'Home', icon: Wallet },
     { key: 'auctions', label: 'Auctions', icon: Gavel },
-    { key: 'my-bids', label: 'My Bids', icon: TicketCheck },
     { key: 'winners-list', label: 'Winners', icon: Trophy },
+    { key: 'profile', label: 'Profile', icon: UserRound },
   ] as const
 
   return (
@@ -115,11 +117,6 @@ function BottomTabBar() {
               {active && <View style={s.activeIndicator} />}
               <View style={{ position: 'relative', marginTop: 4 }}>
                 <Icon size={22} color={active ? colors.primary : colors.neutralGray400} />
-                {tab.key === 'my-bids' && myBids.length > 0 && (
-                  <View style={s.tabBadge}>
-                    <Text style={s.tabBadgeText}>{myBids.length > 9 ? '9+' : myBids.length}</Text>
-                  </View>
-                )}
               </View>
               <Text style={[s.tabLabel, active && s.tabLabelActive]}>{tab.label}</Text>
             </TouchableOpacity>
@@ -180,17 +177,4 @@ const s = StyleSheet.create({
   },
   tabLabel: { fontSize: 10, fontWeight: '500', color: colors.neutralGray400, marginTop: 2 },
   tabLabelActive: { color: colors.primary, fontWeight: '700' },
-  tabBadge: {
-    position: 'absolute', top: -6, right: -10,
-    minWidth: 16, height: 16, borderRadius: 8,
-    backgroundColor: colors.primary,
-    justifyContent: 'center', alignItems: 'center',
-    paddingHorizontal: 4,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  tabBadgeText: { fontSize: 9, fontWeight: '700', color: colors.primaryForeground },
 })

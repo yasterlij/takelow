@@ -1,10 +1,9 @@
-import React, { useState, useRef, useCallback } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Modal, Pressable, Dimensions, RefreshControl } from 'react-native'
+import React, { useState, useRef, useCallback, useEffect } from 'react'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Modal, Pressable, Dimensions, RefreshControl, Image } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Gavel, Wallet, ArrowRight, Eye, EyeOff, Shield, LogOut, Sparkles, Trophy } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { AwashMark } from '../components/AuctionUI'
-import { ImageCarousel } from '../components/ImageCarousel'
 import { colors } from '../theme'
 import { formatCurrency, formatETB, formatCountdown } from '../mockDataV0'
 import { useCountdown } from '../components/Countdown'
@@ -45,59 +44,50 @@ function HeroSlide({ item, onJoin, counter }: { item: any; onJoin: () => void; c
       borderRadius: 16, overflow: 'hidden',
       shadowColor: colors.awashBlue, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.15, shadowRadius: 16, elevation: 8,
     }}>
-      <ImageCarousel
-        images={item.images}
-        alt={item.name}
-        containerWidth={HERO_W + 32}
-        autoPlayInterval={5000}
-        overlay={
-          <>
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.35)' }]} />
-            <View style={{ position: 'absolute', top: 8, left: 10, right: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', zIndex: 10 }}>
-              <View style={{ gap: 6 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,43,92,0.75)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' }}>
-                <Gavel size={12} color="#FFF" />
-                <Text style={{ fontSize: 11, fontWeight: '700', color: '#FFF' }}>Live Auction</Text>
-              </View>
-              <View style={{ alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.14)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' }}>
-                <Text style={{ fontSize: 10, fontWeight: '800', color: '#FFF', letterSpacing: 1 }}>CODE {publicCode}</Text>
-              </View>
+      <Image source={{ uri: item.images[0] }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.35)' }]} />
+      <View style={{ position: 'absolute', top: 8, left: 10, right: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', zIndex: 10 }}>
+        <View style={{ gap: 6 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,43,92,0.75)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' }}>
+            <Gavel size={12} color="#FFF" />
+            <Text style={{ fontSize: 11, fontWeight: '700', color: '#FFF' }}>Live Auction</Text>
+          </View>
+          <View style={{ alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.14)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' }}>
+            <Text style={{ fontSize: 10, fontWeight: '800', color: '#FFF', letterSpacing: 1 }}>CODE {publicCode}</Text>
+          </View>
+        </View>
+        <View style={{ alignItems: 'flex-end', gap: 6 }}>
+          {counter && (
+            <View style={{ backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}>
+              <Text style={{ fontSize: 10, fontWeight: '800', color: '#FFF', fontVariant: ['tabular-nums'] }}>{counter}</Text>
             </View>
-            <View style={{ alignItems: 'flex-end', gap: 6 }}>
-              {counter && (
-                <View style={{ backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}>
-                  <Text style={{ fontSize: 10, fontWeight: '800', color: '#FFF', fontVariant: ['tabular-nums'] }}>{counter}</Text>
-                </View>
-              )}
-              <View style={{ backgroundColor: urgent ? colors.primary + '30' : 'rgba(255,255,255,0.8)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: urgent ? colors.primary + '40' : 'rgba(255,255,255,0.3)' }}>
-                <Text style={{ fontSize: 11, fontWeight: '800', color: urgent ? colors.primary : colors.awashBlue, fontVariant: ['tabular-nums'] }}>
-                  {d !== '00' ? `${parseInt(d)}d ` : ''}{h}:{m}:{s}
-                </Text>
-              </View>
-            </View>
-            </View>
-            <View style={{ position: 'absolute', bottom: 10, left: 10, right: 10, zIndex: 10 }}>
-              <Text style={{ color: '#FFF', fontFamily: 'System', fontSize: 18, fontWeight: '800', textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 }}>
-                {item.name}
-              </Text>
-              {item.specSummary ? <Text style={{ color: 'rgba(255,255,255,0.84)', fontSize: 12, fontWeight: '600', marginTop: 4 }}>{item.specSummary}</Text> : null}
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
-                <View style={{ borderRadius: 999, backgroundColor: colors.primary + '33', paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: colors.primary + '40' }}>
-                  <Text style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>Bid Amount: {formatCurrency(item.bidFee)}</Text>
-                </View>
-                <View style={{ backgroundColor: 'rgba(236,253,245,0.92)', borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: 'rgba(167,243,208,0.45)' }}>
-                  <Text style={{ color: colors.emerald700, fontSize: 10, fontWeight: '700' }}>{item.totalBids || item.bidders} bidders</Text>
-                </View>
-              </View>
-              <TouchableOpacity onPress={onJoin} activeOpacity={0.85} style={{ marginTop: 8, borderRadius: 12, overflow: 'hidden' }}>
-                <LinearGradient colors={['#C8A642', '#D4B85E', '#C8A642']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ paddingVertical: 10, alignItems: 'center' }}>
-                  <Text style={{ color: colors.primaryForeground, fontSize: 13, fontWeight: '700' }}>Join Auction</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-          </>
-        }
-      />
+          )}
+          <View style={{ backgroundColor: urgent ? colors.primary + '30' : 'rgba(255,255,255,0.8)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: urgent ? colors.primary + '40' : 'rgba(255,255,255,0.3)' }}>
+            <Text style={{ fontSize: 11, fontWeight: '800', color: urgent ? colors.primary : colors.awashBlue, fontVariant: ['tabular-nums'] }}>
+              {d !== '00' ? `${parseInt(d)}d ` : ''}{h}:{m}:{s}
+            </Text>
+          </View>
+        </View>
+      </View>
+      <View style={{ position: 'absolute', bottom: 10, left: 10, right: 10, zIndex: 10 }}>
+        <Text style={{ color: '#FFF', fontFamily: 'System', fontSize: 18, fontWeight: '800', textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 }}>
+          {item.name}
+        </Text>
+        {item.specSummary ? <Text style={{ color: 'rgba(255,255,255,0.84)', fontSize: 12, fontWeight: '600', marginTop: 4 }}>{item.specSummary}</Text> : null}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+          <View style={{ borderRadius: 999, backgroundColor: colors.primary + '33', paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: colors.primary + '40' }}>
+            <Text style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>Bid Amount: {formatCurrency(item.bidFee)}</Text>
+          </View>
+          <View style={{ backgroundColor: 'rgba(236,253,245,0.92)', borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: 'rgba(167,243,208,0.45)' }}>
+            <Text style={{ color: colors.emerald700, fontSize: 10, fontWeight: '700' }}>{item.totalBids || item.bidders} bidders</Text>
+          </View>
+        </View>
+        <TouchableOpacity onPress={onJoin} activeOpacity={0.85} style={{ marginTop: 8, borderRadius: 12, overflow: 'hidden' }}>
+          <LinearGradient colors={['#C8A642', '#D4B85E', '#C8A642']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ paddingVertical: 10, alignItems: 'center' }}>
+            <Text style={{ color: colors.primaryForeground, fontSize: 13, fontWeight: '700' }}>Join Auction</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
     </View>
   )
 }
@@ -128,6 +118,7 @@ function WinnerSlide({ auction, index }: { auction: any; index: number }) {
       <Text style={{ fontFamily: 'System', fontSize: 16, fontWeight: '800', color: colors.awashBlue }} numberOfLines={1}>{winnerName}</Text>
       {winnerInfo?.phone && <Text style={{ fontSize: 10, fontWeight: '500', color: colors.mutedForeground, marginTop: 2 }}>{maskPhone(winnerInfo.phone)}</Text>}
       <Text style={{ fontSize: 12, fontWeight: '500', color: colors.mutedForeground, marginTop: 2 }} numberOfLines={1}>{auction.name}</Text>
+      {auction.specSummary ? <Text style={{ fontSize: 10, fontWeight: '500', color: colors.mutedForeground, marginTop: 2 }} numberOfLines={1}>{auction.specSummary}</Text> : null}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8, backgroundColor: colors.primary + '1A', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6, borderWidth: 1, borderColor: colors.primary + '33' }}>
         <Trophy size={14} color={colors.primary} />
         <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>Won with {formatCurrency(bidAmount)}</Text>
@@ -137,14 +128,16 @@ function WinnerSlide({ auction, index }: { auction: any; index: number }) {
 }
 
 export function HomeScreen() {
-  const { go, walletBalance, user, logout, auctions, auctionsLoading, selectAuction, refreshAuctions } = useApp()
+  const { go, walletBalance, user, logout, auctions, auctionsLoading, selectAuction, refreshAuctions, myBids, getAuction } = useApp()
   const isAdmin = user?.role === 'admin'
   const [showBalance, setShowBalance] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [heroIndex, setHeroIndex] = useState(0)
+  const [heroPaused, setHeroPaused] = useState(false)
   const winnerScrollRef = useRef<ScrollView>(null)
   const heroScrollRef = useRef<ScrollView>(null)
+  const isDraggingRef = useRef(false)
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
@@ -157,19 +150,50 @@ export function HomeScreen() {
   const endingSoon = activeAuctions.filter((a) => a.status === 'ending-soon' || a.timeLeft < 3600)
   const displayHero = endingSoon.length > 0 ? endingSoon : activeAuctions
   const heroCount = displayHero.length
-  const heroSlides = Math.min(heroCount, 5)
-  const allAuctions = [...auctions].sort((a, b) => Number(a.status === 'closed') - Number(b.status === 'closed'))
+  const heroSlides = Math.min(heroCount, 10)
+  const heroIds = new Set(displayHero.slice(0, 10).map((a) => a.id))
+  const liveGrid = activeAuctions.filter((a) => !heroIds.has(a.id))
 
-  const onHeroScroll = useCallback((e: any) => {
-    const x = e.nativeEvent.contentOffset.x
+  const bidAuctionIds = new Set(myBids.map((b) => b.auctionId))
+  const bidCategories = new Set(
+    myBids.map((b) => getAuction(b.auctionId)?.category).filter((c): c is string => !!c),
+  )
+  const suggestedAuctions = activeAuctions.filter(
+    (a) => !heroIds.has(a.id) && !bidAuctionIds.has(a.id) && bidCategories.has(a.category),
+  )
+  const showSuggested = myBids.length > 0 && suggestedAuctions.length > 0
+
+  const updateHeroIndex = useCallback((x: number) => {
     const step = HERO_W + 12
     setHeroIndex(Math.max(0, Math.min(Math.round(x / step), Math.max(heroSlides - 1, 0))))
   }, [heroSlides])
 
-  const scrollToHero = useCallback((i: number) => {
-    heroScrollRef.current?.scrollTo({ x: i * (HERO_W + 12), animated: true })
-  }, [])
+  const onHeroScroll = useCallback((e: any) => {
+    if (!isDraggingRef.current) return
+    updateHeroIndex(e.nativeEvent.contentOffset.x)
+  }, [updateHeroIndex])
 
+  const onHeroMomentumEnd = useCallback((e: any) => {
+    isDraggingRef.current = false
+    setHeroPaused(false)
+    updateHeroIndex(e.nativeEvent.contentOffset.x)
+  }, [updateHeroIndex])
+
+  const goToHero = useCallback((i: number) => {
+    const idx = Math.max(0, Math.min(i, Math.max(heroSlides - 1, 0)))
+    setHeroIndex(idx)
+    heroScrollRef.current?.scrollTo({ x: idx * (HERO_W + 12), animated: true })
+  }, [heroSlides])
+
+  const safeHeroIndex = Math.min(heroIndex, Math.max(heroSlides - 1, 0))
+
+  useEffect(() => {
+    if (heroPaused || heroSlides <= 1) return
+    const id = setInterval(() => {
+      goToHero((heroIndex + 1) % heroSlides)
+    }, 5000)
+    return () => clearInterval(id)
+  }, [heroPaused, heroSlides, heroIndex, goToHero])
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.neutralGray50 }}>
@@ -214,7 +238,7 @@ export function HomeScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}
       >
-        {/* ── All Auctions ── */}
+        {/* ── Live Auctions Carousel ── */}
         <View style={{ paddingHorizontal: 16, paddingTop: 20 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -222,8 +246,8 @@ export function HomeScreen() {
                 <Gavel size={18} color={colors.awashBlue} />
               </View>
               <View>
-                <Text style={{ fontFamily: 'System', fontWeight: '700', fontSize: 17, color: colors.foreground }}>All Auctions</Text>
-                <Text style={{ fontSize: 11, fontWeight: '500', color: colors.mutedForeground }}>{activeAuctions.length} live · {closedAuctions.length} closed</Text>
+                <Text style={{ fontFamily: 'System', fontWeight: '700', fontSize: 17, color: colors.foreground }}>Live Auctions</Text>
+                <Text style={{ fontSize: 11, fontWeight: '500', color: colors.mutedForeground }}>{activeAuctions.length} live · bid low, be unique!</Text>
               </View>
             </View>
             <TouchableOpacity onPress={() => go('auctions')} activeOpacity={0.85} style={{ borderRadius: 20, overflow: 'hidden' }}>
@@ -243,11 +267,21 @@ export function HomeScreen() {
             scrollEventThrottle={16}
             snapToInterval={HERO_W + 12}
             decelerationRate="fast"
+            onScrollBeginDrag={() => {
+              isDraggingRef.current = true
+              setHeroPaused(true)
+            }}
+            onScrollEndDrag={(e: any) => {
+              isDraggingRef.current = false
+              setHeroPaused(false)
+              updateHeroIndex(e.nativeEvent.contentOffset.x)
+            }}
+            onMomentumScrollEnd={onHeroMomentumEnd}
           >
             {auctionsLoading ? (
               <View style={{ width: HERO_W, height: HERO_H, borderRadius: 16, backgroundColor: colors.neutralGray200, marginRight: 12 }} />
             ) : displayHero.length > 0 ? (
-              displayHero.slice(0, 5).map((a, i) => (
+              displayHero.slice(0, 10).map((a, i) => (
                 <HeroSlide key={a.id} item={a} onJoin={() => selectAuction(a.id)} counter={`${i + 1} / ${heroSlides}`} />
               ))
             ) : (
@@ -260,14 +294,14 @@ export function HomeScreen() {
 
           {!auctionsLoading && displayHero.length > 1 && (
             <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-              {displayHero.slice(0, 5).map((a, i) => (
-                <TouchableOpacity key={a.id} onPress={() => scrollToHero(i)} activeOpacity={0.7}>
+              {displayHero.slice(0, 10).map((a, i) => (
+                <TouchableOpacity key={a.id} onPress={() => goToHero(i)} activeOpacity={0.7}>
                   <View
                     style={{
-                      width: i === heroIndex ? 22 : 6,
+                      width: i === safeHeroIndex ? 22 : 6,
                       height: 6,
                       borderRadius: 3,
-                      backgroundColor: i === heroIndex ? colors.primary : colors.neutralGray300,
+                      backgroundColor: i === safeHeroIndex ? colors.primary : colors.neutralGray300,
                     }}
                   />
                 </TouchableOpacity>
@@ -275,21 +309,51 @@ export function HomeScreen() {
             </View>
           )}
 
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 8 }}>
             {auctionsLoading && auctions.length === 0 ? (
               [1, 2, 3, 4].map((i) => (
                 <View key={i} style={{ width: CARD_W, height: CARD_W * 0.75, borderTopLeftRadius: 16, borderTopRightRadius: 16, backgroundColor: colors.neutralGray200 }} />
               ))
-            ) : auctions.length > 0 ? (
-              allAuctions.map((a) => <AuctionCard key={a.id} auction={a} onOpen={() => selectAuction(a.id)} />)
-            ) : (
-              <View style={{ width: '100%', borderRadius: 16, borderWidth: 2, borderColor: 'rgba(0,0,0,0.08)', borderStyle: 'dashed', paddingVertical: 40, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.6)' }}>
-                <Gavel size={28} color={colors.neutralGray300} />
-                <Text style={{ fontSize: 13, fontWeight: '500', color: colors.neutralGray400, marginTop: 6 }}>No auctions yet</Text>
-              </View>
-            )}
+            ) : liveGrid.length > 0 ? (
+              liveGrid.slice(0, 4).map((a) => <AuctionCard key={a.id} auction={a} onOpen={() => selectAuction(a.id)} />)
+            ) : null}
           </View>
+
+          {!auctionsLoading && activeAuctions.length > 0 && (
+            <TouchableOpacity onPress={() => go('auctions')} activeOpacity={0.85} style={{ marginTop: 14, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: colors.primary + '50', backgroundColor: colors.primary + '0D' }}>
+              <LinearGradient colors={['rgba(200,166,66,0.08)', 'rgba(212,184,94,0.12)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ paddingVertical: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary }}>View All Live Auctions</Text>
+                <ArrowRight size={14} color={colors.primary} />
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
         </View>
+
+        {/* ── Suggested For You ── */}
+        {showSuggested && (
+          <View style={{ paddingHorizontal: 16, paddingTop: 24 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: colors.primary + '18', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.primary + '20' }}>
+                  <Sparkles size={18} color={colors.primary} />
+                </View>
+                <View>
+                  <Text style={{ fontFamily: 'System', fontWeight: '700', fontSize: 17, color: colors.foreground }}>Suggested For You</Text>
+                  <Text style={{ fontSize: 11, fontWeight: '500', color: colors.mutedForeground }}>Based on the auctions you've joined</Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => go('auctions')} activeOpacity={0.85} style={{ borderRadius: 20, overflow: 'hidden' }}>
+                <LinearGradient colors={['#C8A642', '#D4B85E', '#C8A642']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ paddingHorizontal: 12, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primaryForeground }}>View All</Text>
+                  <ArrowRight size={12} color={colors.primaryForeground} />
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+              {suggestedAuctions.slice(0, 4).map((a) => <AuctionCard key={a.id} auction={a} onOpen={() => selectAuction(a.id)} />)}
+            </View>
+          </View>
+        )}
 
         {/* ── Section B: Winners ── */}
         <View style={{ paddingHorizontal: 16, paddingTop: 24 }}>
@@ -311,21 +375,40 @@ export function HomeScreen() {
             </TouchableOpacity>
           </View>
 
+          {closedAuctions.length > 0 && (
+            <View style={{ marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, borderWidth: 1, borderColor: colors.primary + '33', backgroundColor: colors.primary + '14', paddingHorizontal: 14, paddingVertical: 12 }}>
+              <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' }}>
+                <Trophy size={16} color={colors.primaryForeground} />
+              </View>
+              <Text style={{ fontFamily: 'System', fontSize: 13, fontWeight: '700', color: colors.primary, flex: 1 }}>Congratulations to our latest winners!</Text>
+            </View>
+          )}
+
           <ScrollView
             ref={winnerScrollRef}
             horizontal
             showsHorizontalScrollIndicator={false}
             style={{ marginHorizontal: -16, paddingHorizontal: 16 }}
           >
-            {closedAuctions.slice(0, 5).map((a, i) => (
-              <WinnerSlide key={a.id} auction={a} index={i} />
-            ))}
+            {closedAuctions.length > 0 ? (
+              closedAuctions.slice(0, 5).map((a, i) => (
+                <WinnerSlide key={a.id} auction={a} index={i} />
+              ))
+            ) : (
+              <View style={{ width: SCREEN_W - 32, borderRadius: 16, borderWidth: 2, borderColor: colors.primary + '26', borderStyle: 'dashed', backgroundColor: colors.accent, justifyContent: 'center', alignItems: 'center', paddingVertical: 32, gap: 8 }}>
+                <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: colors.primary + '18', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.primary + '33' }}>
+                  <Trophy size={22} color={colors.primary} />
+                </View>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: colors.primary }}>Winners announced soon</Text>
+                <Text style={{ fontSize: 11, fontWeight: '500', color: colors.mutedForeground }}>The lowest unique bid wins.</Text>
+              </View>
+            )}
           </ScrollView>
 
           <TouchableOpacity onPress={() => go('winners-list')} activeOpacity={0.85} style={{ marginTop: 8, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: colors.primary + '50' }}>
             <LinearGradient colors={['#C8A642', '#D4B85E', '#C8A642']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ paddingVertical: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
               <Trophy size={14} color={colors.primaryForeground} />
-              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primaryForeground }}>View All Closed Auctions</Text>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primaryForeground }}>View All Winners</Text>
               <ArrowRight size={14} color={colors.primaryForeground} />
             </LinearGradient>
           </TouchableOpacity>

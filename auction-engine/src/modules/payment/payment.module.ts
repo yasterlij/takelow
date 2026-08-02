@@ -25,7 +25,12 @@ import { BidEncryptionService } from "../common/bid-encryption.service";
     SikinaWebhookController,
     AwashWebhookController,
   ],
-  providers: [PaymentService, SikinaService, AwashService, BidEncryptionService],
+  providers: [
+    PaymentService,
+    SikinaService,
+    AwashService,
+    BidEncryptionService,
+  ],
   exports: [PaymentService, SikinaService, AwashService],
 })
 export class PaymentModule {}

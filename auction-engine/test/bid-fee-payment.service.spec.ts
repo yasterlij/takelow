@@ -247,8 +247,9 @@ describe('PaymentService - Bid Fee Payment', () => {
         payment_type: PaymentType.WINNING_BID,
         status: PaymentTransactionStatus.PENDING,
       };
-      mockPaymentTransactionRepo.findOne.mockResolvedValue(mockTransaction);
+      mockPaymentTransactionRepo.findOne.mockResolvedValue({ ...mockTransaction, status: PaymentTransactionStatus.SUCCESSFUL });
       mockPaymentTransactionRepo.save.mockResolvedValue({ ...mockTransaction, status: PaymentTransactionStatus.SUCCESSFUL });
+      mockPaymentTransactionRepo.update.mockResolvedValue({ affected: 1 });
       
       const mockAuction = {
         id: auctionId,
@@ -288,8 +289,9 @@ describe('PaymentService - Bid Fee Payment', () => {
         payment_type: PaymentType.BID_FEE,
         status: PaymentTransactionStatus.PENDING,
       };
-      mockPaymentTransactionRepo.findOne.mockResolvedValue(mockTransaction);
+      mockPaymentTransactionRepo.findOne.mockResolvedValue({ ...mockTransaction, status: PaymentTransactionStatus.SUCCESSFUL });
       mockPaymentTransactionRepo.save.mockResolvedValue({ ...mockTransaction, status: PaymentTransactionStatus.SUCCESSFUL });
+      mockPaymentTransactionRepo.update.mockResolvedValue({ affected: 1 });
 
       await service.handleSuccessfulPayment(clientReferenceId, paymentReferenceId, {});
 

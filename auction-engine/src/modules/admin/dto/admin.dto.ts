@@ -86,7 +86,6 @@ export class CreateAuctionDto {
   @IsNumber()
   @Min(0)
   bid_fee?: number;
-
 }
 
 export class UpdateAuctionDto {

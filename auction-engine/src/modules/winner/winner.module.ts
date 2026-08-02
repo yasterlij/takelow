@@ -16,7 +16,12 @@ import { BidEncryptionService } from "../common/bid-encryption.service";
     TypeOrmModule.forFeature([Auction, Bid, Winner]),
     WorkerModule,
   ],
-  providers: [WinnerService, AuctionClosureService, AuctionNotificationService, BidEncryptionService],
+  providers: [
+    WinnerService,
+    AuctionClosureService,
+    AuctionNotificationService,
+    BidEncryptionService,
+  ],
   exports: [WinnerService, AuctionClosureService],
 })
 export class WinnerModule {}

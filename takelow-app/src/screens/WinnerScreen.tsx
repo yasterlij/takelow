@@ -352,9 +352,15 @@ export function WinnerScreen() {
       </View>
       <Card style={s.bottomCta}>
         {winner?.winner_user_id && allWinners?.some((w: any) => w.user_id === user?.id) ? (
-          <CTAButton onPress={() => go('pay-winning')}>
-            <CreditCard size={18} /> {winner.payment_status === 'PAID' ? 'View Receipt' : 'Process Payment'}
-          </CTAButton>
+          winner.payment_status === 'PAID' ? (
+            <CTAButton onPress={() => go('home')}>
+              <CheckCircle2 size={18} /> Payment Complete — Back Home
+            </CTAButton>
+          ) : (
+            <CTAButton onPress={() => go('pay-winning')}>
+              <CreditCard size={18} /> Process Payment
+            </CTAButton>
+          )
         ) : (
           <CTAButton variant="outline" onPress={() => go('home')}>Back to Dashboard</CTAButton>
         )}

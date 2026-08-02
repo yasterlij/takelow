@@ -9,7 +9,9 @@ import { Server, Socket } from "socket.io";
 import { Logger } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 
-const ALLOWED_WS_ORIGINS = (process.env.CORS_ORIGINS || "http://localhost:5173,http://localhost:3000")
+const ALLOWED_WS_ORIGINS = (
+  process.env.CORS_ORIGINS || "http://localhost:5173,http://localhost:3000"
+)
   .split(",")
   .map((o) => o.trim());
 

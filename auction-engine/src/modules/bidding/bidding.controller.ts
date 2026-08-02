@@ -66,7 +66,9 @@ export class BiddingController {
       ticketNumber,
     );
 
-    this.sendBidSms(user, auction, amount, ticketNumber).catch((e: any) => this.logger.warn(`Failed to send bid SMS: ${e.message}`));
+    this.sendBidSms(user, auction, amount, ticketNumber).catch((e: any) =>
+      this.logger.warn(`Failed to send bid SMS: ${e.message}`),
+    );
 
     return {
       message: "Bid placed successfully",
@@ -126,7 +128,8 @@ export class BiddingController {
       winner_name: primaryWinnerInfo?.name || null,
       winner_phone: primaryWinnerInfo?.phone || null,
       winning_bid_amount:
-        auction.winning_bid_amount ?? (winners.length > 0 ? winners[0].amount : null),
+        auction.winning_bid_amount ??
+        (winners.length > 0 ? winners[0].amount : null),
       total_bids: stats.totalBids,
       unique_bidders: stats.uniqueBidders,
       lowest_unique_bid: stats.lowestUniqueBid,
@@ -147,10 +150,18 @@ export class BiddingController {
     };
   }
 
-  private async sendBidSms(user: any, auction: any, amount: number, ticketNumber: string): Promise<void> {
+  private async sendBidSms(
+    user: any,
+    auction: any,
+    amount: number,
+    ticketNumber: string,
+  ): Promise<void> {
     try {
-      const identityBase = process.env.IDENTITY_SERVICE_URL || "http://localhost:3001";
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      const identityBase =
+        process.env.IDENTITY_SERVICE_URL || "http://localhost:3001";
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
       const internalApiKey = process.env.INTERNAL_API_KEY || "";
       if (internalApiKey) headers["x-internal-api-key"] = internalApiKey;
       await fetch(`${identityBase}/api/v1/notify/bid-confirmation`, {
@@ -175,7 +186,8 @@ export class BiddingController {
     try {
       const internalHeaders: Record<string, string> = {};
       const internalApiKey = process.env.INTERNAL_API_KEY || "";
-      if (internalApiKey) internalHeaders["x-internal-api-key"] = internalApiKey;
+      if (internalApiKey)
+        internalHeaders["x-internal-api-key"] = internalApiKey;
       const res = await fetch(
         `http://identity-service:3000/api/v1/wallet/user/${userId}/internal`,
         { headers: internalHeaders },
@@ -202,5 +214,4 @@ export class BiddingController {
       return 0;
     }
   }
-
 }

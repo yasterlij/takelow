@@ -16,13 +16,17 @@ export class WinnerService {
     return Number(amount).toFixed(2);
   }
 
-  private readBidAmount(bid: Pick<Bid, "amount" | "encrypted_amount">): string | null {
+  private readBidAmount(
+    bid: Pick<Bid, "amount" | "encrypted_amount">,
+  ): string | null {
     if (Number(bid.amount) !== 0 || !bid.encrypted_amount) {
       return this.normalizeAmount(bid.amount);
     }
 
     try {
-      return this.normalizeAmount(this.bidEncryptionService.decrypt(bid.encrypted_amount));
+      return this.normalizeAmount(
+        this.bidEncryptionService.decrypt(bid.encrypted_amount),
+      );
     } catch {
       return null;
     }
@@ -56,7 +60,9 @@ export class WinnerService {
         return result;
       }
     } catch (e) {
-      this.logger.warn(`Redis winner calc failed for ${auctionId}: ${e.message}`);
+      this.logger.warn(
+        `Redis winner calc failed for ${auctionId}: ${e.message}`,
+      );
     }
 
     return this.calculateWinnersFromDb(auctionId, 1);
@@ -67,13 +73,17 @@ export class WinnerService {
       const result = await this.hasUniqueBidsFromRedis(auctionId);
       if (result !== null) return result;
     } catch (e) {
-      this.logger.warn(`Redis unique check failed for ${auctionId}: ${e.message}`);
+      this.logger.warn(
+        `Redis unique check failed for ${auctionId}: ${e.message}`,
+      );
     }
 
     return this.hasUniqueBidsFromDb(auctionId);
   }
 
-  private async hasUniqueBidsFromRedis(auctionId: string): Promise<boolean | null> {
+  private async hasUniqueBidsFromRedis(
+    auctionId: string,
+  ): Promise<boolean | null> {
     const totalBidsStr = await this.redis.get(
       `takelow:auction:${auctionId}:total_bids`,
     );
@@ -90,7 +100,10 @@ export class WinnerService {
     const freqKey = `takelow:auction:${auctionId}:frequencies`;
 
     for (const amount of amounts) {
-      const freq = await this.redis.zscore(freqKey, this.normalizeAmount(amount));
+      const freq = await this.redis.zscore(
+        freqKey,
+        this.normalizeAmount(amount),
+      );
       if (freq && Number(freq) === 1) return true;
     }
 
@@ -149,7 +162,9 @@ export class WinnerService {
     paymentDeadline: Date,
     manager?: EntityManager,
   ): Promise<Winner[]> {
-    const repo = manager ? manager.getRepository(Winner) : this.winnerRepository;
+    const repo = manager
+      ? manager.getRepository(Winner)
+      : this.winnerRepository;
     const existing = await repo.find({
       where: { auction_id: auctionId },
     });
@@ -190,7 +205,7 @@ export class WinnerService {
       return { found: false, winningAmounts: [], totalBids: 0, winners: [] };
     }
 
-      const totalBids = parseInt(totalBidsStr, 10);
+    const totalBids = parseInt(totalBidsStr, 10);
     if (totalBids === 0) {
       return { found: true, winningAmounts: [], totalBids: 0, winners: [] };
     }
@@ -212,7 +227,10 @@ export class WinnerService {
       (_, i) => freqResults[i] && Number(freqResults[i]) === 1,
     );
 
-    const earliestMap = await this.findEarliestBidders(auctionId, uniqueAmounts);
+    const earliestMap = await this.findEarliestBidders(
+      auctionId,
+      uniqueAmounts,
+    );
     const winners: { amount: number; userId: string }[] = [];
     for (const amount of uniqueAmounts) {
       const userId = earliestMap.get(amount);
@@ -264,7 +282,11 @@ export class WinnerService {
       userId: earliestPerAmount.get(amount) || "",
     }));
 
-    return { winningAmounts: selected.map((amount) => Number(amount)), totalBids, winners };
+    return {
+      winningAmounts: selected.map((amount) => Number(amount)),
+      totalBids,
+      winners,
+    };
   }
 
   private async findEarliestBidder(
@@ -278,9 +300,14 @@ export class WinnerService {
     });
     const targetAmount = this.normalizeAmount(amount);
     const match = bids.find((b) => {
-      if (Number(b.amount) !== 0 || !b.encrypted_amount) return this.normalizeAmount(b.amount) === targetAmount;
+      if (Number(b.amount) !== 0 || !b.encrypted_amount)
+        return this.normalizeAmount(b.amount) === targetAmount;
       try {
-        return this.normalizeAmount(this.bidEncryptionService.decrypt(b.encrypted_amount)) === targetAmount;
+        return (
+          this.normalizeAmount(
+            this.bidEncryptionService.decrypt(b.encrypted_amount),
+          ) === targetAmount
+        );
       } catch {
         return false;
       }
@@ -293,7 +320,9 @@ export class WinnerService {
     amounts: number[],
   ): Promise<Map<number, string>> {
     if (amounts.length === 0) return new Map();
-    const amountSet = new Set(amounts.map((amount) => this.normalizeAmount(amount)));
+    const amountSet = new Set(
+      amounts.map((amount) => this.normalizeAmount(amount)),
+    );
     const bids = await this.bidRepository.find({
       where: { auction_id: auctionId },
       order: { bid_time: "ASC" },

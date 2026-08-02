@@ -81,7 +81,9 @@ export class AuctionClosureService {
         auction.id,
         totalBids,
         auction.min_bid,
-      ).catch((e) => this.logger.warn(`Failed to send extension notification: ${e.message}`));
+      ).catch((e) =>
+        this.logger.warn(`Failed to send extension notification: ${e.message}`),
+      );
       return;
     }
 
@@ -92,8 +94,8 @@ export class AuctionClosureService {
       this.logger.log(
         `Auction ${auction.id}: No unique bids among ${totalBids} bids (extension #${auction.extensions}), extended 24h for fair play`,
       );
-      this.sendFairPlayNotification(auction.id).catch(
-        (e) => this.logger.warn(`Failed to send fair play notification: ${e.message}`),
+      this.sendFairPlayNotification(auction.id).catch((e) =>
+        this.logger.warn(`Failed to send fair play notification: ${e.message}`),
       );
       return;
     }
@@ -134,9 +136,15 @@ export class AuctionClosureService {
           );
 
           auction.winner_user_id = winningBids[0].user_id;
-          const winAmount = Number(winningBids[0].amount) === 0 && winningBids[0].encrypted_amount
-            ? this.normalizeAmount(this.bidEncryptionService.decrypt(winningBids[0].encrypted_amount))
-            : this.normalizeAmount(winningBids[0].amount);
+          const winAmount =
+            Number(winningBids[0].amount) === 0 &&
+            winningBids[0].encrypted_amount
+              ? this.normalizeAmount(
+                  this.bidEncryptionService.decrypt(
+                    winningBids[0].encrypted_amount,
+                  ),
+                )
+              : this.normalizeAmount(winningBids[0].amount);
           auction.winning_bid_amount = Number(winAmount);
           auction.status = AS.CLOSED;
           auction.payment_status = PaymentStatus.PENDING;
@@ -158,11 +166,13 @@ export class AuctionClosureService {
               `Amounts: [${winners.map((w) => w.amount).join(", ")}]`,
           );
 
-          this.logClosureEvent(auction.id, "AUTO_CLOSE", winners).catch(
-            (e) => this.logger.warn(`Failed to log closure event: ${e.message}`),
+          this.logClosureEvent(auction.id, "AUTO_CLOSE", winners).catch((e) =>
+            this.logger.warn(`Failed to log closure event: ${e.message}`),
           );
-          this.sendWinnerNotifications(auction, winners).catch(
-            (e) => this.logger.warn(`Failed to send winner notifications: ${e.message}`),
+          this.sendWinnerNotifications(auction, winners).catch((e) =>
+            this.logger.warn(
+              `Failed to send winner notifications: ${e.message}`,
+            ),
           );
         }
       } else {
@@ -267,8 +277,10 @@ export class AuctionClosureService {
       `Auction ${auctionId}: Force closed by admin with no unique bids`,
     );
 
-    this.sendForcedClosureNotification(auction.id).catch(
-      (e) => this.logger.warn(`Failed to send forced closure notification: ${e.message}`),
+    this.sendForcedClosureNotification(auction.id).catch((e) =>
+      this.logger.warn(
+        `Failed to send forced closure notification: ${e.message}`,
+      ),
     );
 
     if (actorId) {
@@ -319,7 +331,9 @@ export class AuctionClosureService {
     }
   }
 
-  private async sendForcedClosureNotification(auctionId: string): Promise<void> {
+  private async sendForcedClosureNotification(
+    auctionId: string,
+  ): Promise<void> {
     const auction = await this.auctionRepository.findOne({
       where: { id: auctionId },
       relations: ["product"],
@@ -368,9 +382,16 @@ export class AuctionClosureService {
         order: { bid_time: "ASC" },
       });
       const match = bids.find((b: Bid) => {
-        if (Number(b.amount) !== 0 || !b.encrypted_amount) return this.normalizeAmount(b.amount) === this.normalizeAmount(amount);
+        if (Number(b.amount) !== 0 || !b.encrypted_amount)
+          return (
+            this.normalizeAmount(b.amount) === this.normalizeAmount(amount)
+          );
         try {
-          return this.normalizeAmount(this.bidEncryptionService.decrypt(b.encrypted_amount)) === this.normalizeAmount(amount);
+          return (
+            this.normalizeAmount(
+              this.bidEncryptionService.decrypt(b.encrypted_amount),
+            ) === this.normalizeAmount(amount)
+          );
         } catch {
           return false;
         }

@@ -44,7 +44,8 @@ export class AuctionNotificationService {
           "Content-Type": "application/json",
         };
         const internalApiKey = process.env.INTERNAL_API_KEY || "";
-        if (internalApiKey) notifyHeaders["x-internal-api-key"] = internalApiKey;
+        if (internalApiKey)
+          notifyHeaders["x-internal-api-key"] = internalApiKey;
         await fetch(
           "http://identity-service:3000/api/v1/notify/auction-started",
           {
@@ -102,7 +103,8 @@ export class AuctionNotificationService {
           "Content-Type": "application/json",
         };
         const internalApiKey = process.env.INTERNAL_API_KEY || "";
-        if (internalApiKey) notifyHeaders["x-internal-api-key"] = internalApiKey;
+        if (internalApiKey)
+          notifyHeaders["x-internal-api-key"] = internalApiKey;
         await fetch("http://identity-service:3000/api/v1/notify/ending-soon", {
           method: "POST",
           headers: notifyHeaders,

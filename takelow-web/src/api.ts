@@ -544,19 +544,22 @@ export const api = {
 
 let _sikinaPopup: Window | null = null
 
+const SIKINA_POPUP_W = 420
+const SIKINA_POPUP_H = 700
+
 export function openSikinaPopup(url: string): Window | null {
   if (_sikinaPopup && !_sikinaPopup.closed) {
     _sikinaPopup.focus()
     return _sikinaPopup
   }
-  const w = 520
-  const h = 720
+  const w = SIKINA_POPUP_W
+  const h = SIKINA_POPUP_H
   const left = Math.max(0, Math.round(window.screenX + (window.outerWidth - w) / 2))
   const top = Math.max(0, Math.round(window.screenY + (window.outerHeight - h) / 2))
   _sikinaPopup = window.open(
     url,
     'sikina-pay',
-    `popup=1,width=${w},height=${h},left=${left},top=${top},scrollbars=yes,resizable=yes`,
+    `popup=yes,width=${w},height=${h},left=${left},top=${top},menubar=no,status=no,location=no,toolbar=no,directories=no,scrollbars=yes,resizable=yes`,
   )
   return _sikinaPopup
 }

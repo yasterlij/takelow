@@ -14,7 +14,10 @@ async function bootstrap() {
     rawBody: true,
   });
 
-  const allowedOrigins = (process.env.CORS_ORIGINS || "http://localhost:5173,http://localhost:3000,http://localhost")
+  const allowedOrigins = (
+    process.env.CORS_ORIGINS ||
+    "http://localhost:5173,http://localhost:3000,http://localhost"
+  )
     .split(",")
     .map((o) => o.trim());
 

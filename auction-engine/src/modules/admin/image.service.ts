@@ -38,7 +38,12 @@ export class ImageService {
   }
 
   private isPrivateIp(hostname: string): boolean {
-    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0" || hostname === "::1") {
+    if (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "0.0.0.0" ||
+      hostname === "::1"
+    ) {
       return true;
     }
     if (net.isIPv4(hostname)) {
@@ -61,12 +66,16 @@ export class ImageService {
         return false;
       }
       if (this.isPrivateIp(parsed.hostname)) {
-        this.logger.warn(`SSRF blocked: private IP/hostname ${parsed.hostname} in URL ${url}`);
+        this.logger.warn(
+          `SSRF blocked: private IP/hostname ${parsed.hostname} in URL ${url}`,
+        );
         return false;
       }
       const ext = path.extname(parsed.pathname).toLowerCase();
       if (ext && !ALLOWED_IMAGE_EXTENSIONS.includes(ext) && ext !== "") {
-        this.logger.warn(`SSRF blocked: disallowed extension ${ext} in URL ${url}`);
+        this.logger.warn(
+          `SSRF blocked: disallowed extension ${ext} in URL ${url}`,
+        );
         return false;
       }
       return true;
@@ -87,8 +96,14 @@ export class ImageService {
         return null;
       }
       const contentType = response.headers.get("content-type") || "image/jpeg";
-      if (!ALLOWED_IMAGE_MIME_TYPES.includes(contentType.split(";")[0].trim().toLowerCase())) {
-        this.logger.warn(`SSRF blocked: disallowed MIME type ${contentType} from ${url}`);
+      if (
+        !ALLOWED_IMAGE_MIME_TYPES.includes(
+          contentType.split(";")[0].trim().toLowerCase(),
+        )
+      ) {
+        this.logger.warn(
+          `SSRF blocked: disallowed MIME type ${contentType} from ${url}`,
+        );
         return null;
       }
       const ext = this.extensionFromMime(contentType) || ".jpg";

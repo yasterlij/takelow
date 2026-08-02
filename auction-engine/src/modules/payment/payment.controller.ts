@@ -100,18 +100,7 @@ export class PaymentController {
     @Param("auctionId") auctionId: string,
     @Req() req: any,
   ) {
-    const transaction = await this.paymentService.findTransaction(
-      auctionId,
-      req.user.id,
-    );
-    return {
-      status: transaction?.status || "NONE",
-      payment_url:
-        transaction?.sikina_payment_url ||
-        transaction?.awash_payment_url ||
-        null,
-      gateway: transaction?.gateway || "SIKINAPAY",
-    };
+    return this.paymentService.getWinningPaymentStatus(auctionId, req.user.id);
   }
 
   @UseGuards(AuthGuard("jwt"))
@@ -251,9 +240,8 @@ export class PaymentController {
       throw new ForbiddenException("Invalid or expired proxy token");
     }
 
-    const transaction = await this.paymentService.findTransactionById(
-      transactionId,
-    );
+    const transaction =
+      await this.paymentService.findTransactionById(transactionId);
     if (!transaction) throw new NotFoundException("Transaction not found");
 
     const paymentUrl =

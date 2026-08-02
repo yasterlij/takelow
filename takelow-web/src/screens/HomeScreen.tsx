@@ -11,7 +11,7 @@ function maskPhone(p: string | null): string | null {
   return p ? p.slice(0, 4) + "XXXX" + p.slice(-2) : null
 }
 
-function FeaturedHero({ auctions, onJoin }: { auctions: any[]; onJoin: (id: string) => void }) {
+function LiveAuctionsCarousel({ auctions, onJoin }: { auctions: any[]; onJoin: (id: string) => void }) {
   const [index, setIndex] = useState(0)
   const [paused, setPaused] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -71,7 +71,7 @@ function FeaturedHero({ auctions, onJoin }: { auctions: any[]; onJoin: (id: stri
         <div className="flex items-start justify-between gap-3">
           <div className="flex flex-col gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-awash-gold/20 px-3 py-1.5 text-xs font-bold text-awash-gold-light border border-awash-gold/30 backdrop-blur-md">
-              <Flame className="size-3.5" /> Featured
+              <Flame className="size-3.5" /> Live Auction
             </span>
             <span className="inline-flex items-center rounded-full bg-white/14 backdrop-blur-md px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-white border border-white/10">
               Code {publicCode}
@@ -113,12 +113,12 @@ function FeaturedHero({ auctions, onJoin }: { auctions: any[]; onJoin: (id: stri
       </div>
 
       <div className="absolute inset-y-0 left-2 flex items-center z-20">
-        <button onClick={prev} aria-label="Previous featured auction" className="hidden sm:flex size-9 items-center justify-center rounded-full bg-black/30 text-white backdrop-blur-md border border-white/15 opacity-0 group-hover:opacity-100 transition-opacity duration-300 hover:bg-black/50">
+        <button onClick={prev} aria-label="Previous live auction" className="hidden sm:flex size-9 items-center justify-center rounded-full bg-black/30 text-white backdrop-blur-md border border-white/15 opacity-0 group-hover:opacity-100 transition-opacity duration-300 hover:bg-black/50">
           <ChevronLeft className="size-5" />
         </button>
       </div>
       <div className="absolute inset-y-0 right-2 flex items-center z-20">
-        <button onClick={next} aria-label="Next featured auction" className="hidden sm:flex size-9 items-center justify-center rounded-full bg-black/30 text-white backdrop-blur-md border border-white/15 opacity-0 group-hover:opacity-100 transition-opacity duration-300 hover:bg-black/50">
+        <button onClick={next} aria-label="Next live auction" className="hidden sm:flex size-9 items-center justify-center rounded-full bg-black/30 text-white backdrop-blur-md border border-white/15 opacity-0 group-hover:opacity-100 transition-opacity duration-300 hover:bg-black/50">
           <ChevronRight className="size-5" />
         </button>
       </div>
@@ -189,6 +189,7 @@ function WinnerShowcaseSlide({ auction, index }: { auction: any; index: number }
           </span>
         </div>
         <p className="text-xs font-medium text-neutral-500 leading-tight">{auction.name}</p>
+        {auction.specSummary && <p className="truncate text-[11px] font-medium text-neutral-400">{auction.specSummary}</p>}
         <div className="mt-0.5 inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20 px-3 py-1.5">
           <Sparkles className="size-3 text-awash-gold" />
           <span className="text-[11px] font-semibold text-awash-gold-dark">Lowest unique bid won!</span>
@@ -199,7 +200,7 @@ function WinnerShowcaseSlide({ auction, index }: { auction: any; index: number }
 }
 
 export function HomeScreen() {
-  const { go, walletBalance, auctions, auctionsLoading, selectAuction } = useApp()
+  const { go, walletBalance, auctions, auctionsLoading, selectAuction, myBids, getAuction } = useApp()
   const [showBalance, setShowBalance] = useState(true)
   const winnerScrollRef = useRef<HTMLDivElement>(null)
 
@@ -207,7 +208,17 @@ export function HomeScreen() {
   const closedAuctions = auctions.filter((a) => a.status === "closed")
   const endingSoon = activeAuctions.filter((a) => a.status === "ending-soon" || a.timeLeft < 3600)
   const displayHero = endingSoon.length > 0 ? endingSoon : activeAuctions
-  const allAuctions = [...auctions].sort((a, b) => Number(a.status === "closed") - Number(b.status === "closed"))
+  const heroIds = new Set(displayHero.slice(0, 10).map((a) => a.id))
+  const liveGrid = activeAuctions.filter((a) => !heroIds.has(a.id))
+
+  const bidAuctionIds = new Set(myBids.map((b) => b.auctionId))
+  const bidCategories = new Set(
+    myBids.map((b) => getAuction(b.auctionId)?.category).filter((c): c is string => !!c),
+  )
+  const suggestedAuctions = activeAuctions.filter(
+    (a) => !heroIds.has(a.id) && !bidAuctionIds.has(a.id) && bidCategories.has(a.category),
+  )
+  const showSuggested = myBids.length > 0 && suggestedAuctions.length > 0
 
   const scroll = (ref: React.RefObject<HTMLDivElement | null>, dir: "left" | "right", amount: number) => {
     ref.current?.scrollBy({ left: dir === "left" ? -amount : amount, behavior: "smooth" })
@@ -248,14 +259,14 @@ export function HomeScreen() {
         </div>
       </div>
 
-      {/* ── All Auctions ── */}
+      {/* ── Live Auctions Carousel ── */}
       <section>
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <span className="flex size-11 items-center justify-center rounded-xl bg-awash-blue/10 backdrop-blur-sm border border-awash-blue/20 text-awash-blue"><Gavel className="size-5" /></span>
             <div>
-              <h2 className="font-display text-xl font-extrabold tracking-tight text-foreground">All Auctions</h2>
-              <p className="text-sm font-medium text-neutral-500">{activeAuctions.length} live · {closedAuctions.length} closed — bid low, be unique!</p>
+              <h2 className="font-display text-xl font-extrabold tracking-tight text-foreground">Live Auctions</h2>
+              <p className="text-sm font-medium text-neutral-500">{activeAuctions.length} live — bid low, be unique!</p>
             </div>
           </div>
           <button onClick={() => go("auctions")} className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-bold text-primary-foreground transition-all hover:bg-primary/90 hover:shadow-md hover:shadow-primary/30 hover:scale-105 active:scale-[0.97]">
@@ -263,34 +274,66 @@ export function HomeScreen() {
           </button>
         </div>
 
-        {displayHero.length > 0 && (
-          <div className="mb-6 aspect-[16/9] sm:aspect-[21/9]">
-            <FeaturedHero auctions={displayHero.slice(0, 5)} onJoin={(id) => selectAuction(id)} />
-          </div>
-        )}
-
         {auctionsLoading && auctions.length === 0 ? (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {[1, 2, 3, 4, 5, 6].map((i) => <SkeletonCard key={i} />)}
-          </div>
-        ) : auctions.length > 0 ? (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {allAuctions.map((a, i) => (
-              <AuctionCard key={a.id} auction={a} index={i} onOpen={() => selectAuction(a.id)} />
-            ))}
+          <div className="aspect-[16/9] sm:aspect-[21/9] rounded-3xl skeleton" />
+        ) : displayHero.length > 0 ? (
+          <div className="aspect-[16/9] sm:aspect-[21/9]">
+            <LiveAuctionsCarousel auctions={displayHero.slice(0, 10)} onJoin={(id) => selectAuction(id)} />
           </div>
         ) : (
           <div className="flex h-[200px] items-center justify-center rounded-2xl border-2 border-dashed border-border/50 glass-card-solid">
             <div className="text-center">
               <Gavel className="mx-auto size-10 text-neutral-300" />
-              <p className="mt-2 text-sm font-medium text-neutral-400">No auctions yet</p>
+              <p className="mt-2 text-sm font-medium text-neutral-400">No live auctions yet</p>
             </div>
           </div>
         )}
+
+        {auctionsLoading && auctions.length === 0 ? (
+          <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => <SkeletonCard key={i} />)}
+          </div>
+        ) : liveGrid.length > 0 ? (
+          <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+            {liveGrid.slice(0, 8).map((a, i) => (
+              <AuctionCard key={a.id} auction={a} index={i} onOpen={() => selectAuction(a.id)} />
+            ))}
+          </div>
+        ) : null}
+
+        {!auctionsLoading && activeAuctions.length > 0 && (
+          <button onClick={() => go("auctions")} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary/5 to-awash-gold/5 backdrop-blur-sm border border-primary/20 px-5 py-3 text-sm font-bold text-awash-gold-dark transition-all hover:from-primary/10 hover:to-awash-gold/10 hover:scale-[1.01] active:scale-[0.97] shadow-sm">
+            View All Live Auctions <ArrowRight className="size-4" />
+          </button>
+        )}
       </section>
 
-      {/* ── Section B: Celebrate Our Recent Auction Winners ── */}
-      {closedAuctions.length > 0 && (
+      {/* ── Suggested For You ── */}
+      {showSuggested && (
+        <section>
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="flex size-11 items-center justify-center rounded-xl bg-gradient-to-br from-primary/15 to-awash-gold/15 backdrop-blur-sm border border-primary/20 text-awash-gold-dark shadow-sm shadow-primary/10">
+                <Sparkles className="size-5" />
+              </span>
+              <div>
+                <h2 className="font-display text-xl font-extrabold tracking-tight text-foreground">Suggested For You</h2>
+                <p className="text-sm font-medium text-neutral-500">Based on the auctions you've joined — bid low, be unique!</p>
+              </div>
+            </div>
+            <button onClick={() => go("auctions")} className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-bold text-primary-foreground transition-all hover:bg-primary/90 hover:shadow-md hover:shadow-primary/30 hover:scale-105 active:scale-[0.97]">
+              View All <ArrowRight className="size-4" />
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+            {suggestedAuctions.slice(0, 8).map((a, i) => (
+              <AuctionCard key={a.id} auction={a} index={i} onOpen={() => selectAuction(a.id)} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ── Celebrate Our Recent Auction Winners ── */}
       <section>
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -307,6 +350,22 @@ export function HomeScreen() {
           </button>
         </div>
 
+        {closedAuctions.length > 0 && (
+          <div className="mb-4 flex items-center gap-3 overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/10 via-awash-gold/15 to-primary/10 px-5 py-3.5">
+            <span className="flex size-9 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-awash-gold to-awash-gold-light shadow-lg shadow-primary/30 animate-float">
+              <Trophy className="size-4 text-awash-blue" />
+            </span>
+            <p className="font-display text-sm font-bold text-awash-gold-dark sm:text-base">
+              Congratulations to our latest winners!
+            </p>
+            <div className="ml-auto hidden items-center gap-1 sm:flex">
+              {[0, 1, 2, 3, 4].map((i) => (
+                <span key={i} className="size-1.5 rounded-full bg-awash-gold/60 animate-pulse" style={{ animationDelay: `${i * 0.15}s` }} />
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="relative">
           {closedAuctions.length > 2 && (
             <>
@@ -318,18 +377,29 @@ export function HomeScreen() {
               </button>
             </>
           )}
-          <div ref={winnerScrollRef} className="flex gap-5 overflow-x-auto pb-2 snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden scroll-smooth">
+          {closedAuctions.length > 0 ? (
+            <div ref={winnerScrollRef} className="flex gap-5 overflow-x-auto pb-2 snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden scroll-smooth">
               {closedAuctions.slice(0, 5).map((a, i) => (
-                  <WinnerShowcaseSlide key={a.id} auction={a} index={i} />
-                ))}
-          </div>
+                <WinnerShowcaseSlide key={a.id} auction={a} index={i} />
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-primary/20 bg-gradient-to-br from-primary/5 to-awash-gold/5 py-12 text-center">
+              <span className="flex size-14 items-center justify-center rounded-2xl bg-primary/10 border border-primary/20">
+                <Trophy className="size-6 text-awash-gold" />
+              </span>
+              <div>
+                <p className="font-display text-base font-bold text-awash-gold-dark">Winners announced soon</p>
+                <p className="mt-1 text-sm font-medium text-neutral-500">The lowest unique bid wins. Keep an eye on the live auctions!</p>
+              </div>
+            </div>
+          )}
         </div>
 
         <button onClick={() => go("closed-auctions")} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary/5 to-awash-gold/5 backdrop-blur-sm border border-primary/20 px-5 py-3 text-sm font-bold text-awash-gold-dark transition-all hover:from-primary/10 hover:to-awash-gold/10 hover:scale-[1.01] active:scale-[0.97] shadow-sm">
           <Trophy className="size-4" /> View All Winners <ArrowRight className="size-4" />
         </button>
       </section>
-      )}
 
       {/* ── Promo ── */}
       <section>

@@ -13,6 +13,7 @@ export type View =
   | "admin-dashboard" | "admin-auctions" | "admin-products" | "admin-users" | "admin-transactions" | "admin-audit" | "admin-monitor" | "admin-auction-monitor" | "deposit"
   | "payment-success" | "payment-failed"
   | "closed-auctions"
+  | "profile"
   | "sikina-pay-checkout"
 
 export type UserRole = "admin" | "user"
@@ -64,7 +65,7 @@ type AppState = {
   setPendingBidAmount: (amount: number | null) => void
   payFee: (fee: number, paymentMethod?: 'SIKINAPAY' | 'AWASH') => Promise<void>
   submitBid: (amount: number) => Promise<void>
-  payWinning: (amount: number, paymentMethod?: 'SIKINAPAY' | 'AWASH' | 'WALLET', customerPhone?: string) => Promise<void>
+  payWinning: (amount: number, paymentMethod?: 'SIKINAPAY' | 'AWASH', customerPhone?: string) => Promise<void>
   setPaymentMethod: (method: 'SIKINAPAY' | 'AWASH' | 'WALLET') => void
   checkPaymentStatus: () => Promise<boolean>
   reset: () => void
@@ -395,22 +396,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setPaymentMethodState(method)
   }, [])
 
-  const payWinning = useCallback(async (amount: number, method?: 'SIKINAPAY' | 'AWASH' | 'WALLET', customerPhone?: string) => {
+  const payWinning = useCallback(async (amount: number, method?: 'SIKINAPAY' | 'AWASH', customerPhone?: string) => {
     if (!selectedId) return
     try {
       setAuthError(null)
+      setUserBid(amount)
       const pm = method || paymentMethod
-      if (pm === 'WALLET') {
+      if (pm === 'AWASH') {
         await api.payWinningWithWallet(selectedId)
-        setLastPaymentMethod('WALLET')
+        setLastPaymentMethod('AWASH')
         refreshWallet()
         refreshAuctions()
         setView('payment-confirmed')
         return
       }
       setPaymentContext('winning')
-      setLastPaymentMethod(pm)
-      const { payment_url, proxy_url } = await api.createPaymentLink(selectedId, pm, customerPhone)
+      setLastPaymentMethod('SIKINAPAY')
+      const { payment_url, proxy_url } = await api.createPaymentLink(selectedId, 'SIKINAPAY', customerPhone)
       setSikinaPayUrl(payment_url)
       setSikinaProxyUrl(proxy_url || null)
       setView('sikina-pay-checkout')

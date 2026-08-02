@@ -101,8 +101,8 @@ export class BiddingService {
 
       await this.trackBidInRedis(auctionId, userId, amount);
 
-      this.notifyOutbidBidders(auctionId, userId, amount).catch(
-        (e) => this.logger.warn(`Failed to notify outbid bidders: ${e.message}`),
+      this.notifyOutbidBidders(auctionId, userId, amount).catch((e) =>
+        this.logger.warn(`Failed to notify outbid bidders: ${e.message}`),
       );
 
       const totalBidsStr = await this.redis.get(
@@ -129,7 +129,10 @@ export class BiddingService {
           `Max bids (${auction.max_bid}) reached for auction ${auctionId}, closing early`,
         );
         this.notifyMaxBidReached(auctionId, totalBids, auction.max_bid).catch(
-          (e) => this.logger.warn(`Failed to send max-bid notification: ${e.message}`),
+          (e) =>
+            this.logger.warn(
+              `Failed to send max-bid notification: ${e.message}`,
+            ),
         );
         await this.closureService.closeSingleAuction(auctionId);
       }
@@ -168,9 +171,14 @@ export class BiddingService {
         take: 20,
       });
       const prevBidders = prevBids.filter((b) => {
-        if (Number(b.amount) !== 0 || !b.encrypted_amount) return this.normalizeAmount(Number(b.amount)) === amountKey;
+        if (Number(b.amount) !== 0 || !b.encrypted_amount)
+          return this.normalizeAmount(Number(b.amount)) === amountKey;
         try {
-          return this.normalizeAmount(this.bidEncryptionService.decrypt(b.encrypted_amount)) === amountKey;
+          return (
+            this.normalizeAmount(
+              this.bidEncryptionService.decrypt(b.encrypted_amount),
+            ) === amountKey
+          );
         } catch {
           return false;
         }
@@ -180,17 +188,20 @@ export class BiddingService {
         if (bid.user_id === newBidderId || notified.has(bid.user_id)) continue;
         notified.add(bid.user_id);
         try {
-          const headers: Record<string, string> = { "Content-Type": "application/json" };
+          const headers: Record<string, string> = {
+            "Content-Type": "application/json",
+          };
           const internalApiKey = process.env.INTERNAL_API_KEY || "";
           if (internalApiKey) headers["x-internal-api-key"] = internalApiKey;
-          await fetch(
-            "http://identity-service:3000/api/v1/notify/outbid",
-            {
-              method: "POST",
-              headers,
-              body: JSON.stringify({ user_id: bid.user_id, auction_id: auctionId, bid_amount: amount }),
-            },
-          );
+          await fetch("http://identity-service:3000/api/v1/notify/outbid", {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+              user_id: bid.user_id,
+              auction_id: auctionId,
+              bid_amount: amount,
+            }),
+          });
         } catch {
           // individual notification failure is non-critical
         }
@@ -204,7 +215,9 @@ export class BiddingService {
     max: number,
   ): Promise<void> {
     try {
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
       const internalApiKey = process.env.INTERNAL_API_KEY || "";
       if (internalApiKey) headers["x-internal-api-key"] = internalApiKey;
       await fetch(
@@ -249,11 +262,7 @@ export class BiddingService {
 
     multi.sadd(`takelow:auction:${auctionId}:bidders`, userId);
 
-    multi.zincrby(
-      `takelow:auction:${auctionId}:frequencies`,
-      1,
-      amountKey,
-    );
+    multi.zincrby(`takelow:auction:${auctionId}:frequencies`, 1, amountKey);
 
     const freqKey = `takelow:auction:${auctionId}:frequencies`;
     const uniqueKey = `takelow:auction:${auctionId}:unique_bids`;

@@ -17,6 +17,7 @@ export type View =
   | 'deposit'
   | 'payment-success' | 'payment-failed'
   | 'winners-list'
+  | 'profile'
   | 'sikina-pay-checkout'
 
 export type UserRole = 'admin' | 'user'
@@ -66,7 +67,7 @@ type AppState = {
   selectAuctionForMonitor: (id: string) => void
   payFee: (fee: number, paymentMethod?: 'SIKINAPAY' | 'AWASH') => void
   submitBid: (amount: number) => void
-  payWinning: (paymentMethod?: 'SIKINAPAY' | 'AWASH', customerPhone?: string) => void
+  payWinning: (amount?: number, paymentMethod?: 'SIKINAPAY' | 'AWASH', customerPhone?: string) => void
   setPaymentMethod: (method: 'SIKINAPAY' | 'AWASH') => void
   checkPaymentStatus: () => Promise<boolean>
   reset: () => void
@@ -336,21 +337,37 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [selectedId])
 
-  const payWinning = useCallback(async (method?: 'SIKINAPAY' | 'AWASH', customerPhone?: string) => {
+  const payWinning = useCallback(async (amount?: number, method?: 'SIKINAPAY' | 'AWASH', customerPhone?: string) => {
     if (!selectedId) return
-    try {
-      setAuthError(null)
-      const pm = method || paymentMethod
-      const { payment_url, proxy_url } = await api.createPaymentLink(selectedId, pm, customerPhone)
-      setSikinaPayContext('winning')
-      setSikinaPayUrl(payment_url)
-      setSikinaProxyUrl(proxy_url || null)
-      setView('sikina-pay-checkout')
-      toast.show(`Payment link opened via ${pm}`, 'success')
-    } catch (e: any) {
-      toast.show(getUserFriendlyMessage(e), 'error')
+    setAuthError(null)
+    if (amount != null) setUserBid(amount)
+    const pm = method || paymentMethod
+    if (pm === 'SIKINAPAY') {
+      try {
+        const { payment_url, proxy_url } = await api.createPaymentLink(selectedId, pm, customerPhone)
+        setSikinaPayContext('winning')
+        setSikinaPayUrl(payment_url)
+        setSikinaProxyUrl(proxy_url || null)
+        setView('sikina-pay-checkout')
+      } catch {
+        setAuthError('Failed to create payment link. Please try again.')
+      }
+      return
     }
-  }, [selectedId, paymentMethod, toast])
+
+    if (amount != null && walletBalance < amount) {
+      setAuthError('Insufficient balance to pay winning amount')
+      toast.show('Insufficient balance to pay winning amount', 'error')
+      return
+    }
+    try {
+      await api.payWinningWithWallet(selectedId)
+      if (amount != null) setWalletBalance((b) => b - amount)
+      setView('payment-confirmed')
+    } catch {
+      setAuthError('Failed to process wallet payment. Please try again.')
+    }
+  }, [selectedId, paymentMethod, walletBalance, toast])
 
   const reset = useCallback(() => {
     setView('home')
