@@ -29,6 +29,115 @@ import { AuctionReviewService } from "../admin/auction-review.service";
 export class BiddingController {
   private readonly logger = new Logger(BiddingController.name);
 
+  private isLegacyBidSchemaError(error: unknown): boolean {
+    const message =
+      error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+
+    const isSchemaError =
+      message.includes("does not exist") ||
+      message.includes("unknown column") ||
+      message.includes("no such column");
+
+    return (
+      isSchemaError &&
+      (message.includes("encrypted_amount") || message.includes("ticket_number"))
+    );
+  }
+
+  private normalizeBoolean(value: unknown): boolean {
+    if (typeof value === "boolean") return value;
+    if (typeof value === "number") return value !== 0;
+    if (typeof value === "string") {
+      const normalized = value.toLowerCase();
+      return normalized === "true" || normalized === "1" || normalized === "t";
+    }
+    return value != null;
+  }
+
+  private mapLegacyBidRow(row: Record<string, unknown>): Bid {
+    return {
+      id: String(row.bid_id ?? ""),
+      user_id: String(row.bid_user_id ?? ""),
+      auction_id: String(row.bid_auction_id ?? ""),
+      amount: Number(row.bid_amount ?? 0),
+      bid_time: row.bid_bid_time as Date,
+      service_fee_paid: this.normalizeBoolean(row.bid_service_fee_paid),
+      ticket_number: "",
+      encrypted_amount: "",
+    } as Bid;
+  }
+
+  private async loadUserBids(auctionId: string, userId: string): Promise<Bid[]> {
+    try {
+      return await this.bidRepository.find({
+        where: { auction_id: auctionId, user_id: userId },
+        order: { bid_time: "DESC" },
+      });
+    } catch (e) {
+      if (!this.isLegacyBidSchemaError(e)) {
+        throw e;
+      }
+
+      this.logger.warn(
+        `Legacy bid schema detected for auction=${auctionId} user=${userId}, falling back to base bid columns: ${e.message}`,
+      );
+
+      const rows = await this.bidRepository
+        .createQueryBuilder("bid")
+        .select([
+          "bid.id",
+          "bid.user_id",
+          "bid.auction_id",
+          "bid.amount",
+          "bid.bid_time",
+          "bid.service_fee_paid",
+        ])
+        .where("bid.auction_id = :auctionId", { auctionId })
+        .andWhere("bid.user_id = :userId", { userId })
+        .orderBy("bid.bid_time", "DESC")
+        .getRawMany<Record<string, unknown>>();
+
+      return rows.map((row) => this.mapLegacyBidRow(row));
+    }
+  }
+
+  private async loadLatestUserBid(
+    auctionId: string,
+    userId: string,
+  ): Promise<Bid | null> {
+    try {
+      return await this.bidRepository.findOne({
+        where: { auction_id: auctionId, user_id: userId },
+        order: { bid_time: "DESC" },
+      });
+    } catch (e) {
+      if (!this.isLegacyBidSchemaError(e)) {
+        throw e;
+      }
+
+      this.logger.warn(
+        `Legacy bid schema detected for latest bid auction=${auctionId} user=${userId}, falling back to base bid columns: ${e.message}`,
+      );
+
+      const row = await this.bidRepository
+        .createQueryBuilder("bid")
+        .select([
+          "bid.id",
+          "bid.user_id",
+          "bid.auction_id",
+          "bid.amount",
+          "bid.bid_time",
+          "bid.service_fee_paid",
+        ])
+        .where("bid.auction_id = :auctionId", { auctionId })
+        .andWhere("bid.user_id = :userId", { userId })
+        .orderBy("bid.bid_time", "DESC")
+        .getRawOne<Record<string, unknown>>();
+
+      return row ? this.mapLegacyBidRow(row) : null;
+    }
+  }
+
   constructor(
     private biddingService: BiddingService,
     private auctionReviewService: AuctionReviewService,
@@ -75,10 +184,7 @@ export class BiddingController {
   @Get(":id/my-bids")
   @UseGuards(AuthGuard("jwt"))
   async getMyBids(@Param("id") auctionId: string, @Req() req: any) {
-    const bids = await this.bidRepository.find({
-      where: { auction_id: auctionId, user_id: req.user.id },
-      order: { bid_time: "DESC" },
-    });
+    const bids = await this.loadUserBids(auctionId, req.user.id);
     return {
       auction_id: auctionId,
       bids: bids.map((b) => ({
@@ -95,10 +201,7 @@ export class BiddingController {
     const { bids: _bids, ...result } =
       await this.auctionReviewService.drawWinner(auctionId);
 
-    const userBid = await this.bidRepository.findOne({
-      where: { auction_id: auctionId, user_id: req.user.id },
-      order: { bid_time: "DESC" },
-    });
+    const userBid = await this.loadLatestUserBid(auctionId, req.user.id);
 
     return {
       ...result,

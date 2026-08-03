@@ -15,6 +15,7 @@ function createMockRepo() {
   return {
     findOne: jest.fn(),
     find: jest.fn(),
+    createQueryBuilder: jest.fn(),
     findAndCount: jest.fn(),
     count: jest.fn(),
     save: jest.fn((x: any) => x),
@@ -64,6 +65,39 @@ describe('BiddingController', () => {
       bids: [
         { amount: 50.01, bid_time: expect.any(Date), ticket_number: 'BID_1' },
         { amount: 30.5, bid_time: expect.any(Date), ticket_number: 'BID_2' },
+      ],
+    });
+  });
+
+  it('falls back to base bid columns when legacy schemas are missing encrypted bid fields for my bids', async () => {
+    const queryBuilder = {
+      select: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      getRawMany: jest.fn().mockResolvedValue([
+        {
+          bid_id: 'bid-1',
+          bid_user_id: 'user-1',
+          bid_auction_id: 'auc-1',
+          bid_amount: 50.01,
+          bid_bid_time: new Date('2026-01-01'),
+          bid_service_fee_paid: true,
+        },
+      ]),
+    };
+    mockBidRepo.find.mockRejectedValue(
+      new Error('column bids.encrypted_amount does not exist'),
+    );
+    mockBidRepo.createQueryBuilder.mockReturnValue(queryBuilder);
+
+    const result = await controller.getMyBids('auc-1', { user: { id: 'user-1' } });
+
+    expect(mockBidRepo.createQueryBuilder).toHaveBeenCalledWith('bid');
+    expect(result).toEqual({
+      auction_id: 'auc-1',
+      bids: [
+        { amount: 50.01, bid_time: expect.any(Date), ticket_number: '' },
       ],
     });
   });

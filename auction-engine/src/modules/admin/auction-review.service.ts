@@ -10,6 +10,77 @@ import { BidEncryptionService } from "../common/bid-encryption.service";
 export class AuctionReviewService {
   private readonly logger = new Logger(AuctionReviewService.name);
 
+  private isLegacyBidSchemaError(error: unknown): boolean {
+    const message =
+      error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+
+    const isSchemaError =
+      message.includes("does not exist") ||
+      message.includes("unknown column") ||
+      message.includes("no such column");
+
+    return (
+      isSchemaError &&
+      (message.includes("encrypted_amount") || message.includes("ticket_number"))
+    );
+  }
+
+  private normalizeBoolean(value: unknown): boolean {
+    if (typeof value === "boolean") return value;
+    if (typeof value === "number") return value !== 0;
+    if (typeof value === "string") {
+      const normalized = value.toLowerCase();
+      return normalized === "true" || normalized === "1" || normalized === "t";
+    }
+    return value != null;
+  }
+
+  private mapLegacyBidRow(row: Record<string, unknown>): Bid {
+    return {
+      id: String(row.bid_id ?? ""),
+      user_id: String(row.bid_user_id ?? ""),
+      auction_id: String(row.bid_auction_id ?? ""),
+      amount: Number(row.bid_amount ?? 0),
+      bid_time: row.bid_bid_time as Date,
+      service_fee_paid: this.normalizeBoolean(row.bid_service_fee_paid),
+      ticket_number: "",
+      encrypted_amount: "",
+    } as Bid;
+  }
+
+  private async loadAuctionBids(auctionId: string): Promise<Bid[]> {
+    try {
+      return await this.bidRepository.find({
+        where: { auction_id: auctionId },
+        order: { bid_time: "ASC" },
+      });
+    } catch (e) {
+      if (!this.isLegacyBidSchemaError(e)) {
+        throw e;
+      }
+
+      this.logger.warn(
+        `Legacy bid schema detected for ${auctionId}, falling back to base bid columns: ${e.message}`,
+      );
+
+      const rows = await this.bidRepository
+        .createQueryBuilder("bid")
+        .select([
+          "bid.id",
+          "bid.user_id",
+          "bid.auction_id",
+          "bid.amount",
+          "bid.bid_time",
+          "bid.service_fee_paid",
+        ])
+        .where("bid.auction_id = :auctionId", { auctionId })
+        .orderBy("bid.bid_time", "ASC")
+        .getRawMany<Record<string, unknown>>();
+
+      return rows.map((row) => this.mapLegacyBidRow(row));
+    }
+  }
+
   constructor(
     @InjectRepository(Auction)
     private auctionRepository: Repository<Auction>,
@@ -65,10 +136,7 @@ export class AuctionReviewService {
 
     let bids: Bid[] = [];
     if (auction.status === AuctionStatus.CLOSED) {
-      bids = await this.bidRepository.find({
-        where: { auction_id: auctionId },
-        order: { bid_time: "ASC" },
-      });
+      bids = await this.loadAuctionBids(auctionId);
     }
 
     const { winningAmounts, totalBids, winners } =
@@ -137,10 +205,7 @@ export class AuctionReviewService {
       select: ["id", "status"],
     });
     if (!auction) throw new NotFoundException("Auction not found");
-    const bids = await this.bidRepository.find({
-      where: { auction_id: auctionId },
-      order: { bid_time: "ASC" },
-    });
+    const bids = await this.loadAuctionBids(auctionId);
     const isActive = auction.status === AuctionStatus.ACTIVE;
     const enriched = await Promise.all(
       bids.map(async (b) => {
