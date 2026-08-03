@@ -13,12 +13,14 @@ import { NonceGuard } from "../common/nonce.guard";
 import { BidEncryptionService } from "../common/bid-encryption.service";
 import { WinnerModule } from "../winner/winner.module";
 import { PaymentTransaction } from "../payment/entities/payment-transaction.entity";
+import { WorkerModule } from "../worker/worker.module";
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Bid, Auction, Winner, PaymentTransaction]),
     BullModule.registerQueue({ name: "incoming-bids" }),
     WinnerModule,
+    WorkerModule,
   ],
   controllers: [BiddingController],
   providers: [

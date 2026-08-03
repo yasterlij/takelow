@@ -22,6 +22,7 @@ import {
   PaymentType,
 } from "../payment/entities/payment-transaction.entity";
 import { BidEncryptionService } from "../common/bid-encryption.service";
+import { NotificationDispatchService } from "../worker/notification-dispatch.service";
 
 const LOCK_TTL = 5000;
 const AUCTION_STATE_TTL_BUFFER_SECONDS = 3600;
@@ -51,6 +52,7 @@ export class BiddingService {
     private readonly paymentTransactionRepository: Repository<PaymentTransaction>,
     private readonly closureService: AuctionClosureService,
     private readonly bidEncryptionService: BidEncryptionService,
+    private readonly notificationDispatchService: NotificationDispatchService,
   ) {}
 
   async placeBid(
@@ -204,20 +206,14 @@ export class BiddingService {
         if (bid.user_id === newBidderId || notified.has(bid.user_id)) continue;
         notified.add(bid.user_id);
         try {
-          const headers: Record<string, string> = {
-            "Content-Type": "application/json",
-          };
-          const internalApiKey = process.env.INTERNAL_API_KEY || "";
-          if (internalApiKey) headers["x-internal-api-key"] = internalApiKey;
-          await fetch("http://identity-service:3000/api/v1/notify/outbid", {
-            method: "POST",
-            headers,
-            body: JSON.stringify({
+          await this.notificationDispatchService.dispatch(
+            "/api/v1/notify/outbid",
+            {
               user_id: bid.user_id,
               auction_id: auctionId,
               bid_amount: amount,
-            }),
-          });
+            },
+          );
         } catch {
           // individual notification failure is non-critical
         }
@@ -231,21 +227,12 @@ export class BiddingService {
     max: number,
   ): Promise<void> {
     try {
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-      };
-      const internalApiKey = process.env.INTERNAL_API_KEY || "";
-      if (internalApiKey) headers["x-internal-api-key"] = internalApiKey;
-      await fetch(
-        "http://identity-service:3000/api/v1/notify/max-bid-reached",
+      await this.notificationDispatchService.dispatch(
+        "/api/v1/notify/max-bid-reached",
         {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
             auction_id: auctionId,
             total_bids: total,
             max_bids: max,
-          }),
         },
       );
     } catch (e) {

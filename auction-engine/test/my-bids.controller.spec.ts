@@ -8,6 +8,7 @@ import { Auction } from '../src/modules/winner/entities/auction.entity';
 import { Bid } from '../src/modules/bidding/entities/bid.entity';
 import { Winner } from '../src/modules/winner/entities/winner.entity';
 import { REDIS_CLIENT } from '../src/modules/common/redis.decorator';
+import { NotificationDispatchService } from '../src/modules/worker/notification-dispatch.service';
 
 function createMockRepo() {
   return {
@@ -34,6 +35,7 @@ describe('BiddingController - getMyBids', () => {
         { provide: WinnerService, useValue: {} },
         { provide: BidEncryptionService, useValue: mockBidEncryption },
         { provide: REDIS_CLIENT, useValue: {} },
+        { provide: NotificationDispatchService, useValue: { dispatch: jest.fn() } },
         { provide: getRepositoryToken(Auction), useValue: createMockRepo() },
         { provide: getRepositoryToken(Bid), useValue: mockBidRepo },
         { provide: getRepositoryToken(Winner), useValue: createMockRepo() },

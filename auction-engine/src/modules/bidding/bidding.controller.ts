@@ -26,6 +26,7 @@ import { Repository } from "typeorm";
 import { Auction, AuctionStatus } from "../winner/entities/auction.entity";
 import { Winner } from "../winner/entities/winner.entity";
 import { Bid } from "../bidding/entities/bid.entity";
+import { NotificationDispatchService } from "../worker/notification-dispatch.service";
 
 @Controller("auctions")
 export class BiddingController {
@@ -41,6 +42,7 @@ export class BiddingController {
     private bidRepository: Repository<Bid>,
     @InjectRepository(Winner)
     private winnerRepository: Repository<Winner>,
+    private notificationDispatchService: NotificationDispatchService,
   ) {}
 
   @Post(":id/bid")
@@ -174,23 +176,15 @@ export class BiddingController {
     ticketNumber: string,
   ): Promise<void> {
     try {
-      const identityBase =
-        process.env.IDENTITY_SERVICE_URL || "http://localhost:3001";
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-      };
-      const internalApiKey = process.env.INTERNAL_API_KEY || "";
-      if (internalApiKey) headers["x-internal-api-key"] = internalApiKey;
-      await fetch(`${identityBase}/api/v1/notify/bid-confirmation`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
+      await this.notificationDispatchService.dispatch(
+        "/api/v1/notify/bid-confirmation",
+        {
           phone: user.phone,
           product_name: auction.product?.name || "Unknown",
           bid_amount: amount,
           ticket_number: ticketNumber,
-        }),
-      });
+        },
+      );
     } catch (e) {
       this.logger.warn(`Failed to send bid SMS: ${e.message}`);
     }

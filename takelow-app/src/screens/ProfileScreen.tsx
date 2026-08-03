@@ -12,7 +12,7 @@ function getInitials(name: string) {
 }
 
 export function ProfileScreen() {
-  const { go, user, walletBalance, logout } = useApp()
+  const { go, user, walletBalance, logout, unreadNotificationCount } = useApp()
   const [showBalance, setShowBalance] = useState(true)
   const isAdmin = user?.role === 'admin'
 
@@ -85,6 +85,7 @@ export function ProfileScreen() {
                 <item.icon size={18} color={colors.awashBlue} />
               </View>
               <Text style={s.menuLabel}>{item.label}</Text>
+              {item.id === 'notifications' && unreadNotificationCount > 0 ? <Badge tone="orange">{unreadNotificationCount}</Badge> : null}
               <ChevronRight size={16} color={colors.mutedForeground} />
             </TouchableOpacity>
           ))}

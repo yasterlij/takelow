@@ -51,6 +51,7 @@ type AppState = {
   walletBalance: number
   favoriteAuctionIds: string[]
   favoritesLoading: boolean
+  unreadNotificationCount: number
   myBids: PlacedBid[]
   user: User | null
   users: User[]
@@ -87,6 +88,7 @@ type AppState = {
   refreshAuctions: () => Promise<void>
   refreshWallet: () => Promise<void>
   refreshFavorites: () => Promise<void>
+  refreshUnreadNotifications: () => Promise<void>
   toggleFavorite: (auctionId: string) => Promise<void>
   isFavorite: (auctionId: string) => boolean
   getAuction: (id: string | null | undefined) => Auction | undefined
@@ -146,6 +148,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [walletBalance, setWalletBalance] = useState(INITIAL_BALANCE)
   const [favoriteAuctionIds, setFavoriteAuctionIds] = useState<string[]>([])
   const [favoritesLoading, setFavoritesLoading] = useState(false)
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0)
   const [paymentMethod, setPaymentMethodState] = useState<'SIKINAPAY' | 'AWASH'>('AWASH')
   const [sikinaPayUrl, setSikinaPayUrl] = useState<string | null>(null)
   const [sikinaProxyUrl, setSikinaProxyUrl] = useState<string | null>(null)
@@ -271,14 +274,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [toast, user])
 
+  const refreshUnreadNotifications = useCallback(async () => {
+    if (!user) {
+      setUnreadNotificationCount(0)
+      return
+    }
+    try {
+      const items = await api.getInbox(true)
+      setUnreadNotificationCount(items.length)
+    } catch {
+      setUnreadNotificationCount(0)
+    }
+  }, [user])
+
   useEffect(() => {
     if (!hydrated) return
     if (!user) {
       setFavoriteAuctionIds([])
+      setUnreadNotificationCount(0)
       return
     }
     refreshFavorites()
-  }, [hydrated, user, refreshFavorites])
+    refreshUnreadNotifications()
+  }, [hydrated, user, refreshFavorites, refreshUnreadNotifications])
+
+  useEffect(() => {
+    if (!hydrated || !user) return
+    const interval = setInterval(refreshUnreadNotifications, 60000)
+    return () => clearInterval(interval)
+  }, [hydrated, user, refreshUnreadNotifications])
 
   const isFavorite = useCallback((auctionId: string) => favoriteAuctionIds.includes(auctionId), [favoriteAuctionIds])
 
@@ -703,15 +727,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(
     () => ({
-      view, selectedId, userBid, bidTicketNumber, feePaid, walletBalance, favoriteAuctionIds, favoritesLoading, paymentMethod, sikinaPayUrl, setSikinaPayUrl, sikinaProxyUrl, setSikinaProxyUrl, sikinaPayContext, setFeePaid, myBids, user, users, allBids,
+      view, selectedId, userBid, bidTicketNumber, feePaid, walletBalance, favoriteAuctionIds, favoritesLoading, unreadNotificationCount, paymentMethod, sikinaPayUrl, setSikinaPayUrl, sikinaProxyUrl, setSikinaProxyUrl, sikinaPayContext, setFeePaid, myBids, user, users, allBids,
       pendingBidAmount, auctions, auctionsLoading, authError, sessionEndReason,
       go, selectAuction, selectAuctionForMonitor, setPendingBidAmount, payFee, submitBid, payWinning, setPaymentMethod, checkPaymentStatus, reset,
-      login, register, logout, addAuction, updateAuction, deleteAuction, closeAuction, forceCloseAuction, refreshAuctions, refreshWallet, refreshFavorites, toggleFavorite, isFavorite, getAuction, fetchAuctionById,
+      login, register, logout, addAuction, updateAuction, deleteAuction, closeAuction, forceCloseAuction, refreshAuctions, refreshWallet, refreshFavorites, refreshUnreadNotifications, toggleFavorite, isFavorite, getAuction, fetchAuctionById,
     }),
-    [view, selectedId, userBid, bidTicketNumber, feePaid, walletBalance, favoriteAuctionIds, favoritesLoading, paymentMethod, sikinaPayUrl, sikinaPayContext, setFeePaid, pendingBidAmount, myBids, user, users, allBids,
+    [view, selectedId, userBid, bidTicketNumber, feePaid, walletBalance, favoriteAuctionIds, favoritesLoading, unreadNotificationCount, paymentMethod, sikinaPayUrl, sikinaPayContext, setFeePaid, pendingBidAmount, myBids, user, users, allBids,
      auctions, auctionsLoading, authError, sessionEndReason,
      go, selectAuction, selectAuctionForMonitor, setPendingBidAmount, payFee, submitBid, payWinning, setPaymentMethod, checkPaymentStatus, reset,
-     login, register, logout, addAuction, updateAuction, deleteAuction, closeAuction, forceCloseAuction, refreshAuctions, refreshWallet, refreshFavorites, toggleFavorite, isFavorite, getAuction, fetchAuctionById],
+     login, register, logout, addAuction, updateAuction, deleteAuction, closeAuction, forceCloseAuction, refreshAuctions, refreshWallet, refreshFavorites, refreshUnreadNotifications, toggleFavorite, isFavorite, getAuction, fetchAuctionById],
   )
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>

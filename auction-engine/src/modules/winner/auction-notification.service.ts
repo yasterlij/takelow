@@ -4,6 +4,7 @@ import { Repository, Between } from "typeorm";
 import { Cron, CronExpression } from "@nestjs/schedule";
 import { Auction, AuctionStatus as AS } from "./entities/auction.entity";
 import { Bid } from "../bidding/entities/bid.entity";
+import { NotificationDispatchService } from "../worker/notification-dispatch.service";
 
 const FIVE_MINUTES_MS = 5 * 60 * 1000;
 
@@ -17,6 +18,7 @@ export class AuctionNotificationService {
     private auctionRepository: Repository<Auction>,
     @InjectRepository(Bid)
     private bidRepository: Repository<Bid>,
+    private notificationDispatchService: NotificationDispatchService,
   ) {}
 
   @Cron(CronExpression.EVERY_30_SECONDS)
@@ -40,21 +42,11 @@ export class AuctionNotificationService {
 
       try {
         const productName = auction.product?.name || auction.id;
-        const notifyHeaders: Record<string, string> = {
-          "Content-Type": "application/json",
-        };
-        const internalApiKey = process.env.INTERNAL_API_KEY || "";
-        if (internalApiKey)
-          notifyHeaders["x-internal-api-key"] = internalApiKey;
-        await fetch(
-          "http://identity-service:3000/api/v1/notify/auction-started",
+        await this.notificationDispatchService.dispatch(
+          "/api/v1/notify/auction-started",
           {
-            method: "POST",
-            headers: notifyHeaders,
-            body: JSON.stringify({
               auction_id: auction.id,
               product_name: productName,
-            }),
           },
         );
 
@@ -99,21 +91,14 @@ export class AuctionNotificationService {
 
         const productName = auction.product?.name || auction.id;
 
-        const notifyHeaders: Record<string, string> = {
-          "Content-Type": "application/json",
-        };
-        const internalApiKey = process.env.INTERNAL_API_KEY || "";
-        if (internalApiKey)
-          notifyHeaders["x-internal-api-key"] = internalApiKey;
-        await fetch("http://identity-service:3000/api/v1/notify/ending-soon", {
-          method: "POST",
-          headers: notifyHeaders,
-          body: JSON.stringify({
+        await this.notificationDispatchService.dispatch(
+          "/api/v1/notify/ending-soon",
+          {
             user_ids: userIds,
             auction_id: auction.id,
             product_name: productName,
-          }),
-        });
+          },
+        );
 
         this.logger.log(
           `Notified ${userIds.length} bidders: ${productName} ending soon`,

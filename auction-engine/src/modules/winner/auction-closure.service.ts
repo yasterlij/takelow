@@ -14,6 +14,7 @@ import { Bid } from "../bidding/entities/bid.entity";
 import { BullMqWorker } from "../worker/bullmq.worker";
 import { BidEncryptionService } from "../common/bid-encryption.service";
 import { InjectRedis } from "../common/redis.decorator";
+import { NotificationDispatchService } from "../worker/notification-dispatch.service";
 
 const MAX_RETRIES = 5;
 const RETRY_DELAY_MS = 300;
@@ -58,6 +59,7 @@ export class AuctionClosureService {
     private bullMqWorker: BullMqWorker,
     private bidEncryptionService: BidEncryptionService,
     @InjectRedis() private readonly redis: Redis,
+    private notificationDispatchService: NotificationDispatchService,
   ) {}
 
   @Cron(CronExpression.EVERY_10_SECONDS)
@@ -331,22 +333,13 @@ export class AuctionClosureService {
     });
 
     try {
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-      };
-      const internalApiKey = process.env.INTERNAL_API_KEY || "";
-      if (internalApiKey) headers["x-internal-api-key"] = internalApiKey;
-      await fetch(
-        "http://identity-service:3000/api/v1/notify/auction-fair-play-extended",
+      await this.notificationDispatchService.dispatch(
+        "/api/v1/notify/auction-fair-play-extended",
         {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
             auction_id: auctionId,
             product_name: productName,
             total_bids: totalBids,
             extensions: auction.extensions,
-          }),
         },
       );
     } catch (e) {
@@ -371,21 +364,12 @@ export class AuctionClosureService {
     });
 
     try {
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-      };
-      const internalApiKey = process.env.INTERNAL_API_KEY || "";
-      if (internalApiKey) headers["x-internal-api-key"] = internalApiKey;
-      await fetch(
-        "http://identity-service:3000/api/v1/notify/auction-forced-closure",
+      await this.notificationDispatchService.dispatch(
+        "/api/v1/notify/auction-forced-closure",
         {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
             auction_id: auctionId,
             product_name: productName,
             total_bids: totalBids,
-          }),
         },
       );
     } catch (e) {
@@ -463,16 +447,10 @@ export class AuctionClosureService {
     }));
 
     try {
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-      };
-      const internalApiKey = process.env.INTERNAL_API_KEY || "";
-      if (internalApiKey) headers["x-internal-api-key"] = internalApiKey;
-      await fetch("http://identity-service:3000/api/v1/notify/winner-bulk", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ winners: winnerPayloads }),
-      });
+      await this.notificationDispatchService.dispatch(
+        "/api/v1/notify/winner-bulk",
+        { winners: winnerPayloads },
+      );
     } catch (e) {
       this.logger.warn(
         `Failed to send bulk winner notifications: ${e.message}`,
@@ -486,21 +464,12 @@ export class AuctionClosureService {
     min: number,
   ): Promise<void> {
     try {
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-      };
-      const internalApiKey = process.env.INTERNAL_API_KEY || "";
-      if (internalApiKey) headers["x-internal-api-key"] = internalApiKey;
-      await fetch(
-        "http://identity-service:3000/api/v1/notify/auction-extended",
+      await this.notificationDispatchService.dispatch(
+        "/api/v1/notify/auction-extended",
         {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
             auction_id: auctionId,
             current_bids: current,
             min_bids: min,
-          }),
         },
       );
     } catch (e) {

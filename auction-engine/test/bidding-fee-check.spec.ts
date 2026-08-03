@@ -12,6 +12,7 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { REDIS_CLIENT } from '../src/modules/common/redis.decorator';
 import { BidEncryptionService } from '../src/modules/common/bid-encryption.service';
+import { NotificationDispatchService } from '../src/modules/worker/notification-dispatch.service';
 
 function createMockRedis(): Partial<Record<keyof Redis, jest.Mock>> {
   return {
@@ -57,6 +58,7 @@ describe('BiddingService - Bid Fee Payment Check', () => {
   let mockClosureService: Partial<AuctionClosureService>;
   let mockAuctionGateway: Partial<AuctionGateway>;
   let mockBidQueue: Partial<Queue>;
+  let mockNotificationDispatchService: { dispatch: jest.Mock };
 
   beforeEach(async () => {
     mockRedis = createMockRedis();
@@ -76,6 +78,10 @@ describe('BiddingService - Bid Fee Payment Check', () => {
       add: jest.fn(),
     };
 
+    mockNotificationDispatchService = {
+      dispatch: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BiddingService,
@@ -87,6 +93,7 @@ describe('BiddingService - Bid Fee Payment Check', () => {
         { provide: AuctionGateway, useValue: mockAuctionGateway },
         { provide: 'BullQueue_incoming-bids', useValue: mockBidQueue },
         { provide: BidEncryptionService, useValue: { encrypt: jest.fn((a) => String(a)), decrypt: jest.fn((e) => parseFloat(e)) } },
+        { provide: NotificationDispatchService, useValue: mockNotificationDispatchService },
       ],
     }).compile();
 

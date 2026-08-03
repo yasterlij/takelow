@@ -55,6 +55,7 @@ type AppState = {
   setSikinaProxyUrl: (url: string | null) => void
   favoriteAuctionIds: string[]
   favoritesLoading: boolean
+  unreadNotificationCount: number
   myBids: PlacedBid[]
   user: User | null
   allBids: PlacedBid[]
@@ -85,6 +86,7 @@ type AppState = {
   refreshAuctions: () => Promise<void>
   refreshWallet: () => Promise<void>
   refreshFavorites: () => Promise<void>
+  refreshUnreadNotifications: () => Promise<void>
   toggleFavorite: (auctionId: string) => Promise<void>
   isFavorite: (auctionId: string) => boolean
   fetchAuctionById: (id: string) => Promise<Auction | undefined>
@@ -165,6 +167,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [sikinaProxyUrl, setSikinaProxyUrl] = useState<string | null>(null)
   const [favoriteAuctionIds, setFavoriteAuctionIds] = useState<string[]>([])
   const [favoritesLoading, setFavoritesLoading] = useState(false)
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0)
   const [myBids, setMyBids] = useState<PlacedBid[]>([])
   const [allBids, setAllBids] = useState<PlacedBid[]>([])
   const [auctions, setAuctions] = useState<Auction[]>([])
@@ -340,14 +343,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [user])
 
+  const refreshUnreadNotifications = useCallback(async () => {
+    if (!user) {
+      setUnreadNotificationCount(0)
+      return
+    }
+    try {
+      const items = await api.getInbox(true)
+      setUnreadNotificationCount(items.length)
+    } catch {
+      setUnreadNotificationCount(0)
+    }
+  }, [user])
+
   useEffect(() => {
     if (!hydrated) return
     if (!user) {
       setFavoriteAuctionIds([])
+      setUnreadNotificationCount(0)
       return
     }
     refreshFavorites()
-  }, [hydrated, user, refreshFavorites])
+    refreshUnreadNotifications()
+  }, [hydrated, user, refreshFavorites, refreshUnreadNotifications])
+
+  useEffect(() => {
+    if (!hydrated || !user) return
+    const interval = setInterval(refreshUnreadNotifications, 60000)
+    return () => clearInterval(interval)
+  }, [hydrated, user, refreshUnreadNotifications])
 
   const isFavorite = useCallback((auctionId: string) => favoriteAuctionIds.includes(auctionId), [favoriteAuctionIds])
 
@@ -729,17 +753,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [auctions])
 
   const value = useMemo(() => ({
-    view, selectedId, userBid, pendingBidAmount, bidTicketNumber, feePaid, walletBalance, paymentMethod, lastPaymentMethod, paymentContext, setPaymentContext, sikinaPayUrl, setSikinaPayUrl, sikinaProxyUrl, setSikinaProxyUrl, favoriteAuctionIds, favoritesLoading, myBids, user, allBids,
+    view, selectedId, userBid, pendingBidAmount, bidTicketNumber, feePaid, walletBalance, paymentMethod, lastPaymentMethod, paymentContext, setPaymentContext, sikinaPayUrl, setSikinaPayUrl, sikinaProxyUrl, setSikinaProxyUrl, favoriteAuctionIds, favoritesLoading, unreadNotificationCount, myBids, user, allBids,
     auctions, auctionsLoading, authError, sessionEndReason,
     go, selectAuction, selectAuctionForMonitor, setSelectedIdOnly, setFeePaid, setPendingBidAmount, payFee, submitBid, payWinning, setPaymentMethod, checkPaymentStatus, reset,
     login, register, logout, addAuction, updateAuction, deleteAuction, closeAuction, forceCloseAuction,
-    refreshAuctions, refreshWallet, refreshFavorites, toggleFavorite, isFavorite, fetchAuctionById, getAuction,
+    refreshAuctions, refreshWallet, refreshFavorites, refreshUnreadNotifications, toggleFavorite, isFavorite, fetchAuctionById, getAuction,
   }), [
-    view, selectedId, userBid, pendingBidAmount, bidTicketNumber, feePaid, walletBalance, paymentMethod, lastPaymentMethod, paymentContext, setPaymentContext, sikinaPayUrl, setSikinaPayUrl, sikinaProxyUrl, setSikinaProxyUrl, favoriteAuctionIds, favoritesLoading, myBids, user, allBids,
+    view, selectedId, userBid, pendingBidAmount, bidTicketNumber, feePaid, walletBalance, paymentMethod, lastPaymentMethod, paymentContext, setPaymentContext, sikinaPayUrl, setSikinaPayUrl, sikinaProxyUrl, setSikinaProxyUrl, favoriteAuctionIds, favoritesLoading, unreadNotificationCount, myBids, user, allBids,
     auctions, auctionsLoading, authError, sessionEndReason,
     go, selectAuction, selectAuctionForMonitor, setSelectedIdOnly, setFeePaid, setPendingBidAmount, payFee, submitBid, payWinning, setPaymentMethod, checkPaymentStatus, reset,
     login, register, logout, addAuction, updateAuction, deleteAuction, closeAuction, forceCloseAuction,
-    refreshAuctions, refreshWallet, refreshFavorites, toggleFavorite, isFavorite, fetchAuctionById, getAuction,
+    refreshAuctions, refreshWallet, refreshFavorites, refreshUnreadNotifications, toggleFavorite, isFavorite, fetchAuctionById, getAuction,
   ])
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>

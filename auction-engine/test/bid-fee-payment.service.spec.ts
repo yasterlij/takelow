@@ -11,6 +11,7 @@ import { Bid } from '../src/modules/bidding/entities/bid.entity';
 import { Winner } from '../src/modules/winner/entities/winner.entity';
 import { WinnerService } from '../src/modules/winner/winner.service';
 import { BidEncryptionService } from '../src/modules/common/bid-encryption.service';
+import { NotificationDispatchService } from '../src/modules/worker/notification-dispatch.service';
 
 function createMockRepo() {
   return {
@@ -33,6 +34,7 @@ describe('PaymentService - Bid Fee Payment', () => {
   let mockAwashService: Partial<AwashService>;
   let mockWinnerService: Partial<WinnerService>;
   let mockConfigService: Partial<ConfigService>;
+  let mockNotificationDispatchService: { dispatch: jest.Mock };
 
   beforeEach(async () => {
     mockPaymentTransactionRepo = createMockRepo();
@@ -44,7 +46,9 @@ describe('PaymentService - Bid Fee Payment', () => {
       generatePaymentLink: jest.fn(),
     };
     
-    mockAwashService = {};
+    mockAwashService = {
+      generatePaymentLink: jest.fn(),
+    };
     
     mockWinnerService = {
       updateWinnerPaymentStatus: jest.fn(),
@@ -63,6 +67,10 @@ describe('PaymentService - Bid Fee Payment', () => {
       }),
     };
 
+    mockNotificationDispatchService = {
+      dispatch: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PaymentService,
@@ -75,6 +83,7 @@ describe('PaymentService - Bid Fee Payment', () => {
         { provide: AwashService, useValue: mockAwashService },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: BidEncryptionService, useValue: { encrypt: jest.fn((a) => String(a)), decrypt: jest.fn((e) => parseFloat(e)) } },
+        { provide: NotificationDispatchService, useValue: mockNotificationDispatchService },
         {
           provide: REDIS_CLIENT,
           useValue: {
@@ -168,6 +177,34 @@ describe('PaymentService - Bid Fee Payment', () => {
       });
 
       expect(mockSikinaService.generatePaymentLink).not.toHaveBeenCalled();
+      expect(mockPaymentTransactionRepo.create).not.toHaveBeenCalled();
+    });
+
+    it('should reuse an existing pending winning payment link', async () => {
+      const auctionId = 'bef09c86-21da-4db7-b02e-933f8fb83132';
+      const userId = 'af372c9d-2d80-4db9-ae53-e3bc47531f12';
+      const existingTransaction = {
+        id: 'txn-winning-existing',
+        awash_payment_url: 'https://awash.example/checkout/existing',
+      };
+
+      mockPaymentTransactionRepo.findOne.mockResolvedValue(existingTransaction);
+
+      const result = await service.createPaymentLink(
+        auctionId,
+        userId,
+        150,
+        'Winning payment',
+        'AWASH',
+      );
+
+      expect(result).toEqual({
+        paymentUrl: existingTransaction.awash_payment_url,
+        proxyUrl: expect.any(String),
+        transactionId: existingTransaction.id,
+      });
+
+      expect(mockAwashService.generatePaymentLink).not.toHaveBeenCalled();
       expect(mockPaymentTransactionRepo.create).not.toHaveBeenCalled();
     });
   });
@@ -301,6 +338,18 @@ describe('PaymentService - Bid Fee Payment', () => {
         }),
       );
 
+      expect(mockAuctionRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('should skip processing when the payment is already marked successful', async () => {
+      const clientReferenceId = 'pay-existing-success';
+
+      mockPaymentTransactionRepo.update.mockResolvedValue({ affected: 0 });
+
+      await service.handleSuccessfulPayment(clientReferenceId, 'payment-ref', {});
+
+      expect(mockPaymentTransactionRepo.findOne).not.toHaveBeenCalled();
+      expect(mockPaymentTransactionRepo.save).not.toHaveBeenCalled();
       expect(mockAuctionRepo.save).not.toHaveBeenCalled();
     });
   });

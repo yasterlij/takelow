@@ -28,6 +28,7 @@ import {
   PaymentGateway,
 } from "./entities/payment-transaction.entity";
 import { BidEncryptionService } from "../common/bid-encryption.service";
+import { NotificationDispatchService } from "../worker/notification-dispatch.service";
 
 const PAYMENT_DEADLINE_HOURS = 24;
 
@@ -54,6 +55,7 @@ export class PaymentService {
     private configService: ConfigService,
     private bidEncryptionService: BidEncryptionService,
     @InjectRedis() private readonly redis: Redis,
+    private notificationDispatchService: NotificationDispatchService,
   ) {
     this.bidFee = this.configService.get<number>("app.bidFee")!;
     this.successRedirectUrl =
@@ -908,17 +910,16 @@ export class PaymentService {
       const productName = auction?.product?.name || auctionId;
       const deadline = auction?.payment_deadline?.toISOString();
 
-      await fetch("http://identity-service:3000/api/v1/notify/winner", {
-        method: "POST",
-        headers: this.getInternalHeaders(),
-        body: JSON.stringify({
+      await this.notificationDispatchService.dispatch(
+        "/api/v1/notify/winner",
+        {
           user_id: userId,
           auction_id: auctionId,
           product_name: productName,
           winning_amount: amount,
           payment_deadline: deadline,
-        }),
-      });
+        },
+      );
     } catch (e) {
       this.logger.warn(`Failed to notify new winner: ${e.message}`);
     }

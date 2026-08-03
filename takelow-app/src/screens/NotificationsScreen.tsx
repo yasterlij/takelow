@@ -14,7 +14,7 @@ function formatSentAt(value: string) {
 }
 
 export function NotificationsScreen() {
-  const { go } = useApp()
+  const { go, refreshUnreadNotifications } = useApp()
   const [notifications, setNotifications] = useState<ApiNotification[]>([])
   const [loading, setLoading] = useState(true)
   const [unreadOnly, setUnreadOnly] = useState(false)
@@ -47,6 +47,7 @@ export function NotificationsScreen() {
     try {
       await api.markNotificationRead(id)
       setNotifications((prev) => prev.map((item) => item.id === id ? { ...item, read: true } : item))
+      await refreshUnreadNotifications()
     } finally {
       setBusyId(null)
     }
@@ -57,6 +58,7 @@ export function NotificationsScreen() {
     try {
       await api.markAllNotificationsRead()
       setNotifications((prev) => prev.map((item) => ({ ...item, read: true })))
+      await refreshUnreadNotifications()
     } finally {
       setMarkingAll(false)
     }
