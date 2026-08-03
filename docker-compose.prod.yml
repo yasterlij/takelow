@@ -1,3 +1,5 @@
+version: "3.9"
+
 services:
   postgres-primary:
     image: citusdata/citus:12.1

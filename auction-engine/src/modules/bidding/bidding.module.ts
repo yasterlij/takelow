@@ -14,6 +14,7 @@ import { BidEncryptionService } from "../common/bid-encryption.service";
 import { WinnerModule } from "../winner/winner.module";
 import { PaymentTransaction } from "../payment/entities/payment-transaction.entity";
 import { WorkerModule } from "../worker/worker.module";
+import { AuctionReviewService } from "../admin/auction-review.service";
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { WorkerModule } from "../worker/worker.module";
   providers: [
     BiddingService,
     AuctionGateway,
+    AuctionReviewService,
     BiddingWindowInterceptor,
     ThrottleGuard,
     NonceGuard,
