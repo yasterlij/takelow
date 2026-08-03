@@ -7,6 +7,7 @@ import {
   ZoomIn,
   Bell,
   ArrowLeft,
+  Heart,
   Eye,
   ShieldCheck,
   Wallet,
@@ -91,6 +92,8 @@ export function ProductScreen() {
     go,
     selectedId,
     getAuction,
+    isFavorite,
+    toggleFavorite,
     payFee,
     authError,
     setPaymentMethod,
@@ -155,6 +158,7 @@ export function ProductScreen() {
     auction.id.slice(0, 6).toUpperCase();
   const countdown = formatCountdown(seconds);
   const specEntries = getSpecEntries(auction.specs);
+  const favorite = isFavorite(auction.id);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -400,6 +404,13 @@ export function ProductScreen() {
             </p>
           )}
         </div>
+        <button
+          onClick={() => toggleFavorite(auction.id)}
+          aria-label={favorite ? "Remove from favorites" : "Add to favorites"}
+          className={`flex size-10 items-center justify-center rounded-xl border transition-all shadow-sm hover:-translate-y-0.5 active:scale-[0.97] ${favorite ? "border-red-200 bg-red-50 text-red-500" : "border-border/60 bg-white/80 text-neutral-500 hover:bg-white hover:text-red-500"}`}
+        >
+          <Heart className={`size-5 ${favorite ? "fill-current" : ""}`} />
+        </button>
       </div>
 
       {lightboxOpen && (

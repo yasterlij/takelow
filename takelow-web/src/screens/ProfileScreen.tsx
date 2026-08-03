@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { motion } from "framer-motion"
-import { ArrowLeft, Wallet, Eye, EyeOff, TicketCheck, Trophy, Shield, LogOut, ChevronRight, Phone } from "lucide-react"
+import { ArrowLeft, Wallet, Eye, EyeOff, TicketCheck, Trophy, Shield, LogOut, ChevronRight, Phone, Bell, Heart } from "lucide-react"
 import { useApp } from "../AppContext"
 import { Badge } from "../components/AuctionUI"
 import { formatCurrency } from "../mockDataV0"
@@ -17,6 +17,8 @@ export function ProfileScreen() {
   const menuItems = [
     { id: "my-bids", label: "My Bids", icon: TicketCheck, onClick: () => go("my-bids") },
     { id: "winners", label: "Winners", icon: Trophy, onClick: () => go("closed-auctions") },
+    { id: "favorites", label: "Favorites", icon: Heart, onClick: () => go("favorites") },
+    { id: "notifications", label: "Notifications", icon: Bell, onClick: () => go("notifications") },
     ...(isAdmin ? [{ id: "admin", label: "Admin Panel", icon: Shield, onClick: () => go("admin-dashboard") }] : []),
   ]
 

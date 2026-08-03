@@ -15,6 +15,8 @@ export type View =
   | "payment-success" | "payment-failed"
   | "closed-auctions"
   | "profile"
+  | "notifications"
+  | "favorites"
   | "sikina-pay-checkout"
 
 export type UserRole = "admin" | "user"
@@ -51,6 +53,8 @@ type AppState = {
   setSikinaPayUrl: (url: string | null) => void
   sikinaProxyUrl: string | null
   setSikinaProxyUrl: (url: string | null) => void
+  favoriteAuctionIds: string[]
+  favoritesLoading: boolean
   myBids: PlacedBid[]
   user: User | null
   allBids: PlacedBid[]
@@ -80,6 +84,9 @@ type AppState = {
   forceCloseAuction: (id: string) => Promise<void>
   refreshAuctions: () => Promise<void>
   refreshWallet: () => Promise<void>
+  refreshFavorites: () => Promise<void>
+  toggleFavorite: (auctionId: string) => Promise<void>
+  isFavorite: (auctionId: string) => boolean
   fetchAuctionById: (id: string) => Promise<Auction | undefined>
   getAuction: (id: string | null | undefined) => Auction | undefined
 }
@@ -156,6 +163,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const setPaymentContext = useCallback((ctx: 'bid-fee' | 'winning' | null) => setPaymentContextState(ctx), [])
   const [sikinaPayUrl, setSikinaPayUrl] = useState<string | null>(null)
   const [sikinaProxyUrl, setSikinaProxyUrl] = useState<string | null>(null)
+  const [favoriteAuctionIds, setFavoriteAuctionIds] = useState<string[]>([])
+  const [favoritesLoading, setFavoritesLoading] = useState(false)
   const [myBids, setMyBids] = useState<PlacedBid[]>([])
   const [allBids, setAllBids] = useState<PlacedBid[]>([])
   const [auctions, setAuctions] = useState<Auction[]>([])
@@ -182,7 +191,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
           const saved = JSON.parse(raw)
           if (typeof saved.sessionStartedAt === "number") sessionStartedAtRef.current = saved.sessionStartedAt
           if (saved.auctions?.length) {
-            const unique = Array.from(new Map<string, Auction>(saved.auctions.map((a: any) => [a.id, a])).values())
+            const unique = Array.from(new Map<string, Auction>(saved.auctions.map((a: any) => [
+              a.id,
+              { ...a, category: normalizeAuctionCategory(a.category, a.name) },
+            ])).values())
             setAuctions(unique)
           }
           if (saved.pendingBidAmount != null) setPendingBidAmount(saved.pendingBidAmount)
@@ -311,6 +323,49 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const interval = setInterval(refreshAuctions, POLL_INTERVAL)
     return () => clearInterval(interval)
   }, [hydrated, user, view])
+
+  const refreshFavorites = useCallback(async () => {
+    if (!user) {
+      setFavoriteAuctionIds([])
+      return
+    }
+    setFavoritesLoading(true)
+    try {
+      const res = await api.getFavorites()
+      setFavoriteAuctionIds(res.data.map((item) => item.auction_id))
+    } catch {
+      toast('Failed to refresh favorites', 'error')
+    } finally {
+      setFavoritesLoading(false)
+    }
+  }, [user])
+
+  useEffect(() => {
+    if (!hydrated) return
+    if (!user) {
+      setFavoriteAuctionIds([])
+      return
+    }
+    refreshFavorites()
+  }, [hydrated, user, refreshFavorites])
+
+  const isFavorite = useCallback((auctionId: string) => favoriteAuctionIds.includes(auctionId), [favoriteAuctionIds])
+
+  const toggleFavorite = useCallback(async (auctionId: string) => {
+    if (!user) return
+    const currentlyFavorite = favoriteAuctionIds.includes(auctionId)
+    setFavoriteAuctionIds((prev) => currentlyFavorite ? prev.filter((id) => id !== auctionId) : [...prev, auctionId])
+    try {
+      if (currentlyFavorite) {
+        await api.removeFavorite(auctionId)
+      } else {
+        await api.addFavorite(auctionId)
+      }
+    } catch (e: any) {
+      setFavoriteAuctionIds((prev) => currentlyFavorite ? [...prev, auctionId] : prev.filter((id) => id !== auctionId))
+      toast(e?.message || 'Failed to update favorites', 'error')
+    }
+  }, [favoriteAuctionIds, user])
 
   const go = useCallback((next: View) => {
     const adminViews: View[] = ['admin-dashboard', 'admin-auctions', 'admin-products', 'admin-users', 'admin-transactions', 'admin-audit', 'admin-monitor', 'admin-auction-monitor', 'monitor']
@@ -674,17 +729,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [auctions])
 
   const value = useMemo(() => ({
-    view, selectedId, userBid, pendingBidAmount, bidTicketNumber, feePaid, walletBalance, paymentMethod, lastPaymentMethod, paymentContext, setPaymentContext, sikinaPayUrl, setSikinaPayUrl, sikinaProxyUrl, setSikinaProxyUrl, myBids, user, allBids,
+    view, selectedId, userBid, pendingBidAmount, bidTicketNumber, feePaid, walletBalance, paymentMethod, lastPaymentMethod, paymentContext, setPaymentContext, sikinaPayUrl, setSikinaPayUrl, sikinaProxyUrl, setSikinaProxyUrl, favoriteAuctionIds, favoritesLoading, myBids, user, allBids,
     auctions, auctionsLoading, authError, sessionEndReason,
     go, selectAuction, selectAuctionForMonitor, setSelectedIdOnly, setFeePaid, setPendingBidAmount, payFee, submitBid, payWinning, setPaymentMethod, checkPaymentStatus, reset,
     login, register, logout, addAuction, updateAuction, deleteAuction, closeAuction, forceCloseAuction,
-    refreshAuctions, refreshWallet, fetchAuctionById, getAuction,
+    refreshAuctions, refreshWallet, refreshFavorites, toggleFavorite, isFavorite, fetchAuctionById, getAuction,
   }), [
-    view, selectedId, userBid, pendingBidAmount, bidTicketNumber, feePaid, walletBalance, paymentMethod, lastPaymentMethod, paymentContext, setPaymentContext, sikinaPayUrl, setSikinaPayUrl, sikinaProxyUrl, setSikinaProxyUrl, myBids, user, allBids,
+    view, selectedId, userBid, pendingBidAmount, bidTicketNumber, feePaid, walletBalance, paymentMethod, lastPaymentMethod, paymentContext, setPaymentContext, sikinaPayUrl, setSikinaPayUrl, sikinaProxyUrl, setSikinaProxyUrl, favoriteAuctionIds, favoritesLoading, myBids, user, allBids,
     auctions, auctionsLoading, authError, sessionEndReason,
     go, selectAuction, selectAuctionForMonitor, setSelectedIdOnly, setFeePaid, setPendingBidAmount, payFee, submitBid, payWinning, setPaymentMethod, checkPaymentStatus, reset,
     login, register, logout, addAuction, updateAuction, deleteAuction, closeAuction, forceCloseAuction,
-    refreshAuctions, refreshWallet, fetchAuctionById, getAuction,
+    refreshAuctions, refreshWallet, refreshFavorites, toggleFavorite, isFavorite, fetchAuctionById, getAuction,
   ])
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>

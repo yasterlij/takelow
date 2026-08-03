@@ -9,11 +9,24 @@ import { Server, Socket } from "socket.io";
 import { Logger } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 
-const ALLOWED_WS_ORIGINS = (
-  process.env.CORS_ORIGINS || "http://localhost:5173,http://localhost:3000"
-)
-  .split(",")
-  .map((o) => o.trim());
+function getAllowedWsOrigins(): string[] {
+  const configuredOrigins = (process.env.CORS_ORIGINS || "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  if (process.env.NODE_ENV === "production" && configuredOrigins.length === 0) {
+    throw new Error("CORS_ORIGINS must be configured in production for WebSocket access");
+  }
+
+  if (configuredOrigins.length > 0) {
+    return configuredOrigins;
+  }
+
+  return ["http://localhost:5173", "http://localhost:3000"];
+}
+
+const ALLOWED_WS_ORIGINS = getAllowedWsOrigins();
 
 @WebSocketGateway({
   cors: { origin: ALLOWED_WS_ORIGINS },

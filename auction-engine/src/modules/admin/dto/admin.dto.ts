@@ -7,23 +7,32 @@ import {
   IsDateString,
   IsEnum,
   IsObject,
+  MaxLength,
+  MinLength,
+  ArrayMaxSize,
+  IsUUID,
 } from "class-validator";
 import { AuctionStatus } from "../../winner/entities/auction.entity";
 
 export class CreateProductDto {
   @IsString()
+  @MinLength(2)
+  @MaxLength(120)
   name: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(80)
   category?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(2000)
   description?: string;
 
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(8)
   @IsString({ each: true })
   image_urls?: string[];
 
@@ -39,18 +48,23 @@ export class CreateProductDto {
 export class UpdateProductDto {
   @IsOptional()
   @IsString()
+  @MinLength(2)
+  @MaxLength(120)
   name?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(80)
   category?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(2000)
   description?: string;
 
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(8)
   @IsString({ each: true })
   image_urls?: string[];
 
@@ -65,7 +79,7 @@ export class UpdateProductDto {
 }
 
 export class CreateAuctionDto {
-  @IsString()
+  @IsUUID()
   product_id: string;
 
   @IsDateString()
@@ -90,7 +104,7 @@ export class CreateAuctionDto {
 
 export class UpdateAuctionDto {
   @IsOptional()
-  @IsString()
+  @IsUUID()
   product_id?: string;
 
   @IsOptional()

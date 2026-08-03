@@ -154,6 +154,16 @@ jobs:
             envsubst < "$f" | kubectl apply -f -
           done
 
+      - name: Run database migrations
+        run: |
+          kubectl delete job takelow-migrate --ignore-not-found
+          kubectl create configmap takelow-migrations \
+            --from-file=scripts/migrate-raw.sh \
+            --from-file=database/migrations \
+            --dry-run=client -o yaml | kubectl apply -f -
+          kubectl apply -f k8s/migrate-job.yaml
+          kubectl wait --for=condition=complete job/takelow-migrate --timeout=300s
+
       - name: Rollout restart
         run: |
           kubectl set image deployment/identity-service \

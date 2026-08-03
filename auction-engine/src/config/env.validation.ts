@@ -74,6 +74,10 @@ class EnvironmentVariables {
   @IsString()
   @IsNotEmpty()
   INTERNAL_API_KEY: string;
+
+  @IsString()
+  @IsOptional()
+  CORS_ORIGINS: string = "";
 }
 
 export function validate(config: Record<string, unknown>) {
@@ -83,6 +87,9 @@ export function validate(config: Record<string, unknown>) {
   const errors = validateSync(validated, { skipMissingProperties: false });
   if (errors.length > 0) {
     throw new Error(`Environment validation failed: ${errors.toString()}`);
+  }
+  if (config.NODE_ENV === "production" && !validated.CORS_ORIGINS.trim()) {
+    throw new Error("Environment validation failed: CORS_ORIGINS is required in production");
   }
   return validated;
 }

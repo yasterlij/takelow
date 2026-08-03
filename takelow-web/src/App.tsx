@@ -16,6 +16,8 @@ import { ClosedAuctionsScreen } from "./screens/ClosedAuctionsScreen"
 import { WinnerScreen } from "./screens/WinnerScreen"
 import { PayWinningScreen } from "./screens/PayWinningScreen"
 import { ProfileScreen } from "./screens/ProfileScreen"
+import { NotificationsScreen } from "./screens/NotificationsScreen"
+import { FavoritesScreen } from "./screens/FavoritesScreen"
 import { PaymentConfirmedScreen } from "./screens/PaymentConfirmedScreen"
 import { PaymentResultScreen } from "./screens/PaymentResultScreen"
 
@@ -58,6 +60,8 @@ function ScreenRouter() {
     case "closed-auctions": screen = <ClosedAuctionsScreen />; break
     case "winner": screen = <WinnerScreen />; break
     case "profile": screen = <ProfileScreen />; break
+    case "notifications": screen = <NotificationsScreen />; break
+    case "favorites": screen = <FavoritesScreen />; break
     case "pay-winning": screen = <PayWinningScreen />; break
     case "payment-confirmed": screen = <PaymentConfirmedScreen />; break
     case "delivery": screen = <DeliveryScreen />; break

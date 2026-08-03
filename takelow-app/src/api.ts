@@ -361,6 +361,23 @@ export type ApiUser = {
   avatar_url: string | null
 }
 
+export type ApiFavorite = {
+  user_id: string
+  auction_id: string
+  created_at: string
+}
+
+export type ApiNotification = {
+  id: string
+  user_id: string
+  type: string
+  title: string
+  body: string
+  metadata: Record<string, unknown> | null
+  read: boolean
+  sent_at: string
+}
+
 export const api = {
   auth: {
     register(phone_number: string, password: string, full_name: string) {
@@ -429,6 +446,15 @@ export const api = {
   },
   deleteProduct(id: string) {
     return request<{ deleted: boolean; id: string }>('DELETE', `/admin/products/${id}`, undefined, ENGINE_API)
+  },
+  getFavorites() {
+    return request<{ data: ApiFavorite[]; total: number }>('GET', '/favorites', undefined, QUERY_API)
+  },
+  addFavorite(auctionId: string) {
+    return request<ApiFavorite>('POST', `/favorites/${auctionId}`, undefined, QUERY_API)
+  },
+  removeFavorite(auctionId: string) {
+    return request<{ removed: boolean }>('DELETE', `/favorites/${auctionId}`, undefined, QUERY_API)
   },
   createAuction(data: { product_id: string; start_time: string; end_time: string; min_bid?: number; max_bid?: number; bid_fee?: number }) {
     return request<ApiAuction>('POST', '/admin/auctions', data, ENGINE_API)
@@ -507,5 +533,14 @@ export const api = {
   },
   payBidFeeWithWallet(auctionId: string) {
     return request<{ paid: boolean }>('POST', `/payments/bid-fee/${auctionId}/wallet-pay`, undefined, ENGINE_API)
+  },
+  getInbox(unreadOnly = false) {
+    return request<ApiNotification[]>('GET', `/notify/inbox${unreadOnly ? '?unread=true' : ''}`, undefined, IDENTITY_API)
+  },
+  markNotificationRead(id: string) {
+    return request<{ read: boolean }>('POST', `/notify/inbox/${id}/read`, undefined, IDENTITY_API)
+  },
+  markAllNotificationsRead() {
+    return request<{ read: boolean }>('POST', '/notify/inbox/read-all', undefined, IDENTITY_API)
   },
 }

@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
-import { Wallet, Eye, EyeOff, TicketCheck, Trophy, Shield, LogOut, ChevronRight, Phone } from 'lucide-react-native'
+import { Wallet, Eye, EyeOff, TicketCheck, Trophy, Shield, LogOut, ChevronRight, Phone, Bell, Heart } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { AppBar, Badge } from '../components/AuctionUI'
 import { formatCurrency } from '../mockDataV0'
@@ -19,6 +19,8 @@ export function ProfileScreen() {
   const menuItems = [
     { id: 'my-bids', label: 'My Bids', icon: TicketCheck, onPress: () => go('my-bids') },
     { id: 'winners', label: 'Winners', icon: Trophy, onPress: () => go('winners-list') },
+    { id: 'favorites', label: 'Favorites', icon: Heart, onPress: () => go('favorites') },
+    { id: 'notifications', label: 'Notifications', icon: Bell, onPress: () => go('notifications') },
     ...(isAdmin ? [{ id: 'admin', label: 'Admin Panel', icon: Shield, onPress: () => go('admin-dashboard') }] : []),
   ]
 

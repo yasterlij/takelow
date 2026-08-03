@@ -1,4 +1,5 @@
 import { Injectable, Logger, BadRequestException } from "@nestjs/common";
+import { Redis } from "ioredis";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, LessThan } from "typeorm";
 import { Cron, CronExpression } from "@nestjs/schedule";
@@ -12,10 +13,12 @@ import { WinnerService } from "./winner.service";
 import { Bid } from "../bidding/entities/bid.entity";
 import { BullMqWorker } from "../worker/bullmq.worker";
 import { BidEncryptionService } from "../common/bid-encryption.service";
+import { InjectRedis } from "../common/redis.decorator";
 
 const MAX_RETRIES = 5;
 const RETRY_DELAY_MS = 300;
 const PAYMENT_DEADLINE_HOURS = 24;
+const AUCTION_STATE_TTL_BUFFER_SECONDS = 3600;
 
 @Injectable()
 export class AuctionClosureService {
@@ -23,6 +26,25 @@ export class AuctionClosureService {
 
   private normalizeAmount(amount: string | number): string {
     return Number(amount).toFixed(2);
+  }
+
+  private getAuctionStateTtl(endTime: Date): number {
+    const secondsUntilEnd = Math.ceil((endTime.getTime() - Date.now()) / 1000);
+    return Math.max(60, secondsUntilEnd + AUCTION_STATE_TTL_BUFFER_SECONDS);
+  }
+
+  private async refreshAuctionRedisTtl(
+    auctionId: string,
+    endTime: Date,
+  ): Promise<void> {
+    const ttl = this.getAuctionStateTtl(endTime);
+    await this.redis
+      .multi()
+      .expire(`takelow:auction:${auctionId}:frequencies`, ttl)
+      .expire(`takelow:auction:${auctionId}:unique_bids`, ttl)
+      .expire(`takelow:auction:${auctionId}:bidders`, ttl)
+      .expire(`takelow:auction:${auctionId}:total_bids`, ttl)
+      .exec();
   }
 
   constructor(
@@ -35,6 +57,7 @@ export class AuctionClosureService {
     private winnerService: WinnerService,
     private bullMqWorker: BullMqWorker,
     private bidEncryptionService: BidEncryptionService,
+    @InjectRedis() private readonly redis: Redis,
   ) {}
 
   @Cron(CronExpression.EVERY_10_SECONDS)
@@ -74,6 +97,7 @@ export class AuctionClosureService {
       const extendMs = 24 * 60 * 60 * 1000;
       auction.end_time = new Date(Date.now() + extendMs);
       await this.auctionRepository.save(auction);
+      await this.refreshAuctionRedisTtl(auction.id, auction.end_time);
       this.logger.log(
         `Auction ${auction.id}: Only ${totalBids}/${auction.min_bid} bids, extended 24h`,
       );
@@ -91,6 +115,7 @@ export class AuctionClosureService {
       auction.extensions = (auction.extensions || 0) + 1;
       auction.end_time = new Date(Date.now() + 24 * 60 * 60 * 1000);
       await this.auctionRepository.save(auction);
+      await this.refreshAuctionRedisTtl(auction.id, auction.end_time);
       this.logger.log(
         `Auction ${auction.id}: No unique bids among ${totalBids} bids (extension #${auction.extensions}), extended 24h for fair play`,
       );

@@ -334,6 +334,23 @@ export type ApiUser = {
   avatar_url: string | null
 }
 
+export type ApiNotification = {
+  id: string
+  user_id: string
+  type: string
+  title: string
+  body: string
+  metadata: Record<string, unknown> | null
+  read: boolean
+  sent_at: string
+}
+
+export type ApiFavorite = {
+  user_id: string
+  auction_id: string
+  created_at: string
+}
+
 export const api = {
   auth: {
     login(phone_number: string, password: string) {
@@ -474,6 +491,15 @@ export const api = {
   deleteProduct(id: string) {
     return request<{ deleted: boolean; id: string }>('DELETE', `/admin/products/${id}`, undefined, ENGINE_API)
   },
+  getFavorites() {
+    return request<{ data: ApiFavorite[]; total: number }>('GET', '/favorites', undefined, QUERY_API)
+  },
+  addFavorite(auctionId: string) {
+    return request<ApiFavorite>('POST', `/favorites/${auctionId}`, undefined, QUERY_API)
+  },
+  removeFavorite(auctionId: string) {
+    return request<{ removed: boolean }>('DELETE', `/favorites/${auctionId}`, undefined, QUERY_API)
+  },
 
   // Admin (identity)
   adminListUsers(page = 1, limit = 100, search?: string) {
@@ -538,7 +564,7 @@ export const api = {
 
   // Notifications
   getInbox(unreadOnly = false) {
-    return request<Array<{ id: string; user_id: string; type: string; title: string; body: string; metadata: any; read: boolean; sent_at: string }>>('GET', `/notify/inbox${unreadOnly ? '?unread=true' : ''}`, undefined, IDENTITY_API)
+    return request<ApiNotification[]>('GET', `/notify/inbox${unreadOnly ? '?unread=true' : ''}`, undefined, IDENTITY_API)
   },
   markNotificationRead(id: string) {
     return request<{ read: boolean }>('POST', `/notify/inbox/${id}/read`, undefined, IDENTITY_API)

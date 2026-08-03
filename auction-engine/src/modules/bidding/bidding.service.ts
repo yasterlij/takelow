@@ -24,6 +24,7 @@ import {
 import { BidEncryptionService } from "../common/bid-encryption.service";
 
 const LOCK_TTL = 5000;
+const AUCTION_STATE_TTL_BUFFER_SECONDS = 3600;
 
 @Injectable()
 export class BiddingService {
@@ -31,6 +32,11 @@ export class BiddingService {
 
   private normalizeAmount(amount: number): string {
     return amount.toFixed(2);
+  }
+
+  private getAuctionStateTtl(endTime: Date): number {
+    const secondsUntilEnd = Math.ceil((endTime.getTime() - Date.now()) / 1000);
+    return Math.max(60, secondsUntilEnd + AUCTION_STATE_TTL_BUFFER_SECONDS);
   }
 
   constructor(
@@ -109,7 +115,7 @@ export class BiddingService {
         }),
       );
 
-      await this.trackBidInRedis(auctionId, userId, amount);
+      await this.trackBidInRedis(auctionId, userId, amount, endTime);
 
       this.notifyOutbidBidders(auctionId, userId, amount).catch((e) =>
         this.logger.warn(`Failed to notify outbid bidders: ${e.message}`),
@@ -266,6 +272,7 @@ export class BiddingService {
     auctionId: string,
     userId: string,
     amount: number,
+    endTime: Date,
   ): Promise<void> {
     const multi = this.redis.multi();
     const amountKey = this.normalizeAmount(amount);
@@ -295,7 +302,7 @@ export class BiddingService {
 
     uniqueMulti.incr(`takelow:auction:${auctionId}:total_bids`);
 
-    const ttl = 86400;
+    const ttl = this.getAuctionStateTtl(endTime);
     uniqueMulti.expire(`takelow:auction:${auctionId}:frequencies`, ttl);
     uniqueMulti.expire(`takelow:auction:${auctionId}:unique_bids`, ttl);
     uniqueMulti.expire(`takelow:auction:${auctionId}:bidders`, ttl);

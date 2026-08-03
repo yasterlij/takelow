@@ -4,6 +4,7 @@ import { Repository, MoreThan, In } from "typeorm";
 import { Auction, AuctionStatus } from "./entities/auction.entity";
 import { Bid } from "./entities/bid.entity";
 import { BidEncryptionService } from "../common/bid-encryption.service";
+import { normalizeProductCategory } from "./product-categories";
 
 interface WinnerRow {
   user_id: string;
@@ -148,7 +149,11 @@ export class AuctionsService {
             description: row.product_description,
             image_urls: row.product_image_urls,
             current_market_price: Number(row.product_current_market_price || 0),
-            category: row.product_category,
+            category: normalizeProductCategory(
+              row.product_category,
+              row.product_name,
+              row.product_brand,
+            ),
             brand: row.product_brand,
             specs: null,
           }

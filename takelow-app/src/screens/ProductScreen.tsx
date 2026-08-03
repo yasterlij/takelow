@@ -19,6 +19,7 @@ import {
   Zap,
   Minus,
   Plus,
+  Heart,
   Wallet,
   ShieldCheck,
   Lock,
@@ -91,6 +92,8 @@ export function ProductScreen() {
     go,
     selectedId,
     getAuction,
+    isFavorite,
+    toggleFavorite,
     payFee,
     setPaymentMethod,
     walletBalance,
@@ -157,6 +160,7 @@ export function ProductScreen() {
     auction.publicCode || auction.id.slice(0, 6).toUpperCase();
   const specSummary = auction.specSummary || formatSpecSummary(auction.specs);
   const specEntries = getSpecEntries(auction.specs);
+  const favorite = isFavorite(auction.id);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -392,7 +396,7 @@ export function ProductScreen() {
         onBack={() => go("auctions")}
         right={
           <TouchableOpacity
-            onPress={() => go("home")}
+            onPress={() => toggleFavorite(auction.id)}
             style={{
               width: 34,
               height: 34,
@@ -400,7 +404,7 @@ export function ProductScreen() {
               alignItems: "center",
             }}
           >
-            <AwashMark size={22} />
+            <Heart size={20} color={favorite ? colors.primary : colors.navyForeground} fill={favorite ? colors.primary : 'transparent'} />
           </TouchableOpacity>
         }
       />
