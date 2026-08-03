@@ -3,6 +3,7 @@ import type { ReactNode } from "react"
 import { api, setApiToken, setRefreshToken, getApiToken, getRefreshToken, getUserFriendlyMessage, getAccessTokenExpiry, type SessionExpireReason } from "./api"
 import { toast } from "./store/toast.store"
 import { useAuctionSocket, applySocketUpdate } from "./hooks/useAuctionSocket"
+import { normalizeAuctionCategory } from "./lib/auctionCategories"
 import type { Auction, ProductSpecs } from "./mockDataV0"
 import { formatSpecSummary } from "./mockDataV0"
 
@@ -105,7 +106,7 @@ function mapAuction(apiAuction: any): Auction {
     publicCode: apiAuction.public_code,
     productId: apiAuction.product_id,
     name: apiAuction.product?.name || 'Unknown Product',
-    category: apiAuction.product?.brand || '',
+    category: normalizeAuctionCategory(apiAuction.product?.category, apiAuction.product?.name),
     images: apiAuction.product?.image_urls || [],
     marketPrice: Number(apiAuction.product?.current_market_price || 0),
     bidFee: apiAuction.bid_fee != null ? Number(apiAuction.bid_fee) : 1,
@@ -584,7 +585,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (user?.role !== 'admin') return
     try {
       const product = await api.createProduct({
-        name: a.name, description: a.description, current_market_price: a.marketPrice, brand: a.category,
+        name: a.name, description: a.description, current_market_price: a.marketPrice, category: a.category,
         ...(a.specs ? { specs: a.specs } : {}),
         ...(a.images?.length ? { image_urls: a.images } : {}),
       })
@@ -633,7 +634,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             ...(data.name ? { name: data.name } : {}),
             ...(data.marketPrice !== undefined ? { current_market_price: data.marketPrice } : {}),
             ...(data.description !== undefined ? { description: data.description } : {}),
-            ...(data.category !== undefined ? { brand: data.category } : {}),
+            ...(data.category !== undefined ? { category: data.category } : {}),
             ...(data.images !== undefined ? { image_urls: data.images } : {}),
             ...(data.specs !== undefined ? { specs: data.specs } : {}),
           })

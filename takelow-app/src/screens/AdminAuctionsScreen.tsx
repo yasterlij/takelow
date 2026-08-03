@@ -7,6 +7,7 @@ import { useApp } from '../AppContext'
 import { api } from '../api'
 import { AppBar, CTAButton, Badge, Card } from '../components/AuctionUI'
 import { usePagination, PaginationBar } from '../components/Pagination'
+import { STANDARD_AUCTION_CATEGORIES } from '../lib/auctionCategories'
 import { formatCurrency, formatSpecSummary } from '../mockDataV0'
 import { colors } from '../theme'
 
@@ -171,9 +172,9 @@ export function AdminAuctionsScreen() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [name, setName] = useState('')
-  const CATEGORIES = ['Computer', 'Electronics', 'Phone/Tablet', 'Car', 'Machinery']
+  const CATEGORIES = [...STANDARD_AUCTION_CATEGORIES]
 const emptySpecs = { storage: '', ram: '', edition: '', battery: '', camera: '', osVersion: '', display: '', chipset: '' }
-const [category, setCategory] = useState('Computer')
+const [category, setCategory] = useState<string>(STANDARD_AUCTION_CATEGORIES[0])
   const [marketPrice, setMarketPrice] = useState('')
   const [bidFee, setBidFee] = useState('10')
   const [minBid, setMinBid] = useState('')
@@ -193,7 +194,7 @@ const [category, setCategory] = useState('Computer')
   const [showLightbox, setShowLightbox] = useState(false)
 
   const resetForm = () => {
-    setName(''); setCategory('Computer'); setMarketPrice(''); setBidFee('10')
+    setName(''); setCategory(STANDARD_AUCTION_CATEGORIES[0]); setMarketPrice(''); setBidFee('10')
     setMinBid(''); setMaxBid('')
     setDescription(''); setHighlights(''); setImageUrl(''); setSpecText('')
     setStartDate(new Date()); setEndDate(new Date(Date.now() + 7 * 86400000))

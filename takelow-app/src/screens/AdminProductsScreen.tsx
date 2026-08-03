@@ -5,6 +5,7 @@ import { useApp } from '../AppContext'
 import { api } from '../api'
 import { CTAButton, Card } from '../components/AuctionUI'
 import { usePagination, PaginationBar } from '../components/Pagination'
+import { STANDARD_AUCTION_CATEGORIES, normalizeAuctionCategory } from '../lib/auctionCategories'
 import { formatCurrency, formatSpecSummary } from '../mockDataV0'
 import { colors } from '../theme'
 
@@ -20,6 +21,10 @@ const specFields = [
   { key: 'chipset', label: 'Chipset' },
 ] as const
 
+function getProductCategory(product: { category?: string | null; name?: string | null }) {
+  return normalizeAuctionCategory(product.category, product.name)
+}
+
 export function AdminProductsScreen() {
   const { go } = useApp()
   const [products, setProducts] = useState<any[]>([])
@@ -28,7 +33,7 @@ export function AdminProductsScreen() {
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<any>(null)
   const [name, setName] = useState('')
-  const [brand, setBrand] = useState('')
+  const [category, setCategory] = useState<string>(STANDARD_AUCTION_CATEGORIES[0])
   const [price, setPrice] = useState('')
   const [description, setDescription] = useState('')
   const [imageUrl, setImageUrl] = useState('')
@@ -46,12 +51,12 @@ export function AdminProductsScreen() {
   useEffect(() => { loadProducts() }, [])
 
   const resetForm = () => {
-    setName(''); setBrand(''); setPrice(''); setDescription(''); setImageUrl(''); setSpecs(emptySpecs)
+    setName(''); setCategory(STANDARD_AUCTION_CATEGORIES[0]); setPrice(''); setDescription(''); setImageUrl(''); setSpecs(emptySpecs)
     setEditing(null); setShowForm(false)
   }
 
   const openEdit = (p: any) => {
-    setName(p.name || ''); setBrand(p.brand || ''); setPrice(String(p.current_market_price || ''))
+    setName(p.name || ''); setCategory(getProductCategory(p)); setPrice(String(p.current_market_price || ''))
     setDescription(p.description || ''); setImageUrl((p.image_urls || [])[0] || ''); setSpecs({ ...emptySpecs, ...(p.specs || {}) })
     setEditing(p); setShowForm(true)
   }
@@ -61,7 +66,7 @@ export function AdminProductsScreen() {
     const data: any = {
       name: name.trim(),
       current_market_price: Number(price),
-      brand: brand.trim() || undefined,
+      category: category.trim() || undefined,
       description: description.trim() || undefined,
       image_urls: imageUrl.trim() ? [imageUrl.trim()] : undefined,
       specs: Object.fromEntries(Object.entries(specs).filter(([, value]) => value.trim())),
@@ -84,7 +89,7 @@ export function AdminProductsScreen() {
   }
 
   const filtered = products.filter((p: any) =>
-    !search || p.name?.toLowerCase().includes(search.toLowerCase()) || p.brand?.toLowerCase().includes(search.toLowerCase())
+    !search || p.name?.toLowerCase().includes(search.toLowerCase()) || getProductCategory(p).toLowerCase().includes(search.toLowerCase())
   )
 
   const { page, setPage, perPage, setPerPage, totalPages, paginated, resetPage } = usePagination(filtered, 10)
@@ -101,7 +106,18 @@ export function AdminProductsScreen() {
         <ScrollView style={{ flex: 1, padding: 16 }}>
           <Text style={s.formTitle}>{editing ? 'Edit Product' : 'New Product'}</Text>
           <TextInput value={name} onChangeText={setName} placeholder="Product name" style={s.input} placeholderTextColor={colors.mutedForeground} />
-          <TextInput value={brand} onChangeText={setBrand} placeholder="Brand" style={s.input} placeholderTextColor={colors.mutedForeground} />
+          <Text style={s.fieldLabel}>Category</Text>
+          <View style={s.chipWrap}>
+            {STANDARD_AUCTION_CATEGORIES.map((item) => (
+              <TouchableOpacity
+                key={item}
+                onPress={() => setCategory(item)}
+                style={[s.chip, category === item ? s.chipActive : null]}
+              >
+                <Text style={[s.chipText, category === item ? s.chipTextActive : null]}>{item}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
           <TextInput value={price} onChangeText={setPrice} placeholder="Payment" keyboardType="numeric" style={s.input} placeholderTextColor={colors.mutedForeground} />
           <TextInput value={description} onChangeText={setDescription} placeholder="Description" multiline style={[s.input, { height: 80 }]} placeholderTextColor={colors.mutedForeground} />
           <View style={s.imgPreviewRow}>
@@ -149,7 +165,7 @@ export function AdminProductsScreen() {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={s.productName}>{p.name}</Text>
-                    <Text style={s.productMeta}>{p.brand || 'No brand'} · {formatCurrency(p.current_market_price)}</Text>
+                    <Text style={s.productMeta}>{getProductCategory(p)} · {formatCurrency(p.current_market_price)}</Text>
                     {p.specs && formatSpecSummary(p.specs) ? <Text style={s.productMeta}>{formatSpecSummary(p.specs)}</Text> : null}
                   </View>
                   <TouchableOpacity onPress={() => openEdit(p)} style={s.actionBtn}><Edit3 size={16} color={colors.navy} /></TouchableOpacity>
@@ -180,7 +196,13 @@ const s = StyleSheet.create({
   searchRow: { flexDirection: 'row', alignItems: 'center', margin: 16, borderRadius: 12, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, height: 40 },
   searchInput: { flex: 1, fontSize: 13, fontWeight: '500', color: colors.navy, marginLeft: 8 },
   formTitle: { fontSize: 16, fontWeight: '700', color: colors.navy, marginBottom: 16 },
+  fieldLabel: { fontSize: 11, fontWeight: '600', color: colors.mutedForeground, marginBottom: 6 },
   input: { borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, fontSize: 13, fontWeight: '500', color: colors.navy, marginBottom: 12 },
+  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
+  chipActive: { backgroundColor: colors.navy, borderColor: colors.navy },
+  chipText: { fontSize: 12, fontWeight: '600', color: colors.mutedForeground },
+  chipTextActive: { color: colors.navyForeground },
   productRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: colors.border },
   productIcon: { width: 56, height: 56, borderRadius: 12, backgroundColor: colors.secondary, justifyContent: 'center', alignItems: 'center', marginRight: 12, overflow: 'hidden' },
   productThumb: { width: '100%', height: '100%' },

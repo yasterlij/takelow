@@ -30,6 +30,7 @@ export class AuctionsService {
     return (
       message.includes("does not exist") ||
       message.includes("public_code") ||
+      message.includes("category") ||
       message.includes("specs") ||
       message.includes("bid_fee") ||
       message.includes("current_market_price") ||
@@ -100,6 +101,9 @@ export class AuctionsService {
           ...(productCols.has("current_market_price")
             ? ["p.current_market_price AS product_current_market_price"]
             : ["NULL::numeric AS product_current_market_price"]),
+          ...(productCols.has("category")
+            ? ["p.category AS product_category"]
+            : ["NULL::text AS product_category"]),
           ...(productCols.has("brand")
             ? ["p.brand AS product_brand"]
             : ["NULL::text AS product_brand"]),
@@ -110,6 +114,7 @@ export class AuctionsService {
           "NULL::text AS product_description",
           "NULL::text[] AS product_image_urls",
           "NULL::numeric AS product_current_market_price",
+          "NULL::text AS product_category",
           "NULL::text AS product_brand",
         ].join(",\n        ");
 
@@ -143,6 +148,7 @@ export class AuctionsService {
             description: row.product_description,
             image_urls: row.product_image_urls,
             current_market_price: Number(row.product_current_market_price || 0),
+            category: row.product_category,
             brand: row.product_brand,
             specs: null,
           }
@@ -258,6 +264,7 @@ export class AuctionsService {
         "p.description AS product_description",
         "p.image_urls AS product_image_urls",
         "p.current_market_price AS product_current_market_price",
+        ...(productCols.has("category") ? ["p.category AS product_category"] : ["NULL::text AS product_category"]),
         ...(productCols.has("brand") ? ["p.brand AS product_brand"] : []),
       ].join(",\n          ");
       const rows = await this.auctionRepository.query(

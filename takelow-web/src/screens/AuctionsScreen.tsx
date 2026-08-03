@@ -4,6 +4,7 @@ import { Flame, TicketCheck, ShieldCheck, Trophy, Sparkles, PiggyBank, RefreshCw
 import { useApp } from "../AppContext"
 import { Badge } from "../components/AuctionUI"
 import { useCountdown } from "../components/Countdown"
+import { buildAuctionCategoryOptions } from "../lib/auctionCategories"
 import { CURRENCY, formatCurrency, formatETB, formatCountdown, type Auction } from "../mockDataV0"
 
 function AuctionImage({ src, alt }: { src?: string; alt: string }) {
@@ -133,7 +134,7 @@ export function AuctionsScreen() {
   const [showFilters, setShowFilters] = useState(false)
   const heroScrollRef = useRef<HTMLDivElement>(null)
 
-  const categories = useMemo(() => ["All", ...Array.from(new Set(auctions.map((a) => a.category)))], [auctions])
+  const categories = useMemo(() => buildAuctionCategoryOptions(auctions.map((a) => a.category)), [auctions])
 
   const filtered = useMemo(() => {
     const unique = Array.from(new Map(auctions.map((a) => [a.id, a])).values())

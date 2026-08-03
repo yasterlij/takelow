@@ -7,6 +7,7 @@ import { AppBar, Badge } from '../components/AuctionUI'
 import { useCountdown } from '../components/Countdown'
 import { SkeletonCard } from '../components/SkeletonLoader'
 import { EmptyState } from '../components/EmptyState'
+import { buildAuctionCategoryOptions } from '../lib/auctionCategories'
 import type { Auction } from '../mockDataV0'
 import { formatCurrency, formatCountdown } from '../mockDataV0'
 import { colors } from '../theme'
@@ -121,7 +122,7 @@ export function AuctionsScreen() {
   const liveAuctions = useMemo(() => auctions.filter((a) => a.status !== 'closed'), [auctions])
   const closedAuctions = useMemo(() => auctions.filter((a) => a.status === 'closed'), [auctions])
 
-  const categories = useMemo(() => ['All', ...Array.from(new Set(liveAuctions.map((a) => a.category)))], [liveAuctions])
+  const categories = useMemo(() => buildAuctionCategoryOptions(liveAuctions.map((a) => a.category)), [liveAuctions])
   const filtered = useMemo(() => {
     const source = showClosed ? closedAuctions : liveAuctions
     const unique = Array.from(new Map(source.map((a) => [a.id, a])).values())

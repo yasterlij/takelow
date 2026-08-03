@@ -8,7 +8,7 @@ import {
 const MOCK_AUCTIONS = [
   {
     name: "iPhone 15 Pro Max",
-    brand: "Smartphones",
+    category: "Smartphones",
     description:
       "6.7-inch Super Retina XDR display, A17 Pro chip, titanium design and a pro camera system. The most advanced iPhone, up for grabs at the lowest unique bid.",
     image:
@@ -18,7 +18,7 @@ const MOCK_AUCTIONS = [
   },
   {
     name: 'Samsung 55" Smart TV',
-    brand: "Electronics",
+    category: "Electronics",
     description:
       "Crystal UHD 4K smart TV with vivid color, slim bezels and built-in streaming. Bring the cinema home for a fraction of the price.",
     image:
@@ -28,7 +28,7 @@ const MOCK_AUCTIONS = [
   },
   {
     name: "Dell XPS Laptop",
-    brand: "Computers",
+    category: "Computers",
     description:
       "Ultra-thin Dell XPS with a stunning InfinityEdge display, Intel Core processor and all-day battery. Built for work and play.",
     image:
@@ -38,7 +38,7 @@ const MOCK_AUCTIONS = [
   },
   {
     name: "Wireless Headphones Pro",
-    brand: "Audio",
+    category: "Audio",
     description:
       "Premium noise-cancelling over-ear headphones with up to 30 hours of battery and crystal-clear sound.",
     image:
@@ -48,7 +48,7 @@ const MOCK_AUCTIONS = [
   },
   {
     name: "Next-Gen Game Console",
-    brand: "Gaming",
+    category: "Gaming",
     description:
       "Lightning-fast next-generation console with ultra-high-speed SSD, ray tracing and one wireless controller included.",
     image:
@@ -76,9 +76,9 @@ async function seed() {
   let auctionsCreated = 0;
 
   for (const item of MOCK_AUCTIONS) {
-    // Check if product already exists by name + brand
+    // Check if product already exists by name + category
     let product = await productRepo.findOne({
-      where: { name: item.name, brand: item.brand },
+      where: { name: item.name, category: item.category },
     });
     if (!product) {
       product = productRepo.create({
@@ -86,7 +86,7 @@ async function seed() {
         description: item.description,
         image_urls: [item.image],
         current_market_price: 0,
-        brand: item.brand,
+        category: item.category,
       });
       await productRepo.save(product);
       productsCreated++;

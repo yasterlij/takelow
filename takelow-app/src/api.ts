@@ -263,6 +263,7 @@ export type ApiProduct = {
   description: string | null
   image_urls: string[] | null
   current_market_price: number
+  category: string | null
   brand: string | null
   specs?: Record<string, string> | null
   created_at: string
@@ -417,10 +418,10 @@ export const api = {
     },
   },
 
-  createProduct(data: { name: string; description?: string; image_urls?: string[]; current_market_price: number; brand?: string; specs?: Record<string, string> }) {
+  createProduct(data: { name: string; description?: string; image_urls?: string[]; current_market_price: number; category?: string; specs?: Record<string, string> }) {
     return request<ApiProduct>('POST', '/admin/products', data, ENGINE_API)
   },
-  updateProduct(id: string, data: Partial<{ name: string; description: string; image_urls: string[]; current_market_price: number; brand: string; specs: Record<string, string> }>) {
+  updateProduct(id: string, data: Partial<{ name: string; description: string; image_urls: string[]; current_market_price: number; category: string; specs: Record<string, string> }>) {
     return request<ApiProduct>('PATCH', `/admin/products/${id}`, data, ENGINE_API)
   },
   listProducts(page = 1, limit = 20) {

@@ -20,6 +20,7 @@ import { WinnerService } from "../winner/winner.service";
 import { Bid } from "../bidding/entities/bid.entity";
 import { ImageService } from "./image.service";
 import { BidEncryptionService } from "../common/bid-encryption.service";
+import { normalizeProductCategory } from "./product-categories";
 
 @Injectable()
 export class AuctionManageService {
@@ -50,7 +51,7 @@ export class AuctionManageService {
     }
     params.push(limit, offset);
     const rows = await this.productRepository.query(
-      `SELECT id, name, description, image_urls, current_market_price, brand, created_at
+      `SELECT id, name, description, image_urls, current_market_price, category, brand, created_at
        FROM products
        ${where}
        ORDER BY created_at DESC
@@ -63,7 +64,11 @@ export class AuctionManageService {
     );
     const total = countRows[0]?.total || 0;
     return {
-      data: rows.map((row: any) => ({ ...row, specs: null })),
+      data: rows.map((row: any) => ({
+        ...row,
+        category: normalizeProductCategory(row.category, row.name),
+        specs: null,
+      })),
       meta: { total, page, limit, total_pages: Math.ceil(total / limit) },
     };
   }
@@ -92,6 +97,7 @@ export class AuctionManageService {
               p.description AS product_description,
               p.image_urls AS product_image_urls,
               p.current_market_price AS product_current_market_price,
+        p.category AS product_category,
               p.brand AS product_brand
        FROM auctions a
        LEFT JOIN ranked ON ranked.id = a.id
@@ -151,6 +157,7 @@ export class AuctionManageService {
         data.image_urls,
       );
     }
+    data.category = normalizeProductCategory(data.category, data.name);
     data.specs = this.normalizeSpecs(data.specs) ?? undefined;
     try {
       return await this.productRepository.save(
@@ -159,18 +166,22 @@ export class AuctionManageService {
     } catch (error) {
       if (!this.isMissingColumnError(error)) throw error;
       const rows = await this.productRepository.query(
-        `INSERT INTO products (name, description, image_urls, current_market_price, brand)
+        `INSERT INTO products (name, description, image_urls, current_market_price, category)
          VALUES ($1, $2, $3, $4, $5)
-         RETURNING id, name, description, image_urls, current_market_price, brand, created_at`,
+         RETURNING id, name, description, image_urls, current_market_price, category, brand, created_at`,
         [
           data.name,
           data.description || null,
           data.image_urls || null,
           data.current_market_price,
-          data.brand || null,
+          data.category,
         ],
       );
-      return { ...rows[0], specs: null };
+      return {
+        ...rows[0],
+        category: normalizeProductCategory(rows[0]?.category, data.name),
+        specs: null,
+      };
     }
   }
 
@@ -193,6 +204,12 @@ export class AuctionManageService {
         data.image_urls,
       );
     }
+    if (data.category !== undefined) {
+      data.category = normalizeProductCategory(
+        data.category,
+        data.name ?? product.name,
+      );
+    }
     if (data.specs !== undefined) {
       data.specs = this.normalizeSpecs(data.specs) ?? undefined;
     }
@@ -203,19 +220,23 @@ export class AuctionManageService {
       if (!this.isMissingColumnError(error)) throw error;
       const rows = await this.productRepository.query(
         `UPDATE products
-         SET name = $2, description = $3, image_urls = $4, current_market_price = $5, brand = $6
+         SET name = $2, description = $3, image_urls = $4, current_market_price = $5, category = $6
          WHERE id = $1
-         RETURNING id, name, description, image_urls, current_market_price, brand, created_at`,
+         RETURNING id, name, description, image_urls, current_market_price, category, brand, created_at`,
         [
           id,
           product.name,
           product.description || null,
           product.image_urls || null,
           product.current_market_price,
-          product.brand || null,
+          product.category,
         ],
       );
-      return { ...rows[0], specs: null };
+      return {
+        ...rows[0],
+        category: normalizeProductCategory(product.category, product.name),
+        specs: null,
+      };
     }
   }
 
@@ -281,13 +302,13 @@ export class AuctionManageService {
       products = fallback.data;
     }
     const header =
-      "id,name,description,brand,current_market_price,specs,created_at";
+      "id,name,description,category,current_market_price,specs,created_at";
     const rows = products.map((p) =>
       [
         p.id,
         p.name,
         (p.description || "").replace(/,/g, ";"),
-        p.brand || "",
+        p.category || normalizeProductCategory(undefined, p.name),
         p.current_market_price,
         JSON.stringify(p.specs || {}).replace(/,/g, ";"),
         p.created_at,
@@ -324,6 +345,10 @@ export class AuctionManageService {
               image_urls: row.product_image_urls,
               current_market_price: Number(
                 row.product_current_market_price || 0,
+              ),
+              category: normalizeProductCategory(
+                row.product_category,
+                row.product_name,
               ),
               brand: row.product_brand,
               specs: null,

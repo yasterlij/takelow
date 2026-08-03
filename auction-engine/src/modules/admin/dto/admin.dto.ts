@@ -16,6 +16,10 @@ export class CreateProductDto {
 
   @IsOptional()
   @IsString()
+  category?: string;
+
+  @IsOptional()
+  @IsString()
   description?: string;
 
   @IsOptional()
@@ -28,10 +32,6 @@ export class CreateProductDto {
   current_market_price: number;
 
   @IsOptional()
-  @IsString()
-  brand?: string;
-
-  @IsOptional()
   @IsObject()
   specs?: Record<string, string>;
 }
@@ -40,6 +40,10 @@ export class UpdateProductDto {
   @IsOptional()
   @IsString()
   name?: string;
+
+  @IsOptional()
+  @IsString()
+  category?: string;
 
   @IsOptional()
   @IsString()
@@ -54,10 +58,6 @@ export class UpdateProductDto {
   @IsNumber()
   @Min(0)
   current_market_price?: number;
-
-  @IsOptional()
-  @IsString()
-  brand?: string;
 
   @IsOptional()
   @IsObject()

@@ -6,6 +6,7 @@ import { AdminLayout } from "../components/AdminLayout"
 import { api } from "../api"
 import { toast } from "../store/toast.store"
 import { useAuctionSocket, applySocketUpdate } from "../hooks/useAuctionSocket"
+import { normalizeAuctionCategory } from "../lib/auctionCategories"
 import { formatCurrency, formatETB } from "../mockDataV0"
 import type { Auction } from "../mockDataV0"
 import { useCountdown } from "../components/Countdown"
@@ -198,7 +199,7 @@ function mapAdminAuction(a: any): AdminAuction {
     id: a.id,
     productId: a.product_id,
     name: a.product?.name || "Unknown",
-    category: a.product?.brand || "",
+    category: normalizeAuctionCategory(a.product?.category, a.product?.name),
     images: a.product?.image_urls || [],
     marketPrice: Number(a.product?.current_market_price || 0),
     bidFee: a.bid_fee != null ? Number(a.bid_fee) : 1,

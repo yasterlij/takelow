@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { STANDARD_AUCTION_CATEGORIES } from "./auctionCategories"
 
 export const loginSchema = z.object({
   phone_number: z
@@ -61,7 +62,7 @@ export type WalletPinValues = z.infer<typeof walletPinSchema>
 
 export const productSchema = z.object({
   name: z.string().min(2, "Product name is required").max(120, "Name is too long"),
-  brand: z.string().max(80, "Brand is too long").optional().or(z.literal("")),
+  category: z.enum(STANDARD_AUCTION_CATEGORIES),
   current_market_price: z
     .number({ message: "Enter a valid price" })
     .positive("Price must be greater than 0")

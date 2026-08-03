@@ -6,6 +6,7 @@ import { api, setApiToken, setRefreshToken, getApiToken, getRefreshToken, getUse
 import { useToast } from './components/Toast'
 import { useAuctionSocket, applySocketUpdate } from './hooks/useAuctionSocket'
 import { registerForPushNotifications, useNotificationObserver } from './hooks/usePushNotifications'
+import { normalizeAuctionCategory } from './lib/auctionCategories'
 import { type Auction, type ProductSpecs, formatSpecSummary } from './mockDataV0'
 
 export type View =
@@ -99,7 +100,7 @@ function mapAuction(apiAuction: any): Auction {
     id: apiAuction.id,
     publicCode: apiAuction.public_code,
     name: apiAuction.product?.name || 'Unknown Product',
-    category: apiAuction.product?.brand || '',
+    category: normalizeAuctionCategory(apiAuction.product?.category, apiAuction.product?.name),
     images: apiAuction.product?.image_urls || [],
     marketPrice: Number(apiAuction.product?.current_market_price || 0),
     bidFee: apiAuction.bid_fee != null ? Number(apiAuction.bid_fee) : BID_FEE,
@@ -536,7 +537,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         name: a.name,
         description: a.description,
         current_market_price: a.marketPrice,
-        brand: a.category,
+        category: a.category,
         ...(a.specs ? { specs: a.specs } : {}),
         ...(a.images?.length ? { image_urls: a.images } : {}),
       })
@@ -589,7 +590,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             ...(data.name ? { name: data.name } : {}),
             ...(data.marketPrice !== undefined ? { current_market_price: data.marketPrice } : {}),
             ...(data.description !== undefined ? { description: data.description } : {}),
-            ...(data.category !== undefined ? { brand: data.category } : {}),
+            ...(data.category !== undefined ? { category: data.category } : {}),
             ...(data.images !== undefined ? { image_urls: data.images } : {}),
             ...(data.specs !== undefined ? { specs: data.specs } : {}),
           })

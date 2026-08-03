@@ -6,6 +6,7 @@ import { api } from "../api"
 import { AdminLayout } from "../components/AdminLayout"
 import { CTAButton, Badge, Card } from "../components/AuctionUI"
 import { usePagination, PaginationBar } from "../components/Pagination"
+import { STANDARD_AUCTION_CATEGORIES } from "../lib/auctionCategories"
 import { formatCurrency, formatETB, formatMaskedCurrency } from "../mockDataV0"
 import type { Auction, ProductSpecs } from "../mockDataV0"
 
@@ -146,7 +147,20 @@ function toDatetimeLocal(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
-const emptyForm = { name: "", category: "Computer", marketPrice: "", bidFee: "10", description: "", highlights: "", specText: "", imageUrl: "", startTime: "", endTime: "", minBid: "", maxBid: "" }
+const emptyForm: { name: string; category: string; marketPrice: string; bidFee: string; description: string; highlights: string; specText: string; imageUrl: string; startTime: string; endTime: string; minBid: string; maxBid: string } = {
+  name: "",
+  category: STANDARD_AUCTION_CATEGORIES[0],
+  marketPrice: "",
+  bidFee: "10",
+  description: "",
+  highlights: "",
+  specText: "",
+  imageUrl: "",
+  startTime: "",
+  endTime: "",
+  minBid: "",
+  maxBid: "",
+}
 
 export function AdminAuctionsScreen() {
   const { go, auctions, addAuction, updateAuction, deleteAuction, closeAuction } = useApp()
@@ -331,7 +345,7 @@ export function AdminAuctionsScreen() {
                   <div className="flex-1 space-y-3">
                     <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Product name" className="input-full" />
                     <select value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))} className="input-full">
-                      {["Computer", "Electronics", "Phone/Tablet", "Car", "Machinery"].map((c) => <option key={c}>{c}</option>)}
+                      {STANDARD_AUCTION_CATEGORIES.map((c) => <option key={c}>{c}</option>)}
                     </select>
                   </div>
                   <div className="flex-shrink-0">

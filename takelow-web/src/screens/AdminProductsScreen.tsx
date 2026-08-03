@@ -6,6 +6,7 @@ import { api } from "../api"
 import { AdminLayout } from "../components/AdminLayout"
 import { CTAButton, Badge, Card } from "../components/AuctionUI"
 import { usePagination, PaginationBar } from "../components/Pagination"
+import { STANDARD_AUCTION_CATEGORIES, normalizeAuctionCategory } from "../lib/auctionCategories"
 import { formatCurrency, formatETB, formatSpecSummary } from "../mockDataV0"
 
 const specFields = [
@@ -20,6 +21,11 @@ const specFields = [
 ] as const
 
 const emptySpecs = { storage: "", ram: "", edition: "", battery: "", camera: "", osVersion: "", display: "", chipset: "" }
+type ProductForm = { name: string; category: string; price: string; description: string; imageUrl: string } & Record<keyof typeof emptySpecs, string>
+
+function getProductCategory(product: { category?: string | null; name?: string | null }) {
+  return normalizeAuctionCategory(product.category, product.name)
+}
 
 function ProductThumb({ src, onClick }: { src?: string; onClick?: () => void }) {
   const [err, setErr] = useState(false)
@@ -96,7 +102,7 @@ function ImageLightbox({ src, onClose }: { src: string; onClose: () => void }) {
   )
 }
 
-const emptyForm = { name: "", brand: "", price: "", description: "", imageUrl: "", ...emptySpecs }
+const emptyForm: ProductForm = { name: "", category: STANDARD_AUCTION_CATEGORIES[0], price: "", description: "", imageUrl: "", ...emptySpecs }
 
 export function AdminProductsScreen() {
   const { go, auctions } = useApp()
@@ -104,7 +110,7 @@ export function AdminProductsScreen() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState("")
-  const [brandFilter, setBrandFilter] = useState<string>("all")
+  const [categoryFilter, setCategoryFilter] = useState<string>("all")
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<any>(null)
   const [form, setForm] = useState(emptyForm)
@@ -143,7 +149,7 @@ export function AdminProductsScreen() {
     setEditing(p)
     setForm({
       name: p.name || "",
-      brand: p.brand || "",
+      category: getProductCategory(p),
       price: String(p.current_market_price || ""),
       description: p.description || "",
       imageUrl: (p.image_urls || [])[0] || "",
@@ -159,7 +165,7 @@ export function AdminProductsScreen() {
     const data: any = {
       name: form.name.trim(),
       current_market_price: Number(form.price),
-      brand: form.brand.trim() || undefined,
+      category: form.category.trim() || undefined,
       description: form.description.trim() || undefined,
       specs: Object.fromEntries(Object.keys(emptySpecs).map((key) => [key, (form as any)[key]?.trim()]).filter(([, value]) => value)),
       image_urls: form.imageUrl.trim() ? [form.imageUrl.trim()] : undefined,
@@ -184,11 +190,12 @@ export function AdminProductsScreen() {
     }
   }
 
-  const brands = Array.from(new Set(products.map((p) => p.brand).filter(Boolean))) as string[]
+  const categories = STANDARD_AUCTION_CATEGORIES.filter((category) => products.some((p) => getProductCategory(p) === category))
 
   const filtered = products.filter((p: any) => {
-    if (search && !p.name?.toLowerCase().includes(search.toLowerCase()) && !p.brand?.toLowerCase().includes(search.toLowerCase())) return false
-    if (brandFilter !== "all" && p.brand !== brandFilter) return false
+    const category = getProductCategory(p)
+    if (search && !p.name?.toLowerCase().includes(search.toLowerCase()) && !category.toLowerCase().includes(search.toLowerCase())) return false
+    if (categoryFilter !== "all" && category !== categoryFilter) return false
     return true
   })
 
@@ -230,14 +237,14 @@ export function AdminProductsScreen() {
               className="w-full rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm py-2 pl-8 pr-3 text-xs font-medium outline-none transition-all placeholder:text-neutral-400/50 focus:border-awash-gold focus:bg-white focus:shadow-lg"
             />
           </div>
-          {brands.length > 0 && (
+          {categories.length > 0 && (
             <select
-              value={brandFilter}
-              onChange={(e) => { setBrandFilter(e.target.value); resetPage() }}
+              value={categoryFilter}
+              onChange={(e) => { setCategoryFilter(e.target.value); resetPage() }}
               className="rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm px-3 py-2 text-xs font-semibold text-awash-blue outline-none transition-all focus:border-awash-gold focus:bg-white"
             >
-              <option value="all">All Brands</option>
-              {brands.map((b) => <option key={b}>{b}</option>)}
+              <option value="all">All Categories</option>
+              {categories.map((c) => <option key={c}>{c}</option>)}
             </select>
           )}
         </motion.div>
@@ -266,8 +273,8 @@ export function AdminProductsScreen() {
           <motion.div variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }}>
             <Card className="items-center p-3 text-center">
               <Tag className="size-5 text-emerald-600" />
-              <p className="mt-1 font-display text-2xl font-extrabold text-emerald-600 tabular-nums">{brands.length}</p>
-              <p className="text-[10px] font-medium text-neutral-400">Brands</p>
+              <p className="mt-1 font-display text-2xl font-extrabold text-emerald-600 tabular-nums">{categories.length}</p>
+              <p className="text-[10px] font-medium text-neutral-400">Categories</p>
             </Card>
           </motion.div>
         </motion.div>
@@ -290,8 +297,10 @@ export function AdminProductsScreen() {
                 <div className="flex gap-3">
                   <div className="flex-1 space-y-3">
                     <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Product name" className="input-full" />
-                    <input value={form.brand} onChange={(e) => setForm((f) => ({ ...f, brand: e.target.value }))} placeholder="Brand" className="input-full" />
-                      <input value={form.price} onChange={(e) => setForm((f) => ({ ...f, price: e.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1").replace(/(\.\d{2})\d+/g, "$1") }))} type="text" inputMode="decimal" placeholder="Payment" className="input-full" />
+                    <select value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))} className="input-full">
+                      {STANDARD_AUCTION_CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+                    </select>
+                    <input value={form.price} onChange={(e) => setForm((f) => ({ ...f, price: e.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1").replace(/(\.\d{2})\d+/g, "$1") }))} type="text" inputMode="decimal" placeholder="Payment" className="input-full" />
                   </div>
                   <div className="flex-shrink-0">
                     <ImageUploadBox
@@ -361,9 +370,9 @@ export function AdminProductsScreen() {
             className="flex flex-col items-center gap-3 py-16 text-neutral-400"
           >
             <Package className="size-8 opacity-30" />
-            <p className="text-sm font-medium">{search || brandFilter !== "all" ? "No matching products" : "No products yet"}</p>
-            {search || brandFilter !== "all" ? (
-              <button onClick={() => { setSearch(""); setBrandFilter("all") }} className="text-xs font-semibold text-awash-gold transition-colors hover:text-awash-gold-dark">Clear filters</button>
+            <p className="text-sm font-medium">{search || categoryFilter !== "all" ? "No matching products" : "No products yet"}</p>
+            {search || categoryFilter !== "all" ? (
+              <button onClick={() => { setSearch(""); setCategoryFilter("all") }} className="text-xs font-semibold text-awash-gold transition-colors hover:text-awash-gold-dark">Clear filters</button>
             ) : (
               <p className="text-xs">Click "New Product" to get started</p>
             )}
@@ -386,7 +395,7 @@ export function AdminProductsScreen() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="truncate text-sm font-bold text-awash-blue">{p.name}</p>
-                    {p.brand && <Badge tone="navy">{p.brand}</Badge>}
+                    <Badge tone="navy">{getProductCategory(p)}</Badge>
                     {p.specs && formatSpecSummary(p.specs) && <Badge tone="green">{formatSpecSummary(p.specs)}</Badge>}
                   </div>
                   <p className="mt-0.5 text-xs font-medium text-neutral-400">

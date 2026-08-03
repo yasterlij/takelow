@@ -4,6 +4,7 @@ import { Radio, Users, TrendingDown, Clock, Eye, Search, RefreshCw, Gavel, Image
 import { useApp } from '../AppContext'
 import { api } from '../api'
 import { AppBar, Card } from '../components/AuctionUI'
+import { normalizeAuctionCategory } from '../lib/auctionCategories'
 import { formatCurrency } from '../mockDataV0'
 import { colors } from '../theme'
 
@@ -185,7 +186,7 @@ function mapMonitorAuction(a: any): MonitorAuction {
     id: a.id,
     productId: a.product_id,
     name: a.product?.name || 'Unknown',
-    category: a.product?.brand || '',
+    category: normalizeAuctionCategory(a.product?.category, a.product?.name),
     images: a.product?.image_urls || [],
     marketPrice: Number(a.product?.current_market_price || 0),
     bidFee: a.bid_fee != null ? Number(a.bid_fee) : 1,
