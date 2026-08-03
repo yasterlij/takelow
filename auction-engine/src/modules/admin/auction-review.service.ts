@@ -2,7 +2,6 @@ import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { Auction, AuctionStatus } from "../winner/entities/auction.entity";
-import { Winner } from "../winner/entities/winner.entity";
 import { WinnerService } from "../winner/winner.service";
 import { Bid } from "../bidding/entities/bid.entity";
 import { BidEncryptionService } from "../common/bid-encryption.service";
@@ -16,8 +15,6 @@ export class AuctionReviewService {
     private auctionRepository: Repository<Auction>,
     @InjectRepository(Bid)
     private bidRepository: Repository<Bid>,
-    @InjectRepository(Winner)
-    private winnerRepository: Repository<Winner>,
     private winnerService: WinnerService,
     private bidEncryptionService: BidEncryptionService,
   ) {}
@@ -89,10 +86,9 @@ export class AuctionReviewService {
     const winnerName = primaryWinnerInfo?.name || null;
     const winnerPhone = primaryWinnerInfo?.phone || null;
 
-    const persistedWinners = await this.winnerRepository.find({
-      where: { auction_id: auctionId },
-      order: { rank: "ASC" },
-    });
+    const persistedWinners = await this.winnerService.getAuctionWinners(
+      auctionId,
+    );
 
     const allWinners = await Promise.all(
       (persistedWinners.length > 0 ? persistedWinners : winners).map(

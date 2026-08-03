@@ -269,7 +269,9 @@ export class AuctionsService {
         "p.description AS product_description",
         "p.image_urls AS product_image_urls",
         "p.current_market_price AS product_current_market_price",
-        ...(productCols.has("category") ? ["p.category AS product_category"] : ["NULL::text AS product_category"]),
+        ...(productCols.has("category")
+          ? ["p.category AS product_category"]
+          : ["NULL::text AS product_category"]),
         ...(productCols.has("brand") ? ["p.brand AS product_brand"] : []),
       ].join(",\n          ");
       const rows = await this.auctionRepository.query(

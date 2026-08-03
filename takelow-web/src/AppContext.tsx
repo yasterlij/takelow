@@ -1,123 +1,205 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, useRef } from "react"
-import type { ReactNode } from "react"
-import { api, setApiToken, setRefreshToken, getApiToken, getRefreshToken, getUserFriendlyMessage, getAccessTokenExpiry, type SessionExpireReason } from "./api"
-import { toast } from "./store/toast.store"
-import { useAuctionSocket, applySocketUpdate } from "./hooks/useAuctionSocket"
-import { useFavoriteAuctions } from "./hooks/useFavoriteAuctions"
-import { useUnreadNotifications } from "./hooks/useUnreadNotifications"
-import { normalizeAuctionCategory } from "./lib/auctionCategories"
-import type { Auction, ProductSpecs } from "./mockDataV0"
-import { formatSpecSummary } from "./mockDataV0"
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  useRef,
+} from "react";
+import type { ReactNode } from "react";
+import {
+  api,
+  setApiToken,
+  setRefreshToken,
+  getApiToken,
+  getRefreshToken,
+  getUserFriendlyMessage,
+  getAccessTokenExpiry,
+  type SessionExpireReason,
+} from "./api";
+import { toast } from "./store/toast.store";
+import { useAuctionSocket, applySocketUpdate } from "./hooks/useAuctionSocket";
+import { useFavoriteAuctions } from "./hooks/useFavoriteAuctions";
+import { useUnreadNotifications } from "./hooks/useUnreadNotifications";
+import { normalizeAuctionCategory } from "./lib/auctionCategories";
+import type { Auction, ProductSpecs } from "./mockDataV0";
+import { formatSpecSummary } from "./mockDataV0";
 
 export type View =
-  | "login" | "register" | "home" | "auctions" | "my-bids"
-  | "product" | "pay-fee" | "place-bid" | "bid-confirmed"
-  | "monitor" | "closed" | "winner" | "pay-winning" | "payment-confirmed" | "delivery"
-  | "admin-dashboard" | "admin-auctions" | "admin-products" | "admin-users" | "admin-transactions" | "admin-audit" | "admin-monitor" | "admin-auction-monitor" | "deposit"
-  | "payment-success" | "payment-failed"
+  | "login"
+  | "register"
+  | "home"
+  | "auctions"
+  | "my-bids"
+  | "product"
+  | "pay-fee"
+  | "place-bid"
+  | "bid-confirmed"
+  | "monitor"
+  | "closed"
+  | "winner"
+  | "pay-winning"
+  | "payment-confirmed"
+  | "delivery"
+  | "admin-dashboard"
+  | "admin-auctions"
+  | "admin-products"
+  | "admin-users"
+  | "admin-transactions"
+  | "admin-audit"
+  | "admin-monitor"
+  | "admin-auction-monitor"
+  | "deposit"
+  | "payment-success"
+  | "payment-failed"
   | "closed-auctions"
   | "profile"
   | "notifications"
   | "favorites"
-  | "sikina-pay-checkout"
+  | "sikina-pay-checkout";
 
-export type UserRole = "admin" | "user"
+export type UserRole = "admin" | "user";
 
 export type User = {
-  id: string
-  name: string
-  phone: string
-  role: UserRole
-}
+  id: string;
+  name: string;
+  phone: string;
+  role: UserRole;
+};
 
 export type PlacedBid = {
-  auctionId: string
-  amount: number
-  placedAt: number
-  userId?: string
-  userName?: string
-  ticketNumber?: string
-}
+  auctionId: string;
+  amount: number;
+  placedAt: number;
+  userId?: string;
+  userName?: string;
+  ticketNumber?: string;
+};
 
 type AppState = {
-  view: View
-  selectedId: string | null
-  userBid: number | null
-  pendingBidAmount: number | null
-  bidTicketNumber: string | null
-  feePaid: boolean
-  walletBalance: number
-  paymentMethod: 'SIKINAPAY' | 'AWASH' | 'WALLET'
-  lastPaymentMethod: 'SIKINAPAY' | 'AWASH' | 'WALLET' | null
-  paymentContext: 'bid-fee' | 'winning' | null
-  setPaymentContext: (ctx: 'bid-fee' | 'winning' | null) => void
-  sikinaPayUrl: string | null
-  setSikinaPayUrl: (url: string | null) => void
-  sikinaProxyUrl: string | null
-  setSikinaProxyUrl: (url: string | null) => void
-  favoriteAuctionIds: string[]
-  favoritesLoading: boolean
-  unreadNotificationCount: number
-  myBids: PlacedBid[]
-  user: User | null
-  allBids: PlacedBid[]
-  auctions: Auction[]
-  auctionsLoading: boolean
-  authError: string | null
-  sessionEndReason: SessionExpireReason | null
-  go: (view: View) => void
-  selectAuction: (id: string) => void
-  selectAuctionForMonitor: (id: string) => void
-  setSelectedIdOnly: (id: string) => void
-  setFeePaid: (paid: boolean) => void
-  setPendingBidAmount: (amount: number | null) => void
-  payFee: (fee: number, paymentMethod?: 'SIKINAPAY' | 'AWASH') => Promise<void>
-  submitBid: (amount: number) => Promise<void>
-  payWinning: (amount: number, paymentMethod?: 'SIKINAPAY' | 'AWASH', customerPhone?: string) => Promise<void>
-  setPaymentMethod: (method: 'SIKINAPAY' | 'AWASH' | 'WALLET') => void
-  checkPaymentStatus: () => Promise<boolean>
-  reset: () => void
-  login: (phone: string, password: string) => Promise<boolean>
-  register: (phone: string, password: string, name: string) => Promise<boolean>
-  logout: (reason?: SessionExpireReason) => void
-  addAuction: (a: { name: string; category: string; marketPrice: number; bidFee: number; description: string; highlights: string[]; specs?: ProductSpecs; startTime: string; endTime: string; images?: string[]; minBid?: number; maxBid?: number }) => Promise<void>
-  updateAuction: (id: string, data: Partial<Pick<Auction, "name" | "category" | "marketPrice" | "description" | "highlights" | "images" | "specs">> & { startTime?: string; endTime?: string; minBid?: number; maxBid?: number; bidFee?: number }) => Promise<void>
-  deleteAuction: (id: string) => Promise<void>
-  closeAuction: (id: string) => Promise<void>
-  forceCloseAuction: (id: string) => Promise<void>
-  refreshAuctions: () => Promise<void>
-  refreshWallet: () => Promise<void>
-  refreshFavorites: () => Promise<void>
-  refreshUnreadNotifications: () => Promise<void>
-  toggleFavorite: (auctionId: string) => Promise<void>
-  isFavorite: (auctionId: string) => boolean
-  fetchAuctionById: (id: string) => Promise<Auction | undefined>
-  getAuction: (id: string | null | undefined) => Auction | undefined
-}
+  view: View;
+  selectedId: string | null;
+  userBid: number | null;
+  pendingBidAmount: number | null;
+  bidTicketNumber: string | null;
+  feePaid: boolean;
+  walletBalance: number;
+  paymentMethod: "SIKINAPAY" | "AWASH" | "WALLET";
+  lastPaymentMethod: "SIKINAPAY" | "AWASH" | "WALLET" | null;
+  paymentContext: "bid-fee" | "winning" | null;
+  setPaymentContext: (ctx: "bid-fee" | "winning" | null) => void;
+  sikinaPayUrl: string | null;
+  setSikinaPayUrl: (url: string | null) => void;
+  sikinaProxyUrl: string | null;
+  setSikinaProxyUrl: (url: string | null) => void;
+  favoriteAuctionIds: string[];
+  favoritesLoading: boolean;
+  unreadNotificationCount: number;
+  myBids: PlacedBid[];
+  user: User | null;
+  allBids: PlacedBid[];
+  auctions: Auction[];
+  auctionsLoading: boolean;
+  authError: string | null;
+  sessionEndReason: SessionExpireReason | null;
+  go: (view: View) => void;
+  selectAuction: (id: string) => void;
+  selectAuctionForMonitor: (id: string) => void;
+  setSelectedIdOnly: (id: string) => void;
+  setFeePaid: (paid: boolean) => void;
+  setPendingBidAmount: (amount: number | null) => void;
+  payFee: (fee: number, paymentMethod?: "SIKINAPAY" | "AWASH") => Promise<void>;
+  submitBid: (amount: number) => Promise<void>;
+  payWinning: (
+    amount: number,
+    paymentMethod?: "SIKINAPAY" | "AWASH",
+    customerPhone?: string,
+  ) => Promise<void>;
+  setPaymentMethod: (method: "SIKINAPAY" | "AWASH" | "WALLET") => void;
+  checkPaymentStatus: () => Promise<boolean>;
+  reset: () => void;
+  login: (phone: string, password: string) => Promise<boolean>;
+  register: (phone: string, password: string, name: string) => Promise<boolean>;
+  logout: (reason?: SessionExpireReason) => void;
+  addAuction: (a: {
+    name: string;
+    category: string;
+    marketPrice: number;
+    bidFee: number;
+    description: string;
+    highlights: string[];
+    specs?: ProductSpecs;
+    startTime: string;
+    endTime: string;
+    images?: string[];
+    minBid?: number;
+    maxBid?: number;
+  }) => Promise<void>;
+  updateAuction: (
+    id: string,
+    data: Partial<
+      Pick<
+        Auction,
+        | "name"
+        | "category"
+        | "marketPrice"
+        | "description"
+        | "highlights"
+        | "images"
+        | "specs"
+      >
+    > & {
+      startTime?: string;
+      endTime?: string;
+      minBid?: number;
+      maxBid?: number;
+      bidFee?: number;
+    },
+  ) => Promise<void>;
+  deleteAuction: (id: string) => Promise<void>;
+  closeAuction: (id: string) => Promise<void>;
+  forceCloseAuction: (id: string) => Promise<void>;
+  refreshAuctions: () => Promise<void>;
+  refreshWallet: () => Promise<void>;
+  refreshFavorites: () => Promise<void>;
+  refreshUnreadNotifications: () => Promise<void>;
+  toggleFavorite: (auctionId: string) => Promise<void>;
+  isFavorite: (auctionId: string) => boolean;
+  fetchAuctionById: (id: string) => Promise<Auction | undefined>;
+  getAuction: (id: string | null | undefined) => Auction | undefined;
+};
 
 declare global {
   interface Window {
-    __takelowAppContext?: ReturnType<typeof createContext<AppState | null>>
+    __takelowAppContext?: ReturnType<typeof createContext<AppState | null>>;
   }
 }
 
-const AppContext = window.__takelowAppContext || createContext<AppState | null>(null)
-window.__takelowAppContext = AppContext
+const AppContext =
+  window.__takelowAppContext || createContext<AppState | null>(null);
+window.__takelowAppContext = AppContext;
 
-const INITIAL_BALANCE = 0
-const STORAGE_KEY = "takelow_data"
-const IDLE_TIMEOUT_MS = 30 * 60 * 1000
-const ABSOLUTE_TIMEOUT_MS = 12 * 60 * 60 * 1000
-const IDLE_WARNING_MS = 60 * 1000
+const INITIAL_BALANCE = 0;
+const STORAGE_KEY = "takelow_data";
+const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+const ABSOLUTE_TIMEOUT_MS = 12 * 60 * 60 * 1000;
+const IDLE_WARNING_MS = 60 * 1000;
 
 function mapAuction(apiAuction: any): Auction {
-  const timeLeft = Math.max(0, Math.floor((new Date(apiAuction.end_time).getTime() - Date.now()) / 1000))
+  const timeLeft = Math.max(
+    0,
+    Math.floor((new Date(apiAuction.end_time).getTime() - Date.now()) / 1000),
+  );
   return {
     id: apiAuction.id,
     publicCode: apiAuction.public_code,
     productId: apiAuction.product_id,
-    name: apiAuction.product?.name || 'Unknown Product',
-    category: normalizeAuctionCategory(apiAuction.product?.category, apiAuction.product?.name),
+    name: apiAuction.product?.name || "Unknown Product",
+    category: normalizeAuctionCategory(
+      apiAuction.product?.category,
+      apiAuction.product?.name,
+    ),
     images: apiAuction.product?.image_urls || [],
     marketPrice: Number(apiAuction.product?.current_market_price || 0),
     bidFee: apiAuction.bid_fee != null ? Number(apiAuction.bid_fee) : 1,
@@ -126,8 +208,12 @@ function mapAuction(apiAuction: any): Auction {
     totalBids: apiAuction.stats?.total_bids ?? 0,
     timeLeft,
     endTime: apiAuction.end_time,
-    status: (apiAuction.status === 'ACTIVE' ? (timeLeft < 3600 ? 'ending-soon' : 'live') : 'closed') as Auction['status'],
-    description: apiAuction.product?.description || '',
+    status: (apiAuction.status === "ACTIVE"
+      ? timeLeft < 3600
+        ? "ending-soon"
+        : "live"
+      : "closed") as Auction["status"],
+    description: apiAuction.product?.description || "",
     highlights: [],
     specs: apiAuction.product?.specs || null,
     specSummary: formatSpecSummary(apiAuction.product?.specs),
@@ -147,94 +233,131 @@ function mapAuction(apiAuction: any): Auction {
     winner_user_id: apiAuction.winner_user_id ?? null,
     payment_status: apiAuction.payment_status,
     total_revenue: apiAuction.total_revenue,
-  }
+  };
 }
 
-const POLL_INTERVAL = 30000
-const LIVE_VIEWS: View[] = ['home', 'auctions', 'product', 'monitor', 'my-bids']
+const POLL_INTERVAL = 30000;
+const LIVE_VIEWS: View[] = [
+  "home",
+  "auctions",
+  "product",
+  "monitor",
+  "my-bids",
+];
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [view, setView] = useState<View>('login')
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [userBid, setUserBid] = useState<number | null>(null)
-  const [pendingBidAmount, setPendingBidAmount] = useState<number | null>(null)
-  const [bidTicketNumber, setBidTicketNumber] = useState<string | null>(null)
-  const [feePaid, setFeePaid] = useState(false)
-  const [walletBalance, setWalletBalance] = useState(INITIAL_BALANCE)
-  const [paymentMethod, setPaymentMethodState] = useState<'SIKINAPAY' | 'AWASH' | 'WALLET'>('AWASH')
-  const [lastPaymentMethod, setLastPaymentMethod] = useState<'SIKINAPAY' | 'AWASH' | 'WALLET' | null>(null)
-  const [paymentContext, setPaymentContextState] = useState<'bid-fee' | 'winning' | null>(null)
-  const setPaymentContext = useCallback((ctx: 'bid-fee' | 'winning' | null) => setPaymentContextState(ctx), [])
-  const [sikinaPayUrl, setSikinaPayUrl] = useState<string | null>(null)
-  const [sikinaProxyUrl, setSikinaProxyUrl] = useState<string | null>(null)
-  const [myBids, setMyBids] = useState<PlacedBid[]>([])
-  const [allBids, setAllBids] = useState<PlacedBid[]>([])
-  const [auctions, setAuctions] = useState<Auction[]>([])
-  const [auctionsLoading, setAuctionsLoading] = useState(false)
+  const [view, setView] = useState<View>("login");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [userBid, setUserBid] = useState<number | null>(null);
+  const [pendingBidAmount, setPendingBidAmount] = useState<number | null>(null);
+  const [bidTicketNumber, setBidTicketNumber] = useState<string | null>(null);
+  const [feePaid, setFeePaid] = useState(false);
+  const [walletBalance, setWalletBalance] = useState(INITIAL_BALANCE);
+  const [paymentMethod, setPaymentMethodState] = useState<
+    "SIKINAPAY" | "AWASH" | "WALLET"
+  >("AWASH");
+  const [lastPaymentMethod, setLastPaymentMethod] = useState<
+    "SIKINAPAY" | "AWASH" | "WALLET" | null
+  >(null);
+  const [paymentContext, setPaymentContextState] = useState<
+    "bid-fee" | "winning" | null
+  >(null);
+  const setPaymentContext = useCallback(
+    (ctx: "bid-fee" | "winning" | null) => setPaymentContextState(ctx),
+    [],
+  );
+  const [sikinaPayUrl, setSikinaPayUrl] = useState<string | null>(null);
+  const [sikinaProxyUrl, setSikinaProxyUrl] = useState<string | null>(null);
+  const [myBids, setMyBids] = useState<PlacedBid[]>([]);
+  const [allBids, setAllBids] = useState<PlacedBid[]>([]);
+  const [auctions, setAuctions] = useState<Auction[]>([]);
+  const [auctionsLoading, setAuctionsLoading] = useState(false);
   useAuctionSocket(selectedId, (payload) => {
-    setAuctions((prev) => applySocketUpdate(prev, payload))
-  })
-  const [user, setUser] = useState<User | null>(null)
-  const [authError, setAuthError] = useState<string | null>(null)
-  const [hydrated, setHydrated] = useState(false)
-  const refreshing = useRef(false)
-  const logoutRef = useRef<(reason?: SessionExpireReason) => void>(() => {})
-  const sessionStartedAtRef = useRef<number | null>(null)
-  const sessionChannelRef = useRef<BroadcastChannel | null>(null)
-  const idleWarnTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [sessionEndReason, setSessionEndReason] = useState<SessionExpireReason | null>(null)
-  const { favoriteAuctionIds, favoritesLoading, refreshFavorites, isFavorite, toggleFavorite } = useFavoriteAuctions({ hydrated, userId: user?.id, onError: (message) => toast(message, 'error') })
-  const { unreadNotificationCount, refreshUnreadNotifications } = useUnreadNotifications({ hydrated, userId: user?.id })
+    setAuctions((prev) => applySocketUpdate(prev, payload));
+  });
+  const [user, setUser] = useState<User | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [hydrated, setHydrated] = useState(false);
+  const refreshing = useRef(false);
+  const logoutRef = useRef<(reason?: SessionExpireReason) => void>(() => {});
+  const sessionStartedAtRef = useRef<number | null>(null);
+  const sessionChannelRef = useRef<BroadcastChannel | null>(null);
+  const idleWarnTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [sessionEndReason, setSessionEndReason] =
+    useState<SessionExpireReason | null>(null);
+  const {
+    favoriteAuctionIds,
+    favoritesLoading,
+    refreshFavorites,
+    isFavorite,
+    toggleFavorite,
+  } = useFavoriteAuctions({
+    hydrated,
+    userId: user?.id,
+    onError: (message) => toast(message, "error"),
+  });
+  const { unreadNotificationCount, refreshUnreadNotifications } =
+    useUnreadNotifications({ hydrated, userId: user?.id });
 
   useEffect(() => {
     const hydrate = async () => {
-      const raw = localStorage.getItem(STORAGE_KEY)
+      const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         try {
-          const saved = JSON.parse(raw)
-          if (typeof saved.sessionStartedAt === "number") sessionStartedAtRef.current = saved.sessionStartedAt
+          const saved = JSON.parse(raw);
+          if (typeof saved.sessionStartedAt === "number")
+            sessionStartedAtRef.current = saved.sessionStartedAt;
           if (saved.auctions?.length) {
-            const unique = Array.from(new Map<string, Auction>(saved.auctions.map((a: any) => [
-              a.id,
-              { ...a, category: normalizeAuctionCategory(a.category, a.name) },
-            ])).values())
-            setAuctions(unique)
+            const unique = Array.from(
+              new Map<string, Auction>(
+                saved.auctions.map((a: any) => [
+                  a.id,
+                  {
+                    ...a,
+                    category: normalizeAuctionCategory(a.category, a.name),
+                  },
+                ]),
+              ).values(),
+            );
+            setAuctions(unique);
           }
-          if (saved.pendingBidAmount != null) setPendingBidAmount(saved.pendingBidAmount)
-          if (saved.allBids?.length) setAllBids(saved.allBids)
-          if (saved.myBids?.length) setMyBids(saved.myBids)
-          if (saved.walletBalance != null) setWalletBalance(saved.walletBalance)
+          if (saved.pendingBidAmount != null)
+            setPendingBidAmount(saved.pendingBidAmount);
+          if (saved.allBids?.length) setAllBids(saved.allBids);
+          if (saved.myBids?.length) setMyBids(saved.myBids);
+          if (saved.walletBalance != null)
+            setWalletBalance(saved.walletBalance);
           if (saved.accessToken && saved.refreshToken && saved.user) {
-            setApiToken(saved.accessToken)
-            setRefreshToken(saved.refreshToken)
+            setApiToken(saved.accessToken);
+            setRefreshToken(saved.refreshToken);
             try {
-              const profile = await api.auth.profile()
+              const profile = await api.auth.profile();
               setUser({
                 ...(saved.user as User),
                 id: profile.id,
                 name: profile.full_name || profile.phone_number,
                 phone: profile.phone_number,
                 role: profile.role as UserRole,
-              })
-              setView('home')
+              });
+              setView("home");
             } catch {
               try {
-                const refreshed = await api.auth.refresh(saved.refreshToken)
-                setApiToken(refreshed.access_token)
-                setRefreshToken(refreshed.refresh_token)
-                const profile = await api.auth.profile()
+                const refreshed = await api.auth.refresh(saved.refreshToken);
+                setApiToken(refreshed.access_token);
+                setRefreshToken(refreshed.refresh_token);
+                const profile = await api.auth.profile();
                 setUser({
                   id: profile.id,
                   name: profile.full_name || profile.phone_number,
                   phone: profile.phone_number,
                   role: profile.role as UserRole,
-                })
-                setView('home')
+                });
+                setView("home");
               } catch {
-                setApiToken(null)
-                setRefreshToken(null)
-                setUser(null)
+                setApiToken(null);
+                setRefreshToken(null);
+                setUser(null);
               }
             }
           }
@@ -242,472 +365,748 @@ export function AppProvider({ children }: { children: ReactNode }) {
           // ignore corrupt data
         }
       }
-      setHydrated(true)
-    }
+      setHydrated(true);
+    };
 
-    hydrate()
-  }, [])
+    hydrate();
+  }, []);
 
   useEffect(() => {
-    if (!hydrated) return
-    const tokens = user ? { accessToken: getApiToken(), refreshToken: getRefreshToken() } : {}
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ auctions, allBids, myBids, walletBalance, pendingBidAmount, user, sessionStartedAt: sessionStartedAtRef.current, ...tokens }))
-  }, [auctions, allBids, myBids, walletBalance, pendingBidAmount, user, hydrated])
+    if (!hydrated) return;
+    const tokens = user
+      ? { accessToken: getApiToken(), refreshToken: getRefreshToken() }
+      : {};
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        auctions,
+        allBids,
+        myBids,
+        walletBalance,
+        pendingBidAmount,
+        user,
+        sessionStartedAt: sessionStartedAtRef.current,
+        ...tokens,
+      }),
+    );
+  }, [
+    auctions,
+    allBids,
+    myBids,
+    walletBalance,
+    pendingBidAmount,
+    user,
+    hydrated,
+  ]);
 
   useEffect(() => {
     const onSessionExpired = (e: Event) => {
-      const reason = (e as CustomEvent<{ reason?: SessionExpireReason }>).detail?.reason ?? 'expired'
-      logoutRef.current(reason)
-    }
-    window.addEventListener('session-expired', onSessionExpired)
-    return () => window.removeEventListener('session-expired', onSessionExpired)
-  }, [])
+      const reason =
+        (e as CustomEvent<{ reason?: SessionExpireReason }>).detail?.reason ??
+        "expired";
+      logoutRef.current(reason);
+    };
+    window.addEventListener("session-expired", onSessionExpired);
+    return () =>
+      window.removeEventListener("session-expired", onSessionExpired);
+  }, []);
 
   useEffect(() => {
-    if (typeof BroadcastChannel === 'undefined') return
-    const channel = new BroadcastChannel('takelow-session')
-    sessionChannelRef.current = channel
+    if (typeof BroadcastChannel === "undefined") return;
+    const channel = new BroadcastChannel("takelow-session");
+    sessionChannelRef.current = channel;
     channel.onmessage = (ev: MessageEvent) => {
-      if (ev.data?.type === 'session-expired' && ev.data?.reason) {
-        logoutRef.current(ev.data.reason)
+      if (ev.data?.type === "session-expired" && ev.data?.reason) {
+        logoutRef.current(ev.data.reason);
       }
-    }
+    };
     return () => {
-      sessionChannelRef.current = null
-      channel.close()
-    }
-  }, [])
+      sessionChannelRef.current = null;
+      channel.close();
+    };
+  }, []);
 
   useEffect(() => {
-    if (!user) return
+    if (!user) return;
     const resetIdleTimer = () => {
-      if (idleWarnTimerRef.current) clearTimeout(idleWarnTimerRef.current)
-      if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
+      if (idleWarnTimerRef.current) clearTimeout(idleWarnTimerRef.current);
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
       if (IDLE_TIMEOUT_MS > IDLE_WARNING_MS) {
         idleWarnTimerRef.current = setTimeout(() => {
-          toast('You will be signed out in 1 minute due to inactivity', 'warning')
-        }, IDLE_TIMEOUT_MS - IDLE_WARNING_MS)
+          toast(
+            "You will be signed out in 1 minute due to inactivity",
+            "warning",
+          );
+        }, IDLE_TIMEOUT_MS - IDLE_WARNING_MS);
       }
-      idleTimerRef.current = setTimeout(() => logoutRef.current('idle'), IDLE_TIMEOUT_MS)
-    }
-    resetIdleTimer()
-    const events = ['pointerdown', 'keydown', 'touchstart', 'scroll', 'mousemove']
-    const onActivity = () => resetIdleTimer()
-    events.forEach((evt) => window.addEventListener(evt, onActivity, { passive: true }))
+      idleTimerRef.current = setTimeout(
+        () => logoutRef.current("idle"),
+        IDLE_TIMEOUT_MS,
+      );
+    };
+    resetIdleTimer();
+    const events = [
+      "pointerdown",
+      "keydown",
+      "touchstart",
+      "scroll",
+      "mousemove",
+    ];
+    const onActivity = () => resetIdleTimer();
+    events.forEach((evt) =>
+      window.addEventListener(evt, onActivity, { passive: true }),
+    );
     return () => {
-      events.forEach((evt) => window.removeEventListener(evt, onActivity))
-      if (idleWarnTimerRef.current) clearTimeout(idleWarnTimerRef.current)
-      if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
-      idleWarnTimerRef.current = null
-      idleTimerRef.current = null
-    }
-  }, [user])
+      events.forEach((evt) => window.removeEventListener(evt, onActivity));
+      if (idleWarnTimerRef.current) clearTimeout(idleWarnTimerRef.current);
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      idleWarnTimerRef.current = null;
+      idleTimerRef.current = null;
+    };
+  }, [user]);
 
   useEffect(() => {
-    if (!hydrated || !user) return
+    if (!hydrated || !user) return;
     const checkAbsoluteTimeout = () => {
-      const started = sessionStartedAtRef.current
+      const started = sessionStartedAtRef.current;
       if (started != null && Date.now() - started > ABSOLUTE_TIMEOUT_MS) {
-        logoutRef.current('absolute')
+        logoutRef.current("absolute");
       }
-    }
-    checkAbsoluteTimeout()
-    const interval = setInterval(checkAbsoluteTimeout, 60_000)
-    return () => clearInterval(interval)
-  }, [hydrated, user])
+    };
+    checkAbsoluteTimeout();
+    const interval = setInterval(checkAbsoluteTimeout, 60_000);
+    return () => clearInterval(interval);
+  }, [hydrated, user]);
 
   useEffect(() => {
-    if (!hydrated) return
-    refreshAuctions()
-  }, [hydrated])
+    if (!hydrated) return;
+    refreshAuctions();
+  }, [hydrated]);
 
   useEffect(() => {
-    if (!hydrated || !user) return
-    if (!LIVE_VIEWS.includes(view)) return
-    const interval = setInterval(refreshAuctions, POLL_INTERVAL)
-    return () => clearInterval(interval)
-  }, [hydrated, user, view])
+    if (!hydrated || !user) return;
+    if (!LIVE_VIEWS.includes(view)) return;
+    const interval = setInterval(refreshAuctions, POLL_INTERVAL);
+    return () => clearInterval(interval);
+  }, [hydrated, user, view]);
 
-  const go = useCallback((next: View) => {
-    const adminViews: View[] = ['admin-dashboard', 'admin-auctions', 'admin-products', 'admin-users', 'admin-transactions', 'admin-audit', 'admin-monitor', 'admin-auction-monitor', 'monitor']
-    if (adminViews.includes(next) && user?.role !== 'admin') return
-    setView(next)
-  }, [user])
+  const go = useCallback(
+    (next: View) => {
+      const adminViews: View[] = [
+        "admin-dashboard",
+        "admin-auctions",
+        "admin-products",
+        "admin-users",
+        "admin-transactions",
+        "admin-audit",
+        "admin-monitor",
+        "admin-auction-monitor",
+        "monitor",
+      ];
+      if (adminViews.includes(next) && user?.role !== "admin") return;
+      setView(next);
+    },
+    [user],
+  );
 
-  const selectAuction = useCallback((id: string) => {
-    setSelectedId(id)
-    setFeePaid(false)
-    setPendingBidAmount(null)
-    setUserBid(null)
-    setBidTicketNumber(null)
-    setPaymentContext(null)
-    setSikinaPayUrl(null)
-    setSikinaProxyUrl(null)
-    const auction = auctions.find((a) => a.id === id)
-    if (auction?.status === 'closed') {
-      setView('winner')
-    } else {
-      setView('product')
-    }
-  }, [auctions])
+  const selectAuction = useCallback(
+    (id: string) => {
+      setSelectedId(id);
+      setFeePaid(false);
+      setPendingBidAmount(null);
+      setUserBid(null);
+      setBidTicketNumber(null);
+      setPaymentContext(null);
+      setSikinaPayUrl(null);
+      setSikinaProxyUrl(null);
+      const auction = auctions.find((a) => a.id === id);
+      if (auction?.status === "closed") {
+        setView("winner");
+      } else {
+        setView("product");
+      }
+    },
+    [auctions],
+  );
 
   const setSelectedIdOnly = useCallback((id: string) => {
-    setSelectedId(id)
-  }, [])
+    setSelectedId(id);
+  }, []);
 
   const selectAuctionForMonitor = useCallback((id: string) => {
-    setSelectedId(id)
-    setView('admin-auction-monitor')
-  }, [])
+    setSelectedId(id);
+    setView("admin-auction-monitor");
+  }, []);
 
-  const payFee = useCallback(async (fee: number, paymentMethod?: 'SIKINAPAY' | 'AWASH') => {
-    if (!selectedId) return
-    try {
-      setAuthError(null)
-      if (paymentMethod === 'AWASH') {
-        await api.payBidFeeWithWallet(selectedId)
-        setFeePaid(true)
-        setView('place-bid')
-        return
+  const payFee = useCallback(
+    async (fee: number, paymentMethod?: "SIKINAPAY" | "AWASH") => {
+      if (!selectedId) return;
+      try {
+        setAuthError(null);
+        if (paymentMethod === "AWASH") {
+          await api.payBidFeeWithWallet(selectedId);
+          setFeePaid(true);
+          setView("place-bid");
+          return;
+        }
+        setPaymentContext("bid-fee");
+        const { payment_url, proxy_url } = await api.createBidFeePaymentLink(
+          selectedId,
+          paymentMethod,
+        );
+        setSikinaPayUrl(payment_url);
+        setSikinaProxyUrl(proxy_url || null);
+        setView("sikina-pay-checkout");
+      } catch (e) {
+        const msg = getUserFriendlyMessage(e);
+        setAuthError(msg);
+        toast(msg, "error");
       }
-      setPaymentContext('bid-fee')
-      const { payment_url, proxy_url } = await api.createBidFeePaymentLink(selectedId, paymentMethod)
-      setSikinaPayUrl(payment_url)
-      setSikinaProxyUrl(proxy_url || null)
-      setView('sikina-pay-checkout')
-    } catch (e) {
-      const msg = getUserFriendlyMessage(e)
-      setAuthError(msg)
-      toast(msg, "error")
-    }
-  }, [selectedId])
+    },
+    [selectedId],
+  );
 
-  const submitBid = useCallback(async (amount: number) => {
-    if (!selectedId || !user) return
-    try {
-      const res = await api.bid.place(selectedId, amount)
-      const ticket = res.ticket_number
-      setBidTicketNumber(ticket ?? null)
-      const bid: PlacedBid = { auctionId: selectedId, amount, placedAt: Date.now(), userId: user.id, userName: user.name, ticketNumber: ticket }
-      setMyBids((prev) => [bid, ...prev])
-      setAllBids((prev) => [bid, ...prev])
-      setUserBid(amount)
-      setPendingBidAmount(null)
-      setAuctions((prev) =>
-        prev.map((a) => (a.id === selectedId ? { ...a, bidders: (a.bidders ?? 0) + 1, totalBids: (a.totalBids ?? 0) + 1 } : a)),
-      )
-      setView('bid-confirmed')
-      refreshWallet()
-      setTimeout(() => refreshAuctions(), 3000)
-      const name = auctions.find((a) => a.id === selectedId)?.name || 'Unknown'
-      const smsText = `Your bid of birr ${amount} on '${name}' has been placed successfully. Your BID ticket: ${ticket || 'N/A'}`
-      toast(`📱 SMS: ${smsText}`, "success")
-    } catch (e) {
-      const msg = getUserFriendlyMessage(e)
-      setAuthError(msg)
-      toast(msg, "error")
-    }
-  }, [selectedId, user, auctions])
-
-  const setPaymentMethod = useCallback((method: 'SIKINAPAY' | 'AWASH' | 'WALLET') => {
-    setPaymentMethodState(method)
-  }, [])
-
-  const payWinning = useCallback(async (amount: number, method?: 'SIKINAPAY' | 'AWASH', customerPhone?: string) => {
-    if (!selectedId) return
-    try {
-      setAuthError(null)
-      setUserBid(amount)
-      const pm = method || paymentMethod
-      if (pm === 'AWASH') {
-        await api.payWinningWithWallet(selectedId)
-        setLastPaymentMethod('AWASH')
-        refreshWallet()
-        refreshAuctions()
-        setView('payment-confirmed')
-        return
+  const submitBid = useCallback(
+    async (amount: number) => {
+      if (!selectedId || !user) return;
+      try {
+        const res = await api.bid.place(selectedId, amount);
+        const ticket = res.ticket_number;
+        setBidTicketNumber(ticket ?? null);
+        const bid: PlacedBid = {
+          auctionId: selectedId,
+          amount,
+          placedAt: Date.now(),
+          userId: user.id,
+          userName: user.name,
+          ticketNumber: ticket,
+        };
+        setMyBids((prev) => [bid, ...prev]);
+        setAllBids((prev) => [bid, ...prev]);
+        setUserBid(amount);
+        setPendingBidAmount(null);
+        setAuctions((prev) =>
+          prev.map((a) =>
+            a.id === selectedId
+              ? {
+                  ...a,
+                  bidders: (a.bidders ?? 0) + 1,
+                  totalBids: (a.totalBids ?? 0) + 1,
+                }
+              : a,
+          ),
+        );
+        setView("bid-confirmed");
+        refreshWallet();
+        setTimeout(() => refreshAuctions(), 3000);
+        const name =
+          auctions.find((a) => a.id === selectedId)?.name || "Unknown";
+        const smsText = `Your bid of birr ${amount} on '${name}' has been placed successfully. Your BID ticket: ${ticket || "N/A"}`;
+        toast(`📱 SMS: ${smsText}`, "success");
+      } catch (e) {
+        const msg = getUserFriendlyMessage(e);
+        setAuthError(msg);
+        toast(msg, "error");
       }
-      setPaymentContext('winning')
-      setLastPaymentMethod('SIKINAPAY')
-      const { payment_url, proxy_url } = await api.createPaymentLink(selectedId, 'SIKINAPAY', customerPhone)
-      setSikinaPayUrl(payment_url)
-      setSikinaProxyUrl(proxy_url || null)
-      setView('sikina-pay-checkout')
-    } catch (e) {
-      const msg = getUserFriendlyMessage(e)
-      setAuthError(msg)
-      toast(msg, "error")
-    }
-  }, [selectedId, paymentMethod])
+    },
+    [selectedId, user, auctions],
+  );
+
+  const setPaymentMethod = useCallback(
+    (method: "SIKINAPAY" | "AWASH" | "WALLET") => {
+      setPaymentMethodState(method);
+    },
+    [],
+  );
+
+  const payWinning = useCallback(
+    async (
+      amount: number,
+      method?: "SIKINAPAY" | "AWASH",
+      customerPhone?: string,
+    ) => {
+      if (!selectedId) return;
+      try {
+        setAuthError(null);
+        setUserBid(amount);
+        const pm = method || paymentMethod;
+        if (pm === "AWASH") {
+          await api.payWinningWithWallet(selectedId);
+          setLastPaymentMethod("AWASH");
+          refreshWallet();
+          refreshAuctions();
+          setView("payment-confirmed");
+          return;
+        }
+        setPaymentContext("winning");
+        setLastPaymentMethod("SIKINAPAY");
+        const { payment_url, proxy_url } = await api.createPaymentLink(
+          selectedId,
+          "SIKINAPAY",
+          customerPhone,
+        );
+        setSikinaPayUrl(payment_url);
+        setSikinaProxyUrl(proxy_url || null);
+        setView("sikina-pay-checkout");
+      } catch (e) {
+        const msg = getUserFriendlyMessage(e);
+        setAuthError(msg);
+        toast(msg, "error");
+      }
+    },
+    [selectedId, paymentMethod],
+  );
 
   const checkPaymentStatus = useCallback(async () => {
-    if (!selectedId) return false
+    if (!selectedId) return false;
     try {
-      const status = await api.getPaymentLinkStatus(selectedId)
-      if (status.status === 'SUCCESSFUL') return true
-      return false
+      const status = await api.getPaymentLinkStatus(selectedId);
+      if (status.status === "SUCCESSFUL") return true;
+      return false;
     } catch {
-      return false
+      return false;
     }
-  }, [selectedId])
+  }, [selectedId]);
 
   const reset = useCallback(() => {
-    setView('home')
-    setSelectedId(null)
-    setUserBid(null)
-    setBidTicketNumber(null)
-    setFeePaid(false)
-    setPendingBidAmount(null)
-    setWalletBalance(INITIAL_BALANCE)
-    setPaymentMethodState('AWASH')
-    setPaymentContext(null)
-    setSikinaPayUrl(null)
-    setMyBids([])
-  }, [])
+    setView("home");
+    setSelectedId(null);
+    setUserBid(null);
+    setBidTicketNumber(null);
+    setFeePaid(false);
+    setPendingBidAmount(null);
+    setWalletBalance(INITIAL_BALANCE);
+    setPaymentMethodState("AWASH");
+    setPaymentContext(null);
+    setSikinaPayUrl(null);
+    setMyBids([]);
+  }, []);
 
   const refreshAuctions = useCallback(async () => {
-    if (refreshing.current) return
-    refreshing.current = true
-    setAuctionsLoading(true)
+    if (refreshing.current) return;
+    refreshing.current = true;
+    setAuctionsLoading(true);
     try {
       const [activeRes, closedRes] = await Promise.all([
         api.listAuctions(),
         api.listClosedAuctions().catch(() => ({ data: [] })),
-      ])
-      const allMapped = [...activeRes.data.map(mapAuction), ...closedRes.data.map(mapAuction)]
-      const unique = Array.from(new Map(allMapped.map((a) => [a.id, a])).values())
-      setAuctions(unique)
+      ]);
+      const allMapped = [
+        ...activeRes.data.map(mapAuction),
+        ...closedRes.data.map(mapAuction),
+      ];
+      const unique = Array.from(
+        new Map(allMapped.map((a) => [a.id, a])).values(),
+      );
+      setAuctions(unique);
     } catch {
-      toast("Failed to refresh auctions", "error")
+      toast("Failed to refresh auctions", "error");
     } finally {
-      setAuctionsLoading(false)
-      refreshing.current = false
+      setAuctionsLoading(false);
+      refreshing.current = false;
     }
-  }, [])
+  }, []);
 
   const refreshWallet = useCallback(async () => {
     try {
-      const res = await api.wallet.balance()
-      setWalletBalance(res.balance)
+      const res = await api.wallet.balance();
+      setWalletBalance(res.balance);
     } catch {
-      toast("Failed to fetch wallet balance", "error")
+      toast("Failed to fetch wallet balance", "error");
     }
-  }, [])
+  }, []);
 
-  const fetchAuctionById = useCallback(async (id: string): Promise<Auction | undefined> => {
-    const cached = auctions.find((a) => a.id === id)
-    if (cached) return cached
-    try {
-      const data = await api.getAuction(id)
-      const mapped = mapAuction(data)
-      setAuctions((prev) => {
-        const exists = prev.find((a) => a.id === mapped.id)
-        if (exists) return prev
-        return [...prev, mapped]
-      })
-      return mapped
-    } catch {
-      return undefined
-    }
-  }, [auctions])
-
-  const login = useCallback(async (phone: string, password: string): Promise<boolean> => {
-    try {
-      setAuthError(null)
-      setSessionEndReason(null)
-      sessionStartedAtRef.current = Date.now()
-      const res = await api.auth.login(phone, password)
-      setApiToken(res.access_token)
-      setRefreshToken(res.refresh_token)
-      const appUser: User = {
-        id: res.user.id,
-        name: '',
-        phone: res.user.phone_number,
-        role: res.user.role as UserRole,
-      }
+  const fetchAuctionById = useCallback(
+    async (id: string): Promise<Auction | undefined> => {
+      const cached = auctions.find((a) => a.id === id);
+      if (cached) return cached;
       try {
-        const profile = await api.auth.profile()
-        appUser.name = profile.full_name || profile.phone_number
+        const data = await api.getAuction(id);
+        const mapped = mapAuction(data);
+        setAuctions((prev) => {
+          const exists = prev.find((a) => a.id === mapped.id);
+          if (exists) return prev;
+          return [...prev, mapped];
+        });
+        return mapped;
       } catch {
-        appUser.name = res.user.phone_number
+        return undefined;
       }
-      setUser(appUser)
-      setView('home')
-      refreshWallet()
-      refreshAuctions()
-      return true
-    } catch (e: unknown) {
-      setAuthError(getUserFriendlyMessage(e))
-      return false
-    }
-  }, [])
+    },
+    [auctions],
+  );
 
-  const register = useCallback(async (phone: string, password: string, name: string): Promise<boolean> => {
-    try {
-      setAuthError(null)
-      setSessionEndReason(null)
-      sessionStartedAtRef.current = Date.now()
-      const res = await api.auth.register(phone, password, name)
-      setApiToken(res.access_token)
-      setRefreshToken(res.refresh_token)
-      const appUser: User = {
-        id: res.user.id,
-        name,
-        phone: res.user.phone_number,
-        role: res.user.role as UserRole,
+  const login = useCallback(
+    async (phone: string, password: string): Promise<boolean> => {
+      try {
+        setAuthError(null);
+        setSessionEndReason(null);
+        sessionStartedAtRef.current = Date.now();
+        const res = await api.auth.login(phone, password);
+        setApiToken(res.access_token);
+        setRefreshToken(res.refresh_token);
+        const appUser: User = {
+          id: res.user.id,
+          name: "",
+          phone: res.user.phone_number,
+          role: res.user.role as UserRole,
+        };
+        try {
+          const profile = await api.auth.profile();
+          appUser.name = profile.full_name || profile.phone_number;
+        } catch {
+          appUser.name = res.user.phone_number;
+        }
+        setUser(appUser);
+        setView("home");
+        refreshWallet();
+        refreshAuctions();
+        return true;
+      } catch (e: unknown) {
+        setAuthError(getUserFriendlyMessage(e));
+        return false;
       }
-      setUser(appUser)
-      setView('home')
-      refreshWallet()
-      refreshAuctions()
-      return true
-    } catch (e: unknown) {
-      setAuthError(getUserFriendlyMessage(e))
-      return false
-    }
-  }, [])
+    },
+    [],
+  );
 
-  const logout = useCallback((reason: SessionExpireReason = 'logout') => {
-    setSessionEndReason(reason)
-    sessionStartedAtRef.current = null
-    setApiToken(null)
-    setRefreshToken(null)
-    setUser(null)
-    setSelectedId(null)
-    setUserBid(null)
-    setPendingBidAmount(null)
-    setBidTicketNumber(null)
-    setFeePaid(false)
-    setWalletBalance(INITIAL_BALANCE)
-    setMyBids([])
-    setAllBids([])
-    setAuctions([])
-    setAuthError(null)
-    const raw = localStorage.getItem(STORAGE_KEY)
+  const register = useCallback(
+    async (phone: string, password: string, name: string): Promise<boolean> => {
+      try {
+        setAuthError(null);
+        setSessionEndReason(null);
+        sessionStartedAtRef.current = Date.now();
+        const res = await api.auth.register(phone, password, name);
+        setApiToken(res.access_token);
+        setRefreshToken(res.refresh_token);
+        const appUser: User = {
+          id: res.user.id,
+          name,
+          phone: res.user.phone_number,
+          role: res.user.role as UserRole,
+        };
+        setUser(appUser);
+        setView("home");
+        refreshWallet();
+        refreshAuctions();
+        return true;
+      } catch (e: unknown) {
+        setAuthError(getUserFriendlyMessage(e));
+        return false;
+      }
+    },
+    [],
+  );
+
+  const logout = useCallback((reason: SessionExpireReason = "logout") => {
+    setSessionEndReason(reason);
+    sessionStartedAtRef.current = null;
+    setApiToken(null);
+    setRefreshToken(null);
+    setUser(null);
+    setSelectedId(null);
+    setUserBid(null);
+    setPendingBidAmount(null);
+    setBidTicketNumber(null);
+    setFeePaid(false);
+    setWalletBalance(INITIAL_BALANCE);
+    setMyBids([]);
+    setAllBids([]);
+    setAuctions([]);
+    setAuthError(null);
+    const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       try {
-        const saved = JSON.parse(raw)
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...saved, user: null, accessToken: null, refreshToken: null, sessionStartedAt: null }))
-      } catch { /* ignore */ }
-    }
-    if (reason !== 'logout') {
-      sessionChannelRef.current?.postMessage({ type: 'session-expired', reason })
-    }
-    setView('login')
-  }, [])
-  logoutRef.current = logout
-
-  const addAuction = useCallback(async (a: { name: string; category: string; marketPrice: number; bidFee: number; description: string; highlights: string[]; specs?: ProductSpecs; startTime: string; endTime: string; images?: string[]; minBid?: number; maxBid?: number }) => {
-    if (user?.role !== 'admin') return
-    try {
-      const product = await api.createProduct({
-        name: a.name, description: a.description, current_market_price: a.marketPrice, category: a.category,
-        ...(a.specs ? { specs: a.specs } : {}),
-        ...(a.images?.length ? { image_urls: a.images } : {}),
-      })
-      await api.createAuction({
-        product_id: product.id, start_time: a.startTime, end_time: a.endTime,
-        min_bid: a.minBid, max_bid: a.maxBid, bid_fee: a.bidFee,
-      })
-      await refreshAuctions()
-      toast("Auction created successfully", "success")
-    } catch (e: any) {
-      toast(e?.message || "Failed to create auction", "error")
-    }
-    setView('admin-auctions')
-  }, [refreshAuctions, user])
-
-  const closeAuction = useCallback(async (id: string) => {
-    if (user?.role !== 'admin') return
-    try {
-      await api.closeAuction(id)
-      await refreshAuctions()
-      toast("Auction closed successfully", "success")
-    } catch (e: any) {
-      toast(e?.message || "Failed to close auction", "error")
-    }
-  }, [refreshAuctions, user])
-
-  const forceCloseAuction = useCallback(async (id: string) => {
-    if (user?.role !== 'admin') return
-    try {
-      await api.forceCloseAuction(id)
-      await refreshAuctions()
-      toast("Auction force-closed without winner", "success")
-    } catch (e: any) {
-      toast(e?.message || "Failed to force-close auction", "error")
-    }
-  }, [refreshAuctions, user])
-
-  const updateAuction = useCallback(async (id: string, data: any) => {
-    if (user?.role !== 'admin') return
-    try {
-      const list = await api.adminListAuctions()
-      const auction = list.data.find((a) => a.id === id)
-      if (auction?.product?.id) {
-        if (data.name || data.marketPrice !== undefined || data.description !== undefined || data.category !== undefined || data.images !== undefined) {
-          await api.updateProduct(auction.product.id, {
-            ...(data.name ? { name: data.name } : {}),
-            ...(data.marketPrice !== undefined ? { current_market_price: data.marketPrice } : {}),
-            ...(data.description !== undefined ? { description: data.description } : {}),
-            ...(data.category !== undefined ? { category: data.category } : {}),
-            ...(data.images !== undefined ? { image_urls: data.images } : {}),
-            ...(data.specs !== undefined ? { specs: data.specs } : {}),
-          })
-        }
-        if (data.startTime || data.endTime || data.minBid != null || data.maxBid != null || data.bidFee != null) {
-          await api.updateAuction(id, {
-            ...(data.startTime ? { start_time: data.startTime } : {}),
-            ...(data.endTime ? { end_time: data.endTime } : {}),
-            ...(data.minBid != null ? { min_bid: data.minBid } : {}),
-            ...(data.maxBid != null ? { max_bid: data.maxBid } : {}),
-            ...(data.bidFee != null ? { bid_fee: data.bidFee } : {}),
-
-          })
-        }
+        const saved = JSON.parse(raw);
+        localStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify({
+            ...saved,
+            user: null,
+            accessToken: null,
+            refreshToken: null,
+            sessionStartedAt: null,
+          }),
+        );
+      } catch {
+        /* ignore */
       }
-      await refreshAuctions()
-      toast("Auction updated successfully", "success")
-    } catch (e: any) {
-      toast(e?.message || "Failed to update auction", "error")
     }
-  }, [refreshAuctions, user])
-
-  const deleteAuction = useCallback(async (id: string) => {
-    if (user?.role !== 'admin') return
-    try {
-      await api.deleteAuction(id)
-      await refreshAuctions()
-      toast("Auction deleted successfully", "success")
-    } catch (e: any) {
-      toast(e?.message || "Failed to delete auction", "error")
+    if (reason !== "logout") {
+      sessionChannelRef.current?.postMessage({
+        type: "session-expired",
+        reason,
+      });
     }
-  }, [refreshAuctions, user])
+    setView("login");
+  }, []);
+  logoutRef.current = logout;
 
-  const getAuction = useCallback((id: string | null | undefined): Auction | undefined => {
-    if (!id) return undefined
-    return auctions.find((a) => a.id === id)
-  }, [auctions])
+  const addAuction = useCallback(
+    async (a: {
+      name: string;
+      category: string;
+      marketPrice: number;
+      bidFee: number;
+      description: string;
+      highlights: string[];
+      specs?: ProductSpecs;
+      startTime: string;
+      endTime: string;
+      images?: string[];
+      minBid?: number;
+      maxBid?: number;
+    }) => {
+      if (user?.role !== "admin") return;
+      try {
+        const product = await api.createProduct({
+          name: a.name,
+          description: a.description,
+          current_market_price: a.marketPrice,
+          category: a.category,
+          ...(a.specs ? { specs: a.specs } : {}),
+          ...(a.images?.length ? { image_urls: a.images } : {}),
+        });
+        await api.createAuction({
+          product_id: product.id,
+          start_time: a.startTime,
+          end_time: a.endTime,
+          min_bid: a.minBid,
+          max_bid: a.maxBid,
+          bid_fee: a.bidFee,
+        });
+        await refreshAuctions();
+        toast("Auction created successfully", "success");
+      } catch (e: any) {
+        toast(e?.message || "Failed to create auction", "error");
+      }
+      setView("admin-auctions");
+    },
+    [refreshAuctions, user],
+  );
 
-  const value = useMemo(() => ({
-    view, selectedId, userBid, pendingBidAmount, bidTicketNumber, feePaid, walletBalance, paymentMethod, lastPaymentMethod, paymentContext, setPaymentContext, sikinaPayUrl, setSikinaPayUrl, sikinaProxyUrl, setSikinaProxyUrl, favoriteAuctionIds, favoritesLoading, unreadNotificationCount, myBids, user, allBids,
-    auctions, auctionsLoading, authError, sessionEndReason,
-    go, selectAuction, selectAuctionForMonitor, setSelectedIdOnly, setFeePaid, setPendingBidAmount, payFee, submitBid, payWinning, setPaymentMethod, checkPaymentStatus, reset,
-    login, register, logout, addAuction, updateAuction, deleteAuction, closeAuction, forceCloseAuction,
-    refreshAuctions, refreshWallet, refreshFavorites, refreshUnreadNotifications, toggleFavorite, isFavorite, fetchAuctionById, getAuction,
-  }), [
-    view, selectedId, userBid, pendingBidAmount, bidTicketNumber, feePaid, walletBalance, paymentMethod, lastPaymentMethod, paymentContext, setPaymentContext, sikinaPayUrl, setSikinaPayUrl, sikinaProxyUrl, setSikinaProxyUrl, favoriteAuctionIds, favoritesLoading, unreadNotificationCount, myBids, user, allBids,
-    auctions, auctionsLoading, authError, sessionEndReason,
-    go, selectAuction, selectAuctionForMonitor, setSelectedIdOnly, setFeePaid, setPendingBidAmount, payFee, submitBid, payWinning, setPaymentMethod, checkPaymentStatus, reset,
-    login, register, logout, addAuction, updateAuction, deleteAuction, closeAuction, forceCloseAuction,
-    refreshAuctions, refreshWallet, refreshFavorites, refreshUnreadNotifications, toggleFavorite, isFavorite, fetchAuctionById, getAuction,
-  ])
+  const closeAuction = useCallback(
+    async (id: string) => {
+      if (user?.role !== "admin") return;
+      try {
+        await api.closeAuction(id);
+        await refreshAuctions();
+        toast("Auction closed successfully", "success");
+      } catch (e: any) {
+        toast(e?.message || "Failed to close auction", "error");
+      }
+    },
+    [refreshAuctions, user],
+  );
 
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>
+  const forceCloseAuction = useCallback(
+    async (id: string) => {
+      if (user?.role !== "admin") return;
+      try {
+        await api.forceCloseAuction(id);
+        await refreshAuctions();
+        toast("Auction force-closed without winner", "success");
+      } catch (e: any) {
+        toast(e?.message || "Failed to force-close auction", "error");
+      }
+    },
+    [refreshAuctions, user],
+  );
+
+  const updateAuction = useCallback(
+    async (id: string, data: any) => {
+      if (user?.role !== "admin") return;
+      try {
+        const list = await api.adminListAuctions();
+        const auction = list.data.find((a) => a.id === id);
+        if (auction?.product?.id) {
+          if (
+            data.name ||
+            data.marketPrice !== undefined ||
+            data.description !== undefined ||
+            data.category !== undefined ||
+            data.images !== undefined
+          ) {
+            await api.updateProduct(auction.product.id, {
+              ...(data.name ? { name: data.name } : {}),
+              ...(data.marketPrice !== undefined
+                ? { current_market_price: data.marketPrice }
+                : {}),
+              ...(data.description !== undefined
+                ? { description: data.description }
+                : {}),
+              ...(data.category !== undefined
+                ? { category: data.category }
+                : {}),
+              ...(data.images !== undefined ? { image_urls: data.images } : {}),
+              ...(data.specs !== undefined ? { specs: data.specs } : {}),
+            });
+          }
+          if (
+            data.startTime ||
+            data.endTime ||
+            data.minBid != null ||
+            data.maxBid != null ||
+            data.bidFee != null
+          ) {
+            await api.updateAuction(id, {
+              ...(data.startTime ? { start_time: data.startTime } : {}),
+              ...(data.endTime ? { end_time: data.endTime } : {}),
+              ...(data.minBid != null ? { min_bid: data.minBid } : {}),
+              ...(data.maxBid != null ? { max_bid: data.maxBid } : {}),
+              ...(data.bidFee != null ? { bid_fee: data.bidFee } : {}),
+            });
+          }
+        }
+        await refreshAuctions();
+        toast("Auction updated successfully", "success");
+      } catch (e: any) {
+        toast(e?.message || "Failed to update auction", "error");
+      }
+    },
+    [refreshAuctions, user],
+  );
+
+  const deleteAuction = useCallback(
+    async (id: string) => {
+      if (user?.role !== "admin") return;
+      try {
+        await api.deleteAuction(id);
+        await refreshAuctions();
+        toast("Auction deleted successfully", "success");
+      } catch (e: any) {
+        toast(e?.message || "Failed to delete auction", "error");
+      }
+    },
+    [refreshAuctions, user],
+  );
+
+  const getAuction = useCallback(
+    (id: string | null | undefined): Auction | undefined => {
+      if (!id) return undefined;
+      return auctions.find((a) => a.id === id);
+    },
+    [auctions],
+  );
+
+  const value = useMemo(
+    () => ({
+      view,
+      selectedId,
+      userBid,
+      pendingBidAmount,
+      bidTicketNumber,
+      feePaid,
+      walletBalance,
+      paymentMethod,
+      lastPaymentMethod,
+      paymentContext,
+      setPaymentContext,
+      sikinaPayUrl,
+      setSikinaPayUrl,
+      sikinaProxyUrl,
+      setSikinaProxyUrl,
+      favoriteAuctionIds,
+      favoritesLoading,
+      unreadNotificationCount,
+      myBids,
+      user,
+      allBids,
+      auctions,
+      auctionsLoading,
+      authError,
+      sessionEndReason,
+      go,
+      selectAuction,
+      selectAuctionForMonitor,
+      setSelectedIdOnly,
+      setFeePaid,
+      setPendingBidAmount,
+      payFee,
+      submitBid,
+      payWinning,
+      setPaymentMethod,
+      checkPaymentStatus,
+      reset,
+      login,
+      register,
+      logout,
+      addAuction,
+      updateAuction,
+      deleteAuction,
+      closeAuction,
+      forceCloseAuction,
+      refreshAuctions,
+      refreshWallet,
+      refreshFavorites,
+      refreshUnreadNotifications,
+      toggleFavorite,
+      isFavorite,
+      fetchAuctionById,
+      getAuction,
+    }),
+    [
+      view,
+      selectedId,
+      userBid,
+      pendingBidAmount,
+      bidTicketNumber,
+      feePaid,
+      walletBalance,
+      paymentMethod,
+      lastPaymentMethod,
+      paymentContext,
+      setPaymentContext,
+      sikinaPayUrl,
+      setSikinaPayUrl,
+      sikinaProxyUrl,
+      setSikinaProxyUrl,
+      favoriteAuctionIds,
+      favoritesLoading,
+      unreadNotificationCount,
+      myBids,
+      user,
+      allBids,
+      auctions,
+      auctionsLoading,
+      authError,
+      sessionEndReason,
+      go,
+      selectAuction,
+      selectAuctionForMonitor,
+      setSelectedIdOnly,
+      setFeePaid,
+      setPendingBidAmount,
+      payFee,
+      submitBid,
+      payWinning,
+      setPaymentMethod,
+      checkPaymentStatus,
+      reset,
+      login,
+      register,
+      logout,
+      addAuction,
+      updateAuction,
+      deleteAuction,
+      closeAuction,
+      forceCloseAuction,
+      refreshAuctions,
+      refreshWallet,
+      refreshFavorites,
+      refreshUnreadNotifications,
+      toggleFavorite,
+      isFavorite,
+      fetchAuctionById,
+      getAuction,
+    ],
+  );
+
+  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
 
 export function useApp() {
-  const ctx = useContext(AppContext)
-  if (!ctx) throw new Error('useApp must be used within AppProvider')
-  return ctx
+  const ctx = useContext(AppContext);
+  if (!ctx) throw new Error("useApp must be used within AppProvider");
+  return ctx;
 }

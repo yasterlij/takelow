@@ -12,6 +12,18 @@ import { BidEncryptionService } from "../common/bid-encryption.service";
 export class WinnerService {
   private readonly logger = new Logger(WinnerService.name);
 
+  private isWinnerPersistenceSchemaError(error: unknown): boolean {
+    const message =
+      error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+
+    return (
+      message.includes("winners") &&
+      (message.includes("does not exist") ||
+        message.includes("unknown column") ||
+        message.includes("no such table"))
+    );
+  }
+
   private normalizeAmount(amount: string | number): string {
     return Number(amount).toFixed(2);
   }
@@ -51,7 +63,18 @@ export class WinnerService {
     });
 
     if (auction?.status === "CLOSED" || auction?.status === "EXPIRED") {
-      return this.getPersistedWinners(auctionId);
+      try {
+        return await this.getPersistedWinners(auctionId);
+      } catch (e) {
+        if (!this.isWinnerPersistenceSchemaError(e)) {
+          throw e;
+        }
+
+        this.logger.warn(
+          `Persisted winners unavailable for ${auctionId}, falling back to bids: ${e.message}`,
+        );
+        return this.calculateWinnersFromDb(auctionId, 1);
+      }
     }
 
     try {
@@ -402,10 +425,21 @@ export class WinnerService {
   }
 
   async getAuctionWinners(auctionId: string): Promise<Winner[]> {
-    return this.winnerRepository.find({
-      where: { auction_id: auctionId },
-      order: { rank: "ASC" },
-    });
+    try {
+      return await this.winnerRepository.find({
+        where: { auction_id: auctionId },
+        order: { rank: "ASC" },
+      });
+    } catch (e) {
+      if (!this.isWinnerPersistenceSchemaError(e)) {
+        throw e;
+      }
+
+      this.logger.warn(
+        `Winner records unavailable for ${auctionId}, returning calculated winners only: ${e.message}`,
+      );
+      return [];
+    }
   }
 
   async getNextUnpaidWinner(auctionId: string): Promise<Winner | null> {

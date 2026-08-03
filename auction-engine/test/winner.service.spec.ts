@@ -108,4 +108,26 @@ describe('WinnerService (Section 11.1 - Test Case 1 & 2)', () => {
     expect(result.winningAmounts).toEqual([1.5]);
     expect(result.totalBids).toBe(3);
   });
+
+  it('falls back to bid reconstruction when persisted winners are unavailable for a closed auction', async () => {
+    mockAuctionRepo.findOne.mockResolvedValue({ status: 'CLOSED' });
+    mockWinnerRepo.find.mockRejectedValue(new Error('relation "winners" does not exist'));
+    mockBidRepo.find.mockResolvedValue([
+      { user_id: 'user-1', amount: 1, encrypted_amount: null, bid_time: new Date('2024-01-01T00:00:00Z') },
+      { user_id: 'user-2', amount: 1, encrypted_amount: null, bid_time: new Date('2024-01-01T00:00:01Z') },
+      { user_id: 'user-3', amount: 2, encrypted_amount: null, bid_time: new Date('2024-01-01T00:00:02Z') },
+    ]);
+
+    const result = await service.calculateWinners('auction-closed');
+
+    expect(result.winningAmounts).toEqual([2]);
+    expect(result.totalBids).toBe(3);
+    expect(result.winners).toEqual([{ amount: 2, userId: 'user-3' }]);
+  });
+
+  it('returns no persisted winners when the winners table is unavailable', async () => {
+    mockWinnerRepo.find.mockRejectedValue(new Error('relation "winners" does not exist'));
+
+    await expect(service.getAuctionWinners('auction-closed')).resolves.toEqual([]);
+  });
 });
