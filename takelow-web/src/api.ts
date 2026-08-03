@@ -309,6 +309,8 @@ export type ApiWinnerResult = {
   winner_name?: string
   winner_phone?: string
   unique_bidders?: number
+  all_winners?: ApiWinnerInfo[]
+  winners_count?: number
   payment_status?: string
   payment_deadline?: string
 }
@@ -441,7 +443,7 @@ export const api = {
     return request<{ deleted: boolean; id: string }>('DELETE', `/admin/auctions/${id}`, undefined, ENGINE_API)
   },
   drawWinner(id: string) {
-    return request<ApiWinnerResult & { all_winners?: ApiWinnerInfo[]; winners_count?: number }>('GET', `/admin/auctions/${id}/winner`, undefined, ENGINE_API)
+    return request<ApiWinnerResult>('GET', `/admin/auctions/${id}/winner`, undefined, ENGINE_API)
   },
   getAuctionBids(id: string) {
     return request<ApiBid[]>('GET', `/admin/auctions/${id}/bids`, undefined, ENGINE_API)

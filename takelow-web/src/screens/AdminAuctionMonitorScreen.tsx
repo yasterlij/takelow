@@ -33,6 +33,7 @@ export function AdminAuctionMonitorScreen() {
   const [winner, setWinner] = useState<ApiWinnerResult | null>(null)
   const [winnerLoading, setWinnerLoading] = useState(false)
   const [showWinner, setShowWinner] = useState(false)
+  const [winnerPage, setWinnerPage] = useState(0)
 
   useEffect(() => {
     if (auction) setLiveAuction(auction)
@@ -81,6 +82,7 @@ export function AdminAuctionMonitorScreen() {
       await api.closeAuction(selectedId)
       await refreshAuctions()
       const result = await api.drawWinner(selectedId)
+      setWinnerPage(0)
       setWinner(result)
       setShowWinner(true)
       toast("Auction closed successfully", "success")
@@ -104,6 +106,7 @@ export function AdminAuctionMonitorScreen() {
     try {
       await api.forceCloseAuction(selectedId)
       await refreshAuctions()
+      setWinnerPage(0)
       setWinner({ id: selectedId, product: null, status: "CLOSED", start_time: "", end_time: "", winning_bid_amount: null, winner_user_id: null, winner_name: undefined, winner_phone: undefined, total_bids: bids.length, lowest_unique_bid: null, bids: [], created_at: "" })
       setShowWinner(true)
       toast("Auction force-closed without winner", "success")
@@ -120,6 +123,7 @@ export function AdminAuctionMonitorScreen() {
     setWinnerLoading(true)
     try {
       const result = await api.drawWinner(selectedId)
+      setWinnerPage(0)
       setWinner(result)
       setShowWinner(true)
     } catch (e: any) {
@@ -152,6 +156,9 @@ export function AdminAuctionMonitorScreen() {
   const bidCount = liveAuction.totalBids || liveAuction.bidders || 0
   const bidProgress = liveAuction.maxBid ? Math.min(bidCount / liveAuction.maxBid, 1) : 0
   const isUrgent = bidProgress > 0.8
+  const WINNERS_PAGE_SIZE = 6
+  const visibleWinners = winner?.all_winners?.slice(0, (winnerPage + 1) * WINNERS_PAGE_SIZE) ?? []
+  const hasMoreWinners = (winner?.all_winners?.length ?? 0) > visibleWinners.length
 
   return (
     <AdminLayout
@@ -443,7 +450,8 @@ export function AdminAuctionMonitorScreen() {
         {winner ? (
           <div className="space-y-4">
             {winner.winning_bid_amount != null && winner.winner_user_id ? (
-              <div className="flex flex-col items-center text-center">
+              <div className="space-y-4">
+                <div className="flex flex-col items-center text-center">
                 <motion.div
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
@@ -476,6 +484,41 @@ export function AdminAuctionMonitorScreen() {
                     </p>
                   </div>
                 </div>
+                </div>
+
+                {!!winner.all_winners?.length && (
+                  <div className="space-y-2 rounded-2xl border border-border/60 bg-neutral-50/80 p-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-extrabold text-awash-blue">Winner List</h4>
+                      <span className="text-xs font-semibold text-neutral-500">{winner.winners_count ?? winner.all_winners.length} total</span>
+                    </div>
+                    <div className="space-y-2">
+                      {visibleWinners.map((entry) => {
+                        const maskedPhone = entry.phone ? entry.phone.slice(0, 4) + 'XXXX' + entry.phone.slice(-2) : null
+                        return (
+                          <div key={`${entry.user_id}-${entry.rank}`} className="flex items-center justify-between rounded-xl border border-border/50 bg-white px-3 py-2">
+                            <div>
+                              <p className="text-sm font-bold text-foreground">#{entry.rank} {entry.name || maskedPhone || 'Winner'}</p>
+                              <p className="text-xs font-medium text-neutral-500">{maskedPhone || entry.user_id}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-display text-sm font-extrabold text-primary">{formatCurrency(entry.amount)}</p>
+                              <p className="text-[10px] font-semibold uppercase text-neutral-400">{entry.payment_status || 'PENDING'}</p>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    {hasMoreWinners && (
+                      <button
+                        onClick={() => setWinnerPage((page) => page + 1)}
+                        className="mt-1 flex w-full items-center justify-center rounded-xl border border-border/60 bg-white px-3 py-2 text-xs font-bold text-neutral-600 transition-all hover:bg-neutral-50"
+                      >
+                        Show {Math.min(WINNERS_PAGE_SIZE, winner.all_winners.length - visibleWinners.length)} more winners
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="flex flex-col items-center text-center">

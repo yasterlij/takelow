@@ -20,6 +20,7 @@ export function WinnerScreen() {
   useEffect(() => {
     if (!selectedId) return
     setLoading(true)
+    setBidsPage(0)
     const fetch = isAdmin ? api.drawWinner(selectedId) : api.getAuctionResult(selectedId)
     fetch
       .then(setWinner as any)
@@ -48,18 +49,33 @@ export function WinnerScreen() {
   const deadline = winner?.payment_deadline ? new Date(winner.payment_deadline) : null
   const deadlineHrs = deadline ? Math.max(0, Math.round((deadline.getTime() - Date.now()) / 3600000)) : null
   const allWinners = 'all_winners' in (winner || {}) ? (winner as any).all_winners as any[] : undefined
+  const userWinnerInfo = allWinners?.find((w: any) => w.user_id === user?.id)
+  const isPrimaryWinner = winner?.winner_user_id === user?.id
 
-  const allBids = 'bids' in (winner || {}) ? (winner as any).bids as any[] : []
+  const allBids = 'bids' in (winner || {})
+    ? ((winner as any).bids as any[]).map((bid: any) => ({ ...bid, amount: Number(bid.amount) }))
+    : []
   const amountCount = new Map<number, number>()
   allBids.forEach((b: any) => amountCount.set(b.amount, (amountCount.get(b.amount) || 0) + 1))
-  const winningAmount = winner?.winning_bid_amount
+  const winningAmount = winner?.winning_bid_amount != null ? Number(winner.winning_bid_amount) : null
   const lowerAmounts = winningAmount != null && allBids.length > 0
     ? [...new Set(allBids.filter((b: any) => b.amount < winningAmount).map((b: any) => b.amount))].sort((a: number, b: number) => a - b)
     : []
   const lowerBidsGrouped = lowerAmounts.map((amount: number) => ({ amount, count: amountCount.get(amount) || 1 }))
-  const BIDS_PAGE_SIZE = 10
-  const pagedBids = lowerBidsGrouped.slice(0, (bidsPage + 1) * BIDS_PAGE_SIZE)
-  const hasMore = pagedBids.length < lowerBidsGrouped.length
+  const lowerBidLevels = lowerBidsGrouped.length
+  const lowerBidEntries = lowerBidsGrouped.reduce((sum: number, bid: { amount: number; count: number }) => sum + bid.count, 0)
+  const lowestBlockedAmount = lowerBidsGrouped[0]?.amount ?? null
+  const transparencyMessage = winningAmount == null
+    ? 'No winning amount was found for this auction.'
+    : lowerBidLevels > 0
+      ? `There ${lowerBidLevels === 1 ? 'was' : 'were'} ${lowerBidLevels} lower bid level${lowerBidLevels === 1 ? '' : 's'}, but each one was repeated so none of them qualified.`
+      : 'No lower bid amounts were placed, so this winning amount was already the first valid unique bid.'
+  const BIDS_PAGE_SIZE = 8
+  const totalBidPages = Math.max(1, Math.ceil(lowerBidsGrouped.length / BIDS_PAGE_SIZE))
+  const currentBidsPage = Math.min(bidsPage, totalBidPages - 1)
+  const pagedBids = lowerBidsGrouped.slice(currentBidsPage * BIDS_PAGE_SIZE, (currentBidsPage + 1) * BIDS_PAGE_SIZE)
+  const pageStart = lowerBidsGrouped.length === 0 ? 0 : currentBidsPage * BIDS_PAGE_SIZE + 1
+  const pageEnd = currentBidsPage * BIDS_PAGE_SIZE + pagedBids.length
 
   return (
     <View style={{ flex: 1 }}>
@@ -115,6 +131,14 @@ export function WinnerScreen() {
                   <View style={s.winningBidBox}>
                     <Text style={s.winLabel}>Winning Bid</Text>
                     <Text style={s.winAmount}>{formatCurrency(winner.winning_bid_amount ?? 0)}</Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: 10 }}>
+                      <View style={{ borderRadius: 999, backgroundColor: colors.emerald600 + '22', paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: colors.emerald600 + '33' }}>
+                        <Text style={{ fontSize: 9, fontWeight: '700', color: colors.emerald600 }}>Lowest valid unique bid</Text>
+                      </View>
+                      <View style={{ borderRadius: 999, backgroundColor: colors.card, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: colors.border }}>
+                        <Text style={{ fontSize: 9, fontWeight: '700', color: colors.mutedForeground }}>1 winner at this amount</Text>
+                      </View>
+                    </View>
                   </View>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
                     <Text style={{ fontSize: 12, color: colors.mutedForeground }}>Total Bids</Text>
@@ -207,28 +231,65 @@ export function WinnerScreen() {
                 </Card>
               )}
 
-              {winner.winner_user_id && (
+              {userWinnerInfo && userWinnerInfo.payment_status !== 'PAID' && (
                 <Card style={{ width: '100%', maxWidth: 320, padding: 16, marginTop: 16, borderColor: colors.primary + '20', backgroundColor: colors.accent }}>
                   <View style={{ flexDirection: 'row', gap: 8 }}>
                     <Info size={14} color={colors.primary} style={{ marginTop: 2 }} />
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.navy, marginBottom: 6 }}>Next Steps</Text>
-                      <View style={{ gap: 4 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.navy, marginBottom: 6 }}>{isPrimaryWinner ? 'Next Steps' : 'Standby Status'}</Text>
+                      {isPrimaryWinner ? (
+                        <View style={{ gap: 4 }}>
+                          <Text style={{ fontSize: 11, color: colors.mutedForeground, lineHeight: 16 }}>
+                            <Text style={{ color: colors.primary, fontWeight: '700' }}>1. </Text>
+                            Complete payment before the deadline
+                          </Text>
+                          <Text style={{ fontSize: 11, color: colors.mutedForeground, lineHeight: 16 }}>
+                            <Text style={{ color: colors.primary, fontWeight: '700' }}>2. </Text>
+                            Collect your item at the designated collection point
+                          </Text>
+                          <Text style={{ fontSize: 11, color: colors.mutedForeground, lineHeight: 16 }}>
+                            <Text style={{ color: colors.primary, fontWeight: '700' }}>3. </Text>
+                            Present payment confirmation for collection
+                          </Text>
+                        </View>
+                      ) : (
                         <Text style={{ fontSize: 11, color: colors.mutedForeground, lineHeight: 16 }}>
-                          <Text style={{ color: colors.primary, fontWeight: '700' }}>1. </Text>
-                          Complete payment before the deadline
+                          You are ranked #{userWinnerInfo?.rank ?? '-'} and will only be asked to pay if higher-ranked winners expire. Your place is still visible here for transparency.
                         </Text>
-                        <Text style={{ fontSize: 11, color: colors.mutedForeground, lineHeight: 16 }}>
-                          <Text style={{ color: colors.primary, fontWeight: '700' }}>2. </Text>
-                          Collect your item at the designated collection point
-                        </Text>
-                        <Text style={{ fontSize: 11, color: colors.mutedForeground, lineHeight: 16 }}>
-                          <Text style={{ color: colors.primary, fontWeight: '700' }}>3. </Text>
-                          Present payment confirmation for collection
-                        </Text>
-                      </View>
+                      )}
                     </View>
                   </View>
+                </Card>
+              )}
+
+              {winningAmount != null && (
+                <Card style={{ width: '100%', maxWidth: 320, padding: 16, marginTop: 16 }}>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <Info size={14} color={colors.awashBlue} style={{ marginTop: 2 }} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.navy }}>Transparency Check</Text>
+                      <Text style={{ fontSize: 11, lineHeight: 16, color: colors.mutedForeground, marginTop: 4 }}>{transparencyMessage}</Text>
+                    </View>
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+                    <View style={{ flex: 1, borderRadius: 10, backgroundColor: colors.secondary, padding: 10 }}>
+                      <Text style={{ fontSize: 9, fontWeight: '700', color: colors.mutedForeground }}>Lower levels</Text>
+                      <Text style={{ marginTop: 4, fontSize: 18, fontWeight: '800', color: colors.navy }}>{lowerBidLevels}</Text>
+                    </View>
+                    <View style={{ flex: 1, borderRadius: 10, backgroundColor: colors.secondary, padding: 10 }}>
+                      <Text style={{ fontSize: 9, fontWeight: '700', color: colors.mutedForeground }}>Grouped bids</Text>
+                      <Text style={{ marginTop: 4, fontSize: 18, fontWeight: '800', color: colors.navy }}>{lowerBidEntries}</Text>
+                    </View>
+                    <View style={{ flex: 1, borderRadius: 10, backgroundColor: colors.secondary, padding: 10 }}>
+                      <Text style={{ fontSize: 9, fontWeight: '700', color: colors.mutedForeground }}>Lowest blocked</Text>
+                      <Text style={{ marginTop: 4, fontSize: 11, fontWeight: '800', color: colors.navy }} numberOfLines={2}>{lowestBlockedAmount != null ? formatCurrency(lowestBlockedAmount) : 'None'}</Text>
+                    </View>
+                  </View>
+                  {lowerBidLevels > 0 && (
+                    <Text style={{ marginTop: 10, fontSize: 10, fontWeight: '500', color: colors.mutedForeground }}>
+                      Each lower amount is shown once, with a flag showing how many bidders repeated it.
+                    </Text>
+                  )}
                 </Card>
               )}
 
@@ -251,7 +312,17 @@ export function WinnerScreen() {
               {allBids.length > 0 && (
                 <Card style={{ width: '100%', maxWidth: 320, padding: 16, marginTop: 16 }}>
                   <View style={{ marginBottom: 8 }}>
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: colors.navy }}>Bids ({allBids.length})</Text>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: colors.navy }}>Supporting Bids Below Winner</Text>
+                        <Text style={{ fontSize: 10, color: colors.mutedForeground, marginTop: 2 }}>Grouped by amount so repeated levels only appear once.</Text>
+                      </View>
+                      {lowerBidLevels > 0 && (
+                        <View style={{ borderRadius: 999, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 8, paddingVertical: 4 }}>
+                          <Text style={{ fontSize: 9, fontWeight: '700', color: colors.mutedForeground }}>{pageStart}-{pageEnd} of {lowerBidLevels}</Text>
+                        </View>
+                      )}
+                    </View>
                   </View>
                   {/* ── Winning bid always on top ── */}
                   {winningAmount != null && (() => {
@@ -284,6 +355,9 @@ export function WinnerScreen() {
                           <View style={{ borderRadius: 4, backgroundColor: colors.emerald600 + '22', paddingHorizontal: 6, paddingVertical: 2 }}>
                             <Text style={{ fontSize: 9, fontWeight: '700', color: colors.emerald600 }}>Winner</Text>
                           </View>
+                          <View style={{ borderRadius: 4, backgroundColor: colors.card, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1, borderColor: colors.emerald600 + '30' }}>
+                            <Text style={{ fontSize: 9, fontWeight: '700', color: colors.emerald600 }}>Unique ×1</Text>
+                          </View>
                           <Text style={{ fontSize: 12, fontWeight: '700', color: colors.emerald600 }}>
                             {formatCurrency(winningAmount ?? 0)}
                           </Text>
@@ -304,45 +378,63 @@ export function WinnerScreen() {
                           flexDirection: 'row',
                           justifyContent: 'space-between',
                           alignItems: 'center',
-                          paddingVertical: 6,
+                          paddingVertical: 8,
                           paddingHorizontal: 8,
                           borderRadius: 8,
                           marginBottom: 2,
                           backgroundColor: colors.card,
                         }}>
-                          <Text style={{ fontSize: 11, fontWeight: '500', color: colors.mutedForeground }}>
-                            {count} bidder{count > 1 ? 's' : ''}
-                          </Text>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                            {count > 1 && (
-                              <Text style={{ fontSize: 9, fontWeight: '500', color: colors.mutedForeground }}>×{count}</Text>
-                            )}
+                          <View style={{ flex: 1, paddingRight: 8 }}>
                             <Text style={{ fontSize: 11, fontWeight: '700', color: colors.navy }}>
                               {formatCurrency(amount ?? 0)}
+                            </Text>
+                            <Text style={{ fontSize: 9, color: colors.mutedForeground, marginTop: 2 }}>
+                              Lower than the winner, so it only counts if it was unique.
+                            </Text>
+                          </View>
+                          <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                            <View style={{ borderRadius: 999, backgroundColor: count > 1 ? '#FEF3C7' : '#DCFCE7', paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: count > 1 ? '#FDE68A' : '#BBF7D0' }}>
+                              <Text style={{ fontSize: 9, fontWeight: '700', color: count > 1 ? '#B45309' : colors.emerald600 }}>
+                                {count > 1 ? `Repeated ×${count}` : 'Unique ×1'}
+                              </Text>
+                            </View>
+                            <Text style={{ fontSize: 9, color: colors.mutedForeground }}>
+                              {count > 1 ? 'Disqualified duplicate' : 'Valid unique amount'}
                             </Text>
                           </View>
                         </View>
                       ))}
-                      {hasMore && (
-                        <TouchableOpacity
-                          onPress={() => setBidsPage((p: number) => p + 1)}
-                          activeOpacity={0.85}
-                          style={{
-                            marginTop: 8,
-                            borderRadius: 8,
-                            borderWidth: 1,
-                            borderColor: colors.border,
-                            backgroundColor: colors.card,
-                            paddingVertical: 10,
-                            alignItems: 'center',
-                          }}
-                        >
-                          <Text style={{ fontSize: 11, fontWeight: '600', color: colors.mutedForeground }}>
-                            Show {Math.min(BIDS_PAGE_SIZE, lowerBidsGrouped.length - pagedBids.length)} more
+                      {totalBidPages > 1 && (
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 8, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, paddingHorizontal: 10, paddingVertical: 8 }}>
+                          <TouchableOpacity
+                            onPress={() => setBidsPage((p: number) => Math.max(0, p - 1))}
+                            disabled={currentBidsPage === 0}
+                            activeOpacity={0.85}
+                            style={{ borderRadius: 8, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 7, opacity: currentBidsPage === 0 ? 0.4 : 1 }}
+                          >
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.neutralGray600 }}>Previous</Text>
+                          </TouchableOpacity>
+                          <Text style={{ fontSize: 10, fontWeight: '600', color: colors.mutedForeground }}>
+                            Page {currentBidsPage + 1} of {totalBidPages}
                           </Text>
-                        </TouchableOpacity>
+                          <TouchableOpacity
+                            onPress={() => setBidsPage((p: number) => Math.min(totalBidPages - 1, p + 1))}
+                            disabled={currentBidsPage >= totalBidPages - 1}
+                            activeOpacity={0.85}
+                            style={{ borderRadius: 8, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 7, opacity: currentBidsPage >= totalBidPages - 1 ? 0.4 : 1 }}
+                          >
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.neutralGray600 }}>Next</Text>
+                          </TouchableOpacity>
+                        </View>
                       )}
                     </>
+                  )}
+                  {lowerBidsGrouped.length === 0 && winningAmount != null && (
+                    <View style={{ borderRadius: 8, borderWidth: 1, borderColor: colors.emerald600 + '33', backgroundColor: colors.emerald600 + '12', paddingVertical: 10, paddingHorizontal: 12 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '600', color: colors.emerald600 }}>
+                        No lower bid amounts were placed. The winner was already the lowest valid bid.
+                      </Text>
+                    </View>
                   )}
                 </Card>
               )}
@@ -352,9 +444,13 @@ export function WinnerScreen() {
       </View>
       <Card style={s.bottomCta}>
         {winner?.winner_user_id && allWinners?.some((w: any) => w.user_id === user?.id) ? (
-          winner.payment_status === 'PAID' ? (
+          userWinnerInfo?.payment_status === 'PAID' ? (
             <CTAButton onPress={() => go('home')}>
               <CheckCircle2 size={18} /> Payment Complete — Back Home
+            </CTAButton>
+          ) : !isPrimaryWinner ? (
+            <CTAButton variant="outline" onPress={() => {}}>
+              <Clock size={18} /> Waiting for higher-ranked winners
             </CTAButton>
           ) : (
             <CTAButton onPress={() => go('pay-winning')}>

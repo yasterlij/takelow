@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react"
-import { motion, AnimatePresence } from "framer-motion"
-import { Trophy, Loader2, AlertTriangle, Users, Clock, CreditCard, ArrowLeft, Info, CheckCircle2, PartyPopper, Sparkles } from "lucide-react"
+import { motion } from "framer-motion"
+import { Trophy, Loader2, AlertTriangle, Users, Clock, CreditCard, ArrowLeft, Info, CheckCircle2, PartyPopper } from "lucide-react"
 import { useApp } from "../AppContext"
 import { api, type ApiWinnerResult, type ApiAuctionResult, type ApiWinnerInfo, type ApiBid } from "../api"
-import { formatCurrency, formatMaskedCurrency } from "../mockDataV0"
+import { formatCurrency } from "../mockDataV0"
 
 const confettiParticles = Array.from({ length: 20 }, (_, i) => ({
   id: i,
@@ -27,6 +27,7 @@ export function WinnerScreen() {
     if (!selectedId) return
     setLoading(true)
     setError(null)
+    setBidsPage(0)
     const fetch = isAdmin ? api.drawWinner(selectedId) : api.getAuctionResult(selectedId)
     fetch
       .then(setWinner as any)
@@ -48,17 +49,33 @@ const winnersCount = (winner as any)?.winners_count as number | undefined
   const myBidInfo = (winner as any)?.my_bid as { amount: number; service_fee_paid: boolean } | undefined
   const isUserWinner = allWinners?.some((w) => w.user_id === user?.id)
   const userWinnerInfo = allWinners?.find((w) => w.user_id === user?.id)
-  const allBids = (winner as any)?.bids as ApiBid[] | undefined
+  const isPrimaryWinner = winner?.winner_user_id === user?.id
+  const allBids = ((winner as any)?.bids as ApiBid[] | undefined)?.map((bid) => ({
+    ...bid,
+    amount: Number(bid.amount),
+  }))
   const amountCount = new Map<number, number>()
   allBids?.forEach((b) => amountCount.set(b.amount, (amountCount.get(b.amount) || 0) + 1))
-  const winningAmount = winner?.winning_bid_amount
+  const winningAmount = winner?.winning_bid_amount != null ? Number(winner.winning_bid_amount) : null
   const lowerAmounts = winningAmount != null && allBids
     ? [...new Set(allBids.filter((b) => b.amount < winningAmount).map((b) => b.amount))].sort((a, b) => a - b)
     : []
   const lowerBidsGrouped = lowerAmounts.map((amount) => ({ amount, count: amountCount.get(amount) || 1 }))
-  const BIDS_PAGE_SIZE = 10
-  const pagedBids = lowerBidsGrouped.slice(0, (bidsPage + 1) * BIDS_PAGE_SIZE)
-  const hasMore = pagedBids.length < lowerBidsGrouped.length
+  const lowerBidLevels = lowerBidsGrouped.length
+  const lowerBidEntries = lowerBidsGrouped.reduce((sum, bid) => sum + bid.count, 0)
+  const duplicateLowerLevels = lowerBidsGrouped.filter((bid) => bid.count > 1).length
+  const lowestBlockedAmount = lowerBidsGrouped[0]?.amount ?? null
+  const transparencyMessage = winningAmount == null
+    ? "No winning amount was found for this auction."
+    : lowerBidLevels > 0
+      ? `There ${lowerBidLevels === 1 ? "was" : "were"} ${lowerBidLevels} lower bid level${lowerBidLevels === 1 ? "" : "s"}, but each one was repeated by more than one bidder so none of them qualified.`
+      : "No lower bid amounts were placed, so this winning amount was already the first valid unique bid."
+  const BIDS_PAGE_SIZE = 8
+  const totalBidPages = Math.max(1, Math.ceil(lowerBidsGrouped.length / BIDS_PAGE_SIZE))
+  const currentBidsPage = Math.min(bidsPage, totalBidPages - 1)
+  const pagedBids = lowerBidsGrouped.slice(currentBidsPage * BIDS_PAGE_SIZE, (currentBidsPage + 1) * BIDS_PAGE_SIZE)
+  const pageStart = lowerBidsGrouped.length === 0 ? 0 : currentBidsPage * BIDS_PAGE_SIZE + 1
+  const pageEnd = currentBidsPage * BIDS_PAGE_SIZE + pagedBids.length
 
   return (
     <motion.div
@@ -160,6 +177,14 @@ const winnersCount = (winner as any)?.winners_count as number | undefined
                 <div className="mt-4 rounded-xl bg-gradient-to-br from-awash-gold/15 to-awash-gold-light/10 border border-primary/20 p-4 text-center">
                   <p className="text-xs font-semibold uppercase tracking-wide text-awash-gold-dark">Primary Winning Bid</p>
                   <p className="font-display text-4xl font-extrabold text-gradient-gold tabular-nums">{formatCurrency(winner.winning_bid_amount ?? 0)}</p>
+                  <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+                    <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold text-emerald-700 border border-emerald-200">
+                      Lowest valid unique bid
+                    </span>
+                    <span className="inline-flex items-center rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-semibold text-neutral-600 border border-border/60">
+                      1 winner at this amount
+                    </span>
+                  </div>
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
                   <div className="rounded-lg bg-white/60 p-2.5"><span className="text-xs text-neutral-400">Total Bids</span><p className="font-semibold text-foreground">{winner.total_bids}</p></div>
@@ -195,6 +220,42 @@ const winnersCount = (winner as any)?.winners_count as number | undefined
               </div>
             </div>
           </motion.div>
+
+          {winningAmount != null && (
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.33 }}
+              className="w-full max-w-md rounded-2xl border border-awash-blue/15 bg-white/85 backdrop-blur-sm p-4 shadow-sm"
+            >
+              <div className="flex items-start gap-2">
+                <Info className="mt-0.5 size-4 flex-shrink-0 text-awash-blue" />
+                <div className="flex-1">
+                  <h3 className="text-sm font-bold text-foreground">Transparency Check</h3>
+                  <p className="mt-1 text-xs leading-relaxed text-neutral-600">{transparencyMessage}</p>
+                </div>
+              </div>
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                <div className="rounded-xl bg-neutral-50/90 p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-400">Lower levels</p>
+                  <p className="mt-1 text-lg font-extrabold text-foreground tabular-nums">{lowerBidLevels}</p>
+                </div>
+                <div className="rounded-xl bg-neutral-50/90 p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-400">Grouped bids</p>
+                  <p className="mt-1 text-lg font-extrabold text-foreground tabular-nums">{lowerBidEntries}</p>
+                </div>
+                <div className="rounded-xl bg-neutral-50/90 p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-400">Lowest blocked</p>
+                  <p className="mt-1 text-sm font-extrabold text-foreground tabular-nums">{lowestBlockedAmount != null ? formatCurrency(lowestBlockedAmount) : "None"}</p>
+                </div>
+              </div>
+              {duplicateLowerLevels > 0 && (
+                <p className="mt-3 text-[11px] font-medium text-neutral-500">
+                  Each lower amount is shown once, with a flag for how many bidders repeated that same amount.
+                </p>
+              )}
+            </motion.div>
+          )}
 
           {/* ── All Winners List ── */}
           {allWinners && allWinners.length > 0 && (
@@ -276,12 +337,18 @@ const winnersCount = (winner as any)?.winners_count as number | undefined
               <div className="flex items-start gap-2">
                 <Info className="size-4 text-primary mt-0.5 flex-shrink-0" />
                 <div>
-                  <h3 className="text-sm font-bold text-foreground">Next Steps</h3>
-                  <ul className="mt-1 space-y-1 text-xs text-neutral-600">
-                    <li className="flex items-start gap-1.5"><span className="text-primary mt-0.5 font-bold">1.</span> Complete payment before the deadline</li>
-                    <li className="flex items-start gap-1.5"><span className="text-primary mt-0.5 font-bold">2.</span> Collect your item at the designated collection point</li>
-                    <li className="flex items-start gap-1.5"><span className="text-primary mt-0.5 font-bold">3.</span> Present payment confirmation for collection</li>
-                  </ul>
+                  <h3 className="text-sm font-bold text-foreground">{isPrimaryWinner ? "Next Steps" : "Standby Status"}</h3>
+                  {isPrimaryWinner ? (
+                    <ul className="mt-1 space-y-1 text-xs text-neutral-600">
+                      <li className="flex items-start gap-1.5"><span className="text-primary mt-0.5 font-bold">1.</span> Complete payment before the deadline</li>
+                      <li className="flex items-start gap-1.5"><span className="text-primary mt-0.5 font-bold">2.</span> Collect your item at the designated collection point</li>
+                      <li className="flex items-start gap-1.5"><span className="text-primary mt-0.5 font-bold">3.</span> Present payment confirmation for collection</li>
+                    </ul>
+                  ) : (
+                    <p className="mt-1 text-xs leading-relaxed text-neutral-600">
+                      You are ranked #{userWinnerInfo?.rank ?? "-"}. Payment opens only for the current promoted winner. If a higher-ranked winner expires, you will be moved up automatically.
+                    </p>
+                  )}
                 </div>
               </div>
             </motion.div>
@@ -296,7 +363,20 @@ const winnersCount = (winner as any)?.winners_count as number | undefined
               className="w-full max-w-md rounded-2xl border border-border/60 bg-white/80 backdrop-blur-sm p-4"
             >
               <div className="mb-3 flex items-center justify-between">
-                <h3 className="text-sm font-bold text-foreground">All Bids ({allBids.length})</h3>
+                <div>
+                  <h3 className="text-sm font-bold text-foreground">Supporting Bids Below Winner</h3>
+                  <p className="text-[11px] text-neutral-500">Grouped once per amount to avoid duplicate rows.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {lowerBidLevels > 0 && (
+                    <span className="rounded-full bg-white px-2 py-1 text-[10px] font-bold text-neutral-500 border border-border/60">
+                      {pageStart}-{pageEnd} of {lowerBidLevels}
+                    </span>
+                  )}
+                  <span className="rounded-full bg-neutral-100 px-2 py-1 text-[10px] font-bold text-neutral-500">
+                    {lowerBidLevels} level{lowerBidLevels === 1 ? "" : "s"}
+                  </span>
+                </div>
               </div>
               {winningAmount != null && (() => {
                 const winnerBid = allBids.find((b) => b.amount === winningAmount)
@@ -309,6 +389,7 @@ const winnersCount = (winner as any)?.winners_count as number | undefined
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">Winner</span>
+                      <span className="text-[10px] font-medium text-emerald-700 bg-white px-1.5 py-0.5 rounded border border-emerald-200">Unique ×1</span>
                       <span className="text-xs font-bold text-emerald-700 tabular-nums">{formatCurrency(winningAmount)}</span>
                     </div>
                   </div>
@@ -323,24 +404,47 @@ const winnersCount = (winner as any)?.winners_count as number | undefined
                   </div>
                   <div className="space-y-1">
                     {pagedBids.map(({ amount, count }) => (
-                      <div key={amount} className="flex items-center justify-between rounded-lg bg-neutral-50/80 border border-transparent px-3 py-2">
-                        <span className="text-xs text-neutral-500">{count} bidder{count > 1 ? 's' : ''}</span>
-                        <div className="flex items-center gap-2">
-                          {count > 1 && <span className="text-[10px] font-medium text-neutral-400">×{count}</span>}
+                      <div key={amount} className="flex items-center justify-between rounded-lg bg-neutral-50/80 border border-transparent px-3 py-2.5">
+                        <div>
                           <span className="text-xs font-bold text-foreground tabular-nums">{formatCurrency(amount)}</span>
+                          <p className="mt-0.5 text-[10px] text-neutral-400">Lower than the winner, so it only qualifies if it was unique.</p>
+                        </div>
+                        <div className="text-right">
+                          <span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-bold ${count > 1 ? "bg-amber-100 text-amber-700 border border-amber-200" : "bg-emerald-100 text-emerald-700 border border-emerald-200"}`}>
+                            {count > 1 ? `Repeated ×${count}` : "Unique ×1"}
+                          </span>
+                          <p className="mt-1 text-[10px] text-neutral-400">{count > 1 ? "Disqualified duplicate" : "Valid unique amount"}</p>
                         </div>
                       </div>
                     ))}
                   </div>
-                  {hasMore && (
-                    <button
-                      onClick={() => setBidsPage((p) => p + 1)}
-                      className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-border/60 bg-white/80 py-2 text-xs font-semibold text-neutral-500 hover:bg-white hover:shadow-sm transition-all"
-                    >
-                      Show {Math.min(BIDS_PAGE_SIZE, lowerBidsGrouped.length - pagedBids.length)} more
-                    </button>
+                  {totalBidPages > 1 && (
+                    <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-white/70 px-3 py-2">
+                      <button
+                        onClick={() => setBidsPage((p) => Math.max(0, p - 1))}
+                        disabled={currentBidsPage === 0}
+                        className="rounded-md border border-border/60 px-3 py-1.5 text-xs font-semibold text-neutral-600 transition-all enabled:hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        Previous
+                      </button>
+                      <span className="text-[11px] font-semibold text-neutral-500">
+                        Page {currentBidsPage + 1} of {totalBidPages}
+                      </span>
+                      <button
+                        onClick={() => setBidsPage((p) => Math.min(totalBidPages - 1, p + 1))}
+                        disabled={currentBidsPage >= totalBidPages - 1}
+                        className="rounded-md border border-border/60 px-3 py-1.5 text-xs font-semibold text-neutral-600 transition-all enabled:hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        Next
+                      </button>
+                    </div>
                   )}
                 </>
+              )}
+              {lowerBidsGrouped.length === 0 && winningAmount != null && (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-xs text-emerald-700">
+                  No lower bid amounts were placed. The winner was already the lowest valid bid.
+                </div>
               )}
             </motion.div>
           )}
@@ -353,9 +457,13 @@ const winnersCount = (winner as any)?.winners_count as number | undefined
             className="w-full max-w-md space-y-2"
           >
             {winner.winner_user_id && isUserWinner ? (
-              winner.payment_status === "PAID" ? (
+              userWinnerInfo?.payment_status === "PAID" ? (
                 <button onClick={() => go("home")} className="btn-primary">
                   <CheckCircle2 className="size-[18px]" /> Payment Complete — Back Home
+                </button>
+              ) : !isPrimaryWinner ? (
+                <button type="button" className="btn-outline cursor-default">
+                  <Clock className="size-[18px]" /> Waiting for higher-ranked winners
                 </button>
               ) : (
                 <button onClick={() => go("pay-winning")} className="btn-primary animate-shine">

@@ -23,6 +23,7 @@ export function AdminAuctionMonitorScreen() {
   const [winner, setWinner] = useState<ApiWinnerResult | null>(null)
   const [winnerLoading, setWinnerLoading] = useState(false)
   const [showWinner, setShowWinner] = useState(false)
+  const [winnerPage, setWinnerPage] = useState(0)
 
   useEffect(() => {
     if (auction) setLiveAuction(auction)
@@ -65,6 +66,7 @@ export function AdminAuctionMonitorScreen() {
       await api.closeAuction(selectedId)
       await refreshAuctions()
       const result = await api.drawWinner(selectedId)
+      setWinnerPage(0)
       setWinner(result)
       setShowWinner(true)
     } catch (e: any) {
@@ -87,6 +89,7 @@ export function AdminAuctionMonitorScreen() {
     try {
       await api.forceCloseAuction(selectedId)
       await refreshAuctions()
+      setWinnerPage(0)
       setWinner({ id: selectedId, product: null, status: 'CLOSED', start_time: '', end_time: '', winning_bid_amount: null, winner_user_id: null, winner_name: null, winner_phone: null, total_bids: bids.length, unique_bidders: 0, lowest_unique_bid: null, all_winners: [], bids: [], created_at: '', payment_status: null, payment_deadline: null })
       setShowWinner(true)
     } catch (e: any) {
@@ -99,6 +102,7 @@ export function AdminAuctionMonitorScreen() {
     setWinnerLoading(true)
     try {
       const result = await api.drawWinner(selectedId)
+      setWinnerPage(0)
       setWinner(result)
       setShowWinner(true)
     } catch (e: any) {
@@ -132,6 +136,9 @@ export function AdminAuctionMonitorScreen() {
   const bidCount = liveAuction.totalBids || liveAuction.bidders || 0
   const bidProgress = liveAuction.maxBid ? Math.min(bidCount / liveAuction.maxBid, 1) : 0
   const isUrgent = bidProgress > 0.8
+  const WINNERS_PAGE_SIZE = 6
+  const visibleWinners = winner?.all_winners?.slice(0, (winnerPage + 1) * WINNERS_PAGE_SIZE) ?? []
+  const hasMoreWinners = (winner?.all_winners?.length ?? 0) > visibleWinners.length
 
   const bannerBg = isClosed ? colors.neutralGray100 : endingSoon ? '#FFFBEB' : colors.emerald50
   const bannerBorder = isClosed ? colors.neutralGray200 : endingSoon ? '#FDE68A' : colors.emerald200
@@ -325,34 +332,71 @@ export function AdminAuctionMonitorScreen() {
             {winner ? (
               <View>
                 {winner.winning_bid_amount != null && winner.winner_user_id ? (
-                  <View style={{ alignItems: 'center' }}>
-                    <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' }}>
-                      <Crown size={32} color={colors.white} />
+                  <View style={{ gap: 16 }}>
+                    <View style={{ alignItems: 'center' }}>
+                      <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' }}>
+                        <Crown size={32} color={colors.white} />
+                      </View>
+                      <Text style={{ fontSize: 18, fontWeight: '800', color: colors.awashBlue, marginTop: 16 }}>Winner Found!</Text>
+                      <Text style={{ fontSize: 13, fontWeight: '500', color: colors.neutralGray500, marginTop: 4 }}>
+                        {(() => {
+                          const fn = winner.winner_name ? winner.winner_name.split(' ')[0] : null
+                          const mp = winner.winner_phone ? winner.winner_phone.slice(0, 4) + 'XXXX' + winner.winner_phone.slice(-2) : null
+                          return fn && mp ? `${fn} ${mp}` : (fn || mp || 'Winner')
+                        })()}
+                      </Text>
+                      <View style={{ flexDirection: 'row', gap: 24, marginTop: 16 }}>
+                        <View style={{ alignItems: 'center' }}>
+                          <Text style={{ fontSize: 9, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, color: colors.neutralGray400 }}>Winning Bid</Text>
+                          <Text style={{ fontSize: 18, fontWeight: '800', color: colors.primary, marginTop: 2 }}>{formatCurrency(winner.winning_bid_amount)}</Text>
+                        </View>
+                        <View style={{ alignItems: 'center' }}>
+                          <Text style={{ fontSize: 9, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, color: colors.neutralGray400 }}>Total Bids</Text>
+                          <Text style={{ fontSize: 18, fontWeight: '800', color: colors.awashBlue, marginTop: 2 }}>{winner.total_bids ?? bidCount}</Text>
+                        </View>
+                        <View style={{ alignItems: 'center' }}>
+                          <Text style={{ fontSize: 9, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, color: colors.neutralGray400 }}>Savings</Text>
+                          <Text style={{ fontSize: 18, fontWeight: '800', color: colors.emerald600, marginTop: 2 }}>
+                            {liveAuction.marketPrice > 0 ? Math.round((1 - winner.winning_bid_amount / liveAuction.marketPrice) * 100) : 0}%
+                          </Text>
+                        </View>
+                      </View>
                     </View>
-                    <Text style={{ fontSize: 18, fontWeight: '800', color: colors.awashBlue, marginTop: 16 }}>Winner Found!</Text>
-                    <Text style={{ fontSize: 13, fontWeight: '500', color: colors.neutralGray500, marginTop: 4 }}>
-                      {(() => {
-                        const fn = winner.winner_name ? winner.winner_name.split(' ')[0] : null
-                        const mp = winner.winner_phone ? winner.winner_phone.slice(0, 4) + 'XXXX' + winner.winner_phone.slice(-2) : null
-                        return fn && mp ? `${fn} ${mp}` : (fn || mp || 'Winner')
-                      })()}
-                    </Text>
-                    <View style={{ flexDirection: 'row', gap: 24, marginTop: 16 }}>
-                      <View style={{ alignItems: 'center' }}>
-                        <Text style={{ fontSize: 9, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, color: colors.neutralGray400 }}>Winning Bid</Text>
-                        <Text style={{ fontSize: 18, fontWeight: '800', color: colors.primary, marginTop: 2 }}>{formatCurrency(winner.winning_bid_amount)}</Text>
+
+                    {!!winner.all_winners?.length && (
+                      <View style={{ borderWidth: 1, borderColor: colors.border, backgroundColor: colors.neutralGray50, borderRadius: 16, padding: 12, gap: 8 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Text style={{ fontSize: 14, fontWeight: '800', color: colors.awashBlue }}>Winner List</Text>
+                          <Text style={{ fontSize: 11, fontWeight: '600', color: colors.neutralGray500 }}>{winner.all_winners.length} total</Text>
+                        </View>
+                        {visibleWinners.map((entry) => {
+                          const maskedPhone = entry.phone ? entry.phone.slice(0, 4) + 'XXXX' + entry.phone.slice(-2) : null
+                          return (
+                            <View key={`${entry.user_id}-${entry.rank}`} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: colors.border, backgroundColor: colors.white, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 }}>
+                              <View style={{ flex: 1, paddingRight: 8 }}>
+                                <Text style={{ fontSize: 13, fontWeight: '700', color: colors.foreground }}>#{entry.rank} {entry.name || maskedPhone || 'Winner'}</Text>
+                                <Text style={{ fontSize: 11, fontWeight: '500', color: colors.neutralGray500, marginTop: 2 }}>{maskedPhone || entry.user_id}</Text>
+                              </View>
+                              <View style={{ alignItems: 'flex-end' }}>
+                                <Text style={{ fontSize: 13, fontWeight: '800', color: colors.primary }}>{formatCurrency(entry.amount)}</Text>
+                                <Text style={{ fontSize: 10, fontWeight: '600', color: colors.neutralGray400, marginTop: 2 }}>{entry.payment_status || 'PENDING'}</Text>
+                              </View>
+                            </View>
+                          )
+                        })}
+                        {hasMoreWinners && (
+                          <TouchableOpacity
+                            onPress={() => setWinnerPage((page) => page + 1)}
+                            activeOpacity={0.85}
+                            style={{ marginTop: 4, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.white, paddingHorizontal: 12, paddingVertical: 10, alignItems: 'center' }}
+                          >
+                            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.neutralGray600 }}>
+                              Show {Math.min(WINNERS_PAGE_SIZE, winner.all_winners.length - visibleWinners.length)} more winners
+                            </Text>
+                          </TouchableOpacity>
+                        )}
                       </View>
-                      <View style={{ alignItems: 'center' }}>
-                        <Text style={{ fontSize: 9, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, color: colors.neutralGray400 }}>Total Bids</Text>
-                        <Text style={{ fontSize: 18, fontWeight: '800', color: colors.awashBlue, marginTop: 2 }}>{winner.total_bids ?? bidCount}</Text>
-                      </View>
-                      <View style={{ alignItems: 'center' }}>
-                        <Text style={{ fontSize: 9, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, color: colors.neutralGray400 }}>Savings</Text>
-                        <Text style={{ fontSize: 18, fontWeight: '800', color: colors.emerald600, marginTop: 2 }}>
-                          {liveAuction.marketPrice > 0 ? Math.round((1 - winner.winning_bid_amount / liveAuction.marketPrice) * 100) : 0}%
-                        </Text>
-                      </View>
-                    </View>
+                    )}
                   </View>
                 ) : (
                   <View style={{ alignItems: 'center' }}>
