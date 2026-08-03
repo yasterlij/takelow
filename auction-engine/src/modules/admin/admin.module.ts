@@ -18,6 +18,12 @@ import { BidEncryptionService } from "../common/bid-encryption.service";
     WinnerModule,
   ],
   controllers: [AuctionManageController],
-  providers: [AuctionAdminService, AuctionReviewService, ProductAdminService, ImageService, BidEncryptionService],
+  providers: [
+    AuctionAdminService,
+    AuctionReviewService,
+    ProductAdminService,
+    ImageService,
+    BidEncryptionService,
+  ],
 })
 export class AdminModule {}

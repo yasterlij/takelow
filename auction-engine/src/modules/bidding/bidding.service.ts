@@ -230,9 +230,9 @@ export class BiddingService {
       await this.notificationDispatchService.dispatch(
         "/api/v1/notify/max-bid-reached",
         {
-            auction_id: auctionId,
-            total_bids: total,
-            max_bids: max,
+          auction_id: auctionId,
+          total_bids: total,
+          max_bids: max,
         },
       );
     } catch (e) {

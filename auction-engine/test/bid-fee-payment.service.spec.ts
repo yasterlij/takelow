@@ -212,6 +212,37 @@ describe('PaymentService - Bid Fee Payment', () => {
       expect(mockAwashService.generatePaymentLink).not.toHaveBeenCalled();
       expect(mockPaymentTransactionRepo.create).not.toHaveBeenCalled();
     });
+
+    it('should scope pending winning link reuse to winning payment transactions only', async () => {
+      const auctionId = 'bef09c86-21da-4db7-b02e-933f8fb83132';
+      const userId = 'af372c9d-2d80-4db9-ae53-e3bc47531f12';
+
+      mockPaymentTransactionRepo.findOne.mockResolvedValue(null);
+      (mockAwashService.generatePaymentLink as jest.Mock).mockResolvedValue({
+        paymentUrl: 'https://awash.example/checkout/new',
+      });
+      mockPaymentTransactionRepo.create.mockReturnValue({ id: 'txn-new' });
+      mockPaymentTransactionRepo.save.mockResolvedValue({ id: 'txn-new' });
+
+      await service.createPaymentLink(
+        auctionId,
+        userId,
+        120,
+        'Winning payment',
+        'AWASH',
+      );
+
+      expect(mockPaymentTransactionRepo.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            auction_id: auctionId,
+            user_id: userId,
+            payment_type: PaymentType.WINNING_BID,
+            status: PaymentTransactionStatus.PENDING,
+          }),
+        }),
+      );
+    });
   });
 
   describe('getBidFeePaymentStatus', () => {
@@ -356,6 +387,157 @@ describe('PaymentService - Bid Fee Payment', () => {
       expect(mockPaymentTransactionRepo.findOne).not.toHaveBeenCalled();
       expect(mockPaymentTransactionRepo.save).not.toHaveBeenCalled();
       expect(mockAuctionRepo.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getWinningPaymentStatus', () => {
+    it('should scope status lookup to winning transaction types', async () => {
+      const auctionId = 'auction-winning-1';
+      const userId = 'user-winning-1';
+
+      mockPaymentTransactionRepo.findOne.mockResolvedValue(null);
+
+      await service.getWinningPaymentStatus(auctionId, userId);
+
+      const args = mockPaymentTransactionRepo.findOne.mock.calls[0][0];
+      expect(args.where.auction_id).toBe(auctionId);
+      expect(args.where.user_id).toBe(userId);
+      expect(args.where.payment_type).toBeDefined();
+    });
+  });
+
+  describe('confirmWinningPayment', () => {
+    it('should reject manual confirmation when no successful winning payment exists', async () => {
+      const auctionId = 'auction-confirm-1';
+      const userId = 'user-confirm-1';
+
+      mockAuctionRepo.findOne.mockResolvedValue({
+        id: auctionId,
+        winner_user_id: userId,
+        payment_status: 'PENDING',
+      });
+      mockPaymentTransactionRepo.findOne.mockResolvedValue(null);
+
+      await expect(service.confirmWinningPayment(auctionId, userId)).rejects.toThrow(
+        'Winning payment not yet confirmed',
+      );
+    });
+
+    it('should mark the current winner as paid when a successful winning payment exists', async () => {
+      const auctionId = 'auction-confirm-2';
+      const userId = 'user-confirm-2';
+
+      mockAuctionRepo.findOne
+        .mockResolvedValueOnce({
+          id: auctionId,
+          status: 'CLOSED',
+          winner_user_id: userId,
+          payment_status: 'PENDING',
+        })
+        .mockResolvedValueOnce({
+          id: auctionId,
+          status: 'CLOSED',
+          winner_user_id: userId,
+          payment_status: 'PENDING',
+        });
+      mockPaymentTransactionRepo.findOne.mockResolvedValue({
+        auction_id: auctionId,
+        user_id: userId,
+        payment_type: PaymentType.WINNING_BID,
+        status: PaymentTransactionStatus.SUCCESSFUL,
+      });
+      mockWinnerRepo.findOne.mockResolvedValue({
+        auction_id: auctionId,
+        user_id: userId,
+        payment_status: WinnerPaymentStatus.PENDING,
+      });
+      mockWinnerRepo.count.mockResolvedValue(0);
+      mockAuctionRepo.save.mockResolvedValue({
+        id: auctionId,
+        payment_status: 'PAID',
+      });
+
+      await service.confirmWinningPayment(auctionId, userId);
+
+      expect(mockWinnerService.updateWinnerPaymentStatus).toHaveBeenCalledWith(
+        auctionId,
+        userId,
+        WinnerPaymentStatus.PAID,
+      );
+      expect(mockAuctionRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ payment_status: 'PAID' }),
+      );
+    });
+
+    it('should promote the next unpaid winner when more payments remain', async () => {
+      const auctionId = 'auction-confirm-3';
+      const userId = 'user-confirm-3';
+      const nextWinner = {
+        auction_id: auctionId,
+        user_id: 'user-confirm-4',
+        amount: 19.5,
+        payment_status: WinnerPaymentStatus.PENDING,
+        payment_deadline: null,
+      };
+
+      mockAuctionRepo.findOne
+        .mockResolvedValueOnce({
+          id: auctionId,
+          status: 'CLOSED',
+          winner_user_id: userId,
+          winning_bid_amount: 17.25,
+          payment_status: 'PENDING',
+        })
+        .mockResolvedValueOnce({
+          id: auctionId,
+          status: 'CLOSED',
+          winner_user_id: userId,
+          winning_bid_amount: 17.25,
+          payment_status: 'PENDING',
+        });
+      mockPaymentTransactionRepo.findOne.mockResolvedValue({
+        auction_id: auctionId,
+        user_id: userId,
+        payment_type: PaymentType.WINNING_BID,
+        status: PaymentTransactionStatus.SUCCESSFUL,
+      });
+      mockWinnerRepo.findOne.mockResolvedValue({
+        auction_id: auctionId,
+        user_id: userId,
+        payment_status: WinnerPaymentStatus.PENDING,
+      });
+      mockWinnerRepo.count.mockResolvedValue(1);
+      (mockWinnerService.getNextUnpaidWinner as jest.Mock).mockResolvedValue(nextWinner);
+      mockWinnerRepo.save.mockResolvedValue(nextWinner);
+      mockAuctionRepo.save.mockResolvedValue({
+        id: auctionId,
+        winner_user_id: nextWinner.user_id,
+        winning_bid_amount: nextWinner.amount,
+        payment_status: 'PENDING',
+      });
+
+      await service.confirmWinningPayment(auctionId, userId);
+
+      expect(mockWinnerService.updateWinnerPaymentStatus).toHaveBeenCalledWith(
+        auctionId,
+        userId,
+        WinnerPaymentStatus.PAID,
+      );
+      expect(mockWinnerService.getNextUnpaidWinner).toHaveBeenCalledWith(auctionId);
+      expect(mockWinnerRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          user_id: nextWinner.user_id,
+          payment_deadline: expect.any(Date),
+        }),
+      );
+      expect(mockAuctionRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          winner_user_id: nextWinner.user_id,
+          winning_bid_amount: nextWinner.amount,
+          payment_status: 'PENDING',
+          payment_deadline: expect.any(Date),
+        }),
+      );
     });
   });
 

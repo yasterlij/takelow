@@ -333,38 +333,41 @@ export function HomeScreen() {
         </section>
       )}
 
-      {/* ── Celebrate Our Recent Auction Winners ── */}
-      <section>
-        <div className="mb-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="flex size-11 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 to-awash-gold/20 backdrop-blur-sm border border-primary/20 text-awash-gold shadow-sm shadow-primary/10">
-              <Trophy className="size-5" />
+      {/* ── Recent Auction Winners ── */}
+      <section className="relative overflow-hidden rounded-[28px] border border-primary/15 bg-[radial-gradient(circle_at_top_left,rgba(214,173,60,0.16),transparent_32%),linear-gradient(135deg,rgba(255,255,255,0.96),rgba(255,248,229,0.94))] px-4 py-4 shadow-[0_12px_38px_rgba(205,171,70,0.12)] sm:px-5 sm:py-6">
+        <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-awash-gold/50 to-transparent" />
+        <div className="relative mb-4 flex flex-col gap-3 lg:mb-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-start gap-3">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-awash-gold/95 to-awash-gold-light text-awash-blue shadow-[0_10px_24px_rgba(214,173,60,0.28)] ring-1 ring-white/70 sm:size-11">
+              <Trophy className="size-4 sm:size-[18px]" />
             </span>
-            <div>
-              <h2 className="font-display text-xl font-extrabold tracking-tight text-gradient-gold">Celebrate Our Recent Auction Winners</h2>
-              <p className="text-sm font-medium text-neutral-500">Congratulations to our winners!</p>
+            <div className="space-y-1.5 sm:space-y-1.5">
+              <div className="inline-flex items-center gap-2 rounded-full border border-primary/10 bg-white/75 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-awash-gold-dark/80 backdrop-blur-sm sm:px-3 sm:text-[11px] sm:tracking-[0.22em]">
+                <span className="size-1.5 rounded-full bg-awash-gold" />
+                Winner Spotlight
+              </div>
+              <div className="hidden sm:block">
+                <h2 className="font-display text-[1.72rem] font-extrabold leading-[1.02] tracking-tight text-awash-blue sm:text-[2rem]">Latest Winners</h2>
+                <p className="mt-1 max-w-xl text-[15px] font-medium leading-relaxed text-neutral-600 sm:text-[15px]">
+                  Winning bids from recently closed auctions.
+                </p>
+              </div>
             </div>
           </div>
-          <button onClick={() => go("closed-auctions")} className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-awash-gold to-awash-gold-light px-4 py-2 text-sm font-bold text-awash-blue shadow-lg shadow-primary/20 transition-all hover:shadow-primary/30 hover:scale-105 active:scale-[0.97]">
-            View All Winners <ArrowRight className="size-4" />
-          </button>
+          <div className="flex items-center justify-between gap-3 sm:flex-row sm:items-center lg:justify-end">
+            {closedAuctions.length > 0 && (
+              <div className="hidden items-center gap-2 rounded-full border border-awash-gold/25 bg-white/80 px-3 py-1.5 text-xs font-semibold text-awash-gold-dark shadow-sm shadow-primary/5 backdrop-blur-sm sm:inline-flex">
+                <span className="inline-flex size-6 items-center justify-center rounded-full bg-awash-gold/15 text-awash-gold-dark">
+                  <Trophy className="size-3" />
+                </span>
+                {closedAuctions.length} winners showcased
+              </div>
+            )}
+            <button onClick={() => go("closed-auctions")} className="inline-flex items-center justify-center gap-2 rounded-full bg-awash-blue px-4 py-2.5 text-sm font-bold text-white shadow-[0_10px_24px_rgba(0,43,92,0.16)] transition-all hover:-translate-y-0.5 hover:bg-awash-blue-dark hover:shadow-[0_16px_34px_rgba(0,43,92,0.22)] active:translate-y-0">
+              View All Winners <ArrowRight className="size-4" />
+            </button>
+          </div>
         </div>
-
-        {closedAuctions.length > 0 && (
-          <div className="mb-4 flex items-center gap-3 overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/10 via-awash-gold/15 to-primary/10 px-5 py-3.5">
-            <span className="flex size-9 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-awash-gold to-awash-gold-light shadow-lg shadow-primary/30 animate-float">
-              <Trophy className="size-4 text-awash-blue" />
-            </span>
-            <p className="font-display text-sm font-bold text-awash-gold-dark sm:text-base">
-              Congratulations to our latest winners!
-            </p>
-            <div className="ml-auto hidden items-center gap-1 sm:flex">
-              {[0, 1, 2, 3, 4].map((i) => (
-                <span key={i} className="size-1.5 rounded-full bg-awash-gold/60 animate-pulse" style={{ animationDelay: `${i * 0.15}s` }} />
-              ))}
-            </div>
-          </div>
-        )}
 
         <div className="relative">
           {closedAuctions.length > 2 && (
@@ -396,9 +399,6 @@ export function HomeScreen() {
           )}
         </div>
 
-        <button onClick={() => go("closed-auctions")} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary/5 to-awash-gold/5 backdrop-blur-sm border border-primary/20 px-5 py-3 text-sm font-bold text-awash-gold-dark transition-all hover:from-primary/10 hover:to-awash-gold/10 hover:scale-[1.01] active:scale-[0.97] shadow-sm">
-          <Trophy className="size-4" /> View All Winners <ArrowRight className="size-4" />
-        </button>
       </section>
 
       {/* ── Promo ── */}

@@ -16,7 +16,9 @@ function getAllowedWsOrigins(): string[] {
     .filter(Boolean);
 
   if (process.env.NODE_ENV === "production" && configuredOrigins.length === 0) {
-    throw new Error("CORS_ORIGINS must be configured in production for WebSocket access");
+    throw new Error(
+      "CORS_ORIGINS must be configured in production for WebSocket access",
+    );
   }
 
   if (configuredOrigins.length > 0) {

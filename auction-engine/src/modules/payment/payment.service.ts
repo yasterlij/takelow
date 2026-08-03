@@ -5,7 +5,7 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, LessThan, IsNull, Not } from "typeorm";
+import { Repository, LessThan, IsNull, Not, In } from "typeorm";
 import { Cron, CronExpression } from "@nestjs/schedule";
 import { InjectRedis } from "../common/redis.decorator";
 import { Redis } from "ioredis";
@@ -30,6 +30,7 @@ import { NotificationDispatchService } from "../worker/notification-dispatch.ser
 import { PaymentLinkService } from "./payment-link.service";
 
 const PAYMENT_DEADLINE_HOURS = 24;
+const WINNING_PAYMENT_TYPES = [PaymentType.WINNING_BID, PaymentType.WALLET];
 
 @Injectable()
 export class PaymentService {
@@ -296,7 +297,10 @@ export class PaymentService {
     auctionId: string,
     userId?: string,
   ): Promise<{ status: string; payment_url: string | null; gateway?: string }> {
-    const where: any = { auction_id: auctionId };
+    const where: any = {
+      auction_id: auctionId,
+      payment_type: In(WINNING_PAYMENT_TYPES),
+    };
     if (userId) where.user_id = userId;
 
     const transaction = await this.paymentTransactionRepository.findOne({
@@ -354,6 +358,48 @@ export class PaymentService {
     };
   }
 
+  async confirmWinningPayment(
+    auctionId: string,
+    userId: string,
+  ): Promise<void> {
+    const auction = await this.auctionRepository.findOne({
+      where: { id: auctionId },
+    });
+    if (!auction) throw new Error("Auction not found");
+    if (auction.winner_user_id !== userId) {
+      throw new Error("Only the winner can confirm payment");
+    }
+
+    const transaction = await this.paymentTransactionRepository.findOne({
+      where: {
+        auction_id: auctionId,
+        user_id: userId,
+        payment_type: In(WINNING_PAYMENT_TYPES),
+        status: PaymentTransactionStatus.SUCCESSFUL,
+      },
+      order: { created_at: "DESC" },
+    });
+    if (!transaction) {
+      throw new Error("Winning payment not yet confirmed");
+    }
+
+    if (auction.payment_status === PaymentStatus.PAID) {
+      return;
+    }
+
+    const winner = await this.winnerRepository.findOne({
+      where: {
+        auction_id: auctionId,
+        user_id: userId,
+      },
+    });
+    if (winner?.payment_status === WinnerPaymentStatus.PAID) {
+      return;
+    }
+
+    await this.markAsPaid(auctionId, userId);
+  }
+
   async markAsPaid(auctionId: string, userId?: string): Promise<void> {
     const auction = await this.auctionRepository.findOne({
       where: { id: auctionId },
@@ -390,6 +436,23 @@ export class PaymentService {
         );
         this.logger.log(`Auction ${auctionId}: All winners paid`);
       } else {
+        const nextWinner =
+          await this.winnerService.getNextUnpaidWinner(auctionId);
+        if (nextWinner) {
+          const nextDeadline = new Date(
+            Date.now() + PAYMENT_DEADLINE_HOURS * 60 * 60 * 1000,
+          );
+
+          auction.winner_user_id = nextWinner.user_id;
+          auction.winning_bid_amount = nextWinner.amount;
+          auction.payment_deadline = nextDeadline;
+          auction.last_payment_update = new Date();
+          nextWinner.payment_deadline = nextDeadline;
+
+          await this.winnerRepository.save(nextWinner);
+          await this.auctionRepository.save(auction);
+        }
+
         this.logger.log(
           `Auction ${auctionId}: Winner ${userId} paid, ${remainingUnpaid} remaining`,
         );
@@ -694,16 +757,13 @@ export class PaymentService {
       const productName = auction?.product?.name || auctionId;
       const deadline = auction?.payment_deadline?.toISOString();
 
-      await this.notificationDispatchService.dispatch(
-        "/api/v1/notify/winner",
-        {
-          user_id: userId,
-          auction_id: auctionId,
-          product_name: productName,
-          winning_amount: amount,
-          payment_deadline: deadline,
-        },
-      );
+      await this.notificationDispatchService.dispatch("/api/v1/notify/winner", {
+        user_id: userId,
+        auction_id: auctionId,
+        product_name: productName,
+        winning_amount: amount,
+        payment_deadline: deadline,
+      });
     } catch (e) {
       this.logger.warn(`Failed to notify new winner: ${e.message}`);
     }

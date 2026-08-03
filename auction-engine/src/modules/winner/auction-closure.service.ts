@@ -103,13 +103,13 @@ export class AuctionClosureService {
       this.logger.log(
         `Auction ${auction.id}: Only ${totalBids}/${auction.min_bid} bids, extended 24h`,
       );
-      this.closureEventsService.notifyExtension(
-        auction.id,
-        totalBids,
-        auction.min_bid,
-      ).catch((e) =>
-        this.logger.warn(`Failed to send extension notification: ${e.message}`),
-      );
+      this.closureEventsService
+        .notifyExtension(auction.id, totalBids, auction.min_bid)
+        .catch((e) =>
+          this.logger.warn(
+            `Failed to send extension notification: ${e.message}`,
+          ),
+        );
       return;
     }
 
@@ -121,9 +121,13 @@ export class AuctionClosureService {
       this.logger.log(
         `Auction ${auction.id}: No unique bids among ${totalBids} bids (extension #${auction.extensions}), extended 24h for fair play`,
       );
-      this.closureEventsService.notifyFairPlayExtension(auction.id).catch((e) =>
-        this.logger.warn(`Failed to send fair play notification: ${e.message}`),
-      );
+      this.closureEventsService
+        .notifyFairPlayExtension(auction.id)
+        .catch((e) =>
+          this.logger.warn(
+            `Failed to send fair play notification: ${e.message}`,
+          ),
+        );
       return;
     }
 
@@ -193,14 +197,18 @@ export class AuctionClosureService {
               `Amounts: [${winners.map((w) => w.amount).join(", ")}]`,
           );
 
-          this.closureEventsService.logClosureEvent(auction.id, "AUTO_CLOSE", winners).catch((e) =>
-            this.logger.warn(`Failed to log closure event: ${e.message}`),
-          );
-          this.closureEventsService.notifyWinners(auction, winners).catch((e) =>
-            this.logger.warn(
-              `Failed to send winner notifications: ${e.message}`,
-            ),
-          );
+          this.closureEventsService
+            .logClosureEvent(auction.id, "AUTO_CLOSE", winners)
+            .catch((e) =>
+              this.logger.warn(`Failed to log closure event: ${e.message}`),
+            );
+          this.closureEventsService
+            .notifyWinners(auction, winners)
+            .catch((e) =>
+              this.logger.warn(
+                `Failed to send winner notifications: ${e.message}`,
+              ),
+            );
         }
       } else {
         auction.status = AS.EXPIRED;
@@ -304,14 +312,20 @@ export class AuctionClosureService {
       `Auction ${auctionId}: Force closed by admin with no unique bids`,
     );
 
-    this.closureEventsService.notifyForcedClosure(auction.id).catch((e) =>
-      this.logger.warn(
-        `Failed to send forced closure notification: ${e.message}`,
-      ),
-    );
+    this.closureEventsService
+      .notifyForcedClosure(auction.id)
+      .catch((e) =>
+        this.logger.warn(
+          `Failed to send forced closure notification: ${e.message}`,
+        ),
+      );
 
     if (actorId) {
-      await this.closureEventsService.logClosureEvent(auctionId, "ADMIN_FORCE_CLOSE", []);
+      await this.closureEventsService.logClosureEvent(
+        auctionId,
+        "ADMIN_FORCE_CLOSE",
+        [],
+      );
     }
 
     return this.auctionRepository.findOne({
@@ -360,5 +374,4 @@ export class AuctionClosureService {
     );
     return null;
   }
-
 }

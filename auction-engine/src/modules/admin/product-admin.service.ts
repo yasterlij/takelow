@@ -99,12 +99,16 @@ export class ProductAdminService {
   async createProduct(dto: CreateProductDto) {
     const data = { ...dto };
     if (data.image_urls?.length) {
-      data.image_urls = await this.imageService.processImageUrls(data.image_urls);
+      data.image_urls = await this.imageService.processImageUrls(
+        data.image_urls,
+      );
     }
     data.category = normalizeProductCategory(data.category, data.name);
     data.specs = this.normalizeSpecs(data.specs) ?? undefined;
     try {
-      return await this.productRepository.save(this.productRepository.create(data));
+      return await this.productRepository.save(
+        this.productRepository.create(data),
+      );
     } catch (error) {
       if (!this.isMissingColumnError(error)) throw error;
       const rows = await this.productRepository.query(
@@ -142,10 +146,15 @@ export class ProductAdminService {
     if (!product) throw new NotFoundException("Product not found");
     const data = { ...dto };
     if (data.image_urls?.length) {
-      data.image_urls = await this.imageService.processImageUrls(data.image_urls);
+      data.image_urls = await this.imageService.processImageUrls(
+        data.image_urls,
+      );
     }
     if (data.category !== undefined) {
-      data.category = normalizeProductCategory(data.category, data.name ?? product.name);
+      data.category = normalizeProductCategory(
+        data.category,
+        data.name ?? product.name,
+      );
     }
     if (data.specs !== undefined) {
       data.specs = this.normalizeSpecs(data.specs) ?? undefined;
@@ -190,10 +199,14 @@ export class ProductAdminService {
     if (!product.image_urls?.length) {
       return { downloaded: 0, message: "No images to download" };
     }
-    const localUrls = await this.imageService.processImageUrls(product.image_urls);
+    const localUrls = await this.imageService.processImageUrls(
+      product.image_urls,
+    );
     product.image_urls = localUrls;
     await this.productRepository.save(product);
-    const downloaded = localUrls.filter((u) => u.startsWith("/uploads/")).length;
+    const downloaded = localUrls.filter((u) =>
+      u.startsWith("/uploads/"),
+    ).length;
     return { downloaded, total: product.image_urls.length };
   }
 
@@ -202,7 +215,9 @@ export class ProductAdminService {
     let total = 0;
     for (const product of products) {
       if (!product.image_urls?.length) continue;
-      const localUrls = await this.imageService.processImageUrls(product.image_urls);
+      const localUrls = await this.imageService.processImageUrls(
+        product.image_urls,
+      );
       product.image_urls = localUrls;
       await this.productRepository.save(product);
       total += localUrls.filter((u) => u.startsWith("/uploads/")).length;
@@ -211,7 +226,9 @@ export class ProductAdminService {
   }
 
   async bulkDeleteProducts(ids: string[]) {
-    const products = await this.productRepository.find({ where: { id: In(ids) } });
+    const products = await this.productRepository.find({
+      where: { id: In(ids) },
+    });
     await this.productRepository.remove(products);
     return { deleted: products.length };
   }
@@ -230,7 +247,8 @@ export class ProductAdminService {
       const fallback = await this.listProductsFallback(1, 100000, search);
       products = fallback.data;
     }
-    const header = "id,name,description,category,current_market_price,specs,created_at";
+    const header =
+      "id,name,description,category,current_market_price,specs,created_at";
     const rows = products.map((p) =>
       [
         p.id,

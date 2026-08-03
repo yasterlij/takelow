@@ -44,7 +44,11 @@ export class AuctionManageController {
     @Query("limit") limit = "20",
     @Query("search") search?: string,
   ) {
-    return this.productService.listProducts(parseInt(page), parseInt(limit), search);
+    return this.productService.listProducts(
+      parseInt(page),
+      parseInt(limit),
+      search,
+    );
   }
 
   @Get("products/export/csv")
@@ -96,7 +100,11 @@ export class AuctionManageController {
     @Query("limit") limit = "20",
     @Query("status") status?: AuctionStatus,
   ) {
-    return this.auctionService.listAuctions(parseInt(page), parseInt(limit), status);
+    return this.auctionService.listAuctions(
+      parseInt(page),
+      parseInt(limit),
+      status,
+    );
   }
 
   @Get("auctions/export/csv")

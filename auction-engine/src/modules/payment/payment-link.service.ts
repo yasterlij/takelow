@@ -12,6 +12,9 @@ import {
   PaymentType,
 } from "./entities/payment-transaction.entity";
 import { BidEncryptionService } from "../common/bid-encryption.service";
+import { In } from "typeorm";
+
+const WINNING_PAYMENT_TYPES = [PaymentType.WINNING_BID, PaymentType.WALLET];
 
 @Injectable()
 export class PaymentLinkService {
@@ -116,6 +119,7 @@ export class PaymentLinkService {
       where: {
         auction_id: auctionId,
         user_id: userId,
+        payment_type: PaymentType.WINNING_BID,
         status: PaymentTransactionStatus.PENDING,
       },
     });
@@ -191,7 +195,11 @@ export class PaymentLinkService {
     userId: string,
   ): Promise<PaymentTransaction | null> {
     return this.paymentTransactionRepository.findOne({
-      where: { auction_id: auctionId, user_id: userId },
+      where: {
+        auction_id: auctionId,
+        user_id: userId,
+        payment_type: In(WINNING_PAYMENT_TYPES),
+      },
       order: { created_at: "DESC" },
     });
   }

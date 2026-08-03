@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { api } from "../api"
+import { api, getUserFriendlyMessage } from "../api"
 
 export function useFavoriteAuctions({
   hydrated,
@@ -51,7 +51,7 @@ export function useFavoriteAuctions({
       else await api.addFavorite(auctionId)
     } catch (e: any) {
       setFavoriteAuctionIds((prev) => currentlyFavorite ? [...prev, auctionId] : prev.filter((id) => id !== auctionId))
-      onErrorRef.current?.(e?.message || "Failed to update favorites")
+      onErrorRef.current?.(getUserFriendlyMessage(e))
     }
   }, [favoriteAuctionIds, userId])
 

@@ -85,7 +85,7 @@ export class PaymentController {
   @Post(":auctionId/confirm")
   async confirmPayment(@Param("auctionId") auctionId: string, @Req() req: any) {
     try {
-      await this.paymentService.markAsPaid(auctionId);
+      await this.paymentService.confirmWinningPayment(auctionId, req.user.id);
       return { paid: true };
     } catch (e) {
       if (e.message?.includes("not found"))

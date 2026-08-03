@@ -45,8 +45,8 @@ export class AuctionNotificationService {
         await this.notificationDispatchService.dispatch(
           "/api/v1/notify/auction-started",
           {
-              auction_id: auction.id,
-              product_name: productName,
+            auction_id: auction.id,
+            product_name: productName,
           },
         );
 
