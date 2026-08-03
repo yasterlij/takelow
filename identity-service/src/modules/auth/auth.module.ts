@@ -4,7 +4,9 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
 import { AuthController } from './auth.controller';
+import { AuthAuditService } from './auth-audit.service';
 import { AuthService } from './auth.service';
+import { AuthTokenService } from './auth-token.service';
 import { User } from './entities/user.entity';
 import { LocalStrategy } from './strategies/local.strategy';
 import { TeleBirrStrategy } from './strategies/telebirr.strategy';
@@ -27,12 +29,14 @@ import { SuperAppRegistry } from './adapters/super-app-registry';
   controllers: [AuthController],
   providers: [
     AuthService,
+    AuthTokenService,
+    AuthAuditService,
     LocalStrategy,
     TeleBirrStrategy,
     BankingStrategy,
     JwtStrategy,
     SuperAppRegistry,
   ],
-  exports: [SuperAppRegistry],
+  exports: [SuperAppRegistry, AuthTokenService, AuthAuditService],
 })
 export class AuthModule {}

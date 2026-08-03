@@ -16,11 +16,20 @@ import { AuthGuard } from '@nestjs/passport';
 import { InternalAuthGuard } from '../common/internal-auth.guard';
 import { AuthOrInternalGuard } from '../common/auth-or-internal.guard';
 import { WalletService } from './wallet.service';
+import { WalletPinService } from './wallet-pin.service';
 import { WebhookSignatureGuard } from './webhook.guard';
+import { DepositDto } from './dto/deposit.dto';
+import { DeductFeeDto } from './dto/deduct-fee.dto';
+import { FintechWebhookDto } from './dto/fintech-webhook.dto';
+import { SetPinDto } from './dto/set-pin.dto';
+import { VerifyPinDto } from './dto/verify-pin.dto';
 
 @Controller('wallet')
 export class WalletController {
-  constructor(private walletService: WalletService) {}
+  constructor(
+    private walletService: WalletService,
+    private walletPinService: WalletPinService,
+  ) {}
 
   @UseGuards(AuthGuard('jwt'))
   @Get('balance')
@@ -46,17 +55,14 @@ export class WalletController {
   @UseGuards(AuthGuard('jwt'))
   @Post('deposit')
   @HttpCode(200)
-  async deposit(@Req() req: any, @Body('amount') amount: number) {
-    if (!amount || amount <= 0) {
-      throw new BadRequestException('Amount must be positive');
-    }
-    const user = await this.walletService.deposit(req.user.id, amount, `deposit_${Date.now()}`);
+  async deposit(@Req() req: any, @Body() dto: DepositDto) {
+    const user = await this.walletService.deposit(req.user.id, dto.amount, `deposit_${Date.now()}`);
     return { balance: Number(user.wallet_balance) };
   }
 
   @UseGuards(WebhookSignatureGuard)
   @Post('webhook/fintech')
-  async handleFintechWebhook(@Body() payload: any) {
+  async handleFintechWebhook(@Body() payload: FintechWebhookDto) {
     await this.walletService.handleFintechWebhook(payload);
     return { received: true };
   }
@@ -64,38 +70,37 @@ export class WalletController {
   @UseGuards(AuthGuard('jwt'))
   @Post('set-pin')
   @HttpCode(200)
-  async setPin(@Req() req: any, @Body('pin') pin: string) {
-    if (!pin) throw new BadRequestException('PIN is required');
-    await this.walletService.setPin(req.user.id, pin);
+  async setPin(@Req() req: any, @Body() dto: SetPinDto) {
+    await this.walletPinService.setPin(req.user.id, dto.pin);
     return { set: true };
   }
 
   @UseGuards(AuthGuard('jwt'))
   @Post('verify-pin')
   @HttpCode(200)
-  async verifyPin(@Req() req: any, @Body('pin') pin: string) {
-    if (!pin) throw new BadRequestException('PIN is required');
-    const result = await this.walletService.verifyPin(req.user.id, pin);
+  async verifyPin(@Req() req: any, @Body() dto: VerifyPinDto) {
+    const result = await this.walletPinService.verifyPin(req.user.id, dto.pin);
     return result;
   }
 
   @UseGuards(AuthGuard('jwt'))
   @Get('has-pin')
   async hasPin(@Req() req: any) {
-    const hasPin = await this.walletService.hasPin(req.user.id);
+    const hasPin = await this.walletPinService.hasPin(req.user.id);
     return { hasPin };
   }
 
   @UseGuards(AuthGuard('jwt'))
   @Get('pin-status')
   async getPinStatus(@Req() req: any) {
-    return this.walletService.getPinStatus(req.user.id);
+    return this.walletPinService.getPinStatus(req.user.id);
   }
 
   @UseGuards(AuthOrInternalGuard)
   @Post('deduct-fee')
   @HttpCode(200)
-  async deductFee(@Req() req: any, @Body('user_id') userId: string, @Body('amount') amount: number) {
+  async deductFee(@Req() req: any, @Body() dto: DeductFeeDto) {
+    const { user_id: userId, amount } = dto;
     if (!userId || !amount || amount <= 0) {
       throw new BadRequestException('Invalid user_id or amount');
     }

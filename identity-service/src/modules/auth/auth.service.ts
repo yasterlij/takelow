@@ -2,26 +2,24 @@ import {
   Injectable,
   BadRequestException,
   ConflictException,
-  Inject,
-  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
-import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
 import { User, AuthProvider } from './entities/user.entity';
 import { RegisterDto } from './dto/register.dto';
 import { SuperAppRegistry } from './adapters/super-app-registry';
+import { AuthTokenService } from './auth-token.service';
+import { AuthAuditService } from './auth-audit.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     @InjectRepository(User)
     private userRepository: Repository<User>,
-    private jwtService: JwtService,
     private superAppRegistry: SuperAppRegistry,
-    private configService: ConfigService,
+    private authTokenService: AuthTokenService,
+    private authAuditService: AuthAuditService,
   ) {}
 
   async register(dto: RegisterDto): Promise<{ user: User; access_token: string; refresh_token: string }> {
@@ -49,7 +47,7 @@ export class AuthService {
     }
 
     const saved = await this.userRepository.save(user);
-    const tokens = await this.generateTokens(saved);
+    const tokens = await this.authTokenService.generateTokens(saved);
 
     saved.hashed_refresh_token = await bcrypt.hash(tokens.refresh_token, 12);
     await this.userRepository.save(saved);
@@ -135,7 +133,7 @@ export class AuthService {
   }
 
   async login(user: User): Promise<{ access_token: string; refresh_token: string; user: { id: string; role: string; phone_number: string } }> {
-    const tokens = await this.generateTokens(user);
+    const tokens = await this.authTokenService.generateTokens(user);
     user.hashed_refresh_token = await bcrypt.hash(tokens.refresh_token, 12);
     await this.userRepository.save(user);
     return {
@@ -147,9 +145,7 @@ export class AuthService {
   async refreshToken(refreshToken: string): Promise<{ access_token: string; refresh_token: string; user: { id: string; role: string; phone_number: string } }> {
     let payload: any;
     try {
-      payload = this.jwtService.verify(refreshToken, {
-        secret: this.configService.get<string>('app.jwtRefreshSecret'),
-      });
+      payload = this.authTokenService.verifyRefreshToken(refreshToken);
     } catch {
       throw new BadRequestException('Invalid refresh token');
     }
@@ -164,7 +160,7 @@ export class AuthService {
       throw new BadRequestException('Refresh token mismatch');
     }
 
-    const tokens = await this.generateTokens(user);
+    const tokens = await this.authTokenService.generateTokens(user);
     user.hashed_refresh_token = await bcrypt.hash(tokens.refresh_token, 12);
     await this.userRepository.save(user);
 
@@ -173,8 +169,6 @@ export class AuthService {
       user: { id: user.id, role: user.role, phone_number: user.phone_number },
     };
   }
-
-  private readonly logger = new Logger(AuthService.name);
 
   async getProfile(userId: string) {
     return this.userRepository.findOne({
@@ -207,28 +201,7 @@ export class AuthService {
   }
 
   async logFailedLogin(identifier: string, actorId: string, reason: string): Promise<void> {
-    this.logger.warn(`Failed login attempt for ${identifier}, reason: ${reason}`);
-    try {
-      const internalApiKey = this.configService.get<string>('app.internalApiKey');
-      if (!internalApiKey) return;
-      await fetch('http://localhost:3000/api/v1/admin/audit/log', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-internal-api-key': internalApiKey,
-        },
-        body: JSON.stringify({
-          actor_id: actorId,
-          actor_phone: identifier,
-          action: 'LOGIN_FAILED',
-          entity_type: 'user',
-          entity_id: actorId,
-          details: { reason, timestamp: new Date().toISOString() },
-        }),
-      });
-    } catch (e) {
-      this.logger.warn(`Failed to log login attempt: ${e.message}`);
-    }
+    await this.authAuditService.logFailedLogin(identifier, actorId, reason);
   }
 
   async registerPushToken(
@@ -239,23 +212,5 @@ export class AuthService {
     const updateField =
       platform === 'android' ? { fcm_token: token } : { apns_token: token };
     await this.userRepository.update(userId, updateField);
-  }
-
-  private async generateTokens(
-    user: User,
-  ): Promise<{ access_token: string; refresh_token: string }> {
-    const payload = { sub: user.id, phone: user.phone_number, role: user.role, wallet_balance: user.wallet_balance };
-
-    const access_token = this.jwtService.sign(payload, {
-      secret: this.configService.get<string>('app.jwtSecret'),
-      expiresIn: '15m',
-    });
-
-    const refresh_token = this.jwtService.sign(payload, {
-      secret: this.configService.get<string>('app.jwtRefreshSecret'),
-      expiresIn: '7d',
-    });
-
-    return { access_token, refresh_token };
   }
 }

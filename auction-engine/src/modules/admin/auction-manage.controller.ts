@@ -14,7 +14,9 @@ import {
   Res,
 } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
-import { AuctionManageService } from "./auction-manage.service";
+import { AuctionAdminService } from "./auction-admin.service";
+import { AuctionReviewService } from "./auction-review.service";
+import { ProductAdminService } from "./product-admin.service";
 import {
   CreateProductDto,
   UpdateProductDto,
@@ -30,7 +32,11 @@ import { Response } from "express";
 @UseGuards(AuthGuard("jwt"), RolesGuard)
 @Roles("admin")
 export class AuctionManageController {
-  constructor(private service: AuctionManageService) {}
+  constructor(
+    private reviewService: AuctionReviewService,
+    private auctionService: AuctionAdminService,
+    private productService: ProductAdminService,
+  ) {}
 
   @Get("products")
   async listProducts(
@@ -38,7 +44,7 @@ export class AuctionManageController {
     @Query("limit") limit = "20",
     @Query("search") search?: string,
   ) {
-    return this.service.listProducts(parseInt(page), parseInt(limit), search);
+    return this.productService.listProducts(parseInt(page), parseInt(limit), search);
   }
 
   @Get("products/export/csv")
@@ -46,7 +52,7 @@ export class AuctionManageController {
     @Query("search") search: string,
     @Res() res: Response,
   ) {
-    const csv = await this.service.exportProductsCsv(search);
+    const csv = await this.productService.exportProductsCsv(search);
     res.setHeader("Content-Type", "text/csv");
     res.setHeader("Content-Disposition", "attachment; filename=products.csv");
     res.send(csv);
@@ -55,33 +61,33 @@ export class AuctionManageController {
   @Post("products")
   @UsePipes(new ValidationPipe({ transform: true }))
   async createProduct(@Body() dto: CreateProductDto) {
-    return this.service.createProduct(dto);
+    return this.productService.createProduct(dto);
   }
 
   @Patch("products/:id")
   @UsePipes(new ValidationPipe({ transform: true }))
   async updateProduct(@Param("id") id: string, @Body() dto: UpdateProductDto) {
-    return this.service.updateProduct(id, dto);
+    return this.productService.updateProduct(id, dto);
   }
 
   @Post("products/:id/download-images")
   async downloadProductImages(@Param("id") id: string) {
-    return this.service.downloadProductImages(id);
+    return this.productService.downloadProductImages(id);
   }
 
   @Post("products/download-all-images")
   async downloadAllProductImages() {
-    return this.service.downloadAllProductImages();
+    return this.productService.downloadAllProductImages();
   }
 
   @Delete("products/:id")
   async deleteProduct(@Param("id") id: string) {
-    return this.service.deleteProduct(id);
+    return this.productService.deleteProduct(id);
   }
 
   @Post("products/bulk-delete")
   async bulkDeleteProducts(@Body() body: { ids: string[] }) {
-    return this.service.bulkDeleteProducts(body.ids);
+    return this.productService.bulkDeleteProducts(body.ids);
   }
 
   @Get("auctions")
@@ -90,7 +96,7 @@ export class AuctionManageController {
     @Query("limit") limit = "20",
     @Query("status") status?: AuctionStatus,
   ) {
-    return this.service.listAuctions(parseInt(page), parseInt(limit), status);
+    return this.auctionService.listAuctions(parseInt(page), parseInt(limit), status);
   }
 
   @Get("auctions/export/csv")
@@ -98,7 +104,7 @@ export class AuctionManageController {
     @Query("status") status: AuctionStatus,
     @Res() res: Response,
   ) {
-    const csv = await this.service.exportAuctionsCsv(status);
+    const csv = await this.auctionService.exportAuctionsCsv(status);
     res.setHeader("Content-Type", "text/csv");
     res.setHeader("Content-Disposition", "attachment; filename=auctions.csv");
     res.send(csv);
@@ -107,42 +113,42 @@ export class AuctionManageController {
   @Post("auctions")
   @UsePipes(new ValidationPipe({ transform: true }))
   async createAuction(@Body() dto: CreateAuctionDto) {
-    return this.service.createAuction(dto);
+    return this.auctionService.createAuction(dto);
   }
 
   @Patch("auctions/:id")
   @UsePipes(new ValidationPipe({ transform: true }))
   async updateAuction(@Param("id") id: string, @Body() dto: UpdateAuctionDto) {
-    return this.service.updateAuction(id, dto);
+    return this.auctionService.updateAuction(id, dto);
   }
 
   @Delete("auctions/:id")
   async deleteAuction(@Param("id") id: string) {
-    return this.service.deleteAuction(id);
+    return this.auctionService.deleteAuction(id);
   }
 
   @Post("auctions/bulk-delete")
   async bulkDeleteAuctions(@Body() body: { ids: string[] }) {
-    return this.service.bulkDeleteAuctions(body.ids);
+    return this.auctionService.bulkDeleteAuctions(body.ids);
   }
 
   @Post("auctions/:id/close")
   async closeAuction(@Param("id") id: string, @Req() req: any) {
-    return this.service.closeAuctionEarly(id, req.user?.id);
+    return this.auctionService.closeAuctionEarly(id, req.user?.id);
   }
 
   @Post("auctions/:id/force-close")
   async forceCloseAuction(@Param("id") id: string, @Req() req: any) {
-    return this.service.forceCloseAuction(id, req.user?.id);
+    return this.auctionService.forceCloseAuction(id, req.user?.id);
   }
 
   @Get("auctions/:id/winner")
   async drawWinner(@Param("id") id: string) {
-    return this.service.drawWinner(id);
+    return this.reviewService.drawWinner(id);
   }
 
   @Get("auctions/:id/bids")
   async getAuctionBids(@Param("id") id: string) {
-    return this.service.getAuctionBids(id);
+    return this.reviewService.getAuctionBids(id);
   }
 }

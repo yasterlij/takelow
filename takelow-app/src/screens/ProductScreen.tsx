@@ -39,6 +39,9 @@ import {
 } from "../mockDataV0";
 import { colors, spacing, borderRadius, fontSize } from "../theme";
 import { api } from "../api";
+import { ProductHeroSection } from "../components/ProductHeroSection";
+import { ProductPurchasePanel } from "../components/ProductPurchasePanel";
+import { useProductBidPayment } from "../hooks/useProductBidPayment";
 
 const { width } = Dimensions.get("window");
 
@@ -107,41 +110,55 @@ export function ProductScreen() {
   const [lightboxVisible, setLightboxVisible] = useState(false);
   const [lightboxIdx, setLightboxIdx] = useState(0);
   const [showSpecs, setShowSpecs] = useState(false);
-  const [loadingMethod, setLoadingMethod] = useState<
-    "SIKINAPAY" | "AWASH" | null
-  >(null);
-  const [showPaymentMethods, setShowPaymentMethods] = useState(false);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<
-    "SIKINAPAY" | "AWASH"
-  >("AWASH");
-  const [checkingPin, setCheckingPin] = useState(false);
-  const [showPinModal, setShowPinModal] = useState(false);
-  const [pinInput, setPinInput] = useState("");
-  const [pinError, setPinError] = useState<string | null>(null);
-  const [attemptsRemaining, setAttemptsRemaining] = useState<number | null>(
-    null,
-  );
-  const [pinLocked, setPinLocked] = useState(false);
-  const [pinLockedUntil, setPinLockedUntil] = useState<string | null>(null);
-  const [lockCountdown, setLockCountdown] = useState("");
-  const [pinLoading, setPinLoading] = useState(false);
-  const [needsPinSetup, setNeedsPinSetup] = useState(false);
-  const [setupPin, setSetupPin] = useState("");
-  const [setupConfirm, setSetupConfirm] = useState("");
-  const [setupError, setSetupError] = useState<string | null>(null);
-  const [setupLoading, setSetupLoading] = useState(false);
-  const [bidAmount, setBidAmount] = useState(
-    pendingBidAmount != null ? pendingBidAmount.toFixed(2) : "",
-  );
-  const [bidError, setBidError] = useState<string | null>(null);
-  const [bidFlash, setBidFlash] = useState(false);
   const [serverBidAmounts, setServerBidAmounts] = useState<number[]>([]);
+
+  const {
+    loadingMethod,
+    showPaymentMethods,
+    setShowPaymentMethods,
+    selectedPaymentMethod,
+    setSelectedPaymentMethod,
+    checkingPin,
+    showPinModal,
+    setShowPinModal,
+    pinInput,
+    setPinInput,
+    pinError,
+    setPinError,
+    attemptsRemaining,
+    pinLocked,
+    lockCountdown,
+    pinLoading,
+    needsPinSetup,
+    setupPin,
+    setSetupPin,
+    setupConfirm,
+    setSetupConfirm,
+    setupError,
+    setSetupError,
+    setupLoading,
+    bidAmount,
+    setBidAmount,
+    bidError,
+    setBidError,
+    bidFlash,
+    numericBid,
+    hasValidBid,
+    updateBid,
+    adjustBid,
+    handlePayment,
+    handleVerifyPin,
+    handleSetupPin,
+  } = useProductBidPayment({
+    bidFee: auction?.bidFee ?? 1,
+    pendingBidAmount,
+    payFee,
+    setPaymentMethod,
+    setPendingBidAmount,
+  })
 
   if (!auction) return null;
 
-  const STEP = 0.01;
-  const numericBid = bidAmount ? Number(bidAmount) : 0;
-  const hasValidBid = numericBid >= 1 && /^\d+(\.\d{1,2})?$/.test(bidAmount);
   const isDuplicate =
     numericBid > 0 &&
     (myBids.some(
@@ -177,57 +194,6 @@ export function ProductScreen() {
   }, [selectedId]);
 
   useEffect(() => {
-    if (showPinModal) {
-      setPinInput("");
-      setPinError(null);
-    }
-  }, [showPinModal]);
-
-  useEffect(() => {
-    const nextBid = pendingBidAmount != null ? pendingBidAmount.toFixed(2) : "";
-    setBidAmount((current) => (current === nextBid ? current : nextBid));
-  }, [pendingBidAmount]);
-
-  useEffect(() => {
-    if (!pinLocked || !pinLockedUntil) {
-      setLockCountdown("");
-      return;
-    }
-    const update = () => {
-      const ms = new Date(pinLockedUntil).getTime() - Date.now();
-      if (ms <= 0) {
-        setLockCountdown("");
-        setPinLocked(false);
-        setPinLockedUntil(null);
-        setAttemptsRemaining(5);
-        return;
-      }
-      const totalSec = Math.ceil(ms / 1000);
-      const h = Math.floor(totalSec / 3600);
-      const m = Math.floor((totalSec % 3600) / 60);
-      const s = totalSec % 60;
-      if (h > 0) {
-        setLockCountdown(
-          `${h}h ${m.toString().padStart(2, "0")}m ${s.toString().padStart(2, "0")}s`,
-        );
-      } else {
-        setLockCountdown(
-          `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}s`,
-        );
-      }
-    };
-    update();
-    const id = setInterval(update, 1000);
-    return () => clearInterval(id);
-  }, [pinLocked, pinLockedUntil]);
-
-  useEffect(() => {
-    if (!bidFlash) return;
-    const id = setTimeout(() => setBidFlash(false), 240);
-    return () => clearTimeout(id);
-  }, [bidFlash]);
-
-  useEffect(() => {
     if (!isDuplicate) return;
     Alert.alert(
       "Duplicate Bid",
@@ -235,156 +201,6 @@ export function ProductScreen() {
       [{ text: "Change Bid Amount" }],
     );
   }, [isDuplicate, numericBid]);
-
-  const updateBid = useCallback(
-    (next: number) => {
-      const safe = Math.max(1, Number(next.toFixed(2)));
-      setBidAmount(safe.toFixed(2));
-      setBidError(null);
-      setPendingBidAmount(safe);
-      setBidFlash(true);
-    },
-    [setPendingBidAmount],
-  );
-
-  const adjustBid = useCallback(
-    (delta: number) => {
-      updateBid((bidAmount ? Number(bidAmount) : 1) + delta);
-    },
-    [bidAmount, updateBid],
-  );
-
-  const handlePayment = useCallback(
-    async (method: "SIKINAPAY" | "AWASH") => {
-      if (!hasValidBid) {
-        setBidError("Enter a valid bid amount to continue");
-        return;
-      }
-
-      if (isDuplicate) {
-        Alert.alert(
-          "Duplicate Bid",
-          `You've already placed a bid of ${formatCurrency(numericBid)} on this auction. Please enter a different bid amount.`,
-          [{ text: "Change Bid Amount" }],
-        );
-        return;
-      }
-
-      setPendingBidAmount(numericBid);
-      setPaymentMethod(method);
-
-      if (method === "SIKINAPAY") {
-        setLoadingMethod(method);
-        try {
-          await Promise.resolve(payFee(auction.bidFee, method));
-        } finally {
-          setLoadingMethod(null);
-        }
-        return;
-      }
-
-      setCheckingPin(true);
-      try {
-        const status = await api.wallet.pinStatus();
-        setPinLocked(status.locked);
-        setPinLockedUntil(status.lockedUntil);
-        setAttemptsRemaining(status.locked ? 0 : status.attemptsRemaining);
-        setNeedsPinSetup(!status.hasPin);
-        setShowPinModal(true);
-      } catch (err: any) {
-        setPinError(err?.message || "Failed to check wallet PIN status");
-        setNeedsPinSetup(false);
-        setPinLocked(false);
-        setShowPinModal(true);
-      } finally {
-        setCheckingPin(false);
-      }
-    },
-    [
-      auction.bidFee,
-      hasValidBid,
-      isDuplicate,
-      numericBid,
-      payFee,
-      setPaymentMethod,
-      setPendingBidAmount,
-    ],
-  );
-
-  const handleVerifyPin = useCallback(async () => {
-    if (!pinInput) {
-      setPinError("Please enter your wallet PIN");
-      return;
-    }
-    if (pinLocked) return;
-    setPinLoading(true);
-    setPinError(null);
-    try {
-      const res = await api.wallet.verifyPin(pinInput);
-      if (res.valid) {
-        setShowPinModal(false);
-        setLoadingMethod("AWASH");
-        try {
-          await Promise.resolve(payFee(auction.bidFee, "AWASH"));
-        } finally {
-          setLoadingMethod(null);
-        }
-      } else if (res.locked) {
-        setPinLocked(true);
-        setPinLockedUntil(res.lockedUntil);
-        setAttemptsRemaining(0);
-        setPinError(
-          "Too many incorrect attempts. Your wallet PIN has been locked for 5 minutes.",
-        );
-      } else {
-        setAttemptsRemaining(res.attemptsRemaining);
-        if (res.attemptsRemaining <= 2) {
-          setPinError(
-            `Invalid PIN — ${res.attemptsRemaining} attempt${res.attemptsRemaining !== 1 ? "s" : ""} remaining before lockout`,
-          );
-        } else {
-          setPinError("Invalid wallet PIN");
-        }
-      }
-    } catch (err: any) {
-      setPinError(err?.message || "Unable to verify PIN. Please try again.");
-    } finally {
-      setPinLoading(false);
-    }
-  }, [auction.bidFee, payFee, pinInput, pinLocked]);
-
-  const handleSetupPin = useCallback(async () => {
-    if (
-      !setupPin ||
-      setupPin.length < 4 ||
-      setupPin.length > 6 ||
-      !/^\d+$/.test(setupPin)
-    ) {
-      setSetupError("PIN must be 4–6 digits");
-      return;
-    }
-    if (setupPin !== setupConfirm) {
-      setSetupError("PINs do not match");
-      return;
-    }
-    setSetupLoading(true);
-    setSetupError(null);
-    try {
-      await api.wallet.setPin(setupPin);
-      setShowPinModal(false);
-      setNeedsPinSetup(false);
-      setLoadingMethod("AWASH");
-      try {
-        await Promise.resolve(payFee(auction.bidFee, "AWASH"));
-      } finally {
-        setLoadingMethod(null);
-      }
-    } catch {
-      setSetupError("Failed to set wallet PIN. Please try again.");
-    } finally {
-      setSetupLoading(false);
-    }
-  }, [auction.bidFee, payFee, setupConfirm, setupPin]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -423,710 +239,68 @@ export function ProductScreen() {
           gap: 16,
         }}
       >
-        <Card style={s.heroCard}>
-          {/* ── Image Gallery ── */}
-          {images.length > 0 ? (
-            <ImageCarousel
-              images={images}
-              alt={auction.name}
-              containerWidth={width - 32}
-              autoPlayInterval={4000}
-              showThumbnails
-              onImagePress={(i) => {
-                setLightboxIdx(i);
-                setLightboxVisible(true);
-              }}
-              overlay={
-                <View style={s.badges}>
-                  <Badge tone="green">
-                    <View
-                      style={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: 3,
-                        backgroundColor: colors.emerald500,
-                      }}
-                    />{" "}
-                    Live
-                  </Badge>
-                  {savings > 0 && (
-                    <View style={s.savingsPill}>
-                      <Zap size={12} color="#fff" />
-                      <Text
-                        style={{
-                          fontSize: 10,
-                          fontWeight: "700",
-                          color: "#fff",
-                        }}
-                      >
-                        {savings}% off
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              }
-            />
-          ) : (
-            <View style={s.imageArea}>
-              <View
-                style={{
-                  flex: 1,
-                  justifyContent: "center",
-                  alignItems: "center",
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 14,
-                    fontWeight: "500",
-                    color: colors.mutedForeground,
-                  }}
-                >
-                  No images available
-                </Text>
-              </View>
-            </View>
-          )}
-          <View style={s.heroBody}>
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                alignItems: "flex-start",
-                gap: 12,
-              }}
-            >
-              <View style={{ flex: 1 }}>
-                <Badge tone="navy">{auction.category}</Badge>
-                <Text style={s.name}>{auction.name}</Text>
-                {!!specSummary && (
-                  <Text style={s.specSummary}>{specSummary}</Text>
-                )}
-              </View>
-              {savings > 0 && (
-                <View style={s.savingsBadge}>
-                  <Text
-                    style={{
-                      fontSize: 11,
-                      fontWeight: "700",
-                      color: colors.emerald700,
-                    }}
-                  >
-                    {savings}% off
-                  </Text>
-                </View>
-              )}
-            </View>
-          </View>
-        </Card>
+        <ProductHeroSection
+          auction={auction}
+          images={images}
+          savings={savings}
+          specSummary={specSummary}
+          seconds={seconds}
+          isEnding={isEnding}
+          isOver={isOver}
+          auctionCode={auctionCode}
+          specEntries={specEntries}
+          showSpecs={showSpecs}
+          onToggleSpecs={() => setShowSpecs((value) => !value)}
+          onImagePress={(index) => {
+            setLightboxIdx(index)
+            setLightboxVisible(true)
+          }}
+        />
+
+        <ProductPurchasePanel
+          bidValue={bidAmount}
+          bidFlash={bidFlash}
+          bidError={bidError}
+          onBidChange={(value) => {
+            const clean = value
+              .replace(/[^\d.]/g, "")
+              .replace(/(\..*)\./g, "$1")
+              .replace(/(\.\d{2})\d+/g, "$1")
+              .slice(0, 13)
+            if (clean && Number(clean) < 1) return
+            setBidAmount(clean)
+            setBidError(null)
+          }}
+          onBidBlur={() => {
+            if (!bidAmount) return
+            const normalized = Number(bidAmount)
+            if (normalized < 1) {
+              setBidError("Minimum bid is 1.00")
+              updateBid(1)
+              return
+            }
+            updateBid(normalized)
+          }}
+          onDecrease={() => adjustBid(-0.01)}
+          onIncrease={() => adjustBid(0.01)}
+          selectedPaymentMethod={selectedPaymentMethod}
+          showPaymentMethods={showPaymentMethods}
+          onTogglePaymentMethods={() => setShowPaymentMethods((value) => !value)}
+          onSelectPaymentMethod={(method) => {
+            setSelectedPaymentMethod(method)
+            setShowPaymentMethods(false)
+          }}
+          loadingMethod={loadingMethod}
+          checkingPin={checkingPin}
+          walletBalance={walletBalance}
+          bidFee={auction.bidFee}
+          hasValidBid={hasValidBid}
+          authError={authError}
+          isEnding={isEnding}
+          onSubmit={(method) => handlePayment(method, isDuplicate)}
+        />
 
         <View style={{ paddingHorizontal: 4 }}>
-          <Card
-            style={{
-              padding: 16,
-              borderWidth: 0,
-              backgroundColor: colors.navy,
-            }}
-          >
-            <Text style={s.sectionTitle}>About this product</Text>
-            <Text
-              style={[s.name, { marginTop: 8, fontSize: 18, color: "#FFF" }]}
-            >
-              {auction.name}
-            </Text>
-            {!!specSummary && (
-              <Text
-                style={[s.specSummary, { color: "rgba(255,255,255,0.82)" }]}
-              >
-                {specSummary}
-              </Text>
-            )}
-            {auction.description ? (
-              <Text
-                style={[s.description, { color: "rgba(255,255,255,0.78)" }]}
-              >
-                {auction.description}
-              </Text>
-            ) : null}
-          </Card>
-
-          <View
-            style={{
-              flexDirection: "row",
-              gap: 8,
-              marginTop: 16,
-              marginBottom: specEntries.length > 0 ? 0 : 16,
-            }}
-          >
-            <View
-              style={{
-                flex: 1,
-                minWidth: 0,
-                borderRadius: 16,
-                backgroundColor: colors.navy,
-                paddingHorizontal: 10,
-                paddingVertical: 10,
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: 10,
-                  fontWeight: "700",
-                  textTransform: "uppercase",
-                  letterSpacing: 1,
-                  color: "rgba(255,255,255,0.72)",
-                }}
-              >
-                {isOver
-                  ? "Auction Ended"
-                  : isEnding
-                    ? "Ending Soon"
-                    : "Time Left"}
-              </Text>
-              <View style={{ marginTop: 4 }}>
-                <Countdown seconds={seconds} size="sm" />
-              </View>
-            </View>
-            <View
-              style={{
-                width: 108,
-                borderRadius: 16,
-                backgroundColor: colors.navy,
-                paddingHorizontal: 10,
-                paddingVertical: 10,
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: 10,
-                  fontWeight: "700",
-                  textTransform: "uppercase",
-                  letterSpacing: 1,
-                  color: "rgba(255,255,255,0.72)",
-                }}
-              >
-                Auction Code
-              </Text>
-              <Text
-                numberOfLines={1}
-                style={{
-                  fontSize: 17,
-                  fontWeight: "800",
-                  letterSpacing: 1.2,
-                  color: "#FFF",
-                  marginTop: 4,
-                }}
-              >
-                {auctionCode}
-              </Text>
-            </View>
-          </View>
-
-          {specEntries.length > 0 && (
-            <Card style={{ marginTop: 16, padding: 16 }}>
-              <TouchableOpacity
-                style={s.specToggle}
-                onPress={() => setShowSpecs((value) => !value)}
-              >
-                <Text style={s.sectionTitle}>Product specifications</Text>
-                <Text style={s.specToggleText}>
-                  {showSpecs ? "Hide details" : "View details"}
-                </Text>
-              </TouchableOpacity>
-              {showSpecs && (
-                <View style={s.specGrid}>
-                  {specEntries.map((entry) => (
-                    <Card key={entry.key} style={s.specCard}>
-                      <Text style={s.specLabel}>{entry.label}</Text>
-                      <Text style={s.specValue}>{entry.value}</Text>
-                    </Card>
-                  ))}
-                </View>
-              )}
-            </Card>
-          )}
-
-          <Card
-            style={{
-              marginTop: 16,
-              padding: 14,
-              borderWidth: 0,
-              backgroundColor: colors.navy,
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 10,
-                fontWeight: "700",
-                letterSpacing: 1.2,
-                textTransform: "uppercase",
-                color: "rgba(255,255,255,0.72)",
-                marginBottom: 10,
-              }}
-            >
-              Bid Amount
-            </Text>
-
-            <View
-              style={{
-                width: "100%",
-                maxWidth: 304,
-                alignSelf: "center",
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 8,
-                borderRadius: 16,
-                borderWidth: 1,
-                borderColor: bidFlash
-                  ? colors.emerald200
-                  : "rgba(255,255,255,0.14)",
-                backgroundColor: "rgba(255,255,255,0.08)",
-                padding: 8,
-              }}
-            >
-              <TouchableOpacity
-                onPress={() => adjustBid(-STEP)}
-                disabled={numericBid <= 1}
-                style={{
-                  width: 42,
-                  height: 42,
-                  borderRadius: 10,
-                  borderWidth: 1,
-                  borderColor: "rgba(255,255,255,0.14)",
-                  backgroundColor: "rgba(255,255,255,0.95)",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  opacity: numericBid <= 1 ? 0.45 : 1,
-                }}
-              >
-                <Minus
-                  size={18}
-                  color={
-                    numericBid <= 1 ? colors.mutedForeground : colors.awashBlue
-                  }
-                />
-              </TouchableOpacity>
-              <View style={{ flex: 1 }}>
-                <TextInput
-                  value={bidAmount}
-                  onChangeText={(t) => {
-                    const clean = t
-                      .replace(/[^\d.]/g, "")
-                      .replace(/(\..*)\./g, "$1")
-                      .replace(/(\.\d{2})\d+/g, "$1")
-                      .slice(0, 13);
-                    if (clean && Number(clean) < 1) return;
-                    setBidAmount(clean);
-                    setBidError(null);
-                  }}
-                  onBlur={() => {
-                    if (!bidAmount) return;
-                    const normalized = Number(bidAmount);
-                    if (normalized < 1) {
-                      setBidError("Minimum bid is 1.00");
-                      updateBid(1);
-                      return;
-                    }
-                    updateBid(normalized);
-                  }}
-                  placeholder="0.00"
-                  keyboardType="decimal-pad"
-                  style={{
-                    textAlign: "center",
-                    fontSize: 30,
-                    fontWeight: "800",
-                    color: "#FFF",
-                    paddingVertical: 6,
-                  }}
-                  placeholderTextColor={"rgba(255,255,255,0.45)"}
-                />
-                <Text
-                  style={{
-                    textAlign: "center",
-                    fontSize: 11,
-                    fontWeight: "700",
-                    color: "rgba(255,255,255,0.72)",
-                  }}
-                >
-                  {CURRENCY}
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => adjustBid(STEP)}
-                style={{
-                  width: 42,
-                  height: 42,
-                  borderRadius: 10,
-                  borderWidth: 1,
-                  borderColor: "rgba(255,255,255,0.14)",
-                  backgroundColor: "rgba(255,255,255,0.95)",
-                  justifyContent: "center",
-                  alignItems: "center",
-                }}
-              >
-                <Plus size={18} color={colors.awashBlue} />
-              </TouchableOpacity>
-            </View>
-            {bidError ? (
-              <Text
-                style={{
-                  fontSize: 12,
-                  fontWeight: "600",
-                  color: colors.destructive,
-                  marginTop: 8,
-                }}
-              >
-                {bidError}
-              </Text>
-            ) : null}
-          </Card>
-
-          <Card
-            style={{
-              marginTop: 16,
-              padding: 16,
-              borderWidth: 0,
-              backgroundColor: "#0F4C81",
-            }}
-          >
-            <View>
-              <Text
-                style={{
-                  fontSize: 10,
-                  fontWeight: "700",
-                  letterSpacing: 1.2,
-                  textTransform: "uppercase",
-                  color: "rgba(255,255,255,0.72)",
-                }}
-              >
-                Payment
-              </Text>
-            </View>
-
-            <TouchableOpacity
-              onPress={() => setShowPaymentMethods((value) => !value)}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-                borderRadius: 18,
-                borderWidth: 1,
-                borderColor: "rgba(255,255,255,0.14)",
-                backgroundColor: "rgba(255,255,255,0.08)",
-                padding: 14,
-                marginTop: 10,
-              }}
-            >
-              <View
-                style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
-              >
-                <View
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 12,
-                    justifyContent: "center",
-                    alignItems: "center",
-                    backgroundColor: "rgba(255,255,255,0.15)",
-                  }}
-                >
-                  {selectedPaymentMethod === "AWASH" ? (
-                    <Building2 size={20} color={colors.awashGold} />
-                  ) : (
-                    <ShieldCheck size={20} color={"#FFF"} />
-                  )}
-                </View>
-                <View>
-                  <Text
-                    style={{ fontSize: 14, fontWeight: "700", color: "#FFF" }}
-                  >
-                    {selectedPaymentMethod === "AWASH"
-                      ? "Awash Wallet Pay"
-                      : "SikinaPay"}
-                  </Text>
-                  <Text
-                    style={{ fontSize: 12, color: "rgba(255,255,255,0.68)" }}
-                  >
-                    Select payment type
-                  </Text>
-                </View>
-              </View>
-              {showPaymentMethods ? (
-                <ChevronUp size={18} color={"rgba(255,255,255,0.68)"} />
-              ) : (
-                <ChevronDown size={18} color={"rgba(255,255,255,0.68)"} />
-              )}
-            </TouchableOpacity>
-
-            {showPaymentMethods && (
-              <Card
-                style={{
-                  marginTop: 10,
-                  padding: 8,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                }}
-              >
-                <TouchableOpacity
-                  onPress={() => {
-                    setSelectedPaymentMethod("AWASH");
-                    setShowPaymentMethods(false);
-                  }}
-                  style={[
-                    s.methodOption,
-                    selectedPaymentMethod === "AWASH" && s.methodOptionSelected,
-                  ]}
-                >
-                  <View
-                    style={{
-                      width: 20,
-                      height: 20,
-                      justifyContent: "center",
-                      alignItems: "center",
-                    }}
-                  >
-                    <AwashMark size={18} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.methodOptionTitle}>Awash Wallet Pay</Text>
-                    <Text style={s.methodOptionSub}>
-                      Pay using your wallet balance
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => {
-                    setSelectedPaymentMethod("SIKINAPAY");
-                    setShowPaymentMethods(false);
-                  }}
-                  style={[
-                    s.methodOption,
-                    selectedPaymentMethod === "SIKINAPAY" &&
-                      s.methodOptionSelected,
-                  ]}
-                >
-                  <ShieldCheck size={20} color={colors.primary} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.methodOptionTitle}>SikinaPay</Text>
-                    <Text style={s.methodOptionSub}>
-                      Pay via online payment gateway
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              </Card>
-            )}
-
-            <View
-              style={{
-                borderRadius: 18,
-                borderWidth: 1,
-                borderColor: "rgba(255,255,255,0.14)",
-                backgroundColor: "rgba(255,255,255,0.08)",
-                padding: 14,
-                marginTop: 12,
-              }}
-            >
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 10,
-                }}
-              >
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 10,
-                    flex: 1,
-                  }}
-                >
-                  {selectedPaymentMethod === "AWASH" ? (
-                    <Wallet size={20} color={colors.awashGold} />
-                  ) : (
-                    <ShieldCheck size={20} color={"#FFF"} />
-                  )}
-                  <View style={{ flex: 1 }}>
-                    <Text
-                      style={{
-                        fontSize: 15,
-                        fontWeight: "700",
-                        color:
-                          selectedPaymentMethod === "AWASH"
-                            ? colors.awashGold
-                            : "#FFF",
-                      }}
-                    >
-                      {selectedPaymentMethod === "AWASH"
-                        ? "Awash Wallet Pay"
-                        : "SikinaPay"}
-                    </Text>
-                    <Text
-                      style={{
-                        fontSize: 12,
-                        fontWeight: "500",
-                        color: "rgba(255,255,255,0.72)",
-                        marginTop: 2,
-                      }}
-                    >
-                      {selectedPaymentMethod === "AWASH"
-                        ? "Pay using your wallet balance after PIN confirmation."
-                        : "Open the payment gateway and return automatically after confirmation."}
-                    </Text>
-                  </View>
-                </View>
-                {selectedPaymentMethod === "AWASH" ? (
-                  loadingMethod === "AWASH" || checkingPin ? (
-                    <ActivityIndicator size="small" color={colors.awashGold} />
-                  ) : (
-                    <Lock size={18} color={colors.awashGold} />
-                  )
-                ) : loadingMethod === "SIKINAPAY" ? (
-                  <ActivityIndicator size="small" color={"#FFF"} />
-                ) : null}
-              </View>
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  marginTop: 10,
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 11,
-                    fontWeight: "600",
-                    color: "rgba(255,255,255,0.6)",
-                  }}
-                >
-                  {selectedPaymentMethod === "AWASH" ? "Balance" : "Supports"}
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 11,
-                    fontWeight: "700",
-                    color:
-                      selectedPaymentMethod === "AWASH"
-                        ? walletBalance < auction.bidFee
-                          ? "#FECACA"
-                          : "#FFF"
-                        : "rgba(255,255,255,0.72)",
-                  }}
-                >
-                  {selectedPaymentMethod === "AWASH"
-                    ? formatCurrency(walletBalance)
-                    : "Mobile Money, USSD, card"}
-                </Text>
-              </View>
-            </View>
-
-            <TouchableOpacity
-              onPress={() => handlePayment(selectedPaymentMethod)}
-              disabled={
-                !hasValidBid ||
-                (selectedPaymentMethod === "AWASH" &&
-                  (checkingPin ||
-                    loadingMethod === "SIKINAPAY" ||
-                    walletBalance < auction.bidFee)) ||
-                (selectedPaymentMethod === "SIKINAPAY" &&
-                  (loadingMethod === "AWASH" || checkingPin))
-              }
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 8,
-                borderRadius: 16,
-                backgroundColor: colors.primary,
-                paddingVertical: 14,
-                marginTop: 12,
-                opacity:
-                  !hasValidBid ||
-                  (selectedPaymentMethod === "AWASH" &&
-                    (checkingPin ||
-                      loadingMethod === "SIKINAPAY" ||
-                      walletBalance < auction.bidFee)) ||
-                  (selectedPaymentMethod === "SIKINAPAY" &&
-                    (loadingMethod === "AWASH" || checkingPin))
-                    ? 0.55
-                    : 1,
-              }}
-            >
-              {selectedPaymentMethod === "AWASH" ? (
-                loadingMethod === "AWASH" || checkingPin ? (
-                  <ActivityIndicator
-                    size="small"
-                    color={colors.primaryForeground}
-                  />
-                ) : (
-                  <Wallet size={18} color={colors.primaryForeground} />
-                )
-              ) : loadingMethod === "SIKINAPAY" ? (
-                <ActivityIndicator
-                  size="small"
-                  color={colors.primaryForeground}
-                />
-              ) : (
-                <ShieldCheck size={18} color={colors.primaryForeground} />
-              )}
-              <Text
-                style={{
-                  fontSize: 14,
-                  fontWeight: "700",
-                  color: colors.primaryForeground,
-                }}
-              >
-                {selectedPaymentMethod === "AWASH"
-                  ? "Pay Fee with Awash Wallet"
-                  : "Pay Fee with SikinaPay"}
-              </Text>
-            </TouchableOpacity>
-
-            {walletBalance < auction.bidFee && (
-              <Text
-                style={{
-                  fontSize: 12,
-                  fontWeight: "600",
-                  color: colors.destructive,
-                  marginTop: 10,
-                }}
-              >
-                Awash Wallet balance is below the bid amount. Use SikinaPay or
-                top up your wallet.
-              </Text>
-            )}
-            {authError ? (
-              <Text
-                style={{
-                  fontSize: 12,
-                  fontWeight: "600",
-                  color: colors.destructive,
-                  marginTop: 10,
-                }}
-              >
-                {authError}
-              </Text>
-            ) : null}
-          </Card>
-
-          {isEnding ? (
-            <Card
-              style={{
-                marginTop: 16,
-                padding: 12,
-                borderWidth: 1,
-                borderColor: "#FDE68A",
-                backgroundColor: "#FFFBEB",
-              }}
-            >
-              <Text
-                style={{ fontSize: 11, fontWeight: "700", color: "#B45309" }}
-              >
-                Place your bid before the timer ends.
-              </Text>
-            </Card>
-          ) : null}
 
           <View style={s.hint}>
             <TrendingDown size={18} color={colors.primary} />

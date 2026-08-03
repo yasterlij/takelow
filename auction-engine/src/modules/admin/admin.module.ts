@@ -1,8 +1,10 @@
 import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
+import { AuctionAdminService } from "./auction-admin.service";
 import { AuctionManageController } from "./auction-manage.controller";
-import { AuctionManageService } from "./auction-manage.service";
+import { AuctionReviewService } from "./auction-review.service";
 import { ImageService } from "./image.service";
+import { ProductAdminService } from "./product-admin.service";
 import { Auction } from "../winner/entities/auction.entity";
 import { Winner } from "../winner/entities/winner.entity";
 import { Product } from "./entities/product.entity";
@@ -16,6 +18,6 @@ import { BidEncryptionService } from "../common/bid-encryption.service";
     WinnerModule,
   ],
   controllers: [AuctionManageController],
-  providers: [AuctionManageService, ImageService, BidEncryptionService],
+  providers: [AuctionAdminService, AuctionReviewService, ProductAdminService, ImageService, BidEncryptionService],
 })
 export class AdminModule {}

@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { ConfigModule } from "@nestjs/config";
 import { PaymentController } from "./payment.controller";
+import { PaymentLinkService } from "./payment-link.service";
 import { PaymentService } from "./payment.service";
 import { SikinaService } from "./sikina.service";
 import { AwashService } from "./awash.service";
@@ -28,6 +29,7 @@ import { WorkerModule } from "../worker/worker.module";
     AwashWebhookController,
   ],
   providers: [
+    PaymentLinkService,
     PaymentService,
     SikinaService,
     AwashService,

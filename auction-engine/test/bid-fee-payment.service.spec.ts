@@ -8,10 +8,11 @@ import { REDIS_CLIENT } from '../src/modules/common/redis.decorator';
 import { PaymentTransaction, PaymentTransactionStatus, PaymentType } from '../src/modules/payment/entities/payment-transaction.entity';
 import { Auction } from '../src/modules/winner/entities/auction.entity';
 import { Bid } from '../src/modules/bidding/entities/bid.entity';
-import { Winner } from '../src/modules/winner/entities/winner.entity';
+import { Winner, WinnerPaymentStatus } from '../src/modules/winner/entities/winner.entity';
 import { WinnerService } from '../src/modules/winner/winner.service';
 import { BidEncryptionService } from '../src/modules/common/bid-encryption.service';
 import { NotificationDispatchService } from '../src/modules/worker/notification-dispatch.service';
+import { PaymentLinkService } from '../src/modules/payment/payment-link.service';
 
 function createMockRepo() {
   return {
@@ -21,6 +22,7 @@ function createMockRepo() {
     save: jest.fn(),
     update: jest.fn(),
     count: jest.fn(),
+    increment: jest.fn(),
   };
 }
 
@@ -44,10 +46,12 @@ describe('PaymentService - Bid Fee Payment', () => {
     
     mockSikinaService = {
       generatePaymentLink: jest.fn(),
+      getPaymentStatus: jest.fn(),
     };
     
     mockAwashService = {
       generatePaymentLink: jest.fn(),
+      getPaymentStatus: jest.fn(),
     };
     
     mockWinnerService = {
@@ -73,6 +77,7 @@ describe('PaymentService - Bid Fee Payment', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        PaymentLinkService,
         PaymentService,
         { provide: getRepositoryToken(Auction), useValue: mockAuctionRepo },
         { provide: getRepositoryToken(Bid), useValue: mockBidRepo },
@@ -351,6 +356,173 @@ describe('PaymentService - Bid Fee Payment', () => {
       expect(mockPaymentTransactionRepo.findOne).not.toHaveBeenCalled();
       expect(mockPaymentTransactionRepo.save).not.toHaveBeenCalled();
       expect(mockAuctionRepo.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('expireOverduePayments', () => {
+    beforeEach(() => {
+      global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({}) } as any);
+    });
+
+    it('reassigns the winner when an overdue payment has a next unpaid winner', async () => {
+      const overdueAuction = {
+        id: 'auction-1',
+        status: 'CLOSED',
+        payment_status: 'PENDING',
+        payment_deadline: new Date(Date.now() - 60_000),
+        winner_user_id: 'winner-1',
+        product: { name: 'Phone' },
+      };
+      const currentWinner = {
+        auction_id: 'auction-1',
+        user_id: 'winner-1',
+        payment_status: 'PENDING',
+      };
+      const nextWinner = {
+        auction_id: 'auction-1',
+        user_id: 'winner-2',
+        amount: 12.5,
+        payment_status: 'PENDING',
+        payment_deadline: null,
+      };
+
+      mockAuctionRepo.find.mockResolvedValue([overdueAuction]);
+      mockWinnerRepo.findOne.mockResolvedValue(currentWinner);
+      (mockWinnerService.getNextUnpaidWinner as jest.Mock).mockResolvedValue(nextWinner);
+      mockWinnerRepo.save.mockResolvedValue(nextWinner);
+      mockAuctionRepo.save.mockResolvedValue({ ...overdueAuction, winner_user_id: 'winner-2' });
+
+      await service.expireOverduePayments();
+
+      expect(mockWinnerRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          user_id: 'winner-1',
+          payment_status: WinnerPaymentStatus.EXPIRED,
+        }),
+      );
+      expect(mockAuctionRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          winner_user_id: 'winner-2',
+          winning_bid_amount: 12.5,
+          payment_status: 'PENDING',
+        }),
+      );
+      expect(mockNotificationDispatchService.dispatch).toHaveBeenCalledWith(
+        '/api/v1/notify/winner',
+        expect.objectContaining({
+          user_id: 'winner-2',
+          auction_id: 'auction-1',
+          winning_amount: 12.5,
+        }),
+      );
+    });
+
+    it('expires the auction when no unpaid winners remain', async () => {
+      const overdueAuction = {
+        id: 'auction-2',
+        status: 'CLOSED',
+        payment_status: 'PENDING',
+        payment_deadline: new Date(Date.now() - 60_000),
+        winner_user_id: 'winner-3',
+        product: { name: 'Laptop' },
+      };
+      const currentWinner = {
+        auction_id: 'auction-2',
+        user_id: 'winner-3',
+        payment_status: 'PENDING',
+      };
+
+      mockAuctionRepo.find.mockResolvedValue([overdueAuction]);
+      mockWinnerRepo.findOne.mockResolvedValue(currentWinner);
+      (mockWinnerService.getNextUnpaidWinner as jest.Mock).mockResolvedValue(null);
+      mockWinnerRepo.save.mockResolvedValue(currentWinner);
+      mockWinnerRepo.update.mockResolvedValue({ affected: 1 });
+      mockAuctionRepo.save.mockResolvedValue({ ...overdueAuction, status: 'EXPIRED', payment_status: 'EXPIRED' });
+
+      await service.expireOverduePayments();
+
+      expect(mockWinnerRepo.update).toHaveBeenCalledWith(
+        { auction_id: 'auction-2', payment_status: WinnerPaymentStatus.PENDING },
+        { payment_status: WinnerPaymentStatus.EXPIRED },
+      );
+      expect(mockAuctionRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: 'EXPIRED',
+          payment_status: 'EXPIRED',
+        }),
+      );
+      expect(mockNotificationDispatchService.dispatch).not.toHaveBeenCalledWith(
+        '/api/v1/notify/winner',
+        expect.anything(),
+      );
+    });
+  });
+
+  describe('reconcilePendingPayments', () => {
+    it('marks a pending Sikina transaction successful when the gateway reports success', async () => {
+      const txn = {
+        id: 'txn-reconcile-1',
+        auction_id: 'auction-10',
+        user_id: 'user-10',
+        client_reference_id: 'pay-auction-10-100',
+        gateway: 'SIKINAPAY',
+        payment_type: PaymentType.WINNING_BID,
+        status: PaymentTransactionStatus.PENDING,
+        created_at: new Date('2026-08-03T10:00:00.000Z'),
+      };
+
+      mockPaymentTransactionRepo.find.mockResolvedValue([txn]);
+      (mockSikinaService.getPaymentStatus as jest.Mock).mockResolvedValue('SUCCESSFUL');
+      mockPaymentTransactionRepo.update.mockResolvedValue({ affected: 1 });
+      mockPaymentTransactionRepo.findOne.mockResolvedValue({
+        ...txn,
+        status: PaymentTransactionStatus.SUCCESSFUL,
+      });
+      mockPaymentTransactionRepo.save.mockResolvedValue({
+        ...txn,
+        status: PaymentTransactionStatus.SUCCESSFUL,
+      });
+      mockAuctionRepo.findOne.mockResolvedValue({
+        id: 'auction-10',
+        payment_status: 'PENDING',
+      });
+      mockAuctionRepo.save.mockResolvedValue({ id: 'auction-10', payment_status: 'PAID' });
+      mockWinnerRepo.count.mockResolvedValue(0);
+
+      await service.reconcilePendingPayments();
+
+      expect(mockSikinaService.getPaymentStatus).toHaveBeenCalledWith(
+        'pay-auction-10-100',
+        '2026-08-03',
+      );
+      expect(mockPaymentTransactionRepo.update).toHaveBeenCalledWith(
+        {
+          client_reference_id: 'pay-auction-10-100',
+          status: expect.anything(),
+        },
+        expect.objectContaining({ status: PaymentTransactionStatus.SUCCESSFUL }),
+      );
+    });
+
+    it('increments retry_count when reconciliation throws', async () => {
+      const txn = {
+        id: 'txn-reconcile-2',
+        client_reference_id: 'fee-auction-11-101',
+        gateway: 'AWASH',
+        status: PaymentTransactionStatus.PENDING,
+        created_at: new Date('2026-08-03T10:00:00.000Z'),
+      };
+
+      mockPaymentTransactionRepo.find.mockResolvedValue([txn]);
+      (mockAwashService.getPaymentStatus as jest.Mock).mockRejectedValue(new Error('gateway down'));
+
+      await service.reconcilePendingPayments();
+
+      expect(mockPaymentTransactionRepo.increment).toHaveBeenCalledWith(
+        { id: 'txn-reconcile-2' },
+        'retry_count',
+        1,
+      );
     });
   });
 });

@@ -14,7 +14,7 @@ import { Bid } from "../bidding/entities/bid.entity";
 import { BullMqWorker } from "../worker/bullmq.worker";
 import { BidEncryptionService } from "../common/bid-encryption.service";
 import { InjectRedis } from "../common/redis.decorator";
-import { NotificationDispatchService } from "../worker/notification-dispatch.service";
+import { AuctionClosureEventsService } from "./auction-closure-events.service";
 
 const MAX_RETRIES = 5;
 const RETRY_DELAY_MS = 300;
@@ -59,7 +59,7 @@ export class AuctionClosureService {
     private bullMqWorker: BullMqWorker,
     private bidEncryptionService: BidEncryptionService,
     @InjectRedis() private readonly redis: Redis,
-    private notificationDispatchService: NotificationDispatchService,
+    private closureEventsService: AuctionClosureEventsService,
   ) {}
 
   @Cron(CronExpression.EVERY_10_SECONDS)
@@ -103,7 +103,7 @@ export class AuctionClosureService {
       this.logger.log(
         `Auction ${auction.id}: Only ${totalBids}/${auction.min_bid} bids, extended 24h`,
       );
-      this.sendExtensionNotification(
+      this.closureEventsService.notifyExtension(
         auction.id,
         totalBids,
         auction.min_bid,
@@ -121,7 +121,7 @@ export class AuctionClosureService {
       this.logger.log(
         `Auction ${auction.id}: No unique bids among ${totalBids} bids (extension #${auction.extensions}), extended 24h for fair play`,
       );
-      this.sendFairPlayNotification(auction.id).catch((e) =>
+      this.closureEventsService.notifyFairPlayExtension(auction.id).catch((e) =>
         this.logger.warn(`Failed to send fair play notification: ${e.message}`),
       );
       return;
@@ -193,10 +193,10 @@ export class AuctionClosureService {
               `Amounts: [${winners.map((w) => w.amount).join(", ")}]`,
           );
 
-          this.logClosureEvent(auction.id, "AUTO_CLOSE", winners).catch((e) =>
+          this.closureEventsService.logClosureEvent(auction.id, "AUTO_CLOSE", winners).catch((e) =>
             this.logger.warn(`Failed to log closure event: ${e.message}`),
           );
-          this.sendWinnerNotifications(auction, winners).catch((e) =>
+          this.closureEventsService.notifyWinners(auction, winners).catch((e) =>
             this.logger.warn(
               `Failed to send winner notifications: ${e.message}`,
             ),
@@ -262,7 +262,7 @@ export class AuctionClosureService {
         where: { auction_id: auctionId },
         order: { rank: "ASC" },
       });
-      await this.logClosureEvent(
+      await this.closureEventsService.logClosureEvent(
         auctionId,
         "ADMIN_CLOSE",
         winners.map((w) => ({ amount: w.amount, userId: w.user_id })),
@@ -304,79 +304,20 @@ export class AuctionClosureService {
       `Auction ${auctionId}: Force closed by admin with no unique bids`,
     );
 
-    this.sendForcedClosureNotification(auction.id).catch((e) =>
+    this.closureEventsService.notifyForcedClosure(auction.id).catch((e) =>
       this.logger.warn(
         `Failed to send forced closure notification: ${e.message}`,
       ),
     );
 
     if (actorId) {
-      await this.logClosureEvent(auctionId, "ADMIN_FORCE_CLOSE", []);
+      await this.closureEventsService.logClosureEvent(auctionId, "ADMIN_FORCE_CLOSE", []);
     }
 
     return this.auctionRepository.findOne({
       where: { id: auctionId },
       relations: ["product"],
     }) as Promise<Auction>;
-  }
-
-  private async sendFairPlayNotification(auctionId: string): Promise<void> {
-    const auction = await this.auctionRepository.findOne({
-      where: { id: auctionId },
-      relations: ["product"],
-    });
-    if (!auction) return;
-
-    const productName = auction.product?.name || auctionId;
-    const totalBids = await this.bidRepository.count({
-      where: { auction_id: auctionId },
-    });
-
-    try {
-      await this.notificationDispatchService.dispatch(
-        "/api/v1/notify/auction-fair-play-extended",
-        {
-            auction_id: auctionId,
-            product_name: productName,
-            total_bids: totalBids,
-            extensions: auction.extensions,
-        },
-      );
-    } catch (e) {
-      this.logger.warn(
-        `Failed to send fair play extension notification: ${e.message}`,
-      );
-    }
-  }
-
-  private async sendForcedClosureNotification(
-    auctionId: string,
-  ): Promise<void> {
-    const auction = await this.auctionRepository.findOne({
-      where: { id: auctionId },
-      relations: ["product"],
-    });
-    if (!auction) return;
-
-    const productName = auction.product?.name || auctionId;
-    const totalBids = await this.bidRepository.count({
-      where: { auction_id: auctionId },
-    });
-
-    try {
-      await this.notificationDispatchService.dispatch(
-        "/api/v1/notify/auction-forced-closure",
-        {
-            auction_id: auctionId,
-            product_name: productName,
-            total_bids: totalBids,
-        },
-      );
-    } catch (e) {
-      this.logger.warn(
-        `Failed to send forced closure notification: ${e.message}`,
-      );
-    }
   }
 
   private async findWinBidWithRetry(
@@ -420,97 +361,4 @@ export class AuctionClosureService {
     return null;
   }
 
-  private async sendWinnerNotifications(
-    auction: Auction,
-    winners: { amount: number; userId: string }[],
-  ): Promise<void> {
-    const auctionWithProduct = await this.auctionRepository.findOne({
-      where: { id: auction.id },
-      relations: ["product"],
-    });
-    const productName = auctionWithProduct?.product?.name || auction.id;
-    const productDescription =
-      auctionWithProduct?.product?.description || undefined;
-    const deadline =
-      auction.payment_deadline?.toISOString() ||
-      new Date(
-        Date.now() + PAYMENT_DEADLINE_HOURS * 60 * 60 * 1000,
-      ).toISOString();
-
-    const winnerPayloads = winners.map((w) => ({
-      user_id: w.userId,
-      auction_id: auction.id,
-      product_name: productName,
-      product_description: productDescription,
-      winning_amount: w.amount,
-      payment_deadline: deadline,
-    }));
-
-    try {
-      await this.notificationDispatchService.dispatch(
-        "/api/v1/notify/winner-bulk",
-        { winners: winnerPayloads },
-      );
-    } catch (e) {
-      this.logger.warn(
-        `Failed to send bulk winner notifications: ${e.message}`,
-      );
-    }
-  }
-
-  private async sendExtensionNotification(
-    auctionId: string,
-    current: number,
-    min: number,
-  ): Promise<void> {
-    try {
-      await this.notificationDispatchService.dispatch(
-        "/api/v1/notify/auction-extended",
-        {
-            auction_id: auctionId,
-            current_bids: current,
-            min_bids: min,
-        },
-      );
-    } catch (e) {
-      this.logger.warn(`Failed to send extension notification: ${e.message}`);
-    }
-  }
-
-  private async logClosureEvent(
-    auctionId: string,
-    action: string,
-    winners: { amount: number; userId: string }[],
-  ): Promise<void> {
-    try {
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-      };
-      const internalApiKey = process.env.INTERNAL_API_KEY || "";
-      if (internalApiKey) headers["x-internal-api-key"] = internalApiKey;
-      await fetch("http://identity-service:3000/api/v1/admin/audit/log", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          actor_id: "system",
-          actor_phone: "system",
-          action,
-          entity_type: "auction",
-          entity_id: auctionId,
-          details: {
-            winners: winners.map((w) => ({
-              user_id: w.userId,
-              amount: w.amount,
-            })),
-            winner_count: winners.length,
-            timestamp: new Date().toISOString(),
-          },
-        }),
-      });
-    } catch (e) {
-      this.logger.warn(
-        `Failed to log closure event for auction ${auctionId}: ${e.message}`,
-      );
-    }
-  }
 }

@@ -18,6 +18,10 @@ import { Redis } from 'ioredis';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { RegisterPushTokenDto } from './dto/register-push-token.dto';
+import { SuperAppLoginDto } from './dto/super-app-login.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import { SuperAppRegistry } from './adapters/super-app-registry';
 
 const LOGIN_RATE_LIMIT_WINDOW_MS = 60000;
@@ -93,13 +97,12 @@ export class AuthController {
   @Post('login/super-app/:provider')
   async loginWithSuperApp(
     @Param('provider') provider: string,
-    @Body('code') code: string,
-    @Body('redirect_uri') redirectUri: string,
+    @Body() dto: SuperAppLoginDto,
   ) {
     const user = await this.authService.validateSuperAppUser(
       provider,
-      code,
-      redirectUri,
+      dto.code,
+      dto.redirect_uri,
     );
     return this.authService.login(user);
   }
@@ -114,8 +117,8 @@ export class AuthController {
   }
 
   @Post('refresh')
-  async refresh(@Body('refresh_token') refreshToken: string) {
-    return this.authService.refreshToken(refreshToken);
+  async refresh(@Body() dto: RefreshTokenDto) {
+    return this.authService.refreshToken(dto.refresh_token);
   }
 
   @UseGuards(AuthGuard('jwt'))
@@ -128,7 +131,7 @@ export class AuthController {
   @Patch('profile')
   async updateProfile(
     @Req() req: any,
-    @Body() data: { full_name?: string; email?: string },
+    @Body() data: UpdateProfileDto,
   ) {
     const user = await this.authService.updateProfile(req.user.id, data);
     if (!user) {
@@ -141,10 +144,9 @@ export class AuthController {
   @Post('fcm-token')
   async registerFcmToken(
     @Req() req: any,
-    @Body('token') token: string,
-    @Body('platform') platform: 'android' | 'ios',
+    @Body() dto: RegisterPushTokenDto,
   ) {
-    await this.authService.registerPushToken(req.user.id, token, platform);
+    await this.authService.registerPushToken(req.user.id, dto.token, dto.platform);
     return { registered: true };
   }
 }

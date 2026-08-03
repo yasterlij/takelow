@@ -3,6 +3,7 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { ScheduleModule } from "@nestjs/schedule";
 import { WinnerService } from "./winner.service";
 import { AuctionClosureService } from "./auction-closure.service";
+import { AuctionClosureEventsService } from "./auction-closure-events.service";
 import { AuctionNotificationService } from "./auction-notification.service";
 import { Auction } from "./entities/auction.entity";
 import { Winner } from "./entities/winner.entity";
@@ -19,6 +20,7 @@ import { BidEncryptionService } from "../common/bid-encryption.service";
   providers: [
     WinnerService,
     AuctionClosureService,
+    AuctionClosureEventsService,
     AuctionNotificationService,
     BidEncryptionService,
   ],

@@ -3,6 +3,8 @@ import type { ReactNode } from "react"
 import { api, setApiToken, setRefreshToken, getApiToken, getRefreshToken, getUserFriendlyMessage, getAccessTokenExpiry, type SessionExpireReason } from "./api"
 import { toast } from "./store/toast.store"
 import { useAuctionSocket, applySocketUpdate } from "./hooks/useAuctionSocket"
+import { useFavoriteAuctions } from "./hooks/useFavoriteAuctions"
+import { useUnreadNotifications } from "./hooks/useUnreadNotifications"
 import { normalizeAuctionCategory } from "./lib/auctionCategories"
 import type { Auction, ProductSpecs } from "./mockDataV0"
 import { formatSpecSummary } from "./mockDataV0"
@@ -165,9 +167,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const setPaymentContext = useCallback((ctx: 'bid-fee' | 'winning' | null) => setPaymentContextState(ctx), [])
   const [sikinaPayUrl, setSikinaPayUrl] = useState<string | null>(null)
   const [sikinaProxyUrl, setSikinaProxyUrl] = useState<string | null>(null)
-  const [favoriteAuctionIds, setFavoriteAuctionIds] = useState<string[]>([])
-  const [favoritesLoading, setFavoritesLoading] = useState(false)
-  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0)
   const [myBids, setMyBids] = useState<PlacedBid[]>([])
   const [allBids, setAllBids] = useState<PlacedBid[]>([])
   const [auctions, setAuctions] = useState<Auction[]>([])
@@ -185,6 +184,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const idleWarnTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [sessionEndReason, setSessionEndReason] = useState<SessionExpireReason | null>(null)
+  const { favoriteAuctionIds, favoritesLoading, refreshFavorites, isFavorite, toggleFavorite } = useFavoriteAuctions({ hydrated, userId: user?.id, onError: (message) => toast(message, 'error') })
+  const { unreadNotificationCount, refreshUnreadNotifications } = useUnreadNotifications({ hydrated, userId: user?.id })
 
   useEffect(() => {
     const hydrate = async () => {
@@ -326,70 +327,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const interval = setInterval(refreshAuctions, POLL_INTERVAL)
     return () => clearInterval(interval)
   }, [hydrated, user, view])
-
-  const refreshFavorites = useCallback(async () => {
-    if (!user) {
-      setFavoriteAuctionIds([])
-      return
-    }
-    setFavoritesLoading(true)
-    try {
-      const res = await api.getFavorites()
-      setFavoriteAuctionIds(res.data.map((item) => item.auction_id))
-    } catch {
-      toast('Failed to refresh favorites', 'error')
-    } finally {
-      setFavoritesLoading(false)
-    }
-  }, [user])
-
-  const refreshUnreadNotifications = useCallback(async () => {
-    if (!user) {
-      setUnreadNotificationCount(0)
-      return
-    }
-    try {
-      const items = await api.getInbox(true)
-      setUnreadNotificationCount(items.length)
-    } catch {
-      setUnreadNotificationCount(0)
-    }
-  }, [user])
-
-  useEffect(() => {
-    if (!hydrated) return
-    if (!user) {
-      setFavoriteAuctionIds([])
-      setUnreadNotificationCount(0)
-      return
-    }
-    refreshFavorites()
-    refreshUnreadNotifications()
-  }, [hydrated, user, refreshFavorites, refreshUnreadNotifications])
-
-  useEffect(() => {
-    if (!hydrated || !user) return
-    const interval = setInterval(refreshUnreadNotifications, 60000)
-    return () => clearInterval(interval)
-  }, [hydrated, user, refreshUnreadNotifications])
-
-  const isFavorite = useCallback((auctionId: string) => favoriteAuctionIds.includes(auctionId), [favoriteAuctionIds])
-
-  const toggleFavorite = useCallback(async (auctionId: string) => {
-    if (!user) return
-    const currentlyFavorite = favoriteAuctionIds.includes(auctionId)
-    setFavoriteAuctionIds((prev) => currentlyFavorite ? prev.filter((id) => id !== auctionId) : [...prev, auctionId])
-    try {
-      if (currentlyFavorite) {
-        await api.removeFavorite(auctionId)
-      } else {
-        await api.addFavorite(auctionId)
-      }
-    } catch (e: any) {
-      setFavoriteAuctionIds((prev) => currentlyFavorite ? [...prev, auctionId] : prev.filter((id) => id !== auctionId))
-      toast(e?.message || 'Failed to update favorites', 'error')
-    }
-  }, [favoriteAuctionIds, user])
 
   const go = useCallback((next: View) => {
     const adminViews: View[] = ['admin-dashboard', 'admin-auctions', 'admin-products', 'admin-users', 'admin-transactions', 'admin-audit', 'admin-monitor', 'admin-auction-monitor', 'monitor']
