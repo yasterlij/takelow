@@ -288,9 +288,9 @@ export class BiddingService {
 
     const uniqueMulti = this.redis.multi();
     if (count === 1) {
-      uniqueMulti.zadd(uniqueKey, amount, String(amount));
+      uniqueMulti.zadd(uniqueKey, amount, amountKey);
     } else if (count > 1) {
-      uniqueMulti.zrem(uniqueKey, String(amount));
+      uniqueMulti.zrem(uniqueKey, amountKey);
     }
 
     uniqueMulti.incr(`takelow:auction:${auctionId}:total_bids`);

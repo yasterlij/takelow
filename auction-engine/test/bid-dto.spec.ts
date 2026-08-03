@@ -57,4 +57,25 @@ describe('BidDto Validation (Section 11.1 - Test Case 3)', () => {
     const errors = await validate(dto);
     expect(errors.length).toBeGreaterThan(0);
   });
+
+  it('should accept values above 10.00', async () => {
+    const dto = new BidDto();
+    dto.amount = 1000.0;
+    const errors = await validate(dto);
+    expect(errors.length).toBe(0);
+  });
+
+  it('should accept 92047.23', async () => {
+    const dto = new BidDto();
+    dto.amount = 92047.23;
+    const errors = await validate(dto);
+    expect(errors.length).toBe(0);
+  });
+
+  it('should reject values exceeding DECIMAL(12,2) capacity', async () => {
+    const dto = new BidDto();
+    (dto as any).amount = 10000000000;
+    const errors = await validate(dto);
+    expect(errors.length).toBeGreaterThan(0);
+  });
 });

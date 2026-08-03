@@ -1,118 +1,161 @@
-import { useState, useCallback, useEffect, useRef } from "react"
-import { motion, AnimatePresence } from "framer-motion"
-import { Sparkles, TrendingDown, CheckCircle2, Loader2, AlertCircle, AlertTriangle, Target, Minus, Plus, ArrowLeft, X } from "lucide-react"
-import { useApp } from "../AppContext"
-import { useForm } from "../hooks/useForm"
-import { placeBidSchema, type PlaceBidValues } from "../lib/validation"
-import { CURRENCY, formatCurrency, formatETB } from "../mockDataV0"
-import { api } from "../api"
+import { useState, useCallback, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Sparkles,
+  TrendingDown,
+  CheckCircle2,
+  Loader2,
+  AlertCircle,
+  AlertTriangle,
+  Target,
+  Minus,
+  Plus,
+  ArrowLeft,
+  X,
+} from "lucide-react";
+import { useApp } from "../AppContext";
+import { useForm } from "../hooks/useForm";
+import { placeBidSchema, type PlaceBidValues } from "../lib/validation";
+import { CURRENCY, formatCurrency, formatETB } from "../mockDataV0";
+import { api } from "../api";
 
 export function PlaceBidScreen() {
-  const { go, selectedId, submitBid, getAuction, authError, feePaid, pendingBidAmount, setPendingBidAmount, myBids } = useApp()
-  const auction = getAuction(selectedId)
-  const [bidStr, setBidStr] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [submitError, setSubmitError] = useState<string | null>(null)
-  const autoSubmittedRef = useRef(false)
-  const [bidFlash, setBidFlash] = useState(false)
-  const [serverBidAmounts, setServerBidAmounts] = useState<number[]>([])
-  const [duplicateAmount, setDuplicateAmount] = useState<number | null>(null)
+  const {
+    go,
+    selectedId,
+    submitBid,
+    getAuction,
+    authError,
+    feePaid,
+    pendingBidAmount,
+    setPendingBidAmount,
+    myBids,
+  } = useApp();
+  const auction = getAuction(selectedId);
+  const [bidStr, setBidStr] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const autoSubmittedRef = useRef(false);
+  const [bidFlash, setBidFlash] = useState(false);
+  const [serverBidAmounts, setServerBidAmounts] = useState<number[]>([]);
+  const [duplicateAmount, setDuplicateAmount] = useState<number | null>(null);
 
-  const STEP = 0.01
+  const STEP = 0.01;
 
-  const form = useForm<PlaceBidValues>(placeBidSchema, { amount: 0 })
+  const form = useForm<PlaceBidValues>(placeBidSchema, { amount: 0 });
 
   useEffect(() => {
-    if (!selectedId) return
-    let active = true
+    if (!selectedId) return;
+    let active = true;
     api.bid
       .myBids(selectedId)
       .then((res) => {
-        if (active) setServerBidAmounts(res.bids.map((b) => b.amount))
+        if (active) setServerBidAmounts(res.bids.map((b) => b.amount));
       })
-      .catch(() => {})
+      .catch(() => {});
     return () => {
-      active = false
-    }
-  }, [selectedId])
+      active = false;
+    };
+  }, [selectedId]);
 
   const hasPlacedBid = useCallback(
     (amount: number) =>
       myBids.some((b) => b.auctionId === selectedId && b.amount === amount) ||
       serverBidAmounts.some((a) => a === amount),
     [myBids, serverBidAmounts, selectedId],
-  )
+  );
 
-  const isDuplicate = form.values.amount > 0 && hasPlacedBid(form.values.amount)
-  const [showDuplicateModal, setShowDuplicateModal] = useState(false)
-
-  useEffect(() => {
-    if (!isDuplicate) return
-    setDuplicateAmount(form.values.amount)
-    setShowDuplicateModal(true)
-  }, [form.values.amount, isDuplicate])
-
-  const adjustAmount = useCallback((delta: number) => {
-    const current = form.values.amount
-    const next = Math.max(1, +(current + delta).toFixed(2))
-    setBidStr(next.toFixed(2))
-    form.handleChange("amount", next)
-    setSubmitError(null)
-    setBidFlash(true)
-  }, [form])
+  const isDuplicate =
+    form.values.amount > 0 && hasPlacedBid(form.values.amount);
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
 
   useEffect(() => {
-    if (!bidFlash) return
-    const id = window.setTimeout(() => setBidFlash(false), 240)
-    return () => window.clearTimeout(id)
-  }, [bidFlash])
+    if (!isDuplicate) return;
+    setDuplicateAmount(form.values.amount);
+    setShowDuplicateModal(true);
+  }, [form.values.amount, isDuplicate]);
 
-  if (!auction) return null
+  const adjustAmount = useCallback(
+    (delta: number) => {
+      const current = form.values.amount;
+      const next = Math.max(1, +(current + delta).toFixed(2));
+      setBidStr(next.toFixed(2));
+      form.handleChange("amount", next);
+      setSubmitError(null);
+      setBidFlash(true);
+    },
+    [form],
+  );
+
+  useEffect(() => {
+    if (!bidFlash) return;
+    const id = window.setTimeout(() => setBidFlash(false), 240);
+    return () => window.clearTimeout(id);
+  }, [bidFlash]);
+
+  if (!auction) return null;
 
   const onSubmit = async (values: PlaceBidValues) => {
     if (hasPlacedBid(values.amount)) {
-      setDuplicateAmount(values.amount)
-      setShowDuplicateModal(true)
-      return
+      setDuplicateAmount(values.amount);
+      setShowDuplicateModal(true);
+      return;
     }
-    setLoading(true)
-    setSubmitError(null)
+    setLoading(true);
+    setSubmitError(null);
     try {
-      await submitBid(values.amount)
+      await submitBid(values.amount);
     } catch (e: any) {
-      setSubmitError(e?.message || "Bid submission failed. Please try again.")
+      setSubmitError(e?.message || "Bid submission failed. Please try again.");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   useEffect(() => {
-    if (!auction || !feePaid || pendingBidAmount == null || autoSubmittedRef.current) return
+    if (
+      !auction ||
+      !feePaid ||
+      pendingBidAmount == null ||
+      autoSubmittedRef.current
+    )
+      return;
     if (hasPlacedBid(pendingBidAmount)) {
-      setBidStr(pendingBidAmount.toFixed(2))
-      form.handleChange("amount", pendingBidAmount)
-      setDuplicateAmount(pendingBidAmount)
-      setShowDuplicateModal(true)
-      setPendingBidAmount(null)
-      return
+      setBidStr(pendingBidAmount.toFixed(2));
+      form.handleChange("amount", pendingBidAmount);
+      setDuplicateAmount(pendingBidAmount);
+      setShowDuplicateModal(true);
+      setPendingBidAmount(null);
+      return;
     }
-    autoSubmittedRef.current = true
-    setBidStr(pendingBidAmount.toFixed(2))
-    form.handleChange("amount", pendingBidAmount)
-    setLoading(true)
-    setSubmitError(null)
+    autoSubmittedRef.current = true;
+    setBidStr(pendingBidAmount.toFixed(2));
+    form.handleChange("amount", pendingBidAmount);
+    setLoading(true);
+    setSubmitError(null);
     submitBid(pendingBidAmount)
       .catch((e: any) => {
-        autoSubmittedRef.current = false
-        setSubmitError(e?.message || "Bid submission failed. Please try again.")
+        autoSubmittedRef.current = false;
+        setSubmitError(
+          e?.message || "Bid submission failed. Please try again.",
+        );
       })
-      .finally(() => setLoading(false))
-  }, [auction, feePaid, pendingBidAmount, submitBid, hasPlacedBid, form.handleChange])
+      .finally(() => setLoading(false));
+  }, [
+    auction,
+    feePaid,
+    pendingBidAmount,
+    submitBid,
+    hasPlacedBid,
+    form.handleChange,
+  ]);
 
-  const displayedDuplicateAmount = duplicateAmount ?? form.values.amount
+  const displayedDuplicateAmount = duplicateAmount ?? form.values.amount;
 
-  const bidProgress = auction.maxBid ? Math.min((auction.totalBids || auction.bidders) / auction.maxBid, 1) : 0
-  const isUrgent = bidProgress > 0.8
+  const bidProgress = auction.maxBid
+    ? Math.min((auction.totalBids || auction.bidders) / auction.maxBid, 1)
+    : 0;
+  const isUrgent = bidProgress > 0.8;
 
   return (
     <motion.div
@@ -123,23 +166,43 @@ export function PlaceBidScreen() {
     >
       {/* ── Header ── */}
       <div className="flex items-center gap-3">
-        <button onClick={() => go("pay-fee")} className="flex size-10 items-center justify-center rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm text-awash-blue hover:bg-white transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5 active:scale-[0.97]">
+        <button
+          onClick={() => go("pay-fee")}
+          className="flex size-10 items-center justify-center rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm text-awash-blue hover:bg-white transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5 active:scale-[0.97]"
+        >
           <ArrowLeft className="size-5" />
         </button>
         <div>
-          <h1 className="font-display text-2xl font-extrabold text-foreground">Place Your Bid</h1>
-          <p className="text-sm font-medium text-neutral-500">Choose the lowest unique amount to win</p>
+          <h1 className="font-display text-2xl font-extrabold text-foreground">
+            Place Your Bid
+          </h1>
+          <p className="text-sm font-medium text-neutral-500">
+            Choose the lowest unique amount to win
+          </p>
         </div>
       </div>
 
       <div className="rounded-[2rem] border border-border/60 bg-white/90 p-4 shadow-[0_18px_48px_rgba(0,43,92,0.08)]">
         <div className="rounded-[1.5rem] bg-gradient-to-r from-awash-blue via-awash-blue-dark to-awash-gold-dark p-4 text-white shadow-[0_16px_40px_rgba(0,43,92,0.18)]">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-white/12 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.24em] text-white/80">Ready to bid</span>
-            <span className="rounded-full bg-white/12 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.24em] text-white/80">Code {auction.publicCode || auction.productId || auction.id.slice(0, 6).toUpperCase()}</span>
+            <span className="rounded-full bg-white/12 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.24em] text-white/80">
+              Ready to bid
+            </span>
+            <span className="rounded-full bg-white/12 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.24em] text-white/80">
+              Code{" "}
+              {auction.publicCode ||
+                auction.productId ||
+                auction.id.slice(0, 6).toUpperCase()}
+            </span>
           </div>
-          <h2 className="mt-3 font-display text-xl font-extrabold sm:text-2xl">{auction.name}</h2>
-          {auction.specSummary && <p className="mt-2 text-sm font-semibold text-white/85">{auction.specSummary}</p>}
+          <h2 className="mt-3 font-display text-xl font-extrabold sm:text-2xl">
+            {auction.name}
+          </h2>
+          {auction.specSummary && (
+            <p className="mt-2 text-sm font-semibold text-white/85">
+              {auction.specSummary}
+            </p>
+          )}
         </div>
       </div>
 
@@ -149,12 +212,15 @@ export function PlaceBidScreen() {
         className="flex items-center gap-2 rounded-xl border border-emerald-200/60 bg-emerald-50 p-3"
       >
         <CheckCircle2 className="size-[18px] shrink-0 text-emerald-600" />
-        <p className="text-xs font-semibold text-emerald-700">Bid fee paid. You're in the auction for {auction.name}!</p>
+        <p className="text-xs font-semibold text-emerald-700">
+          Bid fee paid. You're in the auction for {auction.name}!
+        </p>
       </motion.div>
 
       {feePaid && pendingBidAmount != null && (
         <div className="rounded-xl border border-awash-blue/10 bg-awash-blue/5 px-4 py-3 text-sm font-semibold text-awash-blue">
-          Saved bid {formatCurrency(pendingBidAmount)} detected. Submitting automatically after payment.
+          Saved bid {formatCurrency(pendingBidAmount)} detected. Submitting
+          automatically after payment.
         </div>
       )}
 
@@ -162,8 +228,12 @@ export function PlaceBidScreen() {
       {auction.maxBid && (
         <div className="rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm p-3 shadow-[0_8px_24px_rgba(0,43,92,0.05)]">
           <div className="mb-2 flex justify-between">
-            <span className="text-[10px] font-semibold text-neutral-400">Total bids: {auction.totalBids || auction.bidders}</span>
-            <span className="text-[10px] font-semibold text-neutral-400">Capacity: {auction.maxBid}</span>
+            <span className="text-[10px] font-semibold text-neutral-400">
+              Total bids: {auction.totalBids || auction.bidders}
+            </span>
+            <span className="text-[10px] font-semibold text-neutral-400">
+              Capacity: {auction.maxBid}
+            </span>
           </div>
           <div className="h-1.5 overflow-hidden rounded-full bg-border">
             <motion.div
@@ -179,7 +249,9 @@ export function PlaceBidScreen() {
 
       {/* ── Bid Amount Section ── */}
       <div className="text-center">
-        <h2 className="font-display text-lg font-extrabold text-foreground">Enter your bid amount</h2>
+        <h2 className="font-display text-lg font-extrabold text-foreground">
+          Enter your bid amount
+        </h2>
         <p className="mx-auto mt-1 max-w-[16rem] text-xs font-medium text-neutral-500">
           Your bid must be a unique lowest amount to win.
         </p>
@@ -187,7 +259,9 @@ export function PlaceBidScreen() {
 
       {/* ── Bid Input Card ── */}
       <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-awash-gold/10 via-awash-gold-light/5 to-white/50 backdrop-blur-sm p-5 shadow-[0_4px_20px_rgba(200,166,66,0.06)]">
-        <div className={`flex items-end justify-center gap-2 rounded-2xl p-1 transition-all ${bidFlash ? "bg-emerald-50/80 ring-2 ring-emerald-200" : ""}`}>
+        <div
+          className={`flex items-end justify-center gap-2 rounded-2xl p-1 transition-all ${bidFlash ? "bg-emerald-50/80 ring-2 ring-emerald-200" : ""}`}
+        >
           <button
             type="button"
             onClick={() => adjustAmount(-STEP)}
@@ -202,50 +276,54 @@ export function PlaceBidScreen() {
             <input
               value={bidStr}
               onChange={(e) => {
-                const raw = e.target.value
+                const raw = e.target.value;
                 const clean = raw
-                 .replace(/[^0-9.]/g, "")
-                 .replace(/(\..*)\./g, "$1")
-                 .replace(/^(\d*\.?\d{0,2}).*/, "$1")
-                 .slice(0, 8)
-                setBidStr(clean)
-                form.handleChange("amount", clean ? +clean : 0)
-                setSubmitError(null)
+                  .replace(/[^0-9.]/g, "")
+                  .replace(/(\..*)\./g, "$1")
+                  .replace(/^(\d*\.?\d{0,2}).*/, "$1")
+                  .slice(0, 13);
+                setBidStr(clean);
+                form.handleChange("amount", clean ? +clean : 0);
+                setSubmitError(null);
               }}
               onBlur={() => {
-                const num = form.values.amount
+                const num = form.values.amount;
                 if (num < 1) {
-                  form.handleChange("amount", 1)
-                  setBidStr("1.00")
-                  setSubmitError("Minimum bid is 1.00")
-                  return
+                  form.handleChange("amount", 1);
+                  setBidStr("1.00");
+                  setSubmitError("Minimum bid is 1.00");
+                  return;
                 }
-                setBidStr(num > 0 ? num.toFixed(2) : "")
-                form.handleBlur("amount")
+                setBidStr(num > 0 ? num.toFixed(2) : "");
+                form.handleBlur("amount");
               }}
               onKeyDown={(e) => {
-                if (e.key === "Enter") form.handleSubmit(onSubmit)
+                if (e.key === "Enter") form.handleSubmit(onSubmit);
                 if (e.key === "ArrowUp") {
-                  e.preventDefault()
-                  adjustAmount(STEP)
+                  e.preventDefault();
+                  adjustAmount(STEP);
                 }
                 if (e.key === "ArrowDown") {
-                  e.preventDefault()
-                  adjustAmount(-STEP)
+                  e.preventDefault();
+                  adjustAmount(-STEP);
                 }
               }}
-             aria-label="Bid amount"
-             placeholder="0.00"
-             className={`w-40 rounded-xl border-2 bg-white/80 px-3 py-3 text-center font-display text-4xl font-extrabold text-foreground outline-none transition-all focus:ring-2 tabular-nums ${
-               isDuplicate
-                 ? "border-amber-400 focus:border-amber-400 focus:ring-amber-400/20"
-                 : form.errors.amount && form.touched.amount
-                 ? "border-destructive focus:border-destructive focus:ring-destructive/20"
-                 : "border-primary/20 focus:border-primary focus:ring-primary/20"
-             }`}
+              aria-label="Bid amount"
+              placeholder="0.00"
+              className={`w-40 rounded-xl border-2 bg-white/80 px-3 py-3 text-center font-display text-4xl font-extrabold text-foreground outline-none transition-all focus:ring-2 tabular-nums ${
+                isDuplicate
+                  ? "border-amber-400 focus:border-amber-400 focus:ring-amber-400/20"
+                  : form.errors.amount && form.touched.amount
+                    ? "border-destructive focus:border-destructive focus:ring-destructive/20"
+                    : "border-primary/20 focus:border-primary focus:ring-primary/20"
+              }`}
             />
-            <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 text-[10px] font-bold text-neutral-400">{CURRENCY}</span>
-            <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-amber-100 border border-amber-200/50 px-1.5 py-[1px] text-[9px] font-bold text-amber-700">Min 1.00</span>
+            <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 text-[10px] font-bold text-neutral-400">
+              {CURRENCY}
+            </span>
+            <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-amber-100 border border-amber-200/50 px-1.5 py-[1px] text-[9px] font-bold text-amber-700">
+              Min 1.00
+            </span>
           </div>
 
           <button
@@ -274,7 +352,9 @@ export function PlaceBidScreen() {
 
         <div className="mt-3 flex items-center justify-center gap-2 rounded-lg bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20 px-3 py-2">
           <TrendingDown className="size-4 text-primary" />
-          <span className="text-xs font-semibold text-awash-gold-dark">Lower & unique = better chance to win</span>
+          <span className="text-xs font-semibold text-awash-gold-dark">
+            Lower & unique = better chance to win
+          </span>
         </div>
 
         {/* ── Bid Preview ── */}
@@ -302,7 +382,11 @@ export function PlaceBidScreen() {
       <div className="flex items-start gap-2.5 rounded-2xl bg-awash-blue/5 backdrop-blur-sm border border-awash-blue/10 p-3.5">
         <Sparkles className="mt-0.5 size-[18px] shrink-0 text-primary" />
         <p className="text-xs font-medium leading-relaxed text-foreground/80">
-          The winner is the person with the <span className="font-bold text-awash-gold-dark">lowest bid that nobody else picked</span>. Choose an unexpected amount!
+          The winner is the person with the{" "}
+          <span className="font-bold text-awash-gold-dark">
+            lowest bid that nobody else picked
+          </span>
+          . Choose an unexpected amount!
         </p>
       </div>
 
@@ -316,7 +400,9 @@ export function PlaceBidScreen() {
             className="flex items-center gap-2 rounded-xl bg-destructive/10 border border-destructive/20 p-3"
           >
             <AlertCircle className="size-4 shrink-0 text-destructive" />
-            <p className="text-xs font-semibold text-destructive">{submitError || authError}</p>
+            <p className="text-xs font-semibold text-destructive">
+              {submitError || authError}
+            </p>
           </motion.div>
         )}
       </AnimatePresence>
@@ -327,7 +413,13 @@ export function PlaceBidScreen() {
         onClick={() => form.handleSubmit(onSubmit)}
         className="btn-primary animate-shine group"
       >
-        {loading ? <><Loader2 className="size-4 animate-spin" /> Submitting…</> : "Submit Bid Amount"}
+        {loading ? (
+          <>
+            <Loader2 className="size-4 animate-spin" /> Submitting…
+          </>
+        ) : (
+          "Submit Bid Amount"
+        )}
       </button>
 
       <p className="mt-3 text-center text-[11px] font-semibold uppercase tracking-[0.25em] text-neutral-400">
@@ -349,7 +441,9 @@ export function PlaceBidScreen() {
               className="w-full max-w-md rounded-2xl border border-border bg-white p-5 shadow-2xl"
             >
               <div className="mb-3 flex items-center justify-between">
-                <h3 className="font-display text-lg font-bold text-amber-700">Duplicate Bid</h3>
+                <h3 className="font-display text-lg font-bold text-amber-700">
+                  Duplicate Bid
+                </h3>
                 <button
                   onClick={() => setShowDuplicateModal(false)}
                   className="rounded-lg p-1 text-neutral-500 hover:bg-neutral-100"
@@ -362,7 +456,8 @@ export function PlaceBidScreen() {
                 <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-600" />
                 <div>
                   <p className="text-sm font-semibold text-neutral-800">
-                    You've already placed a bid of {formatCurrency(displayedDuplicateAmount)} on this auction.
+                    You've already placed a bid of{" "}
+                    {formatCurrency(displayedDuplicateAmount)} on this auction.
                   </p>
                   <p className="mt-1 text-xs font-medium text-neutral-600">
                     Please enter a different bid amount.
@@ -380,5 +475,5 @@ export function PlaceBidScreen() {
         )}
       </AnimatePresence>
     </motion.div>
-  )
+  );
 }

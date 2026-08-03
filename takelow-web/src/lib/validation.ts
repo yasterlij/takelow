@@ -44,7 +44,9 @@ export const placeBidSchema = z.object({
   amount: z
     .number({ message: "Enter a valid bid amount" })
     .positive("Bid must be greater than 0")
-    .min(1.00, "Minimum bid is 1.00"),
+    .min(1.00, "Minimum bid is 1.00")
+    .max(9_999_999_999.99, "Bid amount is too large")
+    .refine((v) => Math.round(v * 100) === v * 100, "Maximum 2 decimal places"),
 })
 export type PlaceBidValues = z.infer<typeof placeBidSchema>
 

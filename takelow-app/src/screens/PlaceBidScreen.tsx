@@ -194,7 +194,7 @@ export function PlaceBidScreen() {
               <TextInput
                 value={amountStr}
                 onChangeText={(t) => {
-                  setAmountStr(t.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1').replace(/(\.\d{2})\d+/g, '$1').slice(0, 8))
+                  setAmountStr(t.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1').replace(/(\.\d{2})\d+/g, '$1').slice(0, 13))
                   setSubmitError(null)
                 }}
                 onBlur={() => {

@@ -1,9 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThan, In } from 'typeorm';
-import { Auction, AuctionStatus } from './entities/auction.entity';
-import { Bid } from './entities/bid.entity';
-import { BidEncryptionService } from '../common/bid-encryption.service';
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, MoreThan, In } from "typeorm";
+import { Auction, AuctionStatus } from "./entities/auction.entity";
+import { Bid } from "./entities/bid.entity";
+import { BidEncryptionService } from "../common/bid-encryption.service";
 
 interface WinnerRow {
   user_id: string;
@@ -28,25 +28,30 @@ export class AuctionsService {
   private isRecoverableSchemaError(error: unknown): boolean {
     const message = error instanceof Error ? error.message : String(error);
     return (
-      message.includes('does not exist') ||
-      message.includes('public_code') ||
-      message.includes('specs') ||
-      message.includes('bid_fee') ||
-      message.includes('current_market_price') ||
-      message.includes('created_at')
+      message.includes("does not exist") ||
+      message.includes("public_code") ||
+      message.includes("specs") ||
+      message.includes("bid_fee") ||
+      message.includes("current_market_price") ||
+      message.includes("created_at")
     );
   }
 
   private async getExistingColumns(table: string): Promise<Set<string>> {
     const rows: any[] = await this.auctionRepository.query(
-      'SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = $1',
+      "SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = $1",
       [table],
     );
     return new Set(rows.map((r) => r.column_name));
   }
 
-  private async loadAuctionRows(statuses: AuctionStatus[], activeOnly = false): Promise<any[]> {
-    const statusPlaceholders = statuses.map((_, index) => `$${index + 1}`).join(', ');
+  private async loadAuctionRows(
+    statuses: AuctionStatus[],
+    activeOnly = false,
+  ): Promise<any[]> {
+    const statusPlaceholders = statuses
+      .map((_, index) => `$${index + 1}`)
+      .join(", ");
     const params: any[] = [...statuses];
     let where = `a.status IN (${statusPlaceholders})`;
     if (activeOnly) {
@@ -54,57 +59,59 @@ export class AuctionsService {
       where += ` AND a.end_time > $${params.length}`;
     }
 
-    const auctionCols = await this.getExistingColumns('auctions');
-    const productCols = await this.getExistingColumns('products');
+    const auctionCols = await this.getExistingColumns("auctions");
+    const productCols = await this.getExistingColumns("products");
 
     if (auctionCols.size === 0) {
       return [];
     }
 
     const hasProductsTable = productCols.size > 0;
-    const rankedOrder = auctionCols.has('created_at')
-      ? 'created_at ASC'
-      : 'start_time ASC, id ASC';
-    const finalOrder = auctionCols.has('created_at')
-      ? 'a.created_at DESC'
-      : 'a.start_time DESC';
+    const rankedOrder = auctionCols.has("created_at")
+      ? "created_at ASC"
+      : "start_time ASC, id ASC";
+    const finalOrder = auctionCols.has("created_at")
+      ? "a.created_at DESC"
+      : "a.start_time DESC";
 
     const auctionSelect = [
-      'a.id',
-      'ranked.public_code',
-      'a.product_id',
-      'a.start_time',
-      'a.end_time',
-      'a.status',
-      ...(auctionCols.has('bid_fee') ? ['a.bid_fee'] : []),
-      ...(auctionCols.has('winner_user_id') ? ['a.winner_user_id'] : []),
-      ...(auctionCols.has('winning_bid_amount') ? ['a.winning_bid_amount'] : []),
-      ...(auctionCols.has('payment_status') ? ['a.payment_status'] : []),
-      ...(auctionCols.has('payment_deadline') ? ['a.payment_deadline'] : []),
-      ...(auctionCols.has('created_at') ? ['a.created_at'] : []),
-    ].join(',\n        ');
+      "a.id",
+      "ranked.public_code",
+      "a.product_id",
+      "a.start_time",
+      "a.end_time",
+      "a.status",
+      ...(auctionCols.has("bid_fee") ? ["a.bid_fee"] : []),
+      ...(auctionCols.has("winner_user_id") ? ["a.winner_user_id"] : []),
+      ...(auctionCols.has("winning_bid_amount")
+        ? ["a.winning_bid_amount"]
+        : []),
+      ...(auctionCols.has("payment_status") ? ["a.payment_status"] : []),
+      ...(auctionCols.has("payment_deadline") ? ["a.payment_deadline"] : []),
+      ...(auctionCols.has("created_at") ? ["a.created_at"] : []),
+    ].join(",\n        ");
 
     const productSelect = hasProductsTable
       ? [
-          'p.id AS product_ref_id',
-          'p.name AS product_name',
-          'p.description AS product_description',
-          'p.image_urls AS product_image_urls',
-          ...(productCols.has('current_market_price')
-            ? ['p.current_market_price AS product_current_market_price']
-            : ['NULL::numeric AS product_current_market_price']),
-          ...(productCols.has('brand')
-            ? ['p.brand AS product_brand']
-            : ['NULL::text AS product_brand']),
-        ].join(',\n        ')
+          "p.id AS product_ref_id",
+          "p.name AS product_name",
+          "p.description AS product_description",
+          "p.image_urls AS product_image_urls",
+          ...(productCols.has("current_market_price")
+            ? ["p.current_market_price AS product_current_market_price"]
+            : ["NULL::numeric AS product_current_market_price"]),
+          ...(productCols.has("brand")
+            ? ["p.brand AS product_brand"]
+            : ["NULL::text AS product_brand"]),
+        ].join(",\n        ")
       : [
-          'NULL::uuid AS product_ref_id',
-          'NULL::text AS product_name',
-          'NULL::text AS product_description',
-          'NULL::text[] AS product_image_urls',
-          'NULL::numeric AS product_current_market_price',
-          'NULL::text AS product_brand',
-        ].join(',\n        ');
+          "NULL::uuid AS product_ref_id",
+          "NULL::text AS product_name",
+          "NULL::text AS product_description",
+          "NULL::text[] AS product_image_urls",
+          "NULL::numeric AS product_current_market_price",
+          "NULL::text AS product_brand",
+        ].join(",\n        ");
 
     return this.auctionRepository.query(
       `WITH ranked AS (
@@ -116,7 +123,7 @@ export class AuctionsService {
         ${productSelect}
       FROM auctions a
       LEFT JOIN ranked ON ranked.id = a.id
-      ${hasProductsTable ? 'LEFT JOIN products p ON p.id = a.product_id' : ''}
+      ${hasProductsTable ? "LEFT JOIN products p ON p.id = a.product_id" : ""}
       WHERE ${where}
       ORDER BY ${finalOrder}
       LIMIT 50`,
@@ -157,8 +164,8 @@ export class AuctionsService {
     try {
       auctions = await this.auctionRepository.find({
         where: { status: AuctionStatus.ACTIVE, end_time: MoreThan(new Date()) },
-        relations: ['product'],
-        order: { created_at: 'DESC' },
+        relations: ["product"],
+        order: { created_at: "DESC" },
         take: 50,
       });
     } catch (error) {
@@ -176,23 +183,27 @@ export class AuctionsService {
     try {
       const [bidCounts, uniqueBidderRows] = await Promise.all([
         this.bidRepository
-          .createQueryBuilder('bid')
-          .select('bid.auction_id', 'auction_id')
-          .addSelect('COUNT(*)', 'count')
-          .where('bid.auction_id IN (:...ids)', { ids: auctionIds })
-          .groupBy('bid.auction_id')
+          .createQueryBuilder("bid")
+          .select("bid.auction_id", "auction_id")
+          .addSelect("COUNT(*)", "count")
+          .where("bid.auction_id IN (:...ids)", { ids: auctionIds })
+          .groupBy("bid.auction_id")
           .getRawMany(),
         this.bidRepository
-          .createQueryBuilder('bid')
-          .select('bid.auction_id', 'auction_id')
-          .addSelect('COUNT(DISTINCT bid.user_id)', 'count')
-          .where('bid.auction_id IN (:...ids)', { ids: auctionIds })
-          .groupBy('bid.auction_id')
+          .createQueryBuilder("bid")
+          .select("bid.auction_id", "auction_id")
+          .addSelect("COUNT(DISTINCT bid.user_id)", "count")
+          .where("bid.auction_id IN (:...ids)", { ids: auctionIds })
+          .groupBy("bid.auction_id")
           .getRawMany(),
       ]);
 
-      bidCountMap = new Map(bidCounts.map((r: any) => [r.auction_id, parseInt(r.count, 10)]));
-      uniqueBidderMap = new Map(uniqueBidderRows.map((r: any) => [r.auction_id, parseInt(r.count, 10)]));
+      bidCountMap = new Map(
+        bidCounts.map((r: any) => [r.auction_id, parseInt(r.count, 10)]),
+      );
+      uniqueBidderMap = new Map(
+        uniqueBidderRows.map((r: any) => [r.auction_id, parseInt(r.count, 10)]),
+      );
     } catch (error) {
       if (!this.isRecoverableSchemaError(error)) throw error;
     }
@@ -219,34 +230,36 @@ export class AuctionsService {
     try {
       auction = await this.auctionRepository.findOne({
         where: { id: auctionId },
-        relations: ['product'],
+        relations: ["product"],
       });
     } catch (error) {
       if (!this.isRecoverableSchemaError(error)) throw error;
-      const auctionCols = await this.getExistingColumns('auctions');
-      const productCols = await this.getExistingColumns('products');
+      const auctionCols = await this.getExistingColumns("auctions");
+      const productCols = await this.getExistingColumns("products");
       const auctionSelect = [
-        'a.id',
-        'ranked.public_code',
-        'a.product_id',
-        'a.start_time',
-        'a.end_time',
-        'a.status',
-        ...(auctionCols.has('bid_fee') ? ['a.bid_fee'] : []),
-        ...(auctionCols.has('winner_user_id') ? ['a.winner_user_id'] : []),
-        ...(auctionCols.has('winning_bid_amount') ? ['a.winning_bid_amount'] : []),
-        ...(auctionCols.has('payment_status') ? ['a.payment_status'] : []),
-        ...(auctionCols.has('payment_deadline') ? ['a.payment_deadline'] : []),
-        ...(auctionCols.has('created_at') ? ['a.created_at'] : []),
-      ].join(',\n          ');
+        "a.id",
+        "ranked.public_code",
+        "a.product_id",
+        "a.start_time",
+        "a.end_time",
+        "a.status",
+        ...(auctionCols.has("bid_fee") ? ["a.bid_fee"] : []),
+        ...(auctionCols.has("winner_user_id") ? ["a.winner_user_id"] : []),
+        ...(auctionCols.has("winning_bid_amount")
+          ? ["a.winning_bid_amount"]
+          : []),
+        ...(auctionCols.has("payment_status") ? ["a.payment_status"] : []),
+        ...(auctionCols.has("payment_deadline") ? ["a.payment_deadline"] : []),
+        ...(auctionCols.has("created_at") ? ["a.created_at"] : []),
+      ].join(",\n          ");
       const productSelect = [
-        'p.id AS product_ref_id',
-        'p.name AS product_name',
-        'p.description AS product_description',
-        'p.image_urls AS product_image_urls',
-        'p.current_market_price AS product_current_market_price',
-        ...(productCols.has('brand') ? ['p.brand AS product_brand'] : []),
-      ].join(',\n          ');
+        "p.id AS product_ref_id",
+        "p.name AS product_name",
+        "p.description AS product_description",
+        "p.image_urls AS product_image_urls",
+        "p.current_market_price AS product_current_market_price",
+        ...(productCols.has("brand") ? ["p.brand AS product_brand"] : []),
+      ].join(",\n          ");
       const rows = await this.auctionRepository.query(
         `WITH ranked AS (
           SELECT id, LPAD(ROW_NUMBER() OVER (ORDER BY created_at ASC)::text, 5, '0') AS public_code
@@ -265,8 +278,12 @@ export class AuctionsService {
       auction = rows[0] ? this.toAuctionRecord(rows[0]) : null;
     }
 
-    if (!auction || auction.status !== AuctionStatus.ACTIVE || auction.end_time.getTime() <= Date.now()) {
-      throw new NotFoundException('Auction not found or has ended');
+    if (
+      !auction ||
+      auction.status !== AuctionStatus.ACTIVE ||
+      auction.end_time.getTime() <= Date.now()
+    ) {
+      throw new NotFoundException("Auction not found or has ended");
     }
 
     const now = Date.now();
@@ -277,9 +294,9 @@ export class AuctionsService {
     });
 
     const uniqueBidders = await this.bidRepository
-      .createQueryBuilder('bid')
-      .where('bid.auction_id = :auctionId', { auctionId })
-      .select('COUNT(DISTINCT bid.user_id)', 'count')
+      .createQueryBuilder("bid")
+      .where("bid.auction_id = :auctionId", { auctionId })
+      .select("COUNT(DISTINCT bid.user_id)", "count")
       .getRawOne();
 
     return {
@@ -295,7 +312,7 @@ export class AuctionsService {
       },
       stats: {
         total_bids: totalBids,
-        unique_bidders: parseInt(uniqueBidders?.count || '0', 10),
+        unique_bidders: parseInt(uniqueBidders?.count || "0", 10),
       },
       status: auction.status,
     };
@@ -309,13 +326,16 @@ export class AuctionsService {
           { status: AuctionStatus.CLOSED },
           { status: AuctionStatus.EXPIRED },
         ],
-        relations: ['product'],
-        order: { created_at: 'DESC' },
+        relations: ["product"],
+        order: { created_at: "DESC" },
         take: 50,
       });
     } catch (error) {
       if (!this.isRecoverableSchemaError(error)) throw error;
-      const rows = await this.loadAuctionRows([AuctionStatus.CLOSED, AuctionStatus.EXPIRED]);
+      const rows = await this.loadAuctionRows([
+        AuctionStatus.CLOSED,
+        AuctionStatus.EXPIRED,
+      ]);
       auctions = rows.map((row) => this.toAuctionRecord(row));
     }
 
@@ -324,8 +344,8 @@ export class AuctionsService {
     let winnersByAuction: Map<string, WinnerRow[]> = new Map();
     if (auctionIds.length > 0) {
       try {
-          const winnerRows: any[] = await this.auctionRepository.query(
-           `SELECT w.auction_id, w.user_id, w.amount, w.rank, w.payment_status, w.payment_deadline, u.full_name AS user_name, u.phone_number AS phone
+        const winnerRows: any[] = await this.auctionRepository.query(
+          `SELECT w.auction_id, w.user_id, w.amount, w.rank, w.payment_status, w.payment_deadline, u.full_name AS user_name, u.phone_number AS phone
             FROM winners w
             LEFT JOIN users u ON u.id = w.user_id
             WHERE w.auction_id = ANY($1)
@@ -354,13 +374,15 @@ export class AuctionsService {
     if (auctions.length === 0) return [];
 
     const bidCountRows = await this.bidRepository
-      .createQueryBuilder('bid')
-      .select('bid.auction_id', 'auction_id')
-      .addSelect('COUNT(*)', 'count')
-      .where('bid.auction_id IN (:...ids)', { ids: auctionIds })
-      .groupBy('bid.auction_id')
+      .createQueryBuilder("bid")
+      .select("bid.auction_id", "auction_id")
+      .addSelect("COUNT(*)", "count")
+      .where("bid.auction_id IN (:...ids)", { ids: auctionIds })
+      .groupBy("bid.auction_id")
       .getRawMany();
-    const bidCountMap = new Map(bidCountRows.map((r: any) => [r.auction_id, parseInt(r.count, 10)]));
+    const bidCountMap = new Map(
+      bidCountRows.map((r: any) => [r.auction_id, parseInt(r.count, 10)]),
+    );
 
     return auctions.map((auction) => {
       const auctionWinners = winnersByAuction.get(auction.id) || [];
@@ -394,41 +416,43 @@ export class AuctionsService {
   async getBidHistory(auctionId: string): Promise<any[]> {
     const auction = await this.auctionRepository.findOne({
       where: { id: auctionId },
-      select: ['id', 'status'],
+      select: ["id", "status"],
     });
     const isActive = auction?.status === AuctionStatus.ACTIVE;
     const bids = await this.bidRepository.find({
       where: { auction_id: auctionId },
-      order: { bid_time: 'DESC' },
+      order: { bid_time: "DESC" },
       take: 200,
     });
-    return Promise.all(bids.map(async (b) => {
-      let realAmount = b.amount;
-      if (!isActive && b.encrypted_amount) {
-        try {
-          realAmount = this.bidEncryptionService.decrypt(b.encrypted_amount);
-        } catch {
-          realAmount = 0;
+    return Promise.all(
+      bids.map(async (b) => {
+        let realAmount = b.amount;
+        if (!isActive && b.encrypted_amount) {
+          try {
+            realAmount = this.bidEncryptionService.decrypt(b.encrypted_amount);
+          } catch {
+            realAmount = 0;
+          }
         }
-      }
-      return {
-        id: b.id,
-        user_id: b.user_id,
-        auction_id: b.auction_id,
-        amount: isActive ? 0 : realAmount,
-        encrypted_amount: isActive ? b.encrypted_amount : null,
-        amount_encrypted: isActive,
-        bid_time: b.bid_time,
-        service_fee_paid: b.service_fee_paid,
-        ticket_number: b.ticket_number,
-      };
-    }));
+        return {
+          id: b.id,
+          user_id: b.user_id,
+          auction_id: b.auction_id,
+          amount: isActive ? 0 : realAmount,
+          encrypted_amount: isActive ? b.encrypted_amount : null,
+          amount_encrypted: isActive,
+          bid_time: b.bid_time,
+          service_fee_paid: b.service_fee_paid,
+          ticket_number: b.ticket_number,
+        };
+      }),
+    );
   }
 
   async getUserBidHistory(userId: string): Promise<any[]> {
     const bids = await this.bidRepository.find({
       where: { user_id: userId },
-      order: { bid_time: 'DESC' },
+      order: { bid_time: "DESC" },
       take: 100,
     });
 
@@ -437,32 +461,35 @@ export class AuctionsService {
     const auctionIds = [...new Set(bids.map((b) => b.auction_id))];
     const auctions = await this.auctionRepository.find({
       where: { id: In(auctionIds) },
-      select: ['id', 'status'],
+      select: ["id", "status"],
     });
     const auctionStatusMap = new Map(auctions.map((a) => [a.id, a.status]));
 
-    return Promise.all(bids.map(async (b) => {
-      const isActive = auctionStatusMap.get(b.auction_id) === AuctionStatus.ACTIVE;
-      let realAmount = b.amount;
-      if (!isActive && b.encrypted_amount) {
-        try {
-          realAmount = this.bidEncryptionService.decrypt(b.encrypted_amount);
-        } catch {
-          realAmount = 0;
+    return Promise.all(
+      bids.map(async (b) => {
+        const isActive =
+          auctionStatusMap.get(b.auction_id) === AuctionStatus.ACTIVE;
+        let realAmount = b.amount;
+        if (!isActive && b.encrypted_amount) {
+          try {
+            realAmount = this.bidEncryptionService.decrypt(b.encrypted_amount);
+          } catch {
+            realAmount = 0;
+          }
         }
-      }
-      return {
-        id: b.id,
-        user_id: b.user_id,
-        auction_id: b.auction_id,
-        amount: isActive ? 0 : realAmount,
-        encrypted_amount: isActive ? b.encrypted_amount : null,
-        amount_encrypted: isActive,
-        bid_time: b.bid_time,
-        service_fee_paid: b.service_fee_paid,
-        ticket_number: b.ticket_number,
-      };
-    }));
+        return {
+          id: b.id,
+          user_id: b.user_id,
+          auction_id: b.auction_id,
+          amount: isActive ? 0 : realAmount,
+          encrypted_amount: isActive ? b.encrypted_amount : null,
+          amount_encrypted: isActive,
+          bid_time: b.bid_time,
+          service_fee_paid: b.service_fee_paid,
+          ticket_number: b.ticket_number,
+        };
+      }),
+    );
   }
 
   async getUserWonAuctions(userId: string): Promise<any[]> {
@@ -473,8 +500,8 @@ export class AuctionsService {
           winner_user_id: userId,
           status: AuctionStatus.CLOSED,
         },
-        relations: ['product'],
-        order: { created_at: 'DESC' },
+        relations: ["product"],
+        order: { created_at: "DESC" },
         take: 50,
       });
     } catch (error) {
@@ -510,7 +537,9 @@ export class AuctionsService {
             phone: row.phone || null,
           });
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
 
     return auctions.map((auction) => {

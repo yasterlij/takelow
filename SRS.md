@@ -9,7 +9,7 @@ The TakeLow platform is a mobile-first (Android/iOS) and web-based auction syste
 
 1.2 Core Business Rule (The Algorithm)
 If ETB 1.00 is submitted twice, ETB 2.50 once, ETB 3.00 twice, and ETB 4.00 once, the lowest unique bid is ETB 2.50 — that user wins.
-RULE: Bid amounts support up to 2 decimal places (e.g., 10.50). Minimum bid is 1.00 ETB.
+RULE: Bid amounts support exactly 2 decimal places (e.g., 10.50, 23.45, 1000.00, 92047.23). Minimum bid is 1.00 ETB. There is no fixed upper ceiling other than the storage limit of the `bids.amount` column (`DECIMAL(12,2)`, max 9,999,999,999.99 ETB). All bid inputs accept the full range and normalize input to 2 decimal places on blur.
 
 1.3 Scope
 The system includes:
@@ -30,13 +30,13 @@ FR-01: User Authentication & Profile
   FR-01.7: **Failed login auditing**: All failed login attempts are logged to the audit trail with identifier, reason, and timestamp.
 
 FR-02: Auction Bidding Engine (Core Business Logic)
-  FR-02.1 (Bid Placement): Users enter a bid amount (up to 2 decimal places, min 1.00) and pay a non-refundable "Bid Service Fee" (minimum 1.00 ETB, configurable via BID_FEE) from their wallet.
+  FR-02.1 (Bid Placement): Users enter a bid amount (2-decimal precision, min 1.00; any value above 1.00 is accepted, e.g. 1000.00, 92047.23) and pay a non-refundable "Bid Service Fee" (minimum 1.00 ETB, configurable via BID_FEE) from their wallet.
   FR-02.2 (Bid Service Fee): Fee deducted atomically via wallet service call on bid submission. Supports both SikinaPay and wallet payment methods. Bid fee must be at least 1.00 and is configured via the BID_FEE environment variable.
   FR-02.3 (Real-time Updates): Socket.io pushes bid updates (total_bids, new bid amount) to all subscribed users in real-time. WebSocket CORS restricted to configured origins.
   FR-02.4 (LUB Calculation): Redis ZSET tracks bid frequencies and unique bids in real-time (ZINCRBY / ZREM). On auction close, ZRANGEBYSCORE finds the lowest unique bid in O(log N). **Batch winner calculation** uses a single DB query for all winning amounts instead of N individual queries.
   FR-02.5 (Ticket Number): Each successful bid generates a unique ticket number (BID_ + 12 hex chars) stored in the bid record and returned to the client.
   FR-02.6 (Outbid Notifications): When a bid makes a previously unique amount non-unique, all previous bidders at that amount receive an outbid alert via the notification service.
-  FR-02.7 (Bid Validation): Bid amount validated server-side with class-validator (@IsNumber, maxDecimalPlaces: 2, @Min(1.00)). Nonce+timestamp headers prevent replay attacks.
+  FR-02.7 (Bid Validation): Bid amount validated server-side with class-validator (@IsNumber, maxDecimalPlaces: 2, @Min(1.00), @Max(9999999999.99) matching DECIMAL(12,2)). Frontend inputs allow the full 1.00–9,999,999,999.99 range and normalize display to 2 decimal places (e.g., 1000.00, 23.45, 92047.23). Nonce+timestamp headers prevent replay attacks.
 
 FR-03: Product & Auction Management
   FR-03.1 (Product Details): Display images, descriptions, and current market value per product.
@@ -123,9 +123,9 @@ Table: Auctions
   end_time (TIMESTAMP)
   status (ENUM: 'ACTIVE', 'CLOSED', 'EXPIRED')
   winner_user_id (UUID, Foreign Key to Users, Nullable)
-  winning_bid_amount (DECIMAL(10,2), Nullable)
-  min_bid (DECIMAL(10,2), Nullable)
-  max_bid (DECIMAL(10,2), Nullable)
+  winning_bid_amount (DECIMAL(12,2), Nullable)
+  min_bid (DECIMAL(12,2), Nullable)
+  max_bid (DECIMAL(12,2), Nullable)
   num_winners (INTEGER, default 1)
   created_at (TIMESTAMP)
   Indexes: (status, end_time), (status, payment_status, winner_user_id)
@@ -143,7 +143,7 @@ Table: Bids
   id (UUID, Primary Key)
   user_id (UUID, Foreign Key to Users)
   auction_id (UUID, Foreign Key to Auctions)
-  amount (DECIMAL(10,2))
+  amount (DECIMAL(12,2)) — 2-decimal precision; supports 1.00 up to 9,999,999,999.99
   bid_time (TIMESTAMP)
   service_fee_paid (BOOLEAN, default TRUE)
   ticket_number (VARCHAR, nullable) — BID_XXXXXXXXXXXX format
@@ -154,18 +154,19 @@ Table: Winners
   id (UUID, Primary Key)
   auction_id (UUID, Foreign Key to Auctions)
   user_id (UUID, Foreign Key to Users)
-  amount (DECIMAL(10,2))
+  amount (DECIMAL(12,2))
   payment_status (VARCHAR, default 'pending')
   payment_deadline (TIMESTAMP)
   created_at (TIMESTAMP)
 
 SECTION 6: CRITICAL ALGORITHMS & LOGIC
 6.1 The "Incremental Winner" Algorithm (Redis ZSET Method)
-  Winner calculation uses Redis exclusively — no DB query at close time.
-  1. Bid Placement: ZINCRBY takelow:auction:{id}:frequencies 1 <amount>
-  2. Track Uniqueness:
-     If frequency returns 1: ZADD takelow:auction:{id}:unique_bids 0 <amount>
-     If frequency returns >1: ZREM takelow:auction:{id}:unique_bids <amount>
+   Winner calculation uses Redis exclusively — no DB query at close time.
+   All amount keys are normalized to 2 decimals (e.g., 10.5 is stored as "10.50") so integer and decimal bids of the same value share one frequency entry.
+   1. Bid Placement: ZINCRBY takelow:auction:{id}:frequencies 1 <amount> (member normalized to 2 decimals)
+   2. Track Uniqueness:
+      If frequency returns 1: ZADD takelow:auction:{id}:unique_bids <amount> "<amount>" (score + normalized member)
+      If frequency returns >1: ZREM takelow:auction:{id}:unique_bids "<amount>"
   3. Determine Winner (At auction close):
      ZRANGEBYSCORE takelow:auction:{id}:unique_bids 0 0 WITHSCORES LIMIT 1
      Returns the lowest unique bid in O(log N).

@@ -53,7 +53,10 @@ export type Auction = {
 export const CURRENCY = "birr"
 
 export function formatETB(amount: number | null | undefined): string {
-  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(amount ?? 0)
+  return new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount ?? 0)
 }
 
 export function formatCurrency(amount: number | null | undefined): string {
