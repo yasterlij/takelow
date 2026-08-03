@@ -1,5 +1,5 @@
 import React, { Children } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, type ViewStyle } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, type StyleProp, type ViewStyle } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { ChevronLeft, Signal, Wifi, BatteryFull, Gavel, Trophy, Zap } from 'lucide-react-native'
 import Svg, { Circle, Path, LinearGradient as SvgGradient, Stop, Defs } from 'react-native-svg'
@@ -172,7 +172,7 @@ export function NavyButton({ children, onPress, disabled, style }: {
 
 // ─── Card ────────────────────────────────────────────────────────────
 
-export function Card({ children, style }: { children: React.ReactNode; style?: ViewStyle }) {
+export function Card({ children, style }: { children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
   return (
     <View style={[s.glassCard, style]}>
       {children}
@@ -180,7 +180,7 @@ export function Card({ children, style }: { children: React.ReactNode; style?: V
   )
 }
 
-export function GoldCard({ children, style }: { children: React.ReactNode; style?: ViewStyle }) {
+export function GoldCard({ children, style }: { children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
   return (
     <View style={[s.glassCard, { borderColor: colors.primary + '4D', backgroundColor: colors.accent + 'CC' }, style]}>
       {children}
