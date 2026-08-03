@@ -44,6 +44,7 @@ function createMockRepo() {
   return {
     findOne: jest.fn(),
     find: jest.fn(),
+    count: jest.fn(),
     create: jest.fn((x: any) => x),
     save: jest.fn((x: any) => x),
   };
@@ -253,6 +254,37 @@ describe('BiddingService - Bid Fee Payment Check', () => {
 
       await service.placeBid(auctionId, userId, amount, endTime, "test-ticket");
 
+      expect(mockRedis.del).toHaveBeenCalledWith(`takelow:auction:${auctionId}:lock`);
+    });
+
+    it('should still return success when redis bid-state updates fail after the bid is saved', async () => {
+      mockPaymentTransactionRepo.findOne.mockResolvedValue({
+        status: PaymentTransactionStatus.SUCCESSFUL,
+      });
+      mockBidRepo.count.mockResolvedValue(1);
+      (mockRedis.multi as jest.Mock).mockReturnValue({
+        exec: jest.fn().mockRejectedValue(new Error('redis write failed')),
+        sadd: jest.fn().mockReturnThis(),
+        zincrby: jest.fn().mockReturnThis(),
+        zadd: jest.fn().mockReturnThis(),
+        zrem: jest.fn().mockReturnThis(),
+        incr: jest.fn().mockReturnThis(),
+        expire: jest.fn().mockReturnThis(),
+      });
+
+      const result = await service.placeBid(
+        auctionId,
+        userId,
+        amount,
+        endTime,
+        'test-ticket',
+      );
+
+      expect(mockBidRepo.save).toHaveBeenCalled();
+      expect(mockBidRepo.count).toHaveBeenCalledWith({
+        where: { auction_id: auctionId },
+      });
+      expect(result.newTotalBids).toBe(1);
       expect(mockRedis.del).toHaveBeenCalledWith(`takelow:auction:${auctionId}:lock`);
     });
 

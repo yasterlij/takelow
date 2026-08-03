@@ -40,6 +40,19 @@ export class BiddingService {
     return Math.max(60, secondsUntilEnd + AUCTION_STATE_TTL_BUFFER_SECONDS);
   }
 
+  private async getPersistedBidCount(auctionId: string): Promise<number> {
+    try {
+      return await this.bidRepository.count({
+        where: { auction_id: auctionId },
+      });
+    } catch (e) {
+      this.logger.error(
+        `DB bid count fallback failed for ${auctionId}: ${e.message}`,
+      );
+      return 1;
+    }
+  }
+
   constructor(
     @InjectRedis() private readonly redis: Redis,
     private readonly auctionGateway: AuctionGateway,
@@ -117,22 +130,36 @@ export class BiddingService {
         }),
       );
 
-      await this.trackBidInRedis(auctionId, userId, amount, endTime);
+      let totalBids = 1;
+      try {
+        await this.trackBidInRedis(auctionId, userId, amount, endTime);
+
+        const totalBidsStr = await this.redis.get(
+          `takelow:auction:${auctionId}:total_bids`,
+        );
+        totalBids = totalBidsStr ? parseInt(totalBidsStr, 10) : 1;
+      } catch (e) {
+        this.logger.warn(
+          `Redis bid state update failed for ${auctionId}; continuing with persisted bid only: ${e.message}`,
+        );
+        totalBids = await this.getPersistedBidCount(auctionId);
+      }
 
       this.notifyOutbidBidders(auctionId, userId, amount).catch((e) =>
         this.logger.warn(`Failed to notify outbid bidders: ${e.message}`),
       );
 
-      const totalBidsStr = await this.redis.get(
-        `takelow:auction:${auctionId}:total_bids`,
-      );
-      const totalBids = totalBidsStr ? parseInt(totalBidsStr, 10) : 1;
-
-      this.auctionGateway.broadcastAuctionUpdate({
-        auction_id: auctionId,
-        total_bids: totalBids,
-        timestamp: new Date().toISOString(),
-      });
+      try {
+        this.auctionGateway.broadcastAuctionUpdate({
+          auction_id: auctionId,
+          total_bids: totalBids,
+          timestamp: new Date().toISOString(),
+        });
+      } catch (e) {
+        this.logger.warn(
+          `Auction update broadcast failed for ${auctionId}: ${e.message}`,
+        );
+      }
 
       this.logger.debug(
         `Bid placed: auction=${auctionId} user=${userId} amount=${amount} total_bids=${totalBids}`,
