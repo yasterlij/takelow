@@ -132,8 +132,8 @@ services:
     networks:
       - backend
     command: >
-      sh -c "apk add --no-cache bash postgresql-client &&
-             /app/scripts/migrate-raw.sh"
+      sh -c "apk add --no-cache postgresql-client &&
+             sh /app/scripts/migrate-raw.sh"
 
   seed:
     image: node:20-alpine
@@ -150,11 +150,7 @@ services:
       - backend
     command: >
       sh -c "test -f /app/scripts/seed.js &&
-             apk add --no-cache bash postgresql-client &&
-             mkdir -p /app/identity-service &&
-             cd /app/identity-service &&
-             (test -f package.json || npm init -y >/dev/null 2>&1 || true) &&
-             npm install bcryptjs --no-audit --no-fund &&
+             apk add --no-cache postgresql-client &&
              node /app/scripts/seed.js"
 
 volumes:

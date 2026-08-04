@@ -1,5 +1,5 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/usr/bin/env sh
+set -eu
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DB_URL="${DATABASE_URL:-postgresql://admin:secret@localhost:5432/takelow_db}"

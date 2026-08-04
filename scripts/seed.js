@@ -1,5 +1,5 @@
 const { execSync } = require('child_process');
-const bcrypt = require(require('path').resolve(__dirname, '../identity-service/node_modules/bcryptjs'));
+const bcrypt = require('./vendor/bcryptjs');
 
 const DB_URL = process.env.DATABASE_URL || 'postgresql://admin:secret@localhost:5432/takelow_db';
 const PROXY = 'http://localhost:3333/api/v1';
