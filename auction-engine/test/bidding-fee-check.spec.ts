@@ -288,6 +288,33 @@ describe('BiddingService - Bid Fee Payment Check', () => {
       expect(mockRedis.del).toHaveBeenCalledWith(`takelow:auction:${auctionId}:lock`);
     });
 
+    it('should reject the 151st bid when a user has already placed 150 bids for the auction', async () => {
+      mockBidRepo.count.mockResolvedValue(150);
+
+      await expect(
+        service.placeBid(auctionId, userId, amount, endTime, "test-ticket")
+      ).rejects.toThrow('You have reached the maximum of 150 bids for this auction.');
+
+      expect(mockRedis.del).toHaveBeenCalledWith(`takelow:auction:${auctionId}:lock`);
+    });
+
+    it('should allow a bid when the user is below the 150-bid cap', async () => {
+      mockPaymentTransactionRepo.findOne.mockResolvedValue({
+        status: PaymentTransactionStatus.SUCCESSFUL,
+      });
+      mockBidRepo.count.mockResolvedValue(149);
+
+      const result = await service.placeBid(
+        auctionId,
+        userId,
+        amount,
+        endTime,
+        "test-ticket",
+      );
+
+      expect(result).toBeDefined();
+    });
+
     it('should release auction lock even if bid fee check fails', async () => {
       mockPaymentTransactionRepo.findOne.mockResolvedValue(null);
 

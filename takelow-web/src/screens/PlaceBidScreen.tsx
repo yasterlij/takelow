@@ -12,6 +12,7 @@ import {
   Plus,
   ArrowLeft,
   X,
+  Info,
 } from "lucide-react";
 import { useApp } from "../AppContext";
 import { useForm } from "../hooks/useForm";
@@ -39,10 +40,19 @@ export function PlaceBidScreen() {
   const [bidFlash, setBidFlash] = useState(false);
   const [serverBidAmounts, setServerBidAmounts] = useState<number[]>([]);
   const [duplicateAmount, setDuplicateAmount] = useState<number | null>(null);
+  const [debouncedAmount, setDebouncedAmount] = useState(0);
 
   const STEP = 0.01;
 
   const form = useForm<PlaceBidValues>(placeBidSchema, { amount: 0 });
+
+  useEffect(() => {
+    const id = window.setTimeout(
+      () => setDebouncedAmount(form.values.amount),
+      500,
+    );
+    return () => window.clearTimeout(id);
+  }, [form.values.amount]);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -66,14 +76,8 @@ export function PlaceBidScreen() {
   );
 
   const isDuplicate =
-    form.values.amount > 0 && hasPlacedBid(form.values.amount);
+    debouncedAmount > 0 && hasPlacedBid(debouncedAmount);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
-
-  useEffect(() => {
-    if (!isDuplicate) return;
-    setDuplicateAmount(form.values.amount);
-    setShowDuplicateModal(true);
-  }, [form.values.amount, isDuplicate]);
 
   const adjustAmount = useCallback(
     (delta: number) => {
@@ -346,6 +350,20 @@ export function PlaceBidScreen() {
             >
               <AlertCircle className="size-3" />
               {form.errors.amount}
+            </motion.p>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {isDuplicate && (
+            <motion.p
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mt-2 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-amber-600"
+            >
+              <Info className="size-3" />
+              You've already bid {formatCurrency(form.values.amount)} — pick a different amount.
             </motion.p>
           )}
         </AnimatePresence>

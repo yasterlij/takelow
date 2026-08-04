@@ -26,6 +26,7 @@ import { NotificationDispatchService } from "../worker/notification-dispatch.ser
 
 const LOCK_TTL = 5000;
 const AUCTION_STATE_TTL_BUFFER_SECONDS = 3600;
+const MAX_USER_BIDS_PER_AUCTION = 150;
 
 @Injectable()
 export class BiddingService {
@@ -98,6 +99,15 @@ export class BiddingService {
       const now = Date.now();
       if (now > endTime.getTime()) {
         throw new ForbiddenException("Auction has closed");
+      }
+
+      const userBidCount = await this.bidRepository.count({
+        where: { auction_id: auctionId, user_id: userId },
+      });
+      if (userBidCount >= MAX_USER_BIDS_PER_AUCTION) {
+        throw new BadRequestException(
+          `You have reached the maximum of ${MAX_USER_BIDS_PER_AUCTION} bids for this auction.`,
+        );
       }
 
       // Check if user has paid bid fee via SikinaPay

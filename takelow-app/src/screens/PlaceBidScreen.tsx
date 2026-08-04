@@ -16,27 +16,25 @@ export function PlaceBidScreen() {
   const autoSubmittedRef = useRef(false)
   const [bidFlash, setBidFlash] = useState(false)
   const [serverBidAmounts, setServerBidAmounts] = useState<number[]>([])
+  const [debouncedAmount, setDebouncedAmount] = useState(0)
   const STEP = 0.01
 
+  const amount = parseFloat(amountStr || '0')
+
   const hasPlacedBid = useCallback(
-    (amount: number) =>
-      myBids.some((b) => b.auctionId === selectedId && b.amount === amount) ||
-      serverBidAmounts.some((a) => a === amount),
+    (bAmount: number) =>
+      myBids.some((b) => b.auctionId === selectedId && b.amount === bAmount) ||
+      serverBidAmounts.some((a) => a === bAmount),
     [myBids, serverBidAmounts, selectedId],
   )
 
-  const amount = parseFloat(amountStr || '0')
-  const isDuplicate = amount > 0 && hasPlacedBid(amount)
-  const valid = amount >= 1 && !loading && !isDuplicate
-
   useEffect(() => {
-    if (!isDuplicate) return
-    Alert.alert(
-      'Duplicate Bid',
-      `You've already placed a bid of ${formatCurrency(amount)} on this auction. Please enter a different bid amount.`,
-      [{ text: 'Change Bid Amount' }],
-    )
-  }, [isDuplicate, amount])
+    const id = setTimeout(() => setDebouncedAmount(amount), 500)
+    return () => clearTimeout(id)
+  }, [amount])
+
+  const isDuplicate = debouncedAmount > 0 && hasPlacedBid(debouncedAmount)
+  const valid = amount >= 1 && !loading && !isDuplicate
 
   if (!auction) return null
 
