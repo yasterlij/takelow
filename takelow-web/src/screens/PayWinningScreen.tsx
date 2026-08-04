@@ -17,7 +17,7 @@ const paymentMethods = [
   {
     id: "SIKINAPAY" as const,
     label: "SikinaPay",
-    desc: "Pay via Mobile Money, USSD, or card",
+    desc: "Pay via Mobile Money",
     icon: ShieldCheck,
     gradient: "from-indigo-500/10 to-purple-500/5 border-indigo-200/50",
     iconBg: "bg-indigo-100 text-indigo-600",
@@ -25,7 +25,7 @@ const paymentMethods = [
 ]
 
 export function PayWinningScreen() {
-  const { go, goBack, selectedId, userBid, payWinning, getAuction, authError, setPaymentMethod, walletBalance, refreshWallet } = useApp()
+  const { go, selectedId, userBid, payWinning, getAuction, authError, setPaymentMethod, walletBalance, refreshWallet } = useApp()
   const auction = getAuction(selectedId)
   const [loading, setLoading] = useState(false)
   const [showMethods, setShowMethods] = useState(false)
@@ -210,7 +210,7 @@ export function PayWinningScreen() {
     >
       {/* ── Header ── */}
       <div className="flex items-center gap-3">
-        <button onClick={goBack} className="flex size-10 items-center justify-center rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm text-awash-blue hover:bg-white transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5 active:scale-[0.97]">
+        <button onClick={() => go("winner")} className="flex size-10 items-center justify-center rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm text-awash-blue hover:bg-white transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5 active:scale-[0.97]">
           <ArrowLeft className="size-5" />
         </button>
         <div>
@@ -223,9 +223,8 @@ export function PayWinningScreen() {
       <motion.div
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
-        className={`flex items-center gap-2 rounded-xl p-3 ${
-          urgent ? "bg-red-50 border border-red-200" : "bg-gradient-to-br from-awash-gold/10 to-awash-gold-light/5 border border-primary/20"
-        }`}
+        className={`flex items-center gap-2 rounded-xl p-3 ${urgent ? "bg-red-50 border border-red-200" : "bg-gradient-to-br from-awash-gold/10 to-awash-gold-light/5 border border-primary/20"
+          }`}
       >
         <Clock className={`size-[18px] flex-shrink-0 ${urgent ? "text-red-500 animate-pulse" : "text-primary"}`} />
         <p className={`text-xs font-semibold ${urgent ? "text-red-700" : "text-foreground/80"}`}>
@@ -242,7 +241,7 @@ export function PayWinningScreen() {
       >
         <div className="flex items-center justify-center gap-2 mb-1">
           <Trophy className="size-4 text-awash-gold" />
-          <span className="text-xs font-semibold uppercase tracking-wide text-awash-gold-dark">Primary Winning Bid</span>
+          <span className="text-xs font-semibold uppercase tracking-wide text-awash-gold-dark">Winning Bid</span>
         </div>
         <p className="mt-1 font-display text-4xl font-extrabold text-gradient-gold tabular-nums">{formatCurrency(amount)}</p>
         <span className="mt-2 inline-block text-xs font-medium text-neutral-500">for {auction.name}</span>
@@ -305,11 +304,10 @@ export function PayWinningScreen() {
                     <button
                       key={method.id}
                       onClick={() => { setSelected(method.id); setShowMethods(false) }}
-                      className={`flex w-full items-center gap-3 rounded-xl p-3 text-left transition-all duration-300 ${
-                        isActive
-                          ? "bg-primary/10 ring-1 ring-primary shadow-sm"
-                          : "hover:bg-neutral-50"
-                      }`}
+                      className={`flex w-full items-center gap-3 rounded-xl p-3 text-left transition-all duration-300 ${isActive
+                        ? "bg-primary/10 ring-1 ring-primary shadow-sm"
+                        : "hover:bg-neutral-50"
+                        }`}
                     >
                       <span className={`flex size-10 items-center justify-center rounded-xl ${isActive ? method.iconBg : "bg-neutral-100 text-neutral-500"}`}>
                         <Icon className="size-5" />
@@ -349,7 +347,7 @@ export function PayWinningScreen() {
           <div>
             <p className="text-sm font-bold text-foreground">SikinaPay Checkout</p>
             <p className="mt-1 text-xs font-medium leading-relaxed text-neutral-500">
-              Complete your payment securely within the app using SikinaPay checkout via Mobile Money, USSD, or card.
+              Complete your payment securely within the app using SikinaPay checkout via Mobile Money.
             </p>
           </div>
         </div>
@@ -397,7 +395,7 @@ export function PayWinningScreen() {
         {loading
           ? "Processing..."
           : checkingPin
-          ? "Checking wallet PIN status..."
+            ? "Checking wallet PIN status..."
             : `Proceed to Payment · ${formatCurrency(amount)}`}
       </button>
 
