@@ -44,7 +44,7 @@ type BidRow = {
 };
 
 export function AdminAuctionMonitorScreen() {
-  const { go, selectedId, getAuction, refreshAuctions } = useApp();
+  const { go, goBack, selectedId, getAuction, refreshAuctions } = useApp();
   const auction = getAuction(selectedId);
 
   const [liveAuction, setLiveAuction] = useState(auction);
@@ -182,7 +182,7 @@ export function AdminAuctionMonitorScreen() {
         <View style={{ backgroundColor: colors.navy }}>
           <StatusBarCustom />
         </View>
-        <AppBar title="Monitor Auction" onBack={() => go("admin-monitor")} />
+        <AppBar title="Monitor Auction" onBack={goBack} />
         <View style={{ alignItems: "center", paddingVertical: 80 }}>
           <Gavel size={40} color={colors.neutralGray300} />
           <Text
@@ -255,7 +255,7 @@ export function AdminAuctionMonitorScreen() {
       </View>
       <AppBar
         title="Auction Monitor"
-        onBack={() => go("admin-monitor")}
+        onBack={goBack}
         right={
           <TouchableOpacity
             onPress={() => {

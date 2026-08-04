@@ -41,6 +41,7 @@ const paymentMethods = [
 export function PayFeeScreen() {
   const {
     go,
+    goBack,
     payFee,
     getAuction,
     selectedId,
@@ -325,7 +326,7 @@ export function PayFeeScreen() {
       {/* ── Header ── */}
       <div className="flex items-center gap-3">
         <button
-          onClick={() => go("home")}
+          onClick={goBack}
           className="flex size-10 items-center justify-center rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm text-awash-blue hover:bg-white transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5 active:scale-[0.97]"
         >
           <ArrowLeft className="size-5" />

@@ -7,7 +7,7 @@ import { CTAButton, Card } from "../components/AuctionUI"
 import { formatCurrency, formatETB } from "../mockDataV0"
 
 export function PaymentVerifyingScreen() {
-  const { go, selectedId, userBid, pendingBidAmount, getAuction, paymentContext, setFeePaid } = useApp()
+  const { go, goBack, selectedId, userBid, pendingBidAmount, getAuction, paymentContext, setFeePaid } = useApp()
   const auction = getAuction(selectedId)
   const [message, setMessage] = useState("Waiting for payment confirmation...")
   const [paid, setPaid] = useState(false)
@@ -83,7 +83,7 @@ export function PaymentVerifyingScreen() {
         className="flex flex-1 flex-col overflow-y-auto"
       >
         <div className="flex items-center gap-3 border-b border-border/60 bg-white/80 px-4 py-3 backdrop-blur-md">
-          <button onClick={() => go("auctions")} className="flex size-8 items-center justify-center rounded-full text-neutral-600 transition-colors hover:bg-neutral-100">
+          <button onClick={goBack} className="flex size-8 items-center justify-center rounded-full text-neutral-600 transition-colors hover:bg-neutral-100">
             <ArrowLeft className="size-5" />
           </button>
           <h1 className="font-display text-base font-bold text-awash-blue">Payment</h1>
@@ -183,7 +183,7 @@ export function PaymentVerifyingScreen() {
         className="flex flex-1 flex-col overflow-y-auto"
       >
         <div className="flex items-center gap-3 border-b border-border/60 bg-white/80 px-4 py-3 backdrop-blur-md">
-          <button onClick={() => go("auctions")} className="flex size-8 items-center justify-center rounded-full text-neutral-600 transition-colors hover:bg-neutral-100">
+          <button onClick={goBack} className="flex size-8 items-center justify-center rounded-full text-neutral-600 transition-colors hover:bg-neutral-100">
             <ArrowLeft className="size-5" />
           </button>
           <h1 className="font-display text-base font-bold text-awash-blue">Payment</h1>

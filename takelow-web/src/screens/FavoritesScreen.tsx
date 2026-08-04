@@ -8,6 +8,7 @@ import { formatCurrency } from "../mockDataV0"
 export function FavoritesScreen() {
   const {
     go,
+    goBack,
     auctions,
     favoriteAuctionIds,
     favoritesLoading,
@@ -25,7 +26,7 @@ export function FavoritesScreen() {
     <div className="flex flex-1 flex-col gap-6 pb-8">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <button onClick={() => go("profile")} className="flex size-10 items-center justify-center rounded-xl border border-border/60 bg-white/80 text-awash-blue shadow-sm transition-all hover:bg-white hover:shadow-md hover:-translate-y-0.5 active:scale-[0.97]">
+          <button onClick={goBack} className="flex size-10 items-center justify-center rounded-xl border border-border/60 bg-white/80 text-awash-blue shadow-sm transition-all hover:bg-white hover:shadow-md hover:-translate-y-0.5 active:scale-[0.97]">
             <ArrowLeft className="size-5" />
           </button>
           <div>

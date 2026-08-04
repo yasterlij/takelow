@@ -7,7 +7,7 @@ import { Countdown } from "../components/Countdown"
 import { CURRENCY, formatETB } from "../mockDataV0"
 
 export function MonitorScreen() {
-  const { go, selectedId, userBid, getAuction } = useApp()
+  const { go, goBack, selectedId, userBid, getAuction } = useApp()
   const auction = getAuction(selectedId)
 
   const [seconds, setSeconds] = useState(auction?.timeLeft ?? 130)
@@ -45,7 +45,7 @@ export function MonitorScreen() {
       className="relative flex flex-1 flex-col overflow-y-auto"
     >
       
-      <AppBar title="Auction in Progress" onBack={() => go("bid-confirmed")} />
+      <AppBar title="Auction in Progress" onBack={goBack} />
       <motion.div
         initial="hidden"
         animate="visible"

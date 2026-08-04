@@ -9,7 +9,7 @@ import { formatCurrency, formatETB } from "../mockDataV0"
 type ResultType = "success" | "failed" | "pending"
 
 export function PaymentResultScreen() {
-  const { go, selectedId, userBid, pendingBidAmount, getAuction, paymentContext, setFeePaid } = useApp()
+  const { go, goBack, selectedId, userBid, pendingBidAmount, getAuction, paymentContext, setFeePaid } = useApp()
   const auction = getAuction(selectedId)
   const [polling, setPolling] = useState(true)
   const [result, setResult] = useState<ResultType>("pending")
@@ -216,7 +216,7 @@ export function PaymentResultScreen() {
       className="flex flex-1 flex-col overflow-y-auto"
     >
       <div className="flex items-center gap-3 border-b border-border/60 bg-white/80 px-4 py-3 backdrop-blur-md">
-        <button onClick={() => go("auctions")} className="flex size-8 items-center justify-center rounded-full text-neutral-600 transition-colors hover:bg-neutral-100">
+        <button onClick={goBack} className="flex size-8 items-center justify-center rounded-full text-neutral-600 transition-colors hover:bg-neutral-100">
           <ArrowLeft className="size-5" />
         </button>
         <h1 className="font-display text-base font-bold text-awash-blue">Payment</h1>

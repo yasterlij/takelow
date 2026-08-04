@@ -104,6 +104,7 @@ type AppState = {
   authError: string | null;
   sessionEndReason: SessionExpireReason | null;
   go: (view: View) => void;
+  goBack: () => void;
   selectAuction: (id: string) => void;
   selectAuctionForMonitor: (id: string) => void;
   setSelectedIdOnly: (id: string) => void;
@@ -247,6 +248,7 @@ const LIVE_VIEWS: View[] = [
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [view, setView] = useState<View>("login");
+  const [viewHistory, setViewHistory] = useState<View[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [userBid, setUserBid] = useState<number | null>(null);
   const [pendingBidAmount, setPendingBidAmount] = useState<number | null>(null);
@@ -340,7 +342,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 phone: profile.phone_number,
                 role: profile.role as UserRole,
               });
-              setView("home");
+              resetTo("home");
             } catch {
               try {
                 const refreshed = await api.auth.refresh(saved.refreshToken);
@@ -353,7 +355,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
                   phone: profile.phone_number,
                   role: profile.role as UserRole,
                 });
-                setView("home");
+                resetTo("home");
               } catch {
                 setApiToken(null);
                 setRefreshToken(null);
@@ -490,6 +492,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(interval);
   }, [hydrated, user, view]);
 
+  const navigate = useCallback(
+    (next: View) => {
+      setViewHistory((h) =>
+        next === view ? h : [...h.slice(-19), view],
+      );
+      setView(next);
+    },
+    [view],
+  );
+
+  const resetTo = useCallback((next: View) => {
+    setViewHistory([]);
+    setView(next);
+  }, []);
+
+  const goBack = useCallback(() => {
+    setViewHistory((h) => {
+      if (h.length === 0) {
+        setView(user ? "home" : "login");
+        return h;
+      }
+      const prev = h[h.length - 1];
+      setView(prev);
+      return h.slice(0, -1);
+    });
+  }, [user]);
+
   const go = useCallback(
     (next: View) => {
       const adminViews: View[] = [
@@ -504,9 +533,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         "monitor",
       ];
       if (adminViews.includes(next) && user?.role !== "admin") return;
-      setView(next);
+      navigate(next);
     },
-    [user],
+    [user, navigate],
   );
 
   const selectAuction = useCallback(
@@ -521,12 +550,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setSikinaProxyUrl(null);
       const auction = auctions.find((a) => a.id === id);
       if (auction?.status === "closed") {
-        setView("winner");
+        navigate("winner");
       } else {
-        setView("product");
+        navigate("product");
       }
     },
-    [auctions],
+    [auctions, navigate],
   );
 
   const setSelectedIdOnly = useCallback((id: string) => {
@@ -535,8 +564,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const selectAuctionForMonitor = useCallback((id: string) => {
     setSelectedId(id);
-    setView("admin-auction-monitor");
-  }, []);
+    navigate("admin-auction-monitor");
+  }, [navigate]);
 
   const payFee = useCallback(
     async (fee: number, paymentMethod?: "SIKINAPAY" | "AWASH") => {
@@ -546,7 +575,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (paymentMethod === "AWASH") {
           await api.payBidFeeWithWallet(selectedId);
           setFeePaid(true);
-          setView("place-bid");
+          navigate("place-bid");
           return;
         }
         setPaymentContext("bid-fee");
@@ -556,7 +585,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         );
         setSikinaPayUrl(payment_url);
         setSikinaProxyUrl(proxy_url || null);
-        setView("sikina-pay-checkout");
+        navigate("sikina-pay-checkout");
       } catch (e) {
         const msg = getUserFriendlyMessage(e);
         setAuthError(msg);
@@ -596,7 +625,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
               : a,
           ),
         );
-        setView("bid-confirmed");
+        navigate("bid-confirmed");
         refreshWallet();
         setTimeout(() => refreshAuctions(), 3000);
         const name =
@@ -635,7 +664,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setLastPaymentMethod("AWASH");
           refreshWallet();
           refreshAuctions();
-          setView("payment-confirmed");
+          navigate("payment-confirmed");
           return;
         }
         setPaymentContext("winning");
@@ -647,7 +676,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         );
         setSikinaPayUrl(payment_url);
         setSikinaProxyUrl(proxy_url || null);
-        setView("sikina-pay-checkout");
+        navigate("sikina-pay-checkout");
       } catch (e) {
         const msg = getUserFriendlyMessage(e);
         setAuthError(msg);
@@ -669,7 +698,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [selectedId]);
 
   const reset = useCallback(() => {
-    setView("home");
+    resetTo("home");
     setSelectedId(null);
     setUserBid(null);
     setBidTicketNumber(null);
@@ -680,7 +709,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setPaymentContext(null);
     setSikinaPayUrl(null);
     setMyBids([]);
-  }, []);
+  }, [resetTo]);
 
   const refreshAuctions = useCallback(async () => {
     if (refreshing.current) return;
@@ -758,7 +787,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           appUser.name = res.user.phone_number;
         }
         setUser(appUser);
-        setView("home");
+        resetTo("home");
         refreshWallet();
         refreshAuctions();
         return true;
@@ -767,7 +796,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return false;
       }
     },
-    [],
+    [resetTo],
   );
 
   const register = useCallback(
@@ -786,7 +815,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           role: res.user.role as UserRole,
         };
         setUser(appUser);
-        setView("home");
+        resetTo("home");
         refreshWallet();
         refreshAuctions();
         return true;
@@ -795,7 +824,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return false;
       }
     },
-    [],
+    [resetTo],
   );
 
   const logout = useCallback((reason: SessionExpireReason = "logout") => {
@@ -838,8 +867,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         reason,
       });
     }
-    setView("login");
-  }, []);
+    resetTo("login");
+  }, [resetTo]);
   logoutRef.current = logout;
 
   const addAuction = useCallback(
@@ -880,9 +909,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       } catch (e: any) {
         toast(e?.message || "Failed to create auction", "error");
       }
-      setView("admin-auctions");
+      navigate("admin-auctions");
     },
-    [refreshAuctions, user],
+    [refreshAuctions, user, navigate],
   );
 
   const closeAuction = useCallback(
@@ -1017,6 +1046,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       authError,
       sessionEndReason,
       go,
+      goBack,
       selectAuction,
       selectAuctionForMonitor,
       setSelectedIdOnly,
@@ -1072,6 +1102,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       authError,
       sessionEndReason,
       go,
+      goBack,
       selectAuction,
       selectAuctionForMonitor,
       setSelectedIdOnly,

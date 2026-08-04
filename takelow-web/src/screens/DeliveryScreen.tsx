@@ -12,7 +12,7 @@ const steps = [
 ]
 
 export function DeliveryScreen() {
-  const { go, selectedId, reset, getAuction } = useApp()
+  const { go, goBack, selectedId, reset, getAuction } = useApp()
   const auction = getAuction(selectedId)
   if (!auction) return null
 
@@ -24,7 +24,7 @@ export function DeliveryScreen() {
       className="relative flex flex-1 flex-col overflow-y-auto"
     >
       
-      <AppBar title="Track Delivery" onBack={() => go("winner")} />
+      <AppBar title="Track Delivery" onBack={goBack} />
       <motion.div
         initial="hidden"
         animate="visible"

@@ -127,7 +127,7 @@ const PRICE_RANGES = [
 ]
 
 export function AuctionsScreen() {
-  const { go, selectAuction, myBids, auctions, auctionsLoading, refreshAuctions } = useApp()
+  const { go, goBack, selectAuction, myBids, auctions, auctionsLoading, refreshAuctions } = useApp()
   const [category, setCategory] = useState("All")
   const [statusFilter, setStatusFilter] = useState<"all" | "live" | "closed">("live")
   const [priceRange, setPriceRange] = useState(0)
@@ -170,7 +170,7 @@ export function AuctionsScreen() {
         className="flex items-center justify-between"
       >
         <div className="flex items-center gap-3">
-          <button onClick={() => go("home")} className="flex size-10 items-center justify-center rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm text-awash-blue hover:bg-white transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5 active:scale-[0.97]">
+          <button onClick={goBack} className="flex size-10 items-center justify-center rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm text-awash-blue hover:bg-white transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5 active:scale-[0.97]">
             <ArrowLeft className="size-5" />
           </button>
           <div>

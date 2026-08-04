@@ -10,6 +10,7 @@ import { formatCurrency } from '../mockDataV0'
 export function FavoritesScreen() {
   const {
     go,
+    goBack,
     auctions,
     favoriteAuctionIds,
     favoritesLoading,

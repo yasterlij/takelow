@@ -115,7 +115,7 @@ const loveItems = [
 ]
 
 export function AuctionsScreen() {
-  const { go, selectAuction, myBids, auctions, auctionsLoading, refreshAuctions } = useApp()
+  const { go, goBack, selectAuction, myBids, auctions, auctionsLoading, refreshAuctions } = useApp()
   const [category, setCategory] = useState('All')
   const [showClosed, setShowClosed] = useState(false)
 
@@ -140,7 +140,7 @@ export function AuctionsScreen() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={{ backgroundColor: colors.navy }}>
         <StatusBarCustom />
-        <AppBar title="Live Auctions" onBack={() => go('home')} />
+        <AppBar title="Live Auctions" onBack={goBack} />
       </View>
       <ScrollView
         style={{ flex: 1 }}

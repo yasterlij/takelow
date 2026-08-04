@@ -39,6 +39,7 @@ export default defineConfig({
       '/api/v1/auctions/result': { target: ENGINE, changeOrigin: true },
       '^/api/v1/auctions/[^/]+/result': { target: ENGINE, changeOrigin: true },
       '^/api/v1/auctions/[^/]+/bid': { target: ENGINE, changeOrigin: true },
+      '^/api/v1/auctions/[^/]+/my-bids': { target: ENGINE, changeOrigin: true },
       '/api/v1/auctions': { target: QUERY, changeOrigin: true },
       '/api': { target: QUERY, changeOrigin: true },
       '/socket.io': { target: ENGINE, ws: true },

@@ -52,6 +52,7 @@ export function AdminAuctionMonitorScreen() {
     forceCloseAuction,
     refreshAuctions,
     selectAuctionForMonitor,
+    goBack,
   } = useApp();
   const auction = getAuction(selectedId);
 
@@ -190,7 +191,7 @@ export function AdminAuctionMonitorScreen() {
             No auction selected
           </p>
           <button
-            onClick={() => go("admin-monitor")}
+            onClick={goBack}
             className="mt-4 rounded-xl bg-awash-blue px-4 py-2 text-xs font-bold text-white"
           >
             Browse Active Auctions
@@ -223,7 +224,7 @@ export function AdminAuctionMonitorScreen() {
       subtitle={liveAuction.name}
       actions={
         <button
-          onClick={() => go("admin-monitor")}
+          onClick={goBack}
           className="flex items-center gap-1.5 rounded-xl border border-border/60 bg-white px-3 py-2 text-xs font-bold text-neutral-600 transition-all hover:bg-neutral-50"
         >
           <ArrowLeft className="size-3.5" /> All Auctions

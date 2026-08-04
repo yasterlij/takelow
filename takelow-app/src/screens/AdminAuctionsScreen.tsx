@@ -162,7 +162,7 @@ function fmtDate(d: Date): string {
 }
 
 export function AdminAuctionsScreen() {
-  const { go, auctions, addAuction, updateAuction, deleteAuction, closeAuction, refreshAuctions, allBids } = useApp()
+  const { go, goBack, auctions, addAuction, updateAuction, deleteAuction, closeAuction, refreshAuctions, allBids } = useApp()
   const [showForceCloseConfirm, setShowForceCloseConfirm] = useState<string | null>(null)
   const [forceClosing, setForceClosing] = useState(false)
   const [forceCloseWarning, setForceCloseWarning] = useState('')
@@ -335,7 +335,7 @@ const [category, setCategory] = useState<string>(STANDARD_AUCTION_CATEGORIES[0])
       <View style={{ backgroundColor: colors.navy }}>
         <StatusBarCustom />
       </View>
-      <AppBar title="Auction Management" onBack={() => go('auctions')} right={
+      <AppBar title="Auction Management" onBack={goBack} right={
         <TouchableOpacity style={{ width: 32, height: 32, justifyContent: 'center', alignItems: 'center' }} onPress={openCreate}>
           <Plus size={20} color={colors.navyForeground} />
         </TouchableOpacity>

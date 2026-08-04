@@ -13,7 +13,7 @@ const particles = Array.from({ length: 16 }, (_, i) => ({
 }))
 
 export function BidConfirmedScreen() {
-  const { go, selectedId, userBid, bidTicketNumber, getAuction, user } = useApp()
+  const { go, goBack, selectedId, userBid, bidTicketNumber, getAuction, user } = useApp()
   const isAdmin = user?.role === "admin"
   const auction = getAuction(selectedId)
   const [showConfetti, setShowConfetti] = useState(true)
@@ -57,7 +57,7 @@ export function BidConfirmedScreen() {
 
       {/* ── Header ── */}
       <div className="flex items-center gap-3 border-b border-border/60 bg-white/80 backdrop-blur-md px-4 py-3">
-        <button onClick={() => go("auctions")} className="flex size-8 items-center justify-center rounded-full text-neutral-600 transition-all hover:bg-neutral-100 hover:-translate-y-0.5 active:scale-[0.97]">
+        <button onClick={goBack} className="flex size-8 items-center justify-center rounded-full text-neutral-600 transition-all hover:bg-neutral-100 hover:-translate-y-0.5 active:scale-[0.97]">
           <ArrowLeft className="size-5" />
         </button>
         <h1 className="font-display text-base font-bold text-foreground">Bid Submitted</h1>

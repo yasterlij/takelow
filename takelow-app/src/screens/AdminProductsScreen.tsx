@@ -26,7 +26,7 @@ function getProductCategory(product: { category?: string | null; name?: string |
 }
 
 export function AdminProductsScreen() {
-  const { go } = useApp()
+  const { go, goBack } = useApp()
   const [products, setProducts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -97,7 +97,7 @@ export function AdminProductsScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={s.header}>
-        <TouchableOpacity onPress={() => go('auctions')} style={s.backBtn}><ArrowLeft size={20} color={colors.navyForeground} /></TouchableOpacity>
+        <TouchableOpacity onPress={goBack} style={s.backBtn}><ArrowLeft size={20} color={colors.navyForeground} /></TouchableOpacity>
         <Text style={s.headerTitle}>Products</Text>
         <TouchableOpacity onPress={() => { resetForm(); setShowForm(true) }} style={s.addBtn}><Plus size={18} color={colors.primaryForeground} /></TouchableOpacity>
       </View>

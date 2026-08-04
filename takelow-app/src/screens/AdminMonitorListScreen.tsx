@@ -27,7 +27,7 @@ type MonitorAuction = {
 }
 
 export function AdminMonitorListScreen() {
-  const { go, refreshAuctions, selectAuctionForMonitor } = useApp()
+  const { go, goBack, refreshAuctions, selectAuctionForMonitor } = useApp()
   const [search, setSearch] = useState('')
   const [adminAuctions, setAdminAuctions] = useState<MonitorAuction[]>([])
   const [loading, setLoading] = useState(true)
@@ -69,7 +69,7 @@ export function AdminMonitorListScreen() {
       <View style={{ backgroundColor: colors.navy }}>
         <StatusBarCustom />
       </View>
-      <AppBar title="Monitor Auctions" onBack={() => go('admin-dashboard')} right={
+      <AppBar title="Monitor Auctions" onBack={goBack} right={
         <TouchableOpacity onPress={handleRefresh} style={{ width: 32, height: 32, justifyContent: 'center', alignItems: 'center' }} activeOpacity={0.7}>
           <RefreshCw size={18} color={colors.navyForeground} />
         </TouchableOpacity>

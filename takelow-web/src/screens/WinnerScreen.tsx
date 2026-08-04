@@ -31,7 +31,7 @@ const confettiParticles = Array.from({ length: 20 }, (_, i) => ({
 }));
 
 export function WinnerScreen() {
-  const { go, selectedId, user, getAuction } = useApp();
+  const { go, goBack, selectedId, user, getAuction } = useApp();
   const isAdmin = user?.role === "admin";
   const auction = getAuction(selectedId);
   const [winner, setWinner] = useState<
@@ -171,7 +171,7 @@ export function WinnerScreen() {
       {/* ── Header ── */}
       <div className="flex w-full items-center justify-between">
         <button
-          onClick={() => go("home")}
+          onClick={goBack}
           className="flex size-10 items-center justify-center rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm text-awash-blue hover:bg-white transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5 active:scale-[0.97]"
         >
           <ArrowLeft className="size-5" />

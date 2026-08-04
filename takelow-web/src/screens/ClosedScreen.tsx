@@ -7,7 +7,7 @@ import { api } from "../api"
 import { formatCurrency, formatETB } from "../mockDataV0"
 
 export function ClosedScreen() {
-  const { go, selectedId, user, getAuction } = useApp()
+  const { go, goBack, selectedId, user, getAuction } = useApp()
   const auction = getAuction(selectedId)
   const isAdmin = user?.role === "admin"
   const [progress, setProgress] = useState(0)
@@ -69,7 +69,7 @@ export function ClosedScreen() {
         variants={{ hidden: { opacity: 0, x: -12 }, visible: { opacity: 1, x: 0 } }}
         className="flex w-full items-center"
       >
-        <button onClick={() => go("home")} className="flex size-10 items-center justify-center rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm text-awash-blue shadow-sm transition-all hover:bg-white">
+        <button onClick={goBack} className="flex size-10 items-center justify-center rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm text-awash-blue shadow-sm transition-all hover:bg-white">
           <ArrowLeft className="size-5" />
         </button>
       </motion.div>

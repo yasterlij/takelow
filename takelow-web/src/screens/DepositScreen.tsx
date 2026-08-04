@@ -11,7 +11,7 @@ import { CURRENCY, formatCurrency, formatETB } from "../mockDataV0"
 const QUICK_AMOUNTS = [100, 250, 500, 1000]
 
 export function DepositScreen() {
-  const { go, refreshWallet, walletBalance } = useApp()
+  const { go, goBack, refreshWallet, walletBalance } = useApp()
   const [loading, setLoading] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
@@ -43,7 +43,7 @@ export function DepositScreen() {
       <div className="flex items-center gap-3">
         <motion.button
           whileTap={{ scale: 0.95 }}
-          onClick={() => go("home")}
+          onClick={goBack}
           className="flex size-10 items-center justify-center rounded-xl border border-border/60 bg-white/80 text-awash-blue shadow-sm backdrop-blur-sm transition-all hover:bg-white"
         >
           <ArrowLeft className="size-5" />

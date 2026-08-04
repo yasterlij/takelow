@@ -92,6 +92,7 @@ function Lightbox({
 export function ProductScreen() {
   const {
     go,
+    goBack,
     selectedId,
     getAuction,
     isFavorite,
@@ -201,7 +202,7 @@ export function ProductScreen() {
       {/* ── Back + Title ── */}
       <div className="flex items-start gap-3">
         <button
-          onClick={() => go("auctions")}
+          onClick={goBack}
           className="flex size-10 items-center justify-center rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm text-awash-blue hover:bg-white transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5 active:scale-[0.97]"
         >
           <ArrowLeft className="size-5" />

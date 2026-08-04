@@ -7,7 +7,7 @@ import { CURRENCY, formatETB } from '../mockDataV0'
 import { colors } from '../theme'
 
 export function DeliveryScreen() {
-  const { go, selectedId, userBid, reset, getAuction } = useApp()
+  const { go, goBack, selectedId, userBid, reset, getAuction } = useApp()
   const auction = getAuction(selectedId)
   if (!auction) return null
 
@@ -25,7 +25,7 @@ export function DeliveryScreen() {
       <View style={{ backgroundColor: colors.navy }}>
         <StatusBarCustom />
       </View>
-      <AppBar title="Track Delivery" onBack={() => go('payment-confirmed')} />
+      <AppBar title="Track Delivery" onBack={goBack} />
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 40 }}>
         <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 16, borderColor: colors.primary + '4D', backgroundColor: colors.accent, padding: 16 }}>
           <View style={s.courierIcon}>

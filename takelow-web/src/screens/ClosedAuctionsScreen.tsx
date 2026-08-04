@@ -6,7 +6,7 @@ import { Card, Badge } from "../components/AuctionUI"
 import { formatCurrency, formatETB } from "../mockDataV0"
 
 export function ClosedAuctionsScreen() {
-  const { go, selectAuction, auctions, auctionsLoading } = useApp()
+  const { go, goBack, selectAuction, auctions, auctionsLoading } = useApp()
   const [filter, setFilter] = useState<"all" | "won" | "paid">("all")
 
   const closedAuctions = useMemo(
@@ -35,7 +35,7 @@ export function ClosedAuctionsScreen() {
         className="flex items-center justify-between"
       >
         <div className="flex items-center gap-3">
-          <button onClick={() => go("home")} className="flex size-10 items-center justify-center rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm text-awash-blue shadow-sm transition-all hover:bg-white">
+          <button onClick={goBack} className="flex size-10 items-center justify-center rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm text-awash-blue shadow-sm transition-all hover:bg-white">
             <ArrowLeft className="size-5" />
           </button>
           <div>
