@@ -33,10 +33,11 @@ import { AdminAuditScreen } from "./screens/AdminAuditScreen"
 import { AdminMonitorListScreen } from "./screens/AdminMonitorListScreen"
 import { AdminAuctionMonitorScreen } from "./screens/AdminAuctionMonitorScreen"
 import { AwashMark, BottomTabBar } from "./components/AuctionUI"
+import { NotificationBell } from "./components/NotificationBell"
 import { ErrorBoundary } from "./components/ErrorBoundary"
 import { ToastContainer } from "./components/Toast"
 import { ShimmerProvider } from "./components/SkeletonLoader"
-import { Gavel, Wallet, Shield, LogOut, Trophy, Menu, X, User, Bell } from "lucide-react"
+import { Gavel, Wallet, Shield, LogOut, Trophy, Menu, X, User } from "lucide-react"
 
 function ScreenRouter() {
   const { view, user } = useApp()
@@ -88,7 +89,7 @@ function ScreenRouter() {
 }
 
 function Navbar() {
-  const { go, view, user, logout, unreadNotificationCount } = useApp()
+  const { go, view, user, logout } = useApp()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const isAuthed = !!user
   if (!isAuthed) return null
@@ -135,17 +136,7 @@ function Navbar() {
             </div>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
-            <button
-              onClick={() => go("notifications")}
-              className="relative hidden sm:flex size-9 items-center justify-center rounded-lg border border-border/60 bg-white/50 backdrop-blur-sm text-neutral-500 transition-all duration-300 hover:bg-white hover:text-awash-blue"
-            >
-              <Bell className="size-4" />
-              {unreadNotificationCount > 0 && (
-                <span className="absolute -right-1 -top-1 flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-                  {unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}
-                </span>
-              )}
-            </button>
+            <NotificationBell />
             <span className="hidden text-sm font-medium text-neutral-500 sm:block">
               {user?.name || user?.phone}
             </span>

@@ -95,7 +95,7 @@ export function MyBidsScreen() {
                           <TimeLeft seconds={auction.timeLeft} />
                         )}
                         <Badge tone={auction.status === 'closed' ? 'muted' : 'green'}>
-                          {auction.status === 'closed' ? 'Ended' : <><Trophy size={12} /> Running</>}
+                          {auction.status === 'closed' ? 'Ended' : <><Trophy size={12} /> Live</>}
                         </Badge>
                       </View>
                     </View>

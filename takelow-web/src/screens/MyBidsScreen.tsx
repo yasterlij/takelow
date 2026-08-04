@@ -115,7 +115,7 @@ export function MyBidsScreen() {
                       {auction.status !== "closed" ? (
                         <Badge tone="green">
                           <Trophy className="size-3" />
-                          In the running
+                          Live
                         </Badge>
                       ) : (
                         <Badge tone="muted">Closed</Badge>
