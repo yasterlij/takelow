@@ -77,6 +77,12 @@ export class WinnerService {
       }
     }
 
+    const dbResult = await this.calculateWinnersFromDb(auctionId, 1);
+
+    if (dbResult.totalBids > 0) {
+      return dbResult;
+    }
+
     try {
       const result = await this.calculateWinnersFromRedis(auctionId, 1);
       if (result.found) {
@@ -88,10 +94,18 @@ export class WinnerService {
       );
     }
 
-    return this.calculateWinnersFromDb(auctionId, 1);
+    return dbResult;
   }
 
   async hasUniqueBids(auctionId: string): Promise<boolean> {
+    try {
+      return await this.hasUniqueBidsFromDb(auctionId);
+    } catch (e) {
+      this.logger.warn(
+        `DB unique check failed for ${auctionId}: ${e.message}`,
+      );
+    }
+
     try {
       const result = await this.hasUniqueBidsFromRedis(auctionId);
       if (result !== null) return result;
@@ -101,7 +115,7 @@ export class WinnerService {
       );
     }
 
-    return this.hasUniqueBidsFromDb(auctionId);
+    return false;
   }
 
   private async hasUniqueBidsFromRedis(

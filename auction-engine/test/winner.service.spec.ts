@@ -109,6 +109,44 @@ describe('WinnerService (Section 11.1 - Test Case 1 & 2)', () => {
     expect(result.totalBids).toBe(3);
   });
 
+  it('prefers the DB result when Redis is desynced and misses a lower unique bid', async () => {
+    mockAuctionRepo.findOne.mockResolvedValue({ status: 'ACTIVE' });
+    mockBidRepo.find.mockResolvedValue([
+      { user_id: 'u1', amount: 5.2, encrypted_amount: null, bid_time: new Date('2024-01-01T00:00:00Z') },
+      { user_id: 'u2', amount: 9, encrypted_amount: null, bid_time: new Date('2024-01-01T00:00:01Z') },
+      { user_id: 'u3', amount: 9, encrypted_amount: null, bid_time: new Date('2024-01-01T00:00:02Z') },
+      { user_id: 'u4', amount: 9, encrypted_amount: null, bid_time: new Date('2024-01-01T00:00:03Z') },
+      { user_id: 'u5', amount: 23.43, encrypted_amount: null, bid_time: new Date('2024-01-01T00:00:04Z') },
+      { user_id: 'u6', amount: 54.45, encrypted_amount: null, bid_time: new Date('2024-01-01T00:00:05Z') },
+    ]);
+    (mockRedis.get as jest.Mock).mockResolvedValue('6');
+    (mockRedis.zrange as jest.Mock).mockResolvedValue(['54.45']);
+    (mockRedis.zscore as jest.Mock).mockResolvedValue('1');
+
+    const result = await service.calculateWinners('auction-desync');
+
+    expect(result.winningAmounts).toEqual([5.2]);
+    expect(result.winners).toEqual([{ amount: 5.2, userId: 'u1' }]);
+    expect(result.totalBids).toBe(6);
+  });
+
+  it('returns no winners when all DB bids are duplicated even if Redis reports one', async () => {
+    mockAuctionRepo.findOne.mockResolvedValue({ status: 'ACTIVE' });
+    mockBidRepo.find.mockResolvedValue([
+      { user_id: 'u1', amount: 9, encrypted_amount: null, bid_time: new Date('2024-01-01T00:00:00Z') },
+      { user_id: 'u2', amount: 9, encrypted_amount: null, bid_time: new Date('2024-01-01T00:00:01Z') },
+    ]);
+    (mockRedis.get as jest.Mock).mockResolvedValue('2');
+    (mockRedis.zrange as jest.Mock).mockResolvedValue(['9']);
+    (mockRedis.zscore as jest.Mock).mockResolvedValue('1');
+
+    const result = await service.calculateWinners('auction-alldup');
+
+    expect(result.winningAmounts).toEqual([]);
+    expect(result.winners).toEqual([]);
+    expect(result.totalBids).toBe(2);
+  });
+
   it('falls back to bid reconstruction when persisted winners are unavailable for a closed auction', async () => {
     mockAuctionRepo.findOne.mockResolvedValue({ status: 'CLOSED' });
     mockWinnerRepo.find.mockRejectedValue(new Error('relation "winners" does not exist'));
