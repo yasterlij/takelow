@@ -191,10 +191,6 @@ export function ProductScreen() {
     };
   }, [selectedId]);
 
-  useEffect(() => {
-    if (isDuplicate) setShowDuplicateModal(true);
-  }, [isDuplicate]);
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}

@@ -113,15 +113,6 @@ export function PayFeeScreen() {
   const isDuplicate = numericBid > 0 && hasPlacedBid(numericBid);
 
   useEffect(() => {
-    if (!isDuplicate) return;
-    Alert.alert(
-      "Duplicate Bid",
-      `You've already placed a bid of ${formatCurrency(numericBid)} on this auction. Please enter a different bid amount.`,
-      [{ text: "Change Bid Amount" }],
-    );
-  }, [isDuplicate, numericBid]);
-
-  useEffect(() => {
     if (!bidFlash) return;
     const id = setTimeout(() => setBidFlash(false), 240);
     return () => clearTimeout(id);
@@ -759,7 +750,6 @@ export function PayFeeScreen() {
           onPress={handlePayPress}
           disabled={
             !hasValidBid ||
-            isDuplicate ||
             (selected === "AWASH" &&
               (walletBalance < auction.bidFee || checkingPin))
           }

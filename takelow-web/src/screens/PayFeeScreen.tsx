@@ -163,10 +163,6 @@ export function PayFeeScreen() {
   const isDuplicate = bidAmount > 0 && hasPlacedBid(bidAmount);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
 
-  useEffect(() => {
-    if (isDuplicate) setShowDuplicateModal(true);
-  }, [isDuplicate]);
-
   if (!auction) return null;
 
   const updateBid = useCallback(
@@ -611,7 +607,6 @@ export function PayFeeScreen() {
         onClick={handlePayClick}
         disabled={
           !hasValidBid ||
-          isDuplicate ||
           loading ||
           checkingPin ||
           (selected === "AWASH" && walletBalance < auction.bidFee)

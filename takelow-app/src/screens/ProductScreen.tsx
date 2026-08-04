@@ -9,7 +9,6 @@ import {
   Dimensions,
   TextInput,
   ActivityIndicator,
-  Alert,
 } from "react-native";
 import {
   Users,
@@ -192,15 +191,6 @@ export function ProductScreen() {
       active = false;
     };
   }, [selectedId]);
-
-  useEffect(() => {
-    if (!isDuplicate) return;
-    Alert.alert(
-      "Duplicate Bid",
-      `You've already placed a bid of ${formatCurrency(numericBid)} on this auction. Please enter a different bid amount.`,
-      [{ text: "Change Bid Amount" }],
-    );
-  }, [isDuplicate, numericBid]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
