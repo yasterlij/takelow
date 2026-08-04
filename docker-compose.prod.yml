@@ -150,10 +150,10 @@ services:
       - backend
     command: >
       sh -c "test -f /app/scripts/seed.js &&
-             apk add --no-cache postgresql-client &&
+             apk add --no-cache bash postgresql-client &&
              mkdir -p /app/identity-service &&
              cd /app/identity-service &&
-             (test -f package.json || npm init -y >/dev/null 2>&1) &&
+             (test -f package.json || npm init -y >/dev/null 2>&1 || true) &&
              npm install bcryptjs --no-audit --no-fund &&
              node /app/scripts/seed.js"
 
