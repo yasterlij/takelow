@@ -37,7 +37,7 @@ import { NotificationBell } from "./components/NotificationBell"
 import { ErrorBoundary } from "./components/ErrorBoundary"
 import { ToastContainer } from "./components/Toast"
 import { ShimmerProvider } from "./components/SkeletonLoader"
-import { Gavel, Wallet, Shield, LogOut, Trophy, Menu, X, User } from "lucide-react"
+import { Gavel, Wallet, Shield, LogOut, Trophy, Menu, X, User, TicketCheck } from "lucide-react"
 
 function ScreenRouter() {
   const { view, user } = useApp()
@@ -97,6 +97,7 @@ function Navbar() {
   const navItems = [
     { id: "home", label: "Home", icon: Wallet },
     { id: "auctions", label: "Live Auctions", icon: Gavel },
+    { id: "my-bids", label: "My Bids", icon: TicketCheck },
     { id: "closed-auctions", label: "Winners", icon: Trophy },
     { id: "profile", label: "Profile", icon: User },
     ...(user?.role === "admin" ? [{ id: "admin-dashboard", label: "Admin", icon: Shield }] : []),
