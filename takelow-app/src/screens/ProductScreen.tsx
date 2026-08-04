@@ -92,6 +92,7 @@ function LightboxModal({
 export function ProductScreen() {
   const {
     go,
+    goBack,
     selectedId,
     getAuction,
     isFavorite,
@@ -199,7 +200,7 @@ export function ProductScreen() {
       </View>
       <AppBar
         title="Product Details"
-        onBack={() => go("auctions")}
+        onBack={goBack}
         right={
           <TouchableOpacity
             onPress={() => toggleFavorite(auction.id)}

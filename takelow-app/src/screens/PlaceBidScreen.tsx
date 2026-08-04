@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { View, Text, TextInput, ScrollView, StyleSheet, ActivityIndicator, TouchableOpacity, Alert } from 'react-native'
-import { Sparkles, TrendingDown, CheckCircle2, Minus, Plus, AlertTriangle } from 'lucide-react-native'
+import { Sparkles, TrendingDown, CheckCircle2, Minus, Plus, AlertTriangle, Info } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { AppBar, CTAButton, Card, AwashMark } from '../components/AuctionUI'
 import { CURRENCY, formatCurrency } from '../mockDataV0'
@@ -8,7 +8,7 @@ import { colors } from '../theme'
 import { api } from '../api'
 
 export function PlaceBidScreen() {
-  const { go, selectedId, submitBid, getAuction, authError, feePaid, pendingBidAmount, setPendingBidAmount, myBids } = useApp()
+  const { go, goBack, selectedId, submitBid, getAuction, authError, feePaid, pendingBidAmount, setPendingBidAmount, myBids } = useApp()
   const auction = getAuction(selectedId)
   const [amountStr, setAmountStr] = useState('')
   const [loading, setLoading] = useState(false)
@@ -124,7 +124,7 @@ export function PlaceBidScreen() {
       </View>
       <AppBar
         title="Place Your Bid"
-        onBack={() => go('pay-fee')}
+        onBack={goBack}
         right={
           <TouchableOpacity onPress={() => go('home')} style={{ width: 34, height: 34, justifyContent: 'center', alignItems: 'center' }}>
             <AwashMark size={22} />
@@ -237,6 +237,13 @@ export function PlaceBidScreen() {
           </Text>
         </View>
 
+        <View style={s.limitBanner}>
+          <Info size={16} color={colors.warning} />
+          <Text style={s.limitText}>
+            Limited Auction Bid Participation — each participant is limited to a maximum of 150 bids per auction to ensure fair play and prevent monopolization.
+          </Text>
+        </View>
+
         {(authError || submitError) && (
           <View style={s.error}>
             <Text style={s.errorText}>{submitError || authError}</Text>
@@ -288,6 +295,8 @@ const s = StyleSheet.create({
   tipText: { fontSize: 12, fontWeight: '600', color: colors.accentForeground },
   strategy: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, borderRadius: 12, backgroundColor: colors.navy + '0D', padding: 12, marginTop: 16 },
   strategyText: { fontSize: 12, fontWeight: '500', lineHeight: 18, color: colors.navy + 'CC', flex: 1 },
+  limitBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, borderRadius: 12, backgroundColor: colors.warning + '1A', borderWidth: 1, borderColor: colors.warning + '40', padding: 12, marginTop: 12 },
+  limitText: { fontSize: 12, fontWeight: '500', lineHeight: 18, color: colors.warning, flex: 1 },
   bottomCta: { position: 'absolute', bottom: 0, left: 0, right: 0, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.card + 'F2', padding: 16 },
   footerNote: { marginTop: 10, textAlign: 'center', fontSize: 10, fontWeight: '700', letterSpacing: 1.2, color: colors.mutedForeground, textTransform: 'uppercase' },
   error: { borderRadius: 12, backgroundColor: colors.destructive + '15', padding: 12, marginTop: 16 },

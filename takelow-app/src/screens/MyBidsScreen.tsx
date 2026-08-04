@@ -21,7 +21,7 @@ function TimeLeft({ seconds }: { seconds: number }) {
 }
 
 export function MyBidsScreen() {
-  const { go, myBids, selectAuction, getAuction, auctionsLoading, refreshAuctions } = useApp()
+  const { go, goBack, myBids, selectAuction, getAuction, auctionsLoading, refreshAuctions } = useApp()
   const [refreshing, setRefreshing] = useState(false)
 
   const onRefresh = useCallback(async () => {
@@ -37,7 +37,7 @@ export function MyBidsScreen() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={{ backgroundColor: colors.navy }}>
         <StatusBarCustom />
-        <AppBar title="My Bids" onBack={() => go('home')} />
+        <AppBar title="My Bids" onBack={goBack} />
       </View>
       <ScrollView
         style={{ flex: 1 }}

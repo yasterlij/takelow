@@ -8,7 +8,7 @@ import { CURRENCY, formatETB } from '../mockDataV0'
 import { colors } from '../theme'
 
 export function MonitorScreen() {
-  const { go, selectedId, userBid, getAuction } = useApp()
+  const { go, goBack, selectedId, userBid, getAuction } = useApp()
   const auction = getAuction(selectedId)
   const pulseAnim = useRef(new Animated.Value(1)).current
   const bellAnim = useRef(new Animated.Value(1)).current
@@ -67,7 +67,7 @@ export function MonitorScreen() {
       <View style={{ backgroundColor: colors.navy }}>
         <StatusBarCustom />
       </View>
-      <AppBar title="Auction in Progress" onBack={() => go('bid-confirmed')} />
+      <AppBar title="Auction in Progress" onBack={goBack} />
       <View style={{ flex: 1, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 120 }}>
         <View style={{ alignItems: 'center', justifyContent: 'center', gap: 8 }}>
           <Animated.View style={[s.liveBadge, { opacity: pulseAnim }]}>

@@ -35,6 +35,7 @@ import { colors, fontSize } from "../theme";
 export function PayFeeScreen() {
   const {
     go,
+    goBack,
     selectedId,
     walletBalance,
     payFee,
@@ -297,7 +298,7 @@ export function PayFeeScreen() {
       </View>
       <AppBar
         title="Place Bid & Pay"
-        onBack={() => go("product")}
+        onBack={goBack}
         right={
           <TouchableOpacity
             onPress={() => go("home")}

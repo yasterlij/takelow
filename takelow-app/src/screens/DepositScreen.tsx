@@ -10,7 +10,7 @@ import { colors } from '../theme'
 const QUICK_AMOUNTS = [100, 500, 1000, 5000]
 
 export function DepositScreen() {
-  const { go, walletBalance, refreshWallet } = useApp()
+  const { go, goBack, walletBalance, refreshWallet } = useApp()
   const [amount, setAmount] = useState('')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
@@ -39,7 +39,7 @@ export function DepositScreen() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={{ backgroundColor: colors.navy }}>
         <StatusBarCustom />
-        <AppBar title="Top Up Wallet" onBack={() => go('home')} />
+        <AppBar title="Top Up Wallet" onBack={goBack} />
       </View>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 120 }}>
         <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16 }}>

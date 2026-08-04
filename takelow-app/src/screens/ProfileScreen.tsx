@@ -12,7 +12,7 @@ function getInitials(name: string) {
 }
 
 export function ProfileScreen() {
-  const { go, user, walletBalance, logout, unreadNotificationCount } = useApp()
+  const { go, goBack, user, walletBalance, logout, unreadNotificationCount } = useApp()
   const [showBalance, setShowBalance] = useState(true)
   const isAdmin = user?.role === 'admin'
 
@@ -28,7 +28,7 @@ export function ProfileScreen() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={{ backgroundColor: colors.navy }}>
         <StatusBarCustom />
-        <AppBar title="Profile" onBack={() => go('home')} />
+        <AppBar title="Profile" onBack={goBack} />
       </View>
       <ScrollView
         style={{ flex: 1 }}

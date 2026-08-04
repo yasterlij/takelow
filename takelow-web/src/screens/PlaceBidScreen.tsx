@@ -409,6 +409,18 @@ export function PlaceBidScreen() {
         </p>
       </div>
 
+      {/* ── Bid Participation Limit ── */}
+      <div className="flex items-start gap-2.5 rounded-2xl bg-amber-50 border border-amber-200/60 p-3.5">
+        <Info className="mt-0.5 size-[18px] shrink-0 text-amber-600" />
+        <p className="text-xs font-medium leading-relaxed text-neutral-700">
+          Limited Auction Bid Participation — To ensure fair play and prevent
+          monopolization, each participant is limited to a maximum of{" "}
+          <span className="font-bold">150 bids</span> within a single auction.
+          This promotes broader participation and a more dynamic bidding
+          environment.
+        </p>
+      </div>
+
       {/* ── Errors ── */}
       <AnimatePresence>
         {(submitError || authError) && (

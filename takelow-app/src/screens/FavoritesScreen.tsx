@@ -27,7 +27,7 @@ export function FavoritesScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={{ backgroundColor: colors.navy }}>
-        <AppBar title="Favorites" onBack={() => go('profile')} />
+        <AppBar title="Favorites" onBack={goBack} />
       </View>
       <ScrollView contentContainerStyle={s.container}>
         <View style={s.headerRow}>

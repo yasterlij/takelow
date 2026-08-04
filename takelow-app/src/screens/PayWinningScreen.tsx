@@ -8,7 +8,7 @@ import { api } from '../api'
 import { colors } from '../theme'
 
 export function PayWinningScreen() {
-  const { go, selectedId, userBid, payWinning, getAuction, authError, setPaymentMethod, walletBalance, refreshWallet } = useApp()
+  const { go, goBack, selectedId, userBid, payWinning, getAuction, authError, setPaymentMethod, walletBalance, refreshWallet } = useApp()
   const auction = getAuction(selectedId)
 
   const [showMethods, setShowMethods] = useState(false)
@@ -188,7 +188,7 @@ export function PayWinningScreen() {
       </View>
       <AppBar
         title="Pay Winning Amount"
-        onBack={() => go('winner')}
+        onBack={goBack}
         right={
           <TouchableOpacity onPress={() => go('home')} style={{ width: 34, height: 34, justifyContent: 'center', alignItems: 'center' }}>
             <AwashMark size={22} />

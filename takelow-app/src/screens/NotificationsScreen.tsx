@@ -14,7 +14,7 @@ function formatSentAt(value: string) {
 }
 
 export function NotificationsScreen() {
-  const { go, refreshUnreadNotifications } = useApp()
+  const { go, goBack, refreshUnreadNotifications } = useApp()
   const [notifications, setNotifications] = useState<ApiNotification[]>([])
   const [loading, setLoading] = useState(true)
   const [unreadOnly, setUnreadOnly] = useState(false)
@@ -69,7 +69,7 @@ export function NotificationsScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={{ backgroundColor: colors.navy }}>
-        <AppBar title="Notifications" onBack={() => go('profile')} />
+        <AppBar title="Notifications" onBack={goBack} />
       </View>
       <ScrollView contentContainerStyle={s.container}>
         <View style={s.headerRow}>

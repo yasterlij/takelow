@@ -93,7 +93,7 @@ function UserDetailModal({ visible, user, onClose, onRoleChange }: { visible: bo
 }
 
 export function AdminUsersScreen() {
-  const { go, allBids } = useApp()
+  const { go, goBack, allBids } = useApp()
   const [userList, setUserList] = useState<ApiUser[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -135,7 +135,7 @@ export function AdminUsersScreen() {
       <View style={{ backgroundColor: colors.navy }}>
         <StatusBarCustom />
       </View>
-      <AppBar title="Manage Users" onBack={() => go('auctions')} />
+      <AppBar title="Manage Users" onBack={goBack} />
       <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 16 }}>
         <Card style={s.searchRow}>
           <Search size={16} color={colors.mutedForeground} />
