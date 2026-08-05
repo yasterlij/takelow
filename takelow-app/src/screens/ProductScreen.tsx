@@ -9,6 +9,7 @@ import {
   Dimensions,
   TextInput,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import {
   Users,
@@ -111,6 +112,11 @@ export function ProductScreen() {
   const [lightboxIdx, setLightboxIdx] = useState(0);
   const [showSpecs, setShowSpecs] = useState(false);
   const [serverBidAmounts, setServerBidAmounts] = useState<number[]>([]);
+  const [showBidConfirmModal, setShowBidConfirmModal] = useState(false);
+  const [bidAgreementAccepted, setBidAgreementAccepted] = useState(false);
+  const [pendingPaymentMethod, setPendingPaymentMethod] = useState<
+    "SIKINAPAY" | "AWASH" | null
+  >(null);
 
   const {
     loadingMethod,
@@ -178,6 +184,35 @@ export function ProductScreen() {
   const specSummary = auction.specSummary || formatSpecSummary(auction.specs);
   const specEntries = getSpecEntries(auction.specs);
   const favorite = isFavorite(auction.id);
+
+  const handleOpenPaymentConfirmation = useCallback(
+    (method: "SIKINAPAY" | "AWASH") => {
+      if (!hasValidBid) {
+        setBidError("Enter a valid bid amount to continue");
+        return;
+      }
+
+      if (isDuplicate) {
+        Alert.alert(
+          "Duplicate Bid",
+          `You've already placed a bid of ${formatCurrency(numericBid)} on this auction. Please enter a different bid amount.`,
+          [{ text: "Change Bid Amount" }],
+        );
+        return;
+      }
+
+      setPendingPaymentMethod(method);
+      setBidAgreementAccepted(false);
+      setShowBidConfirmModal(true);
+    },
+    [hasValidBid, isDuplicate, numericBid, setBidError],
+  );
+
+  const handleConfirmPayment = useCallback(() => {
+    if (!pendingPaymentMethod || !bidAgreementAccepted) return;
+    setShowBidConfirmModal(false);
+    handlePayment(pendingPaymentMethod, isDuplicate);
+  }, [bidAgreementAccepted, handlePayment, isDuplicate, pendingPaymentMethod]);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -288,7 +323,7 @@ export function ProductScreen() {
           hasValidBid={hasValidBid}
           authError={authError}
           isEnding={isEnding}
-          onSubmit={(method) => handlePayment(method, isDuplicate)}
+          onSubmit={handleOpenPaymentConfirmation}
         />
 
         <View style={{ paddingHorizontal: 4 }}>
@@ -322,6 +357,94 @@ export function ProductScreen() {
           )}
         </View>
       </ScrollView>
+
+      <Modal
+        visible={showBidConfirmModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowBidConfirmModal(false)}
+      >
+        <View style={s.confirmModalBackdrop}>
+          <View style={s.confirmModalCard}>
+            <View style={s.confirmModalHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.confirmModalTitle}>Confirm Your Bid</Text>
+                <Text style={s.confirmModalSubtitle}>
+                  Review the bid details and bid fee before proceeding to
+                  payment.
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowBidConfirmModal(false)}
+                style={s.confirmModalClose}
+              >
+                <X size={18} color={colors.mutedForeground} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={s.confirmDetailsCard}>
+              <Text style={s.confirmLabel}>Your Bid Item</Text>
+              <Text style={s.confirmValuePrimary}>{auction.name}</Text>
+
+              <View style={s.confirmDivider} />
+
+              <View style={s.confirmRow}>
+                <Text style={s.confirmLabel}>Your Bid Amount</Text>
+                <Text style={s.confirmValue}>{formatCurrency(numericBid)}</Text>
+              </View>
+
+              <View style={s.confirmDivider} />
+
+              <View style={s.confirmRow}>
+                <Text style={s.confirmLabel}>Bid Service Fee</Text>
+                <Text style={s.confirmFeeValue}>
+                  {formatCurrency(auction.bidFee)} (Non-refundable)
+                </Text>
+              </View>
+
+              <Text style={s.confirmBodyText}>
+                The bid service fee is non-refundable and is paid to
+                participate in the auction. Your bid amount is not charged when
+                you place the bid. Only the winning bidder will later pay the
+                winning bid amount, in addition to this participation fee.
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => setBidAgreementAccepted((value) => !value)}
+              style={s.confirmAgreementRow}
+            >
+              <View
+                style={[
+                  s.confirmCheckbox,
+                  bidAgreementAccepted ? s.confirmCheckboxChecked : null,
+                ]}
+              >
+                {bidAgreementAccepted ? (
+                  <CheckCircle2 size={16} color="#FFF" />
+                ) : null}
+              </View>
+              <Text style={s.confirmAgreementText}>I agree to continue</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={handleConfirmPayment}
+              disabled={!bidAgreementAccepted}
+              style={[
+                s.confirmContinueBtn,
+                !bidAgreementAccepted ? s.confirmContinueBtnDisabled : null,
+              ]}
+            >
+              <Text style={s.confirmContinueBtnText}>
+                Continue to{" "}
+                {pendingPaymentMethod === "AWASH"
+                  ? "Awash Wallet"
+                  : "SikinaPay"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={showPinModal}
@@ -770,5 +893,131 @@ const s = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
     padding: 16,
+  },
+  confirmModalBackdrop: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(15,23,42,0.48)",
+    padding: 16,
+  },
+  confirmModalCard: {
+    borderRadius: 28,
+    backgroundColor: colors.card,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  confirmModalHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  confirmModalClose: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.secondary,
+  },
+  confirmModalTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: colors.navy,
+  },
+  confirmModalSubtitle: {
+    marginTop: 6,
+    fontSize: 13,
+    lineHeight: 20,
+    color: colors.mutedForeground,
+  },
+  confirmDetailsCard: {
+    marginTop: 18,
+    borderRadius: 22,
+    backgroundColor: colors.secondary,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  confirmRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+    alignItems: "center",
+  },
+  confirmLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: colors.mutedForeground,
+  },
+  confirmValuePrimary: {
+    marginTop: 8,
+    fontSize: 18,
+    fontWeight: "800",
+    color: colors.primary,
+  },
+  confirmValue: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: colors.emerald700,
+  },
+  confirmFeeValue: {
+    flex: 1,
+    textAlign: "right",
+    fontSize: 16,
+    fontWeight: "700",
+    color: colors.destructive,
+  },
+  confirmDivider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: 16,
+  },
+  confirmBodyText: {
+    marginTop: 18,
+    fontSize: 14,
+    lineHeight: 28,
+    color: colors.mutedForeground,
+  },
+  confirmAgreementRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginTop: 20,
+  },
+  confirmCheckbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  confirmCheckboxChecked: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  confirmAgreementText: {
+    fontSize: 15,
+    fontWeight: "500",
+    color: colors.navy,
+  },
+  confirmContinueBtn: {
+    marginTop: 22,
+    borderRadius: 16,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 15,
+  },
+  confirmContinueBtnDisabled: {
+    opacity: 0.45,
+  },
+  confirmContinueBtnText: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: colors.primaryForeground,
   },
 });

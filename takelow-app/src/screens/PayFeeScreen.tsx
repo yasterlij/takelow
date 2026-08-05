@@ -73,6 +73,8 @@ export function PayFeeScreen() {
   );
   const [bidError, setBidError] = useState<string | null>(null);
   const [bidFlash, setBidFlash] = useState(false);
+  const [showAgreementModal, setShowAgreementModal] = useState(false);
+  const [agreementAccepted, setAgreementAccepted] = useState(false);
   const STEP = 0.01;
   const [serverBidAmounts, setServerBidAmounts] = useState<number[]>([]);
 
@@ -151,6 +153,13 @@ export function PayFeeScreen() {
       );
       return;
     }
+    setAgreementAccepted(false);
+    setShowAgreementModal(true);
+  }, [auction, hasValidBid, isDuplicate, numericBid]);
+
+  const handleConfirmAgreement = useCallback(async () => {
+    if (!auction || !agreementAccepted) return;
+    setShowAgreementModal(false);
     setPendingBidAmount(numericBid);
     if (selected === "SIKINAPAY") {
       setPaymentMethod("SIKINAPAY");
@@ -176,14 +185,13 @@ export function PayFeeScreen() {
       setCheckingPin(false);
     }
   }, [
+    agreementAccepted,
     selected,
     auction,
-    hasValidBid,
     numericBid,
     payFee,
     setPaymentMethod,
     setPendingBidAmount,
-    isDuplicate,
   ]);
 
   const handleVerifyPin = useCallback(async () => {
@@ -792,6 +800,86 @@ export function PayFeeScreen() {
       </Card>
 
       <Modal
+        visible={showAgreementModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowAgreementModal(false)}
+      >
+        <View style={s.confirmBackdrop}>
+          <Card style={s.confirmSheet}>
+            <View style={s.confirmHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.confirmTitle}>Confirm Your Bid</Text>
+                <Text style={s.confirmSubtext}>
+                  Review your bid and the service fee before proceeding to
+                  payment.
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowAgreementModal(false)}
+                style={s.confirmCloseButton}
+              >
+                <X size={18} color={colors.mutedForeground} />
+              </TouchableOpacity>
+            </View>
+
+            <Card style={s.confirmCard}>
+              <Text style={s.confirmLabel}>Your Bid Item:</Text>
+              <Text style={s.confirmProductName}>{auction.name}</Text>
+
+              <View style={s.confirmDivider} />
+
+              <View style={s.confirmRow}>
+                <Text style={s.confirmLabel}>Your Bid Amount:</Text>
+                <Text style={s.confirmBidAmount}>{formatCurrency(numericBid)}</Text>
+              </View>
+
+              <View style={s.confirmDivider} />
+
+              <Text style={s.confirmLabel}>Bid Service Fee:</Text>
+              <Text style={s.confirmFeeText}>
+                {formatCurrency(auction.bidFee)} (Non-refundable)
+              </Text>
+
+              <Text style={s.confirmBody}>
+                The bid service fee is non-refundable and is paid to
+                participate in the auction. The amount submitted as a bid is
+                not charged at the time of placing the bid. In this auction,
+                winners are determined based on the lowest unique bid submitted
+                among all participants. Only participants who win the auction
+                will be required to pay the amount of their winning bid, in
+                addition to the participation fee.
+              </Text>
+            </Card>
+
+            <TouchableOpacity
+              onPress={() => setAgreementAccepted((value) => !value)}
+              style={s.confirmAgreementRow}
+            >
+              <View
+                style={[
+                  s.confirmCheckbox,
+                  agreementAccepted ? s.confirmCheckboxChecked : null,
+                ]}
+              >
+                {agreementAccepted ? (
+                  <ShieldCheck size={14} color={colors.primaryForeground} />
+                ) : null}
+              </View>
+              <Text style={s.confirmAgreementText}>I agree to continue</Text>
+            </TouchableOpacity>
+
+            <CTAButton
+              onPress={handleConfirmAgreement}
+              disabled={!agreementAccepted}
+            >
+              Proceed to Payment · {formatCurrency(auction.bidFee)}
+            </CTAButton>
+          </Card>
+        </View>
+      </Modal>
+
+      <Modal
         visible={showPinModal}
         transparent
         animationType="fade"
@@ -1077,6 +1165,111 @@ const s = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
     padding: 16,
+  },
+  confirmBackdrop: {
+    flex: 1,
+    justifyContent: "center",
+    padding: 20,
+    backgroundColor: "rgba(15,23,42,0.45)",
+  },
+  confirmSheet: {
+    padding: 20,
+    borderRadius: 24,
+    gap: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+  },
+  confirmHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  confirmCloseButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.secondary,
+  },
+  confirmTitle: { fontSize: 20, fontWeight: "800", color: colors.navy },
+  confirmSubtext: {
+    marginTop: 6,
+    fontSize: 13,
+    lineHeight: 20,
+    color: colors.mutedForeground,
+  },
+  confirmCard: {
+    padding: 18,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.secondary,
+  },
+  confirmRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+  },
+  confirmLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: colors.mutedForeground,
+  },
+  confirmProductName: {
+    marginTop: 8,
+    fontSize: 18,
+    fontWeight: "800",
+    color: colors.primary,
+  },
+  confirmDivider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: 16,
+  },
+  confirmBidAmount: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: colors.emerald700,
+  },
+  confirmFeeText: {
+    marginTop: 8,
+    fontSize: 16,
+    fontWeight: "700",
+    color: colors.destructive,
+  },
+  confirmBody: {
+    marginTop: 18,
+    fontSize: 14,
+    lineHeight: 28,
+    color: colors.mutedForeground,
+  },
+  confirmAgreementRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  confirmCheckbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  confirmCheckboxChecked: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  confirmAgreementText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: "500",
+    color: colors.navy,
   },
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)" },
   modalSheet: {

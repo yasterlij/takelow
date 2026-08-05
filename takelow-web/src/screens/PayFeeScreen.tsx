@@ -80,6 +80,8 @@ export function PayFeeScreen() {
   );
   const [bidError, setBidError] = useState<string | null>(null);
   const [bidFlash, setBidFlash] = useState(false);
+  const [showAgreementModal, setShowAgreementModal] = useState(false);
+  const [agreementAccepted, setAgreementAccepted] = useState(false);
 
   const STEP = 0.01;
   const [serverBidAmounts, setServerBidAmounts] = useState<number[]>([]);
@@ -193,6 +195,13 @@ export function PayFeeScreen() {
       setShowDuplicateModal(true);
       return;
     }
+    setAgreementAccepted(false);
+    setShowAgreementModal(true);
+  }, [hasValidBid, isDuplicate]);
+
+  const handleConfirmAgreement = useCallback(async () => {
+    if (!agreementAccepted) return;
+    setShowAgreementModal(false);
     setPendingBidAmount(bidAmount);
     if (selected === "SIKINAPAY") {
       setPaymentMethod("SIKINAPAY");
@@ -223,14 +232,13 @@ export function PayFeeScreen() {
       setCheckingPin(false);
     }
   }, [
+    agreementAccepted,
     auction.bidFee,
     bidAmount,
-    hasValidBid,
     payFee,
     selected,
     setPaymentMethod,
     setPendingBidAmount,
-    isDuplicate,
   ]);
 
   const handleVerifyPin = useCallback(async () => {
@@ -627,6 +635,105 @@ export function PayFeeScreen() {
             ? "Checking wallet PIN status..."
             : `Proceed to Payment · ${formatCurrency(auction.bidFee)}`}
       </button>
+
+        <AnimatePresence>
+          {showAgreementModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center"
+            >
+              <motion.div
+                initial={{ opacity: 0, y: 20, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 20, scale: 0.98 }}
+                className="w-full max-w-md rounded-3xl border border-border bg-white p-5 shadow-2xl"
+              >
+                <div className="mb-4 flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="font-display text-2xl font-bold text-awash-blue">
+                      Confirm Your Bid
+                    </h3>
+                    <p className="mt-1 text-sm font-medium text-neutral-500">
+                      Review your bid and the service fee before proceeding to
+                      payment.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowAgreementModal(false)}
+                    className="rounded-full bg-neutral-100 p-2 text-neutral-500 hover:bg-neutral-200"
+                    aria-label="Close"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </div>
+
+                <div className="rounded-3xl border border-border bg-neutral-50/80 p-5">
+                  <p className="text-sm font-medium text-neutral-500">
+                    Your Bid Item:
+                  </p>
+                  <p className="mt-2 text-3xl font-extrabold text-primary">
+                    {auction.name}
+                  </p>
+
+                  <div className="my-4 h-px bg-border" />
+
+                  <div className="flex items-center justify-between gap-4">
+                    <p className="text-sm font-medium text-neutral-500">
+                      Your Bid Amount:
+                    </p>
+                    <p className="text-2xl font-bold text-emerald-700">
+                      {formatCurrency(bidAmount)}
+                    </p>
+                  </div>
+
+                  <div className="my-4 h-px bg-border" />
+
+                  <p className="text-sm font-medium text-neutral-500">
+                    Bid Service Fee:
+                  </p>
+                  <p className="mt-2 text-2xl font-bold text-destructive">
+                    {formatCurrency(auction.bidFee)} (Non-refundable)
+                  </p>
+
+                  <p className="mt-5 text-sm leading-7 text-neutral-600">
+                    The bid service fee is non-refundable and is paid to
+                    participate in the auction. The amount submitted as a bid is
+                    not charged at the time of placing the bid. In this auction,
+                    winners are determined based on the lowest unique bid
+                    submitted among all participants. Only participants who win
+                    the auction will be required to pay the amount of their
+                    winning bid, in addition to the participation fee.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setAgreementAccepted((value) => !value)}
+                  className="mt-4 flex w-full items-center gap-3 text-left"
+                >
+                  <span
+                    className={`flex size-6 items-center justify-center rounded-md border ${agreementAccepted ? "border-primary bg-primary text-white" : "border-border bg-white text-transparent"}`}
+                  >
+                    <ShieldCheck className="size-3.5" />
+                  </span>
+                  <span className="text-base font-medium text-foreground">
+                    I agree to continue
+                  </span>
+                </button>
+
+                <button
+                  onClick={handleConfirmAgreement}
+                  disabled={!agreementAccepted}
+                  className="btn-primary mt-5 w-full disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Proceed to Payment · {formatCurrency(auction.bidFee)}
+                </button>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
       <AnimatePresence>
         {showPinModal && (
