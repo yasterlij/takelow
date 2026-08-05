@@ -163,7 +163,7 @@ export function ProductScreen() {
     setPaymentMethod,
     setPendingBidAmount,
     walletBalance,
-  })
+  });
 
   if (!auction) return null;
 
@@ -186,27 +186,27 @@ export function ProductScreen() {
   const handleOpenPaymentConfirmation = useCallback(
     (method: "SIKINAPAY" | "AWASH") => {
       if (!hasValidBid) {
-        setBidError("Enter a valid bid amount to continue")
-        return
+        setBidError("Enter a valid bid amount to continue");
+        return;
       }
 
       if (isDuplicate) {
-        setShowDuplicateModal(true)
-        return
+        setShowDuplicateModal(true);
+        return;
       }
 
-      setPendingPaymentMethod(method)
-      setAgreementAccepted(false)
-      setShowAgreementModal(true)
+      setPendingPaymentMethod(method);
+      setAgreementAccepted(false);
+      setShowAgreementModal(true);
     },
     [hasValidBid, isDuplicate, setBidError, setShowDuplicateModal],
-  )
+  );
 
   const handleConfirmPayment = useCallback(() => {
-    if (!pendingPaymentMethod || !agreementAccepted) return
-    setShowAgreementModal(false)
-    handlePayment(pendingPaymentMethod, isDuplicate)
-  }, [agreementAccepted, handlePayment, isDuplicate, pendingPaymentMethod])
+    if (!pendingPaymentMethod || !agreementAccepted) return;
+    setShowAgreementModal(false);
+    handlePayment(pendingPaymentMethod, isDuplicate);
+  }, [agreementAccepted, handlePayment, isDuplicate, pendingPaymentMethod]);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -279,8 +279,8 @@ export function ProductScreen() {
           showSpecs={showSpecs}
           onToggleSpecs={() => setShowSpecs((value) => !value)}
           onOpenLightbox={(index) => {
-            setLightboxIdx(index)
-            setLightboxOpen(true)
+            setLightboxIdx(index);
+            setLightboxOpen(true);
           }}
         />
 
@@ -293,39 +293,41 @@ export function ProductScreen() {
               .replace(/[^0-9.]/g, "")
               .replace(/(\..*)\./g, "$1")
               .replace(/^(\d*\.?\d{0,2}).*/, "$1")
-              .slice(0, 13)
-            if (clean && Number(clean) < 1) return
-            setBidStr(clean)
-            setBidError(null)
+              .slice(0, 13);
+            if (clean && Number(clean) < 1) return;
+            setBidStr(clean);
+            setBidError(null);
           }}
           onBidBlur={() => {
-            if (!bidStr) return
-            const normalized = Number(bidStr)
+            if (!bidStr) return;
+            const normalized = Number(bidStr);
             if (normalized < 1) {
-              setBidError("Minimum bid is 1.00")
-              updateBid(1)
-              return
+              setBidError("Minimum bid is 1.00");
+              updateBid(1);
+              return;
             }
-            updateBid(normalized)
+            updateBid(normalized);
           }}
           onBidKeyDown={(e) => {
             if (e.key === "ArrowUp") {
-              e.preventDefault()
-              adjustBid(0.01)
+              e.preventDefault();
+              adjustBid(0.01);
             }
             if (e.key === "ArrowDown") {
-              e.preventDefault()
-              adjustBid(-0.01)
+              e.preventDefault();
+              adjustBid(-0.01);
             }
           }}
           onDecrease={() => adjustBid(-0.01)}
           onIncrease={() => adjustBid(0.01)}
           selectedPaymentMethod={selectedPaymentMethod}
           showPaymentMethods={showPaymentMethods}
-          onTogglePaymentMethods={() => setShowPaymentMethods((value) => !value)}
+          onTogglePaymentMethods={() =>
+            setShowPaymentMethods((value) => !value)
+          }
           onSelectPaymentMethod={(method) => {
-            setSelectedPaymentMethod(method)
-            setShowPaymentMethods(false)
+            setSelectedPaymentMethod(method);
+            setShowPaymentMethods(false);
           }}
           loadingMethod={loadingMethod}
           checkingPin={checkingPin}
@@ -465,13 +467,13 @@ export function ProductScreen() {
               </p>
 
               <p className="mt-5 text-sm leading-7 text-neutral-600">
-                The bid service fee is non-refundable and is paid to
-                participate in the auction. The amount submitted as a bid is
-                not charged at the time of placing the bid. In this auction,
-                winners are determined based on the lowest unique bid submitted
-                among all participants. Only participants who win the auction
-                will be required to pay the amount of their winning bid, in
-                addition to the participation fee.
+                The bid service fee is non-refundable and is paid to participate
+                in the auction. The amount submitted as a bid is not charged at
+                the time of placing the bid. In this auction, winners are
+                determined based on the lowest unique bid submitted among all
+                participants. Only participants who win the auction will be
+                required to pay the amount of their winning bid, in addition to
+                the participation fee.
               </p>
             </div>
 

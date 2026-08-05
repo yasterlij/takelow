@@ -831,7 +831,9 @@ export function PayFeeScreen() {
 
               <View style={s.confirmRow}>
                 <Text style={s.confirmLabel}>Your Bid Amount:</Text>
-                <Text style={s.confirmBidAmount}>{formatCurrency(numericBid)}</Text>
+                <Text style={s.confirmBidAmount}>
+                  {formatCurrency(numericBid)}
+                </Text>
               </View>
 
               <View style={s.confirmDivider} />
@@ -842,13 +844,13 @@ export function PayFeeScreen() {
               </Text>
 
               <Text style={s.confirmBody}>
-                The bid service fee is non-refundable and is paid to
-                participate in the auction. The amount submitted as a bid is
-                not charged at the time of placing the bid. In this auction,
-                winners are determined based on the lowest unique bid submitted
-                among all participants. Only participants who win the auction
-                will be required to pay the amount of their winning bid, in
-                addition to the participation fee.
+                The bid service fee is non-refundable and is paid to participate
+                in the auction. The amount submitted as a bid is not charged at
+                the time of placing the bid. In this auction, winners are
+                determined based on the lowest unique bid submitted among all
+                participants. Only participants who win the auction will be
+                required to pay the amount of their winning bid, in addition to
+                the participation fee.
               </Text>
             </Card>
 

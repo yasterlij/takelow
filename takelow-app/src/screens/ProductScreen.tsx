@@ -161,7 +161,7 @@ export function ProductScreen() {
     payFee,
     setPaymentMethod,
     setPendingBidAmount,
-  })
+  });
 
   if (!auction) return null;
 
@@ -246,7 +246,11 @@ export function ProductScreen() {
               alignItems: "center",
             }}
           >
-            <Heart size={20} color={favorite ? colors.primary : colors.navyForeground} fill={favorite ? colors.primary : 'transparent'} />
+            <Heart
+              size={20}
+              color={favorite ? colors.primary : colors.navyForeground}
+              fill={favorite ? colors.primary : "transparent"}
+            />
           </TouchableOpacity>
         }
       />
@@ -278,8 +282,8 @@ export function ProductScreen() {
           showSpecs={showSpecs}
           onToggleSpecs={() => setShowSpecs((value) => !value)}
           onImagePress={(index) => {
-            setLightboxIdx(index)
-            setLightboxVisible(true)
+            setLightboxIdx(index);
+            setLightboxVisible(true);
           }}
         />
 
@@ -292,29 +296,31 @@ export function ProductScreen() {
               .replace(/[^\d.]/g, "")
               .replace(/(\..*)\./g, "$1")
               .replace(/(\.\d{2})\d+/g, "$1")
-              .slice(0, 13)
-            if (clean && Number(clean) < 1) return
-            setBidAmount(clean)
-            setBidError(null)
+              .slice(0, 13);
+            if (clean && Number(clean) < 1) return;
+            setBidAmount(clean);
+            setBidError(null);
           }}
           onBidBlur={() => {
-            if (!bidAmount) return
-            const normalized = Number(bidAmount)
+            if (!bidAmount) return;
+            const normalized = Number(bidAmount);
             if (normalized < 1) {
-              setBidError("Minimum bid is 1.00")
-              updateBid(1)
-              return
+              setBidError("Minimum bid is 1.00");
+              updateBid(1);
+              return;
             }
-            updateBid(normalized)
+            updateBid(normalized);
           }}
           onDecrease={() => adjustBid(-0.01)}
           onIncrease={() => adjustBid(0.01)}
           selectedPaymentMethod={selectedPaymentMethod}
           showPaymentMethods={showPaymentMethods}
-          onTogglePaymentMethods={() => setShowPaymentMethods((value) => !value)}
+          onTogglePaymentMethods={() =>
+            setShowPaymentMethods((value) => !value)
+          }
           onSelectPaymentMethod={(method) => {
-            setSelectedPaymentMethod(method)
-            setShowPaymentMethods(false)
+            setSelectedPaymentMethod(method);
+            setShowPaymentMethods(false);
           }}
           loadingMethod={loadingMethod}
           checkingPin={checkingPin}
@@ -327,7 +333,6 @@ export function ProductScreen() {
         />
 
         <View style={{ paddingHorizontal: 4 }}>
-
           <View style={s.hint}>
             <TrendingDown size={18} color={colors.primary} />
             <Text style={s.hintText}>
@@ -403,10 +408,10 @@ export function ProductScreen() {
               </View>
 
               <Text style={s.confirmBodyText}>
-                The bid service fee is non-refundable and is paid to
-                participate in the auction. Your bid amount is not charged when
-                you place the bid. Only the winning bidder will later pay the
-                winning bid amount, in addition to this participation fee.
+                The bid service fee is non-refundable and is paid to participate
+                in the auction. Your bid amount is not charged when you place
+                the bid. Only the winning bidder will later pay the winning bid
+                amount, in addition to this participation fee.
               </Text>
             </View>
 
