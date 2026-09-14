@@ -142,3 +142,52 @@ export class UpdateAuctionDto {
   @IsEnum(AuctionStatus)
   status?: AuctionStatus;
 }
+
+export class ReopenAuctionDto {
+  @IsDateString()
+  start_time: string;
+
+  @IsDateString()
+  end_time: string;
+
+  @IsOptional()
+  @IsNumber()
+  min_bid?: number;
+
+  @IsOptional()
+  @IsNumber()
+  max_bid?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  bid_fee?: number;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(120)
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  category?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  description?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(8)
+  @IsString({ each: true })
+  image_urls?: string[];
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  current_market_price?: number;
+}
+

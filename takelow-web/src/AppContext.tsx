@@ -166,6 +166,7 @@ type AppState = {
   deleteAuction: (id: string) => Promise<void>;
   closeAuction: (id: string) => Promise<void>;
   forceCloseAuction: (id: string) => Promise<void>;
+  reopenAuction: (id: string, data: any) => Promise<void>;
   refreshAuctions: () => Promise<void>;
   refreshWallet: () => Promise<void>;
   refreshFavorites: () => Promise<void>;
@@ -947,6 +948,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [refreshAuctions, user],
   );
 
+  const reopenAuction = useCallback(
+    async (id: string, data: any) => {
+      if (user?.role !== "admin") return;
+      try {
+        await api.adminReopenAuction(id, data);
+        await refreshAuctions();
+        toast("Auction reopened successfully", "success");
+      } catch (e: any) {
+        toast(e?.message || "Failed to reopen auction", "error");
+        throw e;
+      }
+    },
+    [refreshAuctions, user],
+  );
+
   const updateAuction = useCallback(
     async (id: string, data: any) => {
       if (user?.role !== "admin") return;
@@ -1071,6 +1087,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       deleteAuction,
       closeAuction,
       forceCloseAuction,
+      reopenAuction,
       refreshAuctions,
       refreshWallet,
       refreshFavorites,
@@ -1127,6 +1144,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       deleteAuction,
       closeAuction,
       forceCloseAuction,
+      reopenAuction,
       refreshAuctions,
       refreshWallet,
       refreshFavorites,

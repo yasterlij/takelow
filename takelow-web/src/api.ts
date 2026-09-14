@@ -356,6 +356,19 @@ export type ApiAuction = {
   stats?: { total_bids: number; unique_bidders: number };
 };
 
+export type ReopenAuctionPayload = {
+  start_time: string;
+  end_time: string;
+  min_bid?: number;
+  max_bid?: number;
+  bid_fee?: number;
+  name?: string;
+  category?: string;
+  description?: string;
+  image_urls?: string[];
+  current_market_price?: number;
+};
+
 export type ApiBid = {
   id: string;
   user_id: string;
@@ -729,6 +742,22 @@ export const api = {
       "POST",
       `/admin/auctions/${id}/force-close`,
       undefined,
+      ENGINE_API,
+    );
+  },
+  reopenAuction(id: string, data: ReopenAuctionPayload) {
+    return request<ApiAuction>(
+      "POST",
+      `/admin/auctions/${id}/reopen`,
+      data,
+      ENGINE_API,
+    );
+  },
+  adminReopenAuction(id: string, data: ReopenAuctionPayload) {
+    return request<ApiAuction>(
+      "POST",
+      `/admin/auctions/${id}/reopen`,
+      data,
       ENGINE_API,
     );
   },

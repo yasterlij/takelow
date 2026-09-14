@@ -415,6 +415,19 @@ export type ApiAuction = {
   num_winners?: number
 }
 
+export type ReopenAuctionPayload = {
+  start_time: string
+  end_time: string
+  min_bid?: number
+  max_bid?: number
+  bid_fee?: number
+  name?: string
+  category?: string
+  description?: string
+  image_urls?: string[]
+  current_market_price?: number
+}
+
 export type ApiBid = {
   id: string
   user_id: string
@@ -599,6 +612,12 @@ export const api = {
   },
   forceCloseAuction(id: string) {
     return request<ApiAuction>('POST', `/admin/auctions/${id}/force-close`, undefined, ENGINE_API)
+  },
+  reopenAuction(id: string, data: ReopenAuctionPayload) {
+    return request<ApiAuction>('POST', `/admin/auctions/${id}/reopen`, data, ENGINE_API)
+  },
+  adminReopenAuction(id: string, data: ReopenAuctionPayload) {
+    return request<ApiAuction>('POST', `/admin/auctions/${id}/reopen`, data, ENGINE_API)
   },
   drawWinner(id: string) {
     return request<ApiWinnerResult>('GET', `/admin/auctions/${id}/winner`, undefined, ENGINE_API)

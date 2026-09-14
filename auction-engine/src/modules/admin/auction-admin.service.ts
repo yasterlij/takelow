@@ -5,8 +5,9 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AuctionStatus } from "@prisma/client";
-import { CreateAuctionDto, UpdateAuctionDto } from "./dto/admin.dto";
+import { CreateAuctionDto, UpdateAuctionDto, ReopenAuctionDto } from "./dto/admin.dto";
 import { AuctionClosureService } from "../winner/auction-closure.service";
+import { WinnerService } from "../winner/winner.service";
 import { normalizeProductCategory } from "./product-categories";
 
 @Injectable()
@@ -14,6 +15,7 @@ export class AuctionAdminService {
   constructor(
     private prisma: PrismaService,
     private closureService: AuctionClosureService,
+    private winnerService: WinnerService,
   ) {}
 
   private isMissingColumnError(error: unknown): boolean {
@@ -291,5 +293,122 @@ export class AuctionAdminService {
       ].join(","),
     );
     return [header, ...rows].join("\n");
+  }
+
+  async reopenAuction(id: string, dto: ReopenAuctionDto, actorId?: string) {
+    const auction = await this.prisma.repository("auction").findOne({
+      where: { id },
+      include: { product: true },
+    });
+    if (!auction) throw new NotFoundException("Auction not found");
+
+    if (
+      auction.status === AuctionStatus.ACTIVE &&
+      new Date(auction.end_time) > new Date()
+    ) {
+      throw new BadRequestException(
+        "Cannot reopen an auction that is currently active",
+      );
+    }
+
+    if (auction.winner_user_id) {
+      throw new BadRequestException(
+        "Cannot reopen an auction that closed with a confirmed winning bidder",
+      );
+    }
+
+    const paidWinners = await this.prisma.repository("winner").find({
+      where: {
+        auction_id: id,
+        payment_status: "PAID",
+      },
+    });
+    if (paidWinners.length > 0) {
+      throw new BadRequestException(
+        "Cannot reopen an auction that has confirmed paid winners",
+      );
+    }
+
+    const startTime = new Date(dto.start_time);
+    const endTime = new Date(dto.end_time);
+    if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
+      throw new BadRequestException("Invalid start_time or end_time");
+    }
+    if (endTime <= startTime) {
+      throw new BadRequestException("end_time must be after start_time");
+    }
+
+    const prevBidsCount = await this.prisma.repository("bid").count({
+      where: { auction_id: id },
+    });
+
+    await this.prisma.repository("winner").delete({
+      where: { auction_id: id },
+    });
+
+    await this.prisma.repository("bid").delete({
+      where: { auction_id: id },
+    });
+
+    await this.winnerService.cleanupAuctionKeys(id);
+
+    auction.status = AuctionStatus.ACTIVE;
+    auction.start_time = startTime;
+    auction.end_time = endTime;
+    auction.winner_user_id = null;
+    auction.winning_bid_amount = null;
+    auction.payment_status = null;
+    auction.payment_deadline = null;
+    auction.last_payment_update = null;
+    auction.extensions = 0;
+    if (dto.min_bid !== undefined) auction.min_bid = dto.min_bid;
+    if (dto.max_bid !== undefined) auction.max_bid = dto.max_bid;
+    if (dto.bid_fee !== undefined) auction.bid_fee = dto.bid_fee;
+
+    const savedAuction = await this.prisma.repository("auction").save(auction);
+
+    let updatedProduct = auction.product;
+    if (
+      dto.name ||
+      dto.description !== undefined ||
+      dto.category !== undefined ||
+      dto.image_urls !== undefined ||
+      dto.current_market_price !== undefined
+    ) {
+      const product = await this.prisma.repository("product").findOne({
+        where: { id: auction.product_id },
+      });
+      if (product) {
+        if (dto.name) product.name = dto.name;
+        if (dto.description !== undefined) product.description = dto.description;
+        if (dto.category !== undefined) product.category = dto.category;
+        if (dto.image_urls !== undefined) product.image_urls = dto.image_urls;
+        if (dto.current_market_price !== undefined)
+          product.current_market_price = dto.current_market_price;
+        updatedProduct = await this.prisma.repository("product").save(product);
+      }
+    }
+
+    try {
+      await this.prisma.repository("auditLog").save({
+        actor_id: actorId || "admin",
+        action: "AUCTION_REOPENED",
+        entity_type: "auction",
+        entity_id: id,
+        details: {
+          prev_bids_archived: prevBidsCount,
+          new_start_time: startTime.toISOString(),
+          new_end_time: endTime.toISOString(),
+        },
+      });
+    } catch {
+      // audit log table save failure should not abort reopen
+    }
+
+    return {
+      ...savedAuction,
+      product: updatedProduct,
+      stats: { total_bids: 0, unique_bidders: 0 },
+    };
   }
 }
