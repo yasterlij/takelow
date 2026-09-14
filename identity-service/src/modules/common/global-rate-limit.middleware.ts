@@ -46,7 +46,24 @@ function isBiddingEndpoint(req: Request): boolean {
   return url.includes('/bids') && req.method === 'POST';
 }
 
+function isExemptEndpoint(req: Request): boolean {
+  const url = req.originalUrl || req.url || '';
+  const path = url.split('?')[0];
+  return (
+    path === '/api/v1/health' ||
+    path === '/health' ||
+    path.endsWith('/health') ||
+    path === '/metrics' ||
+    path === '/api/v1/metrics' ||
+    path.endsWith('/metrics')
+  );
+}
+
 export async function globalRateLimit(req: Request, res: Response, next: NextFunction): Promise<void> {
+  if (isExemptEndpoint(req)) {
+    return next();
+  }
+
   try {
     const redis = getRedisClient();
     const ip = getClientIp(req);
@@ -58,6 +75,11 @@ export async function globalRateLimit(req: Request, res: Response, next: NextFun
       const count = await redis.incr(key);
       if (count === 1) {
         await redis.expire(key, BIDDING_WINDOW_SECONDS);
+      } else {
+        const ttl = await redis.ttl(key);
+        if (ttl === -1) {
+          await redis.expire(key, BIDDING_WINDOW_SECONDS);
+        }
       }
       const remaining = Math.max(BIDDING_LIMIT - count, 0);
       res.setHeader('x-rate-limit-remaining', remaining.toString());
@@ -75,6 +97,11 @@ export async function globalRateLimit(req: Request, res: Response, next: NextFun
       const count = await redis.incr(key);
       if (count === 1) {
         await redis.expire(key, GENERAL_WINDOW_SECONDS);
+      } else {
+        const ttl = await redis.ttl(key);
+        if (ttl === -1) {
+          await redis.expire(key, GENERAL_WINDOW_SECONDS);
+        }
       }
       const remaining = Math.max(GENERAL_LIMIT - count, 0);
       res.setHeader('x-rate-limit-remaining', remaining.toString());
