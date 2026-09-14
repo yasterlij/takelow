@@ -413,9 +413,19 @@ export class WinnerService {
       `takelow:auction:${auctionId}:total_bids`,
       `takelow:auction:${auctionId}:bidders`,
       `takelow:auction:${auctionId}:lock`,
+      "auctions:closed",
+      "auctions:active",
     ];
 
     await this.redis.del(...keys);
+    try {
+      const cacheKeys = await this.redis.keys("cache:GET:*");
+      if (cacheKeys.length > 0) {
+        await this.redis.del(...cacheKeys);
+      }
+    } catch {
+      // ignore
+    }
     this.logger.debug(`Cleaned up Redis keys for auction ${auctionId}`);
   }
 

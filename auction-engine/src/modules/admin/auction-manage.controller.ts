@@ -30,6 +30,7 @@ import {
   CreateAuctionDto,
   UpdateAuctionDto,
   ReopenAuctionDto,
+  BulkReopenAuctionsDto,
 } from "./dto/admin.dto";
 import { AuctionStatus } from "@prisma/client";
 import { RolesGuard } from "../common/roles.guard";
@@ -199,6 +200,16 @@ export class AuctionManageController {
   @ApiOperation({ summary: "Draw winner for auction" })
   async drawWinner(@Param("id") id: string) {
     return this.reviewService.drawWinner(id);
+  }
+
+  @Post("auctions/bulk-reopen")
+  @UsePipes(new ValidationPipe({ transform: true }))
+  @ApiOperation({ summary: "Bulk reopen multiple unsold auctions" })
+  async bulkReopenAuctions(
+    @Body() dto: BulkReopenAuctionsDto,
+    @Req() req: any,
+  ) {
+    return this.auctionService.bulkReopenAuctions(dto, req.user?.id);
   }
 
   @Post("auctions/:id/reopen")

@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { View, Text, ScrollView, TouchableOpacity, Image, TextInput, StyleSheet, Alert, Platform, Modal, Dimensions, ActivityIndicator } from 'react-native'
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker'
 import * as ImagePicker from 'expo-image-picker'
-import { Plus, X, Pencil, XCircle, Trash2, Eye, Calendar, ImageIcon, Search, Filter, Upload, BarChart3, TrendingDown, ArrowUpRight, Camera, Trophy } from 'lucide-react-native'
+import { Plus, X, Pencil, XCircle, Trash2, Eye, Calendar, ImageIcon, Search, Filter, Upload, BarChart3, TrendingDown, ArrowUpRight, Camera, Trophy, RotateCcw } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { api } from '../api'
 import { AppBar, CTAButton, Badge, Card } from '../components/AuctionUI'
@@ -29,7 +29,10 @@ function AuctionThumb({ src }: { src?: string }) {
   )
 }
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status, isUnsold }: { status: string; isUnsold?: boolean }) {
+  if (isUnsold) {
+    return <Badge tone="orange">Unsold</Badge>
+  }
   const map: Record<string, { tone: 'green' | 'orange' | 'muted'; label: string }> = {
     live: { tone: 'green', label: 'Live' },
     'ending-soon': { tone: 'orange', label: 'Ending Soon' },
@@ -162,7 +165,7 @@ function fmtDate(d: Date): string {
 }
 
 export function AdminAuctionsScreen() {
-  const { go, goBack, auctions, addAuction, updateAuction, deleteAuction, closeAuction, refreshAuctions, allBids } = useApp()
+  const { go, goBack, auctions, addAuction, updateAuction, deleteAuction, closeAuction, reopenAuction, refreshAuctions, allBids } = useApp()
   const [showForceCloseConfirm, setShowForceCloseConfirm] = useState<string | null>(null)
   const [forceClosing, setForceClosing] = useState(false)
   const [forceCloseWarning, setForceCloseWarning] = useState('')
@@ -320,14 +323,52 @@ const [category, setCategory] = useState<string>(STANDARD_AUCTION_CATEGORIES[0])
     ])
   }
 
+  const isNoWinnerAuction = (a: any) => {
+    if (a.status === 'live' || a.status === 'ending-soon') return false
+    const hasWinner = Boolean(
+      a.winner_user_id ||
+      (a.winners && a.winners.length > 0) ||
+      (a.winnersCount && a.winnersCount > 0)
+    )
+    return !hasWinner
+  }
+
+  const handleReopen = (a: any) => {
+    Alert.alert(
+      'Reopen Auction',
+      `Reopen "${a.name}" for 7 days?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reopen',
+          onPress: async () => {
+            try {
+              await reopenAuction(a.id, {
+                start_time: new Date().toISOString(),
+                end_time: new Date(Date.now() + 7 * 86400000).toISOString(),
+              })
+            } catch {
+              // handled in AppContext
+            }
+          },
+        },
+      ],
+    )
+  }
+
   const filtered = auctions.filter((a) => {
-    if (statusFilter !== 'all' && a.status !== statusFilter) return false
+    if (statusFilter === 'unsold') {
+      if (!isNoWinnerAuction(a)) return false
+    } else if (statusFilter !== 'all' && a.status !== statusFilter) {
+      return false
+    }
     if (search && !a.name.toLowerCase().includes(search.toLowerCase())) return false
     return true
   })
 
   const activeCount = auctions.filter((a) => a.status === 'live' || a.status === 'ending-soon').length
   const closedCount = auctions.filter((a) => a.status === 'closed').length
+  const unsoldCount = auctions.filter(isNoWinnerAuction).length
   const { page, setPage, perPage, setPerPage, totalPages, paginated, resetPage } = usePagination(filtered, 10)
 
   return (
@@ -355,14 +396,14 @@ const [category, setCategory] = useState<string>(STANDARD_AUCTION_CATEGORIES[0])
         </View>
 
         <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-          {['all', 'live', 'ending-soon', 'closed'].map((st) => (
+          {['all', 'live', 'ending-soon', 'closed', 'unsold'].map((st) => (
             <TouchableOpacity
               key={st}
               onPress={() => { setStatusFilter(st); resetPage() }}
               style={[s.filterChip, { backgroundColor: statusFilter === st ? colors.navy : colors.card, borderColor: statusFilter === st ? colors.navy : colors.border }]}
             >
               <Text style={{ fontSize: 10, fontWeight: '600', color: statusFilter === st ? colors.navyForeground : colors.mutedForeground }}>
-                {st === 'all' ? 'All' : st === 'ending-soon' ? 'Ending' : st.charAt(0).toUpperCase() + st.slice(1)}
+                {st === 'all' ? 'All' : st === 'ending-soon' ? 'Ending' : st === 'unsold' ? `Unsold (${unsoldCount})` : st.charAt(0).toUpperCase() + st.slice(1)}
               </Text>
             </TouchableOpacity>
           ))}
@@ -471,7 +512,7 @@ const [category, setCategory] = useState<string>(STANDARD_AUCTION_CATEGORIES[0])
                   <View style={{ flex: 1 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                       <Text style={s.name} numberOfLines={1}>{a.name}</Text>
-                      <StatusBadge status={a.status} />
+                      <StatusBadge status={a.status} isUnsold={isNoWinnerAuction(a)} />
                     </View>
                     <Text style={s.meta}>
                       {a.uniqueBidders} bidders · {formatCurrency(a.marketPrice)}
@@ -481,17 +522,26 @@ const [category, setCategory] = useState<string>(STANDARD_AUCTION_CATEGORIES[0])
                   </View>
                   {a.publicCode ? <View style={s.statusChip}><Text style={s.statusChipText}>Code {a.publicCode}</Text></View> : null}
                   {a.status === 'closed' ? (
-                    <TouchableOpacity onPress={async () => {
-                      try {
-                        const mod = await import('../api')
-                        const res = await mod.api.drawWinner(a.id)
-                        Alert.alert('Winner Result', res.winner_name ? `Winner: ${res.winner_name}\nAmount: ${formatCurrency(res.winning_bid_amount ?? 0)}` : 'No unique winner found')
-                      } catch {
-                        Alert.alert('Error', 'Failed to draw winner')
-                      }
-                    }} style={[s.iconBtn, { borderColor: colors.primary + '4D', backgroundColor: colors.primary + '14' }]}>
-                      <Trophy size={12} color={colors.primary} />
-                    </TouchableOpacity>
+                    isNoWinnerAuction(a) ? (
+                      <TouchableOpacity
+                        onPress={() => handleReopen(a)}
+                        style={[s.iconBtn, { borderColor: '#f59e0b4D', backgroundColor: '#f59e0b14' }]}
+                      >
+                        <RotateCcw size={12} color="#d97706" />
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity onPress={async () => {
+                        try {
+                          const mod = await import('../api')
+                          const res = await mod.api.drawWinner(a.id)
+                          Alert.alert('Winner Result', res.winner_name ? `Winner: ${res.winner_name}\nAmount: ${formatCurrency(res.winning_bid_amount ?? 0)}` : 'No unique winner found')
+                        } catch {
+                          Alert.alert('Error', 'Failed to draw winner')
+                        }
+                      }} style={[s.iconBtn, { borderColor: colors.primary + '4D', backgroundColor: colors.primary + '14' }]}>
+                        <Trophy size={12} color={colors.primary} />
+                      </TouchableOpacity>
+                    )
                   ) : (
                     <TouchableOpacity onPress={() => openEdit(a)} style={s.iconBtn}><Pencil size={12} color={colors.mutedForeground} /></TouchableOpacity>
                   )}

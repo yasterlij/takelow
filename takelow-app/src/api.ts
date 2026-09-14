@@ -619,6 +619,20 @@ export const api = {
   adminReopenAuction(id: string, data: ReopenAuctionPayload) {
     return request<ApiAuction>('POST', `/admin/auctions/${id}/reopen`, data, ENGINE_API)
   },
+  adminBulkReopenAuctions(data: {
+    auction_ids: string[]
+    start_time?: string
+    end_time?: string
+    bid_fee?: number
+    duration_days?: number
+  }) {
+    return request<{
+      total: number
+      reopened: number
+      failed: number
+      results: { id: string; success: boolean; error?: string }[]
+    }>('POST', '/admin/auctions/bulk-reopen', data, ENGINE_API)
+  },
   drawWinner(id: string) {
     return request<ApiWinnerResult>('GET', `/admin/auctions/${id}/winner`, undefined, ENGINE_API)
   },

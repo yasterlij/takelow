@@ -7,7 +7,7 @@ import { formatCurrency, formatETB } from "../mockDataV0"
 
 export function ClosedAuctionsScreen() {
   const { go, goBack, selectAuction, auctions, auctionsLoading } = useApp()
-  const [filter, setFilter] = useState<"all" | "won" | "paid">("all")
+  const [filter, setFilter] = useState<"all" | "won" | "unsold" | "paid">("all")
 
   const closedAuctions = useMemo(
     () => auctions.filter((a) => a.status === "closed"),
@@ -16,6 +16,7 @@ export function ClosedAuctionsScreen() {
 
   const filtered = useMemo(() => {
     if (filter === "won") return closedAuctions.filter((a) => a.winnersCount && a.winnersCount > 0)
+    if (filter === "unsold") return closedAuctions.filter((a) => !a.winnersCount || a.winnersCount === 0)
     if (filter === "paid") return closedAuctions.filter((a) => a.winners?.some((w) => w.payment_status === "PAID"))
     return closedAuctions
   }, [closedAuctions, filter])
@@ -53,7 +54,7 @@ export function ClosedAuctionsScreen() {
         variants={{ hidden: { opacity: 0, y: -8 }, visible: { opacity: 1, y: 0 } }}
         className="flex gap-2"
       >
-        {(["all", "won", "paid"] as const).map((f) => (
+        {(["all", "won", "unsold", "paid"] as const).map((f) => (
           <button
             key={f}
             onClick={() => setFilter(f)}
@@ -63,7 +64,7 @@ export function ClosedAuctionsScreen() {
                 : "border-border/60 bg-white/80 backdrop-blur-sm text-neutral-500 transition-all hover:border-awash-blue/40 hover:bg-white"
             }`}
           >
-            {f === "all" ? "All" : f === "won" ? "With Winners" : "Paid"}
+            {f === "all" ? "All" : f === "won" ? "With Winners" : f === "unsold" ? "Unsold" : "Paid"}
           </button>
         ))}
       </motion.div>

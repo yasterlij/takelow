@@ -5,7 +5,12 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AuctionStatus } from "@prisma/client";
-import { CreateAuctionDto, UpdateAuctionDto, ReopenAuctionDto } from "./dto/admin.dto";
+import {
+  CreateAuctionDto,
+  UpdateAuctionDto,
+  ReopenAuctionDto,
+  BulkReopenAuctionsDto,
+} from "./dto/admin.dto";
 import { AuctionClosureService } from "../winner/auction-closure.service";
 import { WinnerService } from "../winner/winner.service";
 import { normalizeProductCategory } from "./product-categories";
@@ -490,6 +495,43 @@ export class AuctionAdminService {
       ...savedAuction,
       product: updatedProduct,
       stats: { total_bids: 0, unique_bidders: 0 },
+    };
+  }
+
+  async bulkReopenAuctions(dto: BulkReopenAuctionsDto, actorId?: string) {
+    if (!dto.auction_ids || dto.auction_ids.length === 0) {
+      throw new BadRequestException("auction_ids must contain at least one ID");
+    }
+
+    const now = new Date();
+    const startTime = dto.start_time ? new Date(dto.start_time) : now;
+    const durationMs = (dto.duration_days ?? 7) * 86400000;
+    const endTime = dto.end_time ? new Date(dto.end_time) : new Date(startTime.getTime() + durationMs);
+
+    const results: { id: string; success: boolean; error?: string }[] = [];
+
+    for (const id of dto.auction_ids) {
+      try {
+        await this.reopenAuction(
+          id,
+          {
+            start_time: startTime.toISOString(),
+            end_time: endTime.toISOString(),
+            bid_fee: dto.bid_fee,
+          },
+          actorId,
+        );
+        results.push({ id, success: true });
+      } catch (err: any) {
+        results.push({ id, success: false, error: err.message || "Failed to reopen" });
+      }
+    }
+
+    return {
+      total: dto.auction_ids.length,
+      reopened: results.filter((r) => r.success).length,
+      failed: results.filter((r) => !r.success).length,
+      results,
     };
   }
 }

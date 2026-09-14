@@ -170,6 +170,16 @@ type AppState = {
   deleteAuction: (id: string) => Promise<void>;
   closeAuction: (id: string) => Promise<void>;
   forceCloseAuction: (id: string) => Promise<void>;
+  reopenAuction: (id: string, data: any) => Promise<void>;
+  bulkReopenAuctions: (
+    ids: string[],
+    options?: {
+      startTime?: string;
+      endTime?: string;
+      bidFee?: number;
+      durationDays?: number;
+    },
+  ) => Promise<{ total: number; reopened: number }>;
   refreshAuctions: () => Promise<void>;
   refreshWallet: () => Promise<void>;
   refreshFavorites: () => Promise<void>;
@@ -877,6 +887,70 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [refreshAuctions, user, toast],
   );
 
+  const reopenAuction = useCallback(
+    async (id: string, data: any) => {
+      if (user?.role !== "admin") return;
+      try {
+        await api.reopenAuction(id, data);
+        await refreshAuctions();
+        toast.show("Auction reopened successfully", "success");
+      } catch (e: any) {
+        toast.show(getUserFriendlyMessage(e), "error");
+        throw e;
+      }
+    },
+    [refreshAuctions, user, toast],
+  );
+
+  const bulkReopenAuctions = useCallback(
+    async (
+      ids: string[],
+      options?: {
+        startTime?: string;
+        endTime?: string;
+        bidFee?: number;
+        durationDays?: number;
+      },
+    ) => {
+      if (user?.role !== "admin" || !ids || ids.length === 0) {
+        return { total: 0, reopened: 0 };
+      }
+      try {
+        let reopenedCount = 0;
+        try {
+          const res = await api.adminBulkReopenAuctions({
+            auction_ids: ids,
+            start_time: options?.startTime,
+            end_time: options?.endTime,
+            bid_fee: options?.bidFee,
+            duration_days: options?.durationDays,
+          });
+          reopenedCount = res.reopened;
+        } catch {
+          const results = await Promise.allSettled(
+            ids.map((id) =>
+              api.reopenAuction(id, {
+                start_time: options?.startTime || new Date().toISOString(),
+                end_time:
+                  options?.endTime ||
+                  new Date(Date.now() + (options?.durationDays ?? 7) * 86400000).toISOString(),
+                bid_fee: options?.bidFee,
+              }),
+            ),
+          );
+          reopenedCount = results.filter((r) => r.status === "fulfilled").length;
+        }
+        await refreshAuctions();
+        toast.show(`Successfully reopened ${reopenedCount} auction${reopenedCount > 1 ? "s" : ""}`, "success");
+        return { total: ids.length, reopened: reopenedCount };
+      } catch (e: any) {
+        toast.show(getUserFriendlyMessage(e), "error");
+        throw e;
+      }
+    },
+    [refreshAuctions, user, toast],
+  );
+
   const updateAuction = useCallback(
     async (id: string, data: any) => {
       if (user?.role !== "admin") return;
@@ -1019,6 +1093,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       deleteAuction,
       closeAuction,
       forceCloseAuction,
+      reopenAuction,
+      bulkReopenAuctions,
       refreshAuctions,
       refreshWallet,
       refreshFavorites,
@@ -1070,6 +1146,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       deleteAuction,
       closeAuction,
       forceCloseAuction,
+      reopenAuction,
+      bulkReopenAuctions,
       refreshAuctions,
       refreshWallet,
       refreshFavorites,

@@ -167,6 +167,15 @@ type AppState = {
   closeAuction: (id: string) => Promise<void>;
   forceCloseAuction: (id: string) => Promise<void>;
   reopenAuction: (id: string, data: any) => Promise<void>;
+  bulkReopenAuctions: (
+    ids: string[],
+    options?: {
+      startTime?: string;
+      endTime?: string;
+      bidFee?: number;
+      durationDays?: number;
+    },
+  ) => Promise<{ total: number; reopened: number }>;
   refreshAuctions: () => Promise<void>;
   refreshWallet: () => Promise<void>;
   refreshFavorites: () => Promise<void>;
@@ -240,6 +249,7 @@ function mapAuction(apiAuction: any): Auction {
     winner_user_id: apiAuction.winner_user_id ?? null,
     payment_status: apiAuction.payment_status,
     total_revenue: apiAuction.total_revenue,
+    raw_status: apiAuction.status,
   };
 }
 
@@ -726,14 +736,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
         api.listAuctions(),
         api.listClosedAuctions().catch(() => ({ data: [] })),
       ]);
-      const allMapped = [
-        ...activeRes.data.map(mapAuction),
-        ...closedRes.data.map(mapAuction),
-      ];
-      const unique = Array.from(
-        new Map(allMapped.map((a) => [a.id, a])).values(),
-      );
-      setAuctions(unique);
+      const auctionMap = new Map<string, Auction>();
+      for (const a of (closedRes.data || []).map(mapAuction)) {
+        auctionMap.set(a.id, a);
+      }
+      for (const a of (activeRes.data || []).map(mapAuction)) {
+        auctionMap.set(a.id, a);
+      }
+      setAuctions(Array.from(auctionMap.values()));
     } catch {
       toast("Failed to refresh auctions", "error");
     } finally {
@@ -963,6 +973,55 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [refreshAuctions, user],
   );
 
+  const bulkReopenAuctions = useCallback(
+    async (
+      ids: string[],
+      options?: {
+        startTime?: string;
+        endTime?: string;
+        bidFee?: number;
+        durationDays?: number;
+      },
+    ) => {
+      if (user?.role !== "admin" || !ids || ids.length === 0) {
+        return { total: 0, reopened: 0 };
+      }
+      try {
+        let reopenedCount = 0;
+        try {
+          const res = await api.adminBulkReopenAuctions({
+            auction_ids: ids,
+            start_time: options?.startTime,
+            end_time: options?.endTime,
+            bid_fee: options?.bidFee,
+            duration_days: options?.durationDays,
+          });
+          reopenedCount = res.reopened;
+        } catch {
+          const results = await Promise.allSettled(
+            ids.map((id) =>
+              api.adminReopenAuction(id, {
+                start_time: options?.startTime || new Date().toISOString(),
+                end_time:
+                  options?.endTime ||
+                  new Date(Date.now() + (options?.durationDays ?? 7) * 86400000).toISOString(),
+                bid_fee: options?.bidFee,
+              }),
+            ),
+          );
+          reopenedCount = results.filter((r) => r.status === "fulfilled").length;
+        }
+        await refreshAuctions();
+        toast(`Successfully reopened ${reopenedCount} of ${ids.length} auction(s)`, "success");
+        return { total: ids.length, reopened: reopenedCount };
+      } catch (e: any) {
+        toast(e?.message || "Failed to bulk reopen auctions", "error");
+        throw e;
+      }
+    },
+    [refreshAuctions, user],
+  );
+
   const updateAuction = useCallback(
     async (id: string, data: any) => {
       if (user?.role !== "admin") return;
@@ -1088,6 +1147,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       closeAuction,
       forceCloseAuction,
       reopenAuction,
+      bulkReopenAuctions,
       refreshAuctions,
       refreshWallet,
       refreshFavorites,
@@ -1145,6 +1205,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       closeAuction,
       forceCloseAuction,
       reopenAuction,
+      bulkReopenAuctions,
       refreshAuctions,
       refreshWallet,
       refreshFavorites,

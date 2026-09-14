@@ -48,6 +48,7 @@ export type Auction = {
   winnersCount?: number
   payment_status?: string
   total_revenue?: number
+  raw_status?: string
 }
 
 export const CURRENCY = "birr"

@@ -163,4 +163,39 @@ describe("AuctionAdminService.reopenAuction", () => {
       }),
     );
   });
+
+  describe("bulkReopenAuctions", () => {
+    it("throws BadRequestException if auction_ids is empty", async () => {
+      await expect(
+        service.bulkReopenAuctions({ auction_ids: [] }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it("reopens multiple auctions and returns summarized report", async () => {
+      mockAuctionRepo.findOne.mockImplementation((opts: any) =>
+        Promise.resolve({
+          id: opts.where.id,
+          status: AuctionStatus.EXPIRED,
+          start_time: new Date("2026-09-01T00:00:00Z"),
+          end_time: new Date("2026-09-08T00:00:00Z"),
+          winner_user_id: null,
+          product: { id: `prod-${opts.where.id}`, name: "Product" },
+        }),
+      );
+      mockAuctionRepo.query.mockResolvedValue([
+        { id: "auc", status: AuctionStatus.ACTIVE },
+      ]);
+      mockWinnerRepo.find.mockResolvedValue([]);
+      mockBidRepo.count.mockResolvedValue(0);
+
+      const result = await service.bulkReopenAuctions({
+        auction_ids: ["auc-1", "auc-2"],
+        duration_days: 7,
+      }, "admin-1");
+
+      expect(result.total).toBe(2);
+      expect(result.reopened).toBe(2);
+      expect(result.failed).toBe(0);
+    });
+  });
 });

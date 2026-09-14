@@ -131,7 +131,7 @@ export class AuctionsService {
       ${hasProductsTable ? "LEFT JOIN products p ON p.id = a.product_id" : ""}
       WHERE ${where}
       ORDER BY ${finalOrder}
-      LIMIT 50`,
+      LIMIT 200`,
       ...params,
     );
   }
@@ -436,7 +436,7 @@ export class AuctionsService {
           },
         },
         orderBy: { created_at: "desc" },
-        take: 50,
+        take: 200,
       });
     } catch (error) {
       if (!this.isRecoverableSchemaError(error)) throw error;

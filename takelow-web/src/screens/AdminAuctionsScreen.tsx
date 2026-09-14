@@ -24,6 +24,10 @@ import {
   AlertTriangle,
   CheckCircle2,
   Gavel,
+  Check,
+  CheckSquare,
+  Square,
+  Layers,
 } from "lucide-react"
 import { useApp } from "../AppContext"
 import { api } from "../api"
@@ -37,18 +41,17 @@ import type { Auction, ProductSpecs } from "../mockDataV0"
 const emptySpecs = { storage: "", ram: "", edition: "", battery: "", camera: "", osVersion: "", display: "", chipset: "" }
 
 export function isNoWinnerAuction(a: Auction): boolean {
-  const isClosed = a.status === "closed" || (a as any).raw_status === "CLOSED" || (a as any).raw_status === "EXPIRED"
-  if (!isClosed) return false
-  const totalBids = a.bidders ?? a.totalBids ?? 0
-  if (totalBids === 0) return true
-  if (a.minBid != null && totalBids < a.minBid) return true
-  const hasWinner = Boolean(a.winner_user_id || (a.winners && a.winners.length > 0))
+  if (a.status === "live" || a.status === "ending-soon" || a.raw_status === "ACTIVE") return false
+  const hasWinner = Boolean(
+    a.winner_user_id ||
+    (a.winners && a.winners.length > 0) ||
+    (a.winnersCount && a.winnersCount > 0)
+  )
   return !hasWinner
 }
 
 export function isClosedWonAuction(a: Auction): boolean {
-  const isClosed = a.status === "closed" || (a as any).raw_status === "CLOSED"
-  if (!isClosed) return false
+  if (a.status === "live" || a.status === "ending-soon" || a.raw_status === "ACTIVE") return false
   return !isNoWinnerAuction(a)
 }
 
@@ -71,10 +74,10 @@ function AuctionThumb({ src, onClick }: { src?: string; onClick?: () => void }) 
 
 function StatusBadge({ status, isUnsold, isWon }: { status: string; isUnsold?: boolean; isWon?: boolean }) {
   if (isUnsold) {
-    return <Badge tone="orange">Unsold / No Bids</Badge>
+    return <Badge tone="orange"><RotateCcw className="size-2.5 mr-1" /> Unsold</Badge>
   }
   if (isWon) {
-    return <Badge tone="green">Closed - Won</Badge>
+    return <Badge tone="green"><Trophy className="size-2.5 mr-1 text-primary" /> Won</Badge>
   }
   const map: Record<string, { tone: "green" | "orange" | "muted"; label: string }> = {
     live: { tone: "green", label: "Live" },
@@ -221,15 +224,32 @@ const emptyForm: {
   maxBid: "",
 }
 
-type TabType = "all" | "live" | "closed-won" | "no-winner"
+type TabType = "all" | "live" | "closed-won" | "unsold" | "no-winner"
 
 export function AdminAuctionsScreen() {
-  const { go, auctions, addAuction, updateAuction, deleteAuction, closeAuction, reopenAuction } = useApp()
+  const { go, auctions, addAuction, updateAuction, deleteAuction, closeAuction, reopenAuction, bulkReopenAuctions, refreshAuctions } = useApp()
   const now = new Date()
   const defaultStart = toDatetimeLocal(now)
   const defaultEnd = toDatetimeLocal(new Date(now.getTime() + 7 * 86400000))
   const defaultStartISO = now.toISOString()
   const defaultEndISO = new Date(now.getTime() + 7 * 86400000).toISOString()
+
+  const [selectedAuctionIds, setSelectedAuctionIds] = useState<string[]>([])
+  const [bulkModalOpen, setBulkModalOpen] = useState(false)
+  const [bulkConfirming, setBulkConfirming] = useState(false)
+  const [bulkReopening, setBulkReopening] = useState(false)
+  const [bulkForm, setBulkForm] = useState({
+    startTime: defaultStart,
+    endTime: defaultEnd,
+    durationDays: 7,
+    customDates: false,
+    overrideBidFee: false,
+    bidFee: "10",
+  })
+
+  useEffect(() => {
+    refreshAuctions()
+  }, [refreshAuctions])
 
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -353,6 +373,61 @@ export function AdminAuctionsScreen() {
     }
   }
 
+  useEffect(() => {
+    setSelectedAuctionIds([])
+  }, [activeTab])
+
+  const toggleSelectAuction = (id: string) => {
+    setSelectedAuctionIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    )
+  }
+
+  const selectedAuctions = useMemo(() => {
+    return auctions.filter((a) => selectedAuctionIds.includes(a.id))
+  }, [auctions, selectedAuctionIds])
+
+
+  const openBulkModal = () => {
+    const currentNow = new Date()
+    setBulkForm({
+      startTime: toDatetimeLocal(currentNow),
+      endTime: toDatetimeLocal(new Date(currentNow.getTime() + 7 * 86400000)),
+      durationDays: 7,
+      customDates: false,
+      overrideBidFee: false,
+      bidFee: "10",
+    })
+    setBulkConfirming(false)
+    setBulkModalOpen(true)
+  }
+
+  const handleBulkReopenSubmit = async () => {
+    if (selectedAuctionIds.length === 0) return
+    setBulkReopening(true)
+    try {
+      const startTime = new Date(bulkForm.startTime).toISOString()
+      const endTime = bulkForm.customDates
+        ? new Date(bulkForm.endTime).toISOString()
+        : new Date(new Date(bulkForm.startTime).getTime() + bulkForm.durationDays * 86400000).toISOString()
+
+      await bulkReopenAuctions(selectedAuctionIds, {
+        startTime,
+        endTime,
+        bidFee: bulkForm.overrideBidFee && bulkForm.bidFee ? Number(bulkForm.bidFee) : undefined,
+        durationDays: bulkForm.durationDays,
+      })
+
+      setSelectedAuctionIds([])
+      setBulkModalOpen(false)
+      setActiveTab("live")
+    } catch {
+      // toast handled in AppContext
+    } finally {
+      setBulkReopening(false)
+    }
+  }
+
   const handleSubmit = async () => {
     if (!form.name) return
     setSubmitting(true)
@@ -417,7 +492,7 @@ export function AdminAuctionsScreen() {
         if (a.status !== "live" && a.status !== "ending-soon") return false
       } else if (activeTab === "closed-won") {
         if (!isClosedWonAuction(a)) return false
-      } else if (activeTab === "no-winner") {
+      } else if (activeTab === "unsold" || activeTab === "no-winner") {
         if (!isNoWinnerAuction(a)) return false
       }
       if (search && !a.name.toLowerCase().includes(search.toLowerCase())) return false
@@ -427,11 +502,32 @@ export function AdminAuctionsScreen() {
 
   const { page, setPage, perPage, setPerPage, totalPages, paginated, resetPage } = usePagination(filtered, 10)
 
+  const unsoldInFiltered = useMemo(() => {
+    return filtered.filter(isNoWinnerAuction)
+  }, [filtered])
+
+  const isAllUnsoldSelected =
+    unsoldInFiltered.length > 0 &&
+    unsoldInFiltered.every((a) => selectedAuctionIds.includes(a.id))
+
+  const toggleSelectAllUnsold = () => {
+    if (isAllUnsoldSelected) {
+      setSelectedAuctionIds([])
+    } else {
+      setSelectedAuctionIds(unsoldInFiltered.map((a) => a.id))
+    }
+  }
+
+  const selectCurrentPageUnsold = () => {
+    const pageUnsoldIds = paginated.filter(isNoWinnerAuction).map((a) => a.id)
+    setSelectedAuctionIds((prev) => Array.from(new Set([...prev, ...pageUnsoldIds])))
+  }
+
   const TABS = [
     { id: "all" as const, label: "All Auctions", count: auctions.length },
     { id: "live" as const, label: "Active / Live", count: activeCount, tone: "green" as const },
     { id: "closed-won" as const, label: "Closed - Won", count: wonCount, tone: "muted" as const },
-    { id: "no-winner" as const, label: "No Winner / Unsold", count: unsoldCount, tone: "orange" as const },
+    { id: "unsold" as const, label: "Unsold", count: unsoldCount, tone: "orange" as const },
   ]
 
   return (
@@ -474,11 +570,14 @@ export function AdminAuctionsScreen() {
                         transition={{ type: "spring", stiffness: 380, damping: 28 }}
                       />
                     )}
-                    <span className="relative z-10 flex items-center gap-2">
+                    <span className="relative z-10 flex items-center gap-1.5">
+                      {tab.id === "unsold" && (
+                        <RotateCcw className={`size-3 ${isActive ? "text-amber-600" : "text-neutral-400"}`} />
+                      )}
                       {tab.label}
                       <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold transition-colors ${
                         isActive
-                          ? tab.id === "no-winner"
+                          ? tab.id === "unsold"
                             ? "bg-amber-100 text-amber-800"
                             : tab.id === "live"
                               ? "bg-emerald-100 text-emerald-800"
@@ -798,6 +897,295 @@ export function AdminAuctionsScreen() {
           )}
         </AnimatePresence>
 
+        {/* ── Bulk Reopen Modal ── */}
+        <AnimatePresence>
+          {bulkModalOpen && selectedAuctionIds.length > 0 && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4"
+              onClick={() => { if (!bulkReopening) setBulkModalOpen(false) }}
+            >
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 16 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 16 }}
+                className="relative w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-3xl border border-awash-gold/30 bg-white p-6 shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  disabled={bulkReopening}
+                  onClick={() => { setBulkModalOpen(false); setBulkConfirming(false) }}
+                  className="absolute right-4 top-4 rounded-xl p-1.5 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700 disabled:opacity-40"
+                >
+                  <X className="size-5" />
+                </button>
+
+                <div className="flex items-center gap-3">
+                  <div className="flex size-11 items-center justify-center rounded-2xl bg-amber-50 border border-amber-200/60 text-amber-700">
+                    <RotateCcw className="size-5.5" />
+                  </div>
+                  <div>
+                    <h2 className="font-display text-lg font-bold text-awash-blue">
+                      Bulk Reopen Auctions
+                    </h2>
+                    <p className="text-xs font-medium text-neutral-500">
+                      Re-list {selectedAuctionIds.length} unsold product{selectedAuctionIds.length > 1 ? "s" : ""} simultaneously
+                    </p>
+                  </div>
+                </div>
+
+                {!bulkConfirming ? (
+                  <div className="mt-5 space-y-4">
+                    {/* Selected Items Preview */}
+                    <div className="rounded-2xl border border-border/70 bg-neutral-50/70 p-3.5 space-y-2">
+                      <div className="flex items-center justify-between text-xs font-bold text-awash-blue">
+                        <span className="flex items-center gap-1.5">
+                          <Layers className="size-3.5 text-primary" /> Selected Auctions ({selectedAuctionIds.length})
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedAuctionIds([])}
+                          className="text-[10px] font-semibold text-neutral-400 hover:text-red-500"
+                        >
+                          Clear Selection
+                        </button>
+                      </div>
+                      <div className="max-h-28 overflow-y-auto flex flex-wrap gap-1.5 pt-1">
+                        {selectedAuctions.map((a) => (
+                          <span
+                            key={a.id}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 bg-white px-2.5 py-1 text-[11px] font-semibold text-neutral-700 shadow-2xs"
+                          >
+                            <span className="size-1.5 rounded-full bg-amber-500" />
+                            <span className="max-w-[180px] truncate">{a.name}</span>
+                            <button
+                              type="button"
+                              onClick={() => toggleSelectAuction(a.id)}
+                              className="text-neutral-400 hover:text-red-500 ml-0.5"
+                            >
+                              <X className="size-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Notice Banner */}
+                    <div className="flex items-start gap-2.5 rounded-2xl border border-amber-200/80 bg-gradient-to-br from-amber-50 to-orange-50/60 p-3.5 text-xs text-amber-900">
+                      <AlertTriangle className="size-4 shrink-0 mt-0.5 text-amber-600" />
+                      <div>
+                        <p className="font-bold">Lifecycle State Reset Notice</p>
+                        <p className="mt-0.5 text-[11px] text-amber-800 leading-relaxed">
+                          All {selectedAuctionIds.length} selected auctions will be reset and transitioned to <strong>ACTIVE</strong>. Prior failed bids and Redis frequency tallies will be cleared for each auction.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Schedule Preset Duration */}
+                    <div className="rounded-2xl border border-border/70 bg-neutral-50/70 p-3.5 space-y-3">
+                      <div className="flex items-center gap-2 text-xs font-bold text-awash-blue">
+                        <Calendar className="size-3.5 text-primary" /> Relist Duration & Schedule
+                      </div>
+
+                      {/* Presets */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {[
+                          { days: 3, label: "3 Days" },
+                          { days: 7, label: "7 Days (Std)" },
+                          { days: 14, label: "14 Days" },
+                          { days: 30, label: "30 Days" },
+                        ].map((preset) => {
+                          const isSelected = !bulkForm.customDates && bulkForm.durationDays === preset.days
+                          return (
+                            <button
+                              key={preset.days}
+                              type="button"
+                              onClick={() => {
+                                const start = new Date(bulkForm.startTime)
+                                const newEnd = toDatetimeLocal(new Date(start.getTime() + preset.days * 86400000))
+                                setBulkForm({
+                                  ...bulkForm,
+                                  durationDays: preset.days,
+                                  endTime: newEnd,
+                                  customDates: false,
+                                })
+                              }}
+                              className={`rounded-xl border py-2 text-xs font-bold transition-all ${
+                                isSelected
+                                  ? "border-amber-500 bg-amber-50 text-amber-900 shadow-xs"
+                                  : "border-border/70 bg-white text-neutral-600 hover:bg-neutral-50"
+                              }`}
+                            >
+                              {preset.label}
+                            </button>
+                          )
+                        })}
+                      </div>
+
+                      {/* Custom Dates toggle */}
+                      <div className="pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setBulkForm({ ...bulkForm, customDates: !bulkForm.customDates })}
+                          className="text-[11px] font-semibold text-primary hover:underline"
+                        >
+                          {bulkForm.customDates ? "← Use duration presets" : "Set custom start & end date / time →"}
+                        </button>
+                      </div>
+
+                      {bulkForm.customDates && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-500 mb-1">
+                              Start Date & Time
+                            </label>
+                            <input
+                              type="datetime-local"
+                              value={bulkForm.startTime}
+                              onChange={(e) => setBulkForm({ ...bulkForm, startTime: e.target.value })}
+                              className="input-full bg-white text-xs"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-500 mb-1">
+                              End Date & Time
+                            </label>
+                            <input
+                              type="datetime-local"
+                              value={bulkForm.endTime}
+                              onChange={(e) => setBulkForm({ ...bulkForm, endTime: e.target.value })}
+                              className="input-full bg-white text-xs"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Pricing & Rules Adjustment */}
+                    <div className="rounded-2xl border border-border/70 bg-neutral-50/70 p-3.5 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-xs font-bold text-awash-blue">
+                          <Gavel className="size-3.5 text-primary" /> Bid Fee Policy
+                        </div>
+                        <label className="flex items-center gap-2 text-[11px] font-medium text-neutral-600 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={bulkForm.overrideBidFee}
+                            onChange={(e) => setBulkForm({ ...bulkForm, overrideBidFee: e.target.checked })}
+                            className="size-3.5 rounded border-neutral-300 text-amber-600 focus:ring-amber-500"
+                          />
+                          Override bid fee for all items
+                        </label>
+                      </div>
+
+                      {bulkForm.overrideBidFee ? (
+                        <div className="max-w-xs">
+                          <label className="block text-[10px] font-bold text-neutral-500 mb-1">
+                            Uniform Bid Fee (ETB)
+                          </label>
+                          <input
+                            value={bulkForm.bidFee}
+                            onChange={(e) => setBulkForm({ ...bulkForm, bidFee: e.target.value.replace(/[^\d.]/g, "") })}
+                            placeholder="e.g. 10"
+                            className="input-full bg-white text-xs"
+                          />
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-neutral-500">
+                          Each item will retain its current configured bid fee.
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Modal Actions */}
+                    <div className="mt-6 flex items-center justify-end gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setBulkModalOpen(false)}
+                        className="rounded-xl border border-border px-4 py-2.5 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBulkConfirming(true)}
+                        className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-5 py-2.5 text-xs font-bold text-white shadow-md hover:from-amber-600 hover:to-orange-600 active:scale-[0.98]"
+                      >
+                        Review & Reopen ({selectedAuctionIds.length}) <Sparkles className="size-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* Step 2 Confirmation */
+                  <div className="mt-6 space-y-4 text-center">
+                    <div className="mx-auto flex size-14 items-center justify-center rounded-full bg-amber-50 border border-amber-200 text-amber-600">
+                      <RotateCcw className="size-7" />
+                    </div>
+                    <div>
+                      <h3 className="font-display text-base font-bold text-awash-blue">
+                        Confirm Bulk Reopening
+                      </h3>
+                      <p className="mt-1 text-xs text-neutral-600 max-w-md mx-auto">
+                        Are you sure you want to reopen all <strong>{selectedAuctionIds.length}</strong> selected auctions?
+                        They will immediately appear in the <strong>Active / Live</strong> feed for user bidding.
+                      </p>
+                    </div>
+
+                    <div className="rounded-2xl bg-neutral-50 border border-border/70 p-3.5 text-left text-xs space-y-1.5 text-neutral-600 max-w-md mx-auto">
+                      <div className="flex justify-between">
+                        <span className="font-medium text-neutral-400">Total Items:</span>
+                        <span className="font-bold text-awash-blue">{selectedAuctionIds.length} items</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="font-medium text-neutral-400">Duration:</span>
+                        <span className="font-semibold">
+                          {bulkForm.customDates
+                            ? `${new Date(bulkForm.startTime).toLocaleDateString()} to ${new Date(bulkForm.endTime).toLocaleDateString()}`
+                            : `${bulkForm.durationDays} Days`}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="font-medium text-neutral-400">Bid Fee Policy:</span>
+                        <span className="font-semibold">
+                          {bulkForm.overrideBidFee ? `${bulkForm.bidFee} ETB (Uniform)` : "Original Product Fees"}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="font-medium text-neutral-400">Target Tab:</span>
+                        <span className="font-bold text-emerald-700">Active / Live</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-center gap-3 pt-4">
+                      <button
+                        type="button"
+                        onClick={() => setBulkConfirming(false)}
+                        disabled={bulkReopening}
+                        className="rounded-xl border border-border px-4 py-2.5 text-xs font-semibold text-neutral-600 hover:bg-neutral-50 disabled:opacity-50"
+                      >
+                        Go Back & Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleBulkReopenSubmit}
+                        disabled={bulkReopening}
+                        className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-600/20 hover:shadow-emerald-600/30 disabled:opacity-50"
+                      >
+                        {bulkReopening ? (
+                          <>Reopening {selectedAuctionIds.length} items...</>
+                        ) : (
+                          <>
+                            <RotateCcw className="size-3.5" /> Confirm & Reopen All Now
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
         {/* ── Summary Counts ── */}
         <div className="flex items-center justify-between text-xs font-semibold text-neutral-400">
           <p>
@@ -811,6 +1199,70 @@ export function AdminAuctionsScreen() {
           </div>
         </div>
 
+        {/* ── Dedicated Unsold / Relist Informational Banner with Bulk Controls ── */}
+        {(activeTab === "unsold" || activeTab === "no-winner") && (
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-col gap-3 rounded-2xl border border-amber-200/80 bg-gradient-to-r from-amber-50/90 via-orange-50/60 to-white/95 p-4 shadow-sm"
+          >
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-700 border border-amber-300/60">
+                  <RotateCcw className="size-4 text-amber-600" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-amber-900">
+                    Unsold & No-Winner Auctions ({unsoldCount})
+                  </h3>
+                  <p className="mt-0.5 text-[11px] text-amber-800/80 leading-relaxed">
+                    Select individual auctions using the checkboxes or click <strong>Select All</strong> to relist unsold items in bulk.
+                  </p>
+                </div>
+              </div>
+
+              {selectedAuctionIds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={openBulkModal}
+                  className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-2 text-xs font-bold text-white shadow-md hover:from-amber-600 hover:to-orange-600 transition-all active:scale-[0.98] shrink-0"
+                >
+                  <RotateCcw className="size-3.5" /> Reopen Selected ({selectedAuctionIds.length})
+                </button>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-amber-200/60 text-xs">
+              <button
+                type="button"
+                onClick={toggleSelectAllUnsold}
+                className="flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white/90 px-2.5 py-1 text-[11px] font-bold text-amber-900 hover:bg-amber-100/60 transition-colors"
+              >
+                {isAllUnsoldSelected ? (
+                  <CheckSquare className="size-3.5 text-amber-600" />
+                ) : (
+                  <Square className="size-3.5 text-neutral-400" />
+                )}
+                {isAllUnsoldSelected ? "Deselect All Unsold" : `Select All Unsold (${unsoldInFiltered.length})`}
+              </button>
+
+              <button
+                type="button"
+                onClick={selectCurrentPageUnsold}
+                className="rounded-lg border border-border/70 bg-white/80 px-2.5 py-1 text-[11px] font-semibold text-neutral-600 hover:bg-neutral-100 transition-colors"
+              >
+                Select Current Page ({paginated.filter(isNoWinnerAuction).length})
+              </button>
+
+              {selectedAuctionIds.length > 0 && (
+                <span className="text-[11px] font-bold text-amber-800 ml-auto">
+                  {selectedAuctionIds.length} of {unsoldCount} selected
+                </span>
+              )}
+            </div>
+          </motion.div>
+        )}
+
         {/* ── Auctions List ── */}
         {filtered.length === 0 ? (
           <motion.div
@@ -820,7 +1272,7 @@ export function AdminAuctionsScreen() {
           >
             <Filter className="size-8 opacity-30 text-awash-blue" />
             <p className="text-sm font-semibold text-foreground">
-              {activeTab === "no-winner"
+              {activeTab === "unsold" || activeTab === "no-winner"
                 ? "No unsold auctions"
                 : activeTab === "closed-won"
                   ? "No won auctions yet"
@@ -829,7 +1281,7 @@ export function AdminAuctionsScreen() {
                     : "No matching auctions found"}
             </p>
             <p className="text-xs text-neutral-400 max-w-sm text-center">
-              {activeTab === "no-winner"
+              {activeTab === "unsold" || activeTab === "no-winner"
                 ? "Auctions that end with 0 bids or without meeting reserve will automatically appear here for convenient reopening."
                 : search
                   ? `No results matching "${search}". Try clearing your search query.`
@@ -860,6 +1312,7 @@ export function AdminAuctionsScreen() {
               const isClosed = a.status === "closed"
               const isUnsold = isNoWinnerAuction(a)
               const isWon = isClosedWonAuction(a)
+              const isSelected = selectedAuctionIds.includes(a.id)
 
               return (
                 <motion.div
@@ -867,12 +1320,35 @@ export function AdminAuctionsScreen() {
                   variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}
                 >
                   <div className={`flex items-center gap-3 rounded-2xl border bg-white/80 backdrop-blur-sm p-3 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5 ${
-                    isUnsold
-                      ? "border-amber-200/80 hover:border-amber-300"
-                      : isWon
-                        ? "border-emerald-200/60 hover:border-emerald-300"
-                        : "border-border/60 hover:border-awash-gold/20"
+                    isSelected
+                      ? "border-amber-400 bg-amber-50/60 ring-1 ring-amber-400/40 shadow-sm"
+                      : isUnsold
+                        ? "border-amber-200/80 hover:border-amber-300"
+                        : isWon
+                          ? "border-emerald-200/60 hover:border-emerald-300"
+                          : "border-border/60 hover:border-awash-gold/20"
                   }`}>
+                    {isUnsold && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          toggleSelectAuction(a.id)
+                        }}
+                        aria-label={isSelected ? "Deselect auction" : "Select auction for bulk reopen"}
+                        className={`flex size-5 shrink-0 items-center justify-center rounded-lg border transition-all ${
+                          isSelected
+                            ? "border-amber-500 bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-xs"
+                            : "border-neutral-300 bg-white hover:border-amber-400"
+                        }`}
+                      >
+                        {isSelected ? (
+                          <Check className="size-3.5 stroke-[3]" />
+                        ) : (
+                          <span className="size-1 rounded-full bg-neutral-300" />
+                        )}
+                      </button>
+                    )}
                     <AuctionThumb src={a.images?.[0]} onClick={() => a.images?.[0] && setLightboxImg(a.images[0])} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
@@ -1039,6 +1515,42 @@ export function AdminAuctionsScreen() {
           onPageChange={setPage}
           onPerPageChange={setPerPage}
         />
+
+        <AnimatePresence>
+          {selectedAuctionIds.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 30 }}
+              className="fixed bottom-6 inset-x-0 z-40 mx-auto flex w-[92%] max-w-xl items-center justify-between gap-3 rounded-2xl border border-amber-300/80 bg-white/95 p-3.5 shadow-2xl shadow-amber-900/10 backdrop-blur-md"
+            >
+              <div className="flex items-center gap-2.5">
+                <span className="flex size-7 items-center justify-center rounded-xl bg-amber-500 font-display text-xs font-bold text-white shadow-sm">
+                  {selectedAuctionIds.length}
+                </span>
+                <span className="text-xs font-bold text-awash-blue">
+                  {selectedAuctionIds.length} unsold product{selectedAuctionIds.length > 1 ? "s" : ""} selected
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedAuctionIds([])}
+                  className="rounded-xl border border-border/80 px-3 py-1.5 text-xs font-semibold text-neutral-600 hover:bg-neutral-100 transition-colors"
+                >
+                  Deselect
+                </button>
+                <button
+                  type="button"
+                  onClick={openBulkModal}
+                  className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-1.5 text-xs font-bold text-white shadow-md hover:from-amber-600 hover:to-orange-600 transition-all active:scale-[0.98]"
+                >
+                  <RotateCcw className="size-3.5" /> Reopen All ({selectedAuctionIds.length})
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
     </AdminLayout>
   )

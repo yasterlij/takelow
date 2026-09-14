@@ -18,6 +18,7 @@ import {
   Calendar,
   Gavel,
   Sparkles,
+  ArrowRight,
 } from "lucide-react";
 import { useApp } from "../AppContext";
 import {
@@ -44,7 +45,7 @@ function toDatetimeLocal(date: Date): string {
 }
 
 export function WinnerScreen() {
-  const { go, goBack, selectedId, user, getAuction, reopenAuction } = useApp();
+  const { go, goBack, selectedId, user, getAuction, reopenAuction, selectAuction } = useApp();
   const isAdmin = user?.role === "admin";
   const canManage = isAdmin;
   const auction = getAuction(selectedId);
@@ -152,6 +153,11 @@ export function WinnerScreen() {
   }, [selectedId, isAdmin, refreshKey]);
 
   if (!auction) return null;
+
+  const isAlreadyActive =
+    auction.status === "live" ||
+    auction.status === "ending-soon" ||
+    (auction as any).raw_status === "ACTIVE";
 
   const winnerPhone = winner?.winner_phone || null;
   const maskPhone = (p: string | null) =>
@@ -304,7 +310,7 @@ export function WinnerScreen() {
           animate={{ opacity: 1 }}
           className="flex w-full max-w-2xl flex-col items-center gap-6"
         >
-          {/* ── Trophy ── */}
+          {/* ── Trophy / Live Icon ── */}
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
@@ -312,27 +318,45 @@ export function WinnerScreen() {
             className="relative"
           >
             <span
-              className={`absolute inset-0 rounded-full ${winner.winner_user_id ? "bg-primary/20 animate-ping" : ""}`}
+              className={`absolute inset-0 rounded-full ${
+                isAlreadyActive
+                  ? "bg-emerald-500/20 animate-pulse"
+                  : winner.winner_user_id
+                    ? "bg-primary/20 animate-ping"
+                    : ""
+              }`}
             />
             <span
               className={`relative flex size-28 items-center justify-center rounded-full bg-gradient-to-br shadow-xl ${
-                winner.winner_user_id
-                  ? "from-primary to-awash-gold-light text-primary-foreground shadow-primary/40"
-                  : "from-neutral-300 to-neutral-400 text-white"
+                isAlreadyActive
+                  ? "from-emerald-500 to-teal-600 text-white shadow-emerald-500/30"
+                  : winner.winner_user_id
+                    ? "from-primary to-awash-gold-light text-primary-foreground shadow-primary/40"
+                    : "from-neutral-300 to-neutral-400 text-white"
               }`}
             >
-              <Trophy className="size-14" />
+              {isAlreadyActive ? (
+                <Gavel className="size-14" />
+              ) : (
+                <Trophy className="size-14" />
+              )}
             </span>
           </motion.div>
 
           <div className="text-center">
             <h1 className="font-display text-3xl font-extrabold text-foreground">
-              {winner.winner_user_id ? "Winner Found!" : "No Winner"}
+              {isAlreadyActive
+                ? "Auction Currently Active"
+                : winner.winner_user_id
+                  ? "Winner Found!"
+                  : "No Winner"}
             </h1>
             <p className="mt-2 text-sm font-medium text-neutral-500">
-              {winner.winner_user_id
-                ? `${allWinners?.length || 1} winner(s) from ${winner.total_bids} bids`
-                : `No unique bids among ${winner.total_bids} bids.`}
+              {isAlreadyActive
+                ? "This auction is currently running and accepting unique bids."
+                : winner.winner_user_id
+                  ? `${allWinners?.length || 1} winner(s) from ${winner.total_bids} bids`
+                  : `No unique bids among ${winner.total_bids} bids.`}
             </p>
             {winner?.payment_status === "PAID" && (
               <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700 border border-emerald-200">
@@ -341,8 +365,40 @@ export function WinnerScreen() {
             )}
           </div>
 
-          {/* ── Unsold Auction Admin Actions ── */}
-          {!winner?.winner_user_id && canManage && (
+          {/* ── Active Auction Notice OR Unsold Relist Admin Actions ── */}
+          {isAlreadyActive ? (
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="w-full max-w-md rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50/50 p-4 text-center shadow-sm"
+            >
+              <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-emerald-800">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                Auction is Currently Active & Live
+              </div>
+              <p className="mt-1 text-[11px] text-neutral-600">
+                This auction is live and accepting bids until{" "}
+                <span className="font-semibold text-neutral-800">
+                  {auction.endTime
+                    ? new Date(auction.endTime).toLocaleString([], {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      })
+                    : "scheduled end"}
+                </span>
+                .
+              </p>
+              <button
+                onClick={() => selectAuction(auction.id)}
+                className="mt-3 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:from-emerald-700 hover:to-teal-700 transition-all active:scale-[0.98]"
+              >
+                <ArrowRight className="size-3.5" /> View Live Auction
+              </button>
+            </motion.div>
+          ) : !winner?.winner_user_id && canManage ? (
             <motion.div
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
@@ -361,7 +417,7 @@ export function WinnerScreen() {
                 <RotateCcw className="size-3.5" /> Reopen This Auction
               </button>
             </motion.div>
-          )}
+          ) : null}
 
           {/* ── Winner Card ── */}
           {(winner?.winner_user_id || winner?.winning_bid_amount != null) && (

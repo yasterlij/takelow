@@ -191,3 +191,27 @@ export class ReopenAuctionDto {
   current_market_price?: number;
 }
 
+export class BulkReopenAuctionsDto {
+  @IsArray()
+  @IsUUID(4, { each: true })
+  auction_ids: string[];
+
+  @IsOptional()
+  @IsDateString()
+  start_time?: string;
+
+  @IsOptional()
+  @IsDateString()
+  end_time?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  bid_fee?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  duration_days?: number;
+}
+
