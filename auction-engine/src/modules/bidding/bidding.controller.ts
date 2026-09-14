@@ -11,20 +11,21 @@ import {
   HttpCode,
   HttpStatus,
   Logger,
+  BadRequestException,
 } from "@nestjs/common";
-import { AuthGuard } from "@nestjs/passport";
 import { BiddingService } from "./bidding.service";
 import { BidDto } from "./dto/bid.dto";
 import { BiddingWindowInterceptor } from "../common/bidding-window.interceptor";
 import { ThrottleGuard } from "../common/throttle.guard";
 import { NonceGuard } from "../common/nonce.guard";
 import { BidEncryptionService } from "../common/bid-encryption.service";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
-import { Bid } from "../bidding/entities/bid.entity";
+import { JwtAuthGuard } from "../common/jwt-auth.guard";
+import { PrismaService } from "../../prisma/prisma.service";
 import { NotificationDispatchService } from "../worker/notification-dispatch.service";
 import { AuctionReviewService } from "../admin/auction-review.service";
+import { ApiTags, ApiOperation, ApiBearerAuth } from "@nestjs/swagger";
 
+@ApiTags("bidding")
 @Controller("auctions")
 export class BiddingController {
   private readonly logger = new Logger(BiddingController.name);
@@ -54,7 +55,7 @@ export class BiddingController {
     return value != null;
   }
 
-  private mapLegacyBidRow(row: Record<string, unknown>): Bid {
+  private mapLegacyBidRow(row: Record<string, unknown>): any {
     return {
       id: String(row.bid_id ?? ""),
       user_id: String(row.bid_user_id ?? ""),
@@ -64,12 +65,12 @@ export class BiddingController {
       service_fee_paid: this.normalizeBoolean(row.bid_service_fee_paid),
       ticket_number: "",
       encrypted_amount: "",
-    } as Bid;
+    };
   }
 
-  private async loadUserBids(auctionId: string, userId: string): Promise<Bid[]> {
+  private async loadUserBids(auctionId: string, userId: string): Promise<any[]> {
     try {
-      return await this.bidRepository.find({
+      return await this.prisma.repository("bid").find({
         where: { auction_id: auctionId, user_id: userId },
         order: { bid_time: "DESC" },
       });
@@ -82,20 +83,21 @@ export class BiddingController {
         `Legacy bid schema detected for auction=${auctionId} user=${userId}, falling back to base bid columns: ${e.message}`,
       );
 
-      const rows = await this.bidRepository
+      const rows = await this.prisma
+        .repository("bid")
         .createQueryBuilder("bid")
-        .select([
+        .select(
           "bid.id",
           "bid.user_id",
           "bid.auction_id",
           "bid.amount",
           "bid.bid_time",
           "bid.service_fee_paid",
-        ])
-        .where("bid.auction_id = :auctionId", { auctionId })
-        .andWhere("bid.user_id = :userId", { userId })
+        )
+        .where({ auction_id: auctionId })
+        .andWhere({ user_id: userId })
         .orderBy("bid.bid_time", "DESC")
-        .getRawMany<Record<string, unknown>>();
+        .getRawMany();
 
       return rows.map((row) => this.mapLegacyBidRow(row));
     }
@@ -104,9 +106,9 @@ export class BiddingController {
   private async loadLatestUserBid(
     auctionId: string,
     userId: string,
-  ): Promise<Bid | null> {
+  ): Promise<any | null> {
     try {
-      return await this.bidRepository.findOne({
+      return await this.prisma.repository("bid").findOne({
         where: { auction_id: auctionId, user_id: userId },
         order: { bid_time: "DESC" },
       });
@@ -119,20 +121,21 @@ export class BiddingController {
         `Legacy bid schema detected for latest bid auction=${auctionId} user=${userId}, falling back to base bid columns: ${e.message}`,
       );
 
-      const row = await this.bidRepository
+      const row = await this.prisma
+        .repository("bid")
         .createQueryBuilder("bid")
-        .select([
+        .select(
           "bid.id",
           "bid.user_id",
           "bid.auction_id",
           "bid.amount",
           "bid.bid_time",
           "bid.service_fee_paid",
-        ])
-        .where("bid.auction_id = :auctionId", { auctionId })
-        .andWhere("bid.user_id = :userId", { userId })
+        )
+        .where({ auction_id: auctionId })
+        .andWhere({ user_id: userId })
         .orderBy("bid.bid_time", "DESC")
-        .getRawOne<Record<string, unknown>>();
+        .getRawOne();
 
       return row ? this.mapLegacyBidRow(row) : null;
     }
@@ -142,15 +145,16 @@ export class BiddingController {
     private biddingService: BiddingService,
     private auctionReviewService: AuctionReviewService,
     private bidEncryptionService: BidEncryptionService,
-    @InjectRepository(Bid)
-    private bidRepository: Repository<Bid>,
+    private prisma: PrismaService,
     private notificationDispatchService: NotificationDispatchService,
   ) {}
 
   @Post(":id/bid")
   @UseInterceptors(BiddingWindowInterceptor)
-  @UseGuards(AuthGuard("jwt"), ThrottleGuard, NonceGuard)
+  @UseGuards(JwtAuthGuard, ThrottleGuard, NonceGuard)
   @HttpCode(HttpStatus.ACCEPTED)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Place a bid on an auction" })
   async placeBid(
     @Param("id") auctionId: string,
     @Body() dto: BidDto,
@@ -159,6 +163,12 @@ export class BiddingController {
     const { amount } = dto;
     const user = req.user;
     const auction = req.auction;
+
+    if (!user?.tc_accepted) {
+      throw new BadRequestException(
+        "You must accept Terms & Conditions before bidding",
+      );
+    }
 
     const ticketNumber = `BID_${crypto.randomBytes(6).toString("hex")}`;
 
@@ -182,7 +192,9 @@ export class BiddingController {
   }
 
   @Get(":id/my-bids")
-  @UseGuards(AuthGuard("jwt"))
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Get my bids for an auction" })
   async getMyBids(@Param("id") auctionId: string, @Req() req: any) {
     const bids = await this.loadUserBids(auctionId, req.user.id);
     return {
@@ -196,7 +208,9 @@ export class BiddingController {
   }
 
   @Get(":id/result")
-  @UseGuards(AuthGuard("jwt"))
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Get auction result" })
   async getAuctionResult(@Param("id") auctionId: string, @Req() req: any) {
     const { bids: _bids, ...result } =
       await this.auctionReviewService.drawWinner(auctionId);
@@ -238,7 +252,7 @@ export class BiddingController {
     }
   }
 
-  private resolveBidAmount(bid: Bid): number {
+  private resolveBidAmount(bid: any): number {
     if (bid.amount !== 0 || !bid.encrypted_amount) return Number(bid.amount);
     try {
       return Number(this.bidEncryptionService.decrypt(bid.encrypted_amount));

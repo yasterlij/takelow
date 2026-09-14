@@ -11,6 +11,9 @@ import {
   Info,
   CheckCircle2,
   PartyPopper,
+  ShieldQuestion,
+  X,
+  Send,
 } from "lucide-react";
 import { useApp } from "../AppContext";
 import {
@@ -21,13 +24,14 @@ import {
   type ApiBid,
 } from "../api";
 import { formatCurrency } from "../mockDataV0";
+import { toast } from "../store/toast.store";
 
 const confettiParticles = Array.from({ length: 20 }, (_, i) => ({
   id: i,
   left: `${Math.random() * 100}%`,
   delay: `${Math.random() * 0.5}s`,
   duration: `${0.8 + Math.random() * 0.8}s`,
-  color: i % 3 === 0 ? "#C8A642" : i % 3 === 1 ? "#002B5C" : "#D4B85E",
+  color: i % 3 === 0 ? "#0071e3" : i % 3 === 1 ? "#1d1d1f" : "#86868b",
 }));
 
 export function WinnerScreen() {
@@ -41,6 +45,31 @@ export function WinnerScreen() {
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [bidsPage, setBidsPage] = useState(0);
+
+  const [disputeModalOpen, setDisputeModalOpen] = useState(false);
+  const [disputeType, setDisputeType] = useState("WINNER_DISPUTE");
+  const [disputeDesc, setDisputeDesc] = useState("");
+  const [disputeSubmitting, setDisputeSubmitting] = useState(false);
+
+  const handleDisputeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!disputeDesc.trim() || !auction) return;
+    setDisputeSubmitting(true);
+    try {
+      await api.createDispute({
+        auction_id: auction.id,
+        type: disputeType,
+        description: disputeDesc.trim(),
+      });
+      toast("Your claim has been submitted to the governance audit team.", "success");
+      setDisputeModalOpen(false);
+      setDisputeDesc("");
+    } catch (err: any) {
+      toast(err.message || "Failed to submit inquiry", "error");
+    } finally {
+      setDisputeSubmitting(false);
+    }
+  };
 
   useEffect(() => {
     if (!selectedId) return;
@@ -411,6 +440,17 @@ export function WinnerScreen() {
                   bidders repeated that same amount.
                 </p>
               )}
+              <div className="mt-3 flex items-center justify-between border-t border-border/60 pt-3">
+                <span className="text-[11px] text-neutral-500">Need transparency verification?</span>
+                <button
+                  type="button"
+                  onClick={() => setDisputeModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
+                >
+                  <ShieldQuestion className="size-3.5" />
+                  Raise Inquiry / Dispute
+                </button>
+              </div>
             </motion.div>
           )}
 
@@ -455,10 +495,14 @@ export function WinnerScreen() {
                     >
                       <div className="flex items-center gap-3">
                         <span
-                          className={`flex size-8 items-center justify-center rounded-full text-xs font-bold ${
+                          className={`flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-extrabold ${
                             i === 0
-                              ? "bg-gradient-to-br from-awash-gold/20 to-awash-gold-light/10 text-primary border border-primary/20"
-                              : "bg-neutral-200/80 text-neutral-600"
+                              ? "bg-amber-100 text-amber-800 border border-amber-300 shadow-sm"
+                              : i === 1
+                              ? "bg-slate-100 text-slate-700 border border-slate-300 shadow-sm"
+                              : i === 2
+                              ? "bg-orange-100 text-orange-800 border border-orange-200 shadow-sm"
+                              : "bg-neutral-100 text-neutral-600"
                           }`}
                         >
                           #{i + 1}
@@ -496,11 +540,15 @@ export function WinnerScreen() {
                             )}
                             {!isPaid && !isExpired && wDeadlineHrs != null && (
                               <span
-                                className={
-                                  wDeadlineHrs < 6 ? "text-red-500" : ""
-                                }
+                                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                  wDeadlineHrs < 6
+                                    ? "bg-destructive/10 text-destructive border border-destructive/20 animate-pulse"
+                                    : wDeadlineHrs < 24
+                                    ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                    : "bg-neutral-100 text-neutral-600"
+                                }`}
                               >
-                                •{" "}
+                                <Clock className="size-2.5" />
                                 {wDeadlineHrs > 0
                                   ? `${wDeadlineHrs}h left`
                                   : "Overdue"}
@@ -763,6 +811,81 @@ export function WinnerScreen() {
           </motion.div>
         </motion.div>
       ) : null}
+
+      {/* ── Dispute / Claim Modal ── */}
+      {disputeModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.95, opacity: 0 }}
+            className="w-full max-w-md rounded-2xl border border-border/60 bg-white p-6 shadow-xl"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-foreground">
+                <ShieldQuestion className="size-5 text-primary" />
+                <h3 className="font-display text-base font-bold">Submit Auction Inquiry</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDisputeModalOpen(false)}
+                className="rounded-full p-1 text-neutral-400 hover:text-foreground"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <p className="mt-2 text-xs text-neutral-500">
+              File an inquiry or transparency review for <strong className="text-foreground">{auction.name}</strong>. Our audit committee reviews all bid frequency logs.
+            </p>
+
+            <form onSubmit={handleDisputeSubmit} className="mt-4 space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-foreground">Inquiry Type</label>
+                <select
+                  value={disputeType}
+                  onChange={(e) => setDisputeType(e.target.value)}
+                  className="mt-1.5 w-full rounded-xl border border-border/60 bg-white px-3 py-2 text-xs text-foreground focus:border-primary focus:outline-none shadow-sm"
+                >
+                  <option value="WINNER_DISPUTE">Winner Determination / Unique Bid Verification</option>
+                  <option value="BID_DISPUTE">Bid Registration or Nonce Dispute</option>
+                  <option value="PAYMENT_DISPUTE">Participation Fee / Payment Inquiry</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-foreground">Explanation / Claim</label>
+                <textarea
+                  required
+                  rows={4}
+                  value={disputeDesc}
+                  onChange={(e) => setDisputeDesc(e.target.value)}
+                  placeholder="Describe what you observed (e.g. Your bid amount, transaction details)..."
+                  className="mt-1.5 w-full rounded-xl border border-border/60 bg-white p-3 text-xs text-foreground placeholder:text-neutral-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-sm"
+                />
+              </div>
+
+              <div className="mt-6 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDisputeModalOpen(false)}
+                  className="rounded-xl border border-border/60 bg-white px-4 py-2 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={disputeSubmitting || !disputeDesc.trim()}
+                  className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground shadow-sm hover:opacity-90 transition-opacity disabled:opacity-50"
+                >
+                  {disputeSubmitting ? <Loader2 className="size-3 animate-spin" /> : <Send className="size-3" />}
+                  Submit Claim
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
     </motion.div>
   );
 }

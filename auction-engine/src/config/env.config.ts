@@ -14,7 +14,7 @@ export const appConfig = registerAs("app", () => {
     jwtSecret: process.env.JWT_SECRET,
     databaseUrl:
       process.env.DATABASE_URL ||
-      "postgresql://admin:secret@localhost:5432/takelow_db",
+      "postgresql://admin:secret@localhost:5433/takelow_db",
     redisUrl: process.env.REDIS_URL || "redis://localhost:6379",
     bidFee: parseFloat(process.env.BID_FEE || "1"),
     sikinaSecretKey: process.env.SIKINA_SECRET_KEY || "",

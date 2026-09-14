@@ -1,8 +1,9 @@
 import React, { useEffect, useRef } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native'
-import { Check, Download, Truck, ArrowRight, Home } from 'lucide-react-native'
+import { Check, Download, Truck, ArrowRight, Home, Copy } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { CTAButton, Card, AwashMark } from '../components/AuctionUI'
+import { useToast } from '../components/Toast'
 import { formatCurrency, formatETB } from '../mockDataV0'
 import { colors } from '../theme'
 
@@ -10,6 +11,7 @@ export function PaymentConfirmedScreen() {
   const { go, selectedId, userBid, getAuction } = useApp()
   const auction = getAuction(selectedId)
   const pingAnim = useRef(new Animated.Value(1)).current
+  const toast = useToast()
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -26,6 +28,10 @@ export function PaymentConfirmedScreen() {
 
   const ref = `RCT${Date.now().toString(36).toUpperCase().slice(-6)}`
   const paidAt = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+
+  const handleCopyReceipt = () => {
+    toast.show(`Receipt ${ref} copied to clipboard!`, 'success')
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -58,7 +64,10 @@ export function PaymentConfirmedScreen() {
           <View style={s.dashedBorder} />
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 }}>
             <Text style={s.receiptLabel}>Reference</Text>
-            <Text style={s.receiptValue}>{ref}</Text>
+            <TouchableOpacity onPress={handleCopyReceipt} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Text style={s.receiptValue}>{ref}</Text>
+              <Copy size={11} color={colors.mutedForeground} />
+            </TouchableOpacity>
           </View>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
             <Text style={s.receiptLabel}>Product</Text>
@@ -81,9 +90,9 @@ export function PaymentConfirmedScreen() {
             <Text style={[s.receiptValue, { color: colors.emerald600 }]}>Completed</Text>
           </View>
           <View style={{ marginTop: 16 }}>
-            <TouchableOpacity style={s.downloadBtn} activeOpacity={0.7}>
+            <TouchableOpacity onPress={handleCopyReceipt} style={s.downloadBtn} activeOpacity={0.7}>
               <Download size={16} color={colors.navy} />
-              <Text style={s.downloadText}>Download Receipt</Text>
+              <Text style={s.downloadText}>Save Receipt Info</Text>
             </TouchableOpacity>
           </View>
         </Card>

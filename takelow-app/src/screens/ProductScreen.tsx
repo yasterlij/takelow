@@ -10,6 +10,7 @@ import {
   TextInput,
   ActivityIndicator,
   Alert,
+  Share,
 } from "react-native";
 import {
   Users,
@@ -26,6 +27,7 @@ import {
   ChevronDown,
   ChevronUp,
   Building2,
+  Share2,
 } from "lucide-react-native";
 import { useApp } from "../AppContext";
 import { AppBar, Card, Badge, AwashMark } from "../components/AuctionUI";
@@ -237,21 +239,42 @@ export function ProductScreen() {
         title="Product Details"
         onBack={goBack}
         right={
-          <TouchableOpacity
-            onPress={() => toggleFavorite(auction.id)}
-            style={{
-              width: 34,
-              height: 34,
-              justifyContent: "center",
-              alignItems: "center",
-            }}
-          >
-            <Heart
-              size={20}
-              color={favorite ? colors.primary : colors.navyForeground}
-              fill={favorite ? colors.primary : "transparent"}
-            />
-          </TouchableOpacity>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+            <TouchableOpacity
+              onPress={async () => {
+                try {
+                  await Share.share({
+                    message: `Check out ${auction.name} on TakeLow! Lowest unique bid wins! Auction Code: ${auctionCode}`,
+                  });
+                } catch {}
+              }}
+              style={{
+                width: 32,
+                height: 32,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+              activeOpacity={0.7}
+            >
+              <Share2 size={18} color={colors.navyForeground} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => toggleFavorite(auction.id)}
+              style={{
+                width: 32,
+                height: 32,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+              activeOpacity={0.7}
+            >
+              <Heart
+                size={19}
+                color={favorite ? colors.primary : colors.navyForeground}
+                fill={favorite ? colors.primary : "transparent"}
+              />
+            </TouchableOpacity>
+          </View>
         }
       />
       <LightboxModal

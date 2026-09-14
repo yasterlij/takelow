@@ -1,7 +1,5 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { In, Like, Repository } from "typeorm";
-import { Product } from "./entities/product.entity";
+import { PrismaService } from "../../prisma/prisma.service";
 import { CreateProductDto, UpdateProductDto } from "./dto/admin.dto";
 import { ImageService } from "./image.service";
 import { normalizeProductCategory } from "./product-categories";
@@ -21,8 +19,7 @@ export class ProductAdminService {
   ] as const;
 
   constructor(
-    @InjectRepository(Product)
-    private productRepository: Repository<Product>,
+    private prisma: PrismaService,
     private imageService: ImageService,
   ) {}
 
@@ -40,7 +37,7 @@ export class ProductAdminService {
       where = `WHERE name ILIKE $${params.length}`;
     }
     params.push(limit, offset);
-    const rows = await this.productRepository.query(
+    const rows = await this.prisma.repository("product").query(
       `SELECT id, name, description, image_urls, current_market_price, category, brand, created_at
        FROM products
        ${where}
@@ -48,7 +45,7 @@ export class ProductAdminService {
        LIMIT $${params.length - 1} OFFSET $${params.length}`,
       params,
     );
-    const countRows = await this.productRepository.query(
+    const countRows = await this.prisma.repository("product").query(
       `SELECT COUNT(*)::int AS total FROM products ${where}`,
       search ? [`%${search}%`] : [],
     );
@@ -79,8 +76,8 @@ export class ProductAdminService {
   async listProducts(page = 1, limit = 20, search?: string) {
     try {
       const where: any = {};
-      if (search) where.name = Like(`%${search}%`);
-      const [data, total] = await this.productRepository.findAndCount({
+      if (search) where.name = { contains: `%${search}%` };
+      const [data, total] = await this.prisma.repository("product").findAndCount({
         where,
         order: { created_at: "DESC" },
         skip: (page - 1) * limit,
@@ -106,12 +103,12 @@ export class ProductAdminService {
     data.category = normalizeProductCategory(data.category, data.name);
     data.specs = this.normalizeSpecs(data.specs) ?? undefined;
     try {
-      return await this.productRepository.save(
-        this.productRepository.create(data),
+      return await this.prisma.repository("product").save(
+        this.prisma.repository("product").create(data),
       );
     } catch (error) {
       if (!this.isMissingColumnError(error)) throw error;
-      const rows = await this.productRepository.query(
+      const rows = await this.prisma.repository("product").query(
         `INSERT INTO products (name, description, image_urls, current_market_price, category)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING id, name, description, image_urls, current_market_price, category, brand, created_at`,
@@ -134,10 +131,10 @@ export class ProductAdminService {
   async updateProduct(id: string, dto: UpdateProductDto) {
     let product = null as any;
     try {
-      product = await this.productRepository.findOne({ where: { id } });
+      product = await this.prisma.repository("product").findOne({ where: { id } });
     } catch (error) {
       if (!this.isMissingColumnError(error)) throw error;
-      const rows = await this.productRepository.query(
+      const rows = await this.prisma.repository("product").query(
         `SELECT id, name, description, image_urls, current_market_price, brand, created_at FROM products WHERE id = $1 LIMIT 1`,
         [id],
       );
@@ -161,10 +158,10 @@ export class ProductAdminService {
     }
     Object.assign(product, data);
     try {
-      return await this.productRepository.save(product);
+      return await this.prisma.repository("product").save(product);
     } catch (error) {
       if (!this.isMissingColumnError(error)) throw error;
-      const rows = await this.productRepository.query(
+      const rows = await this.prisma.repository("product").query(
         `UPDATE products
          SET name = $2, description = $3, image_urls = $4, current_market_price = $5, category = $6
          WHERE id = $1
@@ -187,14 +184,14 @@ export class ProductAdminService {
   }
 
   async deleteProduct(id: string) {
-    const product = await this.productRepository.findOne({ where: { id } });
+    const product = await this.prisma.repository("product").findOne({ where: { id } });
     if (!product) throw new NotFoundException("Product not found");
-    await this.productRepository.remove(product);
+    await this.prisma.repository("product").remove(product);
     return { deleted: true, id };
   }
 
   async downloadProductImages(id: string) {
-    const product = await this.productRepository.findOne({ where: { id } });
+    const product = await this.prisma.repository("product").findOne({ where: { id } });
     if (!product) throw new NotFoundException("Product not found");
     if (!product.image_urls?.length) {
       return { downloaded: 0, message: "No images to download" };
@@ -203,7 +200,7 @@ export class ProductAdminService {
       product.image_urls,
     );
     product.image_urls = localUrls;
-    await this.productRepository.save(product);
+    await this.prisma.repository("product").save(product);
     const downloaded = localUrls.filter((u) =>
       u.startsWith("/uploads/"),
     ).length;
@@ -211,7 +208,7 @@ export class ProductAdminService {
   }
 
   async downloadAllProductImages() {
-    const products = await this.productRepository.find();
+    const products = await this.prisma.repository("product").find({});
     let total = 0;
     for (const product of products) {
       if (!product.image_urls?.length) continue;
@@ -219,26 +216,123 @@ export class ProductAdminService {
         product.image_urls,
       );
       product.image_urls = localUrls;
-      await this.productRepository.save(product);
+      await this.prisma.repository("product").save(product);
       total += localUrls.filter((u) => u.startsWith("/uploads/")).length;
     }
     return { downloaded: total, products: products.length };
   }
 
   async bulkDeleteProducts(ids: string[]) {
-    const products = await this.productRepository.find({
-      where: { id: In(ids) },
+    const products = await this.prisma.repository("product").find({
+      where: { id: { in: ids } },
     });
-    await this.productRepository.remove(products);
+    await this.prisma.repository("product").remove(products);
     return { deleted: products.length };
+  }
+
+  async approveProduct(productId: string, adminId: string) {
+    const product = await this.prisma.repository("product").findOne({
+      where: { id: productId },
+    });
+    if (!product) throw new NotFoundException("Product not found");
+
+    const now = new Date();
+    try {
+      return await this.prisma.repository("product").update(
+        { id: productId },
+        {
+          approval_status: "APPROVED",
+          approved_by: adminId,
+          approved_at: now,
+        },
+      );
+    } catch (error) {
+      if (!this.isMissingColumnError(error)) throw error;
+      await this.prisma.repository("product").query(
+        `UPDATE products
+         SET approval_status = 'APPROVED', approved_by = $2, approved_at = $3
+         WHERE id = $1
+         RETURNING id, name, description, image_urls, current_market_price, category, brand, created_at, approval_status, approved_by, approved_at`,
+        [productId, adminId, now],
+      );
+      return { id: productId, approval_status: "APPROVED", approved_by: adminId, approved_at: now };
+    }
+  }
+
+  async rejectProduct(productId: string, adminId: string, reason?: string) {
+    const product = await this.prisma.repository("product").findOne({
+      where: { id: productId },
+    });
+    if (!product) throw new NotFoundException("Product not found");
+
+    const now = new Date();
+    try {
+      return await this.prisma.repository("product").update(
+        { id: productId },
+        {
+          approval_status: "REJECTED",
+          approved_by: adminId,
+          approved_at: now,
+        },
+      );
+    } catch (error) {
+      if (!this.isMissingColumnError(error)) throw error;
+      await this.prisma.repository("product").query(
+        `UPDATE products
+         SET approval_status = 'REJECTED', approved_by = $2, approved_at = $3
+         WHERE id = $1
+         RETURNING id, name, description, image_urls, current_market_price, category, brand, created_at, approval_status, approved_by, approved_at`,
+        [productId, adminId, now],
+      );
+      return { id: productId, approval_status: "REJECTED", approved_by: adminId, approved_at: now, reason };
+    }
+  }
+
+  async listPendingProducts(page = 1, limit = 20) {
+    const offset = (page - 1) * limit;
+    try {
+      const [data, total] = await this.prisma.repository("product").findAndCount({
+        where: { approval_status: "PENDING" },
+        order: { created_at: "DESC" },
+        skip: offset,
+        take: limit,
+      });
+      return {
+        data,
+        meta: { total, page, limit, total_pages: Math.ceil(total / limit) },
+      };
+    } catch (error) {
+      if (!this.isMissingColumnError(error)) throw error;
+      const rows = await this.prisma.repository("product").query(
+        `SELECT id, name, description, image_urls, current_market_price, category, brand, created_at
+         FROM products
+         WHERE approval_status = 'PENDING'
+         ORDER BY created_at DESC
+         LIMIT $1 OFFSET $2`,
+        [limit, offset],
+      );
+      const countRows = await this.prisma.repository("product").query(
+        `SELECT COUNT(*)::int AS total FROM products WHERE approval_status = 'PENDING'`,
+      );
+      const total = countRows[0]?.total || 0;
+      return {
+        data: rows.map((row: any) => ({
+          ...row,
+          category: normalizeProductCategory(row.category, row.name),
+          specs: null,
+          approval_status: "PENDING",
+        })),
+        meta: { total, page, limit, total_pages: Math.ceil(total / limit) },
+      };
+    }
   }
 
   async exportProductsCsv(search?: string) {
     const where: any = {};
-    if (search) where.name = Like(`%${search}%`);
+    if (search) where.name = { contains: `%${search}%` };
     let products: any[] = [];
     try {
-      products = await this.productRepository.find({
+      products = await this.prisma.repository("product").find({
         where,
         order: { created_at: "DESC" },
       });

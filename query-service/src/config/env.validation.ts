@@ -30,5 +30,10 @@ export function validate(config: Record<string, unknown>) {
   if (errors.length > 0) {
     throw new Error(`Environment validation failed: ${errors.toString()}`);
   }
+  if (config.NODE_ENV === 'production' && !validated.CORS_ORIGINS?.trim()) {
+    throw new Error(
+      'Environment validation failed: CORS_ORIGINS is required in production',
+    );
+  }
   return validated;
 }

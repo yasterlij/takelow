@@ -2,7 +2,7 @@
 set -eu
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-DB_URL="${DATABASE_URL:-postgresql://admin:secret@localhost:5432/takelow_db}"
+DB_URL="${DATABASE_URL:-postgresql://admin:secret@localhost:5433/takelow_db}"
 
 echo "  → Running raw SQL migrations against $DB_URL"
 

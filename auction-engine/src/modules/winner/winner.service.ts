@@ -1,11 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, EntityManager } from "typeorm";
 import { Redis } from "ioredis";
 import { InjectRedis } from "../common/redis.decorator";
-import { Bid } from "../bidding/entities/bid.entity";
-import { Auction } from "./entities/auction.entity";
-import { Winner, WinnerPaymentStatus } from "./entities/winner.entity";
+import { PrismaService } from "../../prisma/prisma.service";
 import { BidEncryptionService } from "../common/bid-encryption.service";
 
 @Injectable()
@@ -29,7 +25,7 @@ export class WinnerService {
   }
 
   private readBidAmount(
-    bid: Pick<Bid, "amount" | "encrypted_amount">,
+    bid: Pick<any, "amount" | "encrypted_amount">,
   ): string | null {
     if (Number(bid.amount) !== 0 || !bid.encrypted_amount) {
       return this.normalizeAmount(bid.amount);
@@ -46,9 +42,7 @@ export class WinnerService {
 
   constructor(
     @InjectRedis() private readonly redis: Redis,
-    @InjectRepository(Bid) private bidRepository: Repository<Bid>,
-    @InjectRepository(Auction) private auctionRepository: Repository<Auction>,
-    @InjectRepository(Winner) private winnerRepository: Repository<Winner>,
+    private readonly prisma: PrismaService,
     private readonly bidEncryptionService: BidEncryptionService,
   ) {}
 
@@ -57,9 +51,9 @@ export class WinnerService {
     totalBids: number;
     winners: { amount: number; userId: string }[];
   }> {
-    const auction = await this.auctionRepository.findOne({
+    const auction = await this.prisma.repository("auction").findOne({
       where: { id: auctionId },
-      select: ["status"],
+      select: { status: true },
     });
 
     if (auction?.status === "CLOSED" || auction?.status === "EXPIRED") {
@@ -148,9 +142,9 @@ export class WinnerService {
   }
 
   private async hasUniqueBidsFromDb(auctionId: string): Promise<boolean> {
-    const bids = await this.bidRepository.find({
+    const bids = await this.prisma.repository("bid").find({
       where: { auction_id: auctionId },
-      select: ["amount", "encrypted_amount"],
+      select: { amount: true, encrypted_amount: true },
     });
 
     if (bids.length === 0) return false;
@@ -174,13 +168,13 @@ export class WinnerService {
     totalBids: number;
     winners: { amount: number; userId: string }[];
   }> {
-    const totalBids = await this.bidRepository.count({
+    const totalBids = await this.prisma.repository("bid").count({
       where: { auction_id: auctionId },
     });
 
-    const persistedWinners = await this.winnerRepository.find({
+    const persistedWinners = await this.prisma.repository("winner").find({
       where: { auction_id: auctionId },
-      order: { rank: "ASC" },
+      order: { rank: "asc" },
     });
 
     return {
@@ -197,11 +191,11 @@ export class WinnerService {
     auctionId: string,
     winners: { amount: number; userId: string }[],
     paymentDeadline: Date,
-    manager?: EntityManager,
-  ): Promise<Winner[]> {
+    manager?: any,
+  ): Promise<any[]> {
     const repo = manager
-      ? manager.getRepository(Winner)
-      : this.winnerRepository;
+      ? manager.repository("winner")
+      : this.prisma.repository("winner");
     const existing = await repo.find({
       where: { auction_id: auctionId },
     });
@@ -218,7 +212,7 @@ export class WinnerService {
         user_id: w.userId,
         amount: w.amount,
         rank: i + 1,
-        payment_status: WinnerPaymentStatus.PENDING,
+        payment_status: "PENDING",
         payment_deadline: paymentDeadline,
       }),
     );
@@ -287,9 +281,9 @@ export class WinnerService {
     totalBids: number;
     winners: { amount: number; userId: string }[];
   }> {
-    const bids = await this.bidRepository.find({
+    const bids = await this.prisma.repository("bid").find({
       where: { auction_id: auctionId },
-      order: { bid_time: "ASC" },
+      order: { bid_time: "asc" },
     });
 
     const totalBids = bids.length;
@@ -330,10 +324,10 @@ export class WinnerService {
     auctionId: string,
     amount: number,
   ): Promise<string | null> {
-    const bids = await this.bidRepository.find({
+    const bids = await this.prisma.repository("bid").find({
       where: { auction_id: auctionId },
-      order: { bid_time: "ASC" },
-      select: ["user_id", "amount", "encrypted_amount"],
+      order: { bid_time: "asc" },
+      select: { user_id: true, amount: true, encrypted_amount: true },
     });
     const targetAmount = this.normalizeAmount(amount);
     const match = bids.find((b) => {
@@ -360,9 +354,9 @@ export class WinnerService {
     const amountSet = new Set(
       amounts.map((amount) => this.normalizeAmount(amount)),
     );
-    const bids = await this.bidRepository.find({
+    const bids = await this.prisma.repository("bid").find({
       where: { auction_id: auctionId },
-      order: { bid_time: "ASC" },
+      order: { bid_time: "asc" },
     });
     const result = new Map<number, string>();
     const seen = new Set<string>();
@@ -387,12 +381,10 @@ export class WinnerService {
     }
 
     try {
-      const dbCount = await this.bidRepository
-        .createQueryBuilder("bid")
-        .where("bid.auction_id = :auctionId", { auctionId })
-        .select("COUNT(DISTINCT bid.user_id)", "count")
-        .getRawOne();
-      return parseInt(dbCount?.count || "0", 10);
+      const result = await this.prisma.$queryRawUnsafe<
+        { count: bigint }[]
+      >(`SELECT COUNT(DISTINCT user_id)::int AS count FROM bids WHERE auction_id = $1`, auctionId);
+      return parseInt(result[0]?.count?.toString() || "0", 10);
     } catch (e) {
       this.logger.error(`DB count query failed for ${auctionId}: ${e.message}`);
       return 0;
@@ -430,19 +422,19 @@ export class WinnerService {
   async updateWinnerPaymentStatus(
     auctionId: string,
     userId: string,
-    status: WinnerPaymentStatus,
+    status: string,
   ): Promise<void> {
-    await this.winnerRepository.update(
+    await this.prisma.repository("winner").update(
       { auction_id: auctionId, user_id: userId },
       { payment_status: status },
     );
   }
 
-  async getAuctionWinners(auctionId: string): Promise<Winner[]> {
+  async getAuctionWinners(auctionId: string): Promise<any[]> {
     try {
-      return await this.winnerRepository.find({
+      return await this.prisma.repository("winner").find({
         where: { auction_id: auctionId },
-        order: { rank: "ASC" },
+        order: { rank: "asc" },
       });
     } catch (e) {
       if (!this.isWinnerPersistenceSchemaError(e)) {
@@ -456,13 +448,13 @@ export class WinnerService {
     }
   }
 
-  async getNextUnpaidWinner(auctionId: string): Promise<Winner | null> {
-    return this.winnerRepository.findOne({
+  async getNextUnpaidWinner(auctionId: string): Promise<any | null> {
+    return this.prisma.repository("winner").findOne({
       where: {
         auction_id: auctionId,
-        payment_status: WinnerPaymentStatus.PENDING,
+        payment_status: "PENDING",
       },
-      order: { rank: "ASC" },
+      order: { rank: "asc" },
     });
   }
 }

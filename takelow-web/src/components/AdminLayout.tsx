@@ -13,6 +13,11 @@ import {
   Menu,
   X,
   ChevronRight,
+  BarChart3,
+  Trophy,
+  FileText,
+  ShieldAlert,
+  Shield,
 } from "lucide-react"
 import { useApp, type View } from "../AppContext"
 import { AwashMark } from "./AuctionUI"
@@ -27,11 +32,16 @@ type NavItem = {
 const NAV: NavItem[] = [
   { id: "admin-dashboard", label: "Dashboard", icon: LayoutDashboard, group: "Overview" },
   { id: "admin-monitor", label: "Monitor Live", icon: Radio, group: "Overview" },
+  { id: "admin-analytics", label: "Analytics", icon: BarChart3, group: "Overview" },
   { id: "admin-auctions", label: "Auctions", icon: Gavel, group: "Manage" },
   { id: "admin-products", label: "Products", icon: Package, group: "Manage" },
+  { id: "admin-winners", label: "Winners", icon: Trophy, group: "Manage" },
   { id: "admin-users", label: "Users", icon: Users, group: "Manage" },
   { id: "admin-transactions", label: "Transactions", icon: Receipt, group: "Finance" },
-  { id: "admin-audit", label: "Audit Log", icon: ScrollText, group: "Finance" },
+  { id: "admin-settlement", label: "Settlement", icon: FileText, group: "Finance" },
+  { id: "admin-disputes", label: "Disputes", icon: ShieldAlert, group: "Governance" },
+  { id: "admin-rbac", label: "Roles & Access", icon: Shield, group: "Governance" },
+  { id: "admin-audit", label: "Audit Log", icon: ScrollText, group: "Governance" },
 ]
 
 export function AdminLayout({ children, title, subtitle, actions }: {
@@ -50,8 +60,8 @@ export function AdminLayout({ children, title, subtitle, actions }: {
       <div className="flex items-center gap-2.5 px-5 py-5">
         <AwashMark size={32} />
         <div className="leading-none">
-          <div className="font-display text-sm font-extrabold text-white">TakeLow</div>
-          <div className="text-[10px] font-semibold tracking-wide text-primary">Admin Console</div>
+          <div className="font-display text-sm font-semibold text-white">TakeLow</div>
+          <div className="text-[10px] font-normal tracking-wide text-white/50">Admin Console</div>
         </div>
       </div>
 
@@ -68,9 +78,9 @@ export function AdminLayout({ children, title, subtitle, actions }: {
                     go(item.id)
                     setMobileNavOpen(false)
                   }}
-                  className={`group relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
+                  className={`group relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-normal transition-colors ${
                     active
-                      ? "bg-gradient-to-r from-primary/20 to-transparent text-white"
+                      ? "bg-white/10 text-white"
                       : "text-white/60 hover:bg-white/5 hover:text-white"
                   }`}
                 >
@@ -114,7 +124,7 @@ export function AdminLayout({ children, title, subtitle, actions }: {
   return (
     <div className="flex min-h-screen bg-neutral-50">
       {/* Desktop sidebar */}
-      <aside className="hidden w-64 shrink-0 bg-gradient-to-b from-awash-blue to-awash-blue-dark lg:block">
+      <aside className="hidden w-64 shrink-0 bg-ink lg:block">
         {SidebarContent}
       </aside>
 
@@ -134,7 +144,7 @@ export function AdminLayout({ children, title, subtitle, actions }: {
               animate={{ x: 0 }}
               exit={{ x: -280 }}
               transition={{ type: "spring", damping: 28, stiffness: 300 }}
-              className="fixed left-0 top-0 z-50 h-full w-64 bg-gradient-to-b from-awash-blue to-awash-blue-dark lg:hidden"
+              className="fixed left-0 top-0 z-50 h-full w-64 bg-ink lg:hidden"
             >
               <button
                 onClick={() => setMobileNavOpen(false)}
@@ -158,7 +168,7 @@ export function AdminLayout({ children, title, subtitle, actions }: {
             <Menu className="size-4.5" />
           </button>
           <div className="min-w-0 flex-1">
-            <h1 className="truncate font-display text-lg font-extrabold text-awash-blue">{title}</h1>
+            <h1 className="truncate font-display text-lg font-semibold tracking-[-0.022em] text-foreground">{title}</h1>
             {subtitle && <p className="truncate text-xs font-medium text-neutral-400">{subtitle}</p>}
           </div>
           {actions}

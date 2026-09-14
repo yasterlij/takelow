@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc 3.10.2" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>TakeLow - README</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: 1.5em;}
+    div.column{flex: auto;}
+    @media screen {
+    div.columns{gap: min(4vw, 1.5em);}
+    div.column{overflow-x: auto;}
+    }
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    /* CSS for syntax highlighting */
+    html { -webkit-text-size-adjust: 100%; }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {  background-color: #f8f8f8; }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ef2929; } /* Alert */
+    code span.an { color: #8f5902; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #204a87; } /* Attribute */
+    code span.bn { color: #0000cf; } /* BaseN */
+    code span.cf { color: #204a87; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4e9a06; } /* Char */
+    code span.cn { color: #8f5902; } /* Constant */
+    code span.co { color: #8f5902; font-style: italic; } /* Comment */
+    code span.cv { color: #8f5902; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #8f5902; font-weight: bold; font-style: italic; } /* Documentation */
+    code span.dt { color: #204a87; } /* DataType */
+    code span.dv { color: #0000cf; } /* DecVal */
+    code span.er { color: #a40000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #0000cf; } /* Float */
+    code span.fu { color: #204a87; font-weight: bold; } /* Function */
+    code span.im { } /* Import */
+    code span.in { color: #8f5902; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #204a87; font-weight: bold; } /* Keyword */
+    code span.op { color: #ce5c00; font-weight: bold; } /* Operator */
+    code span.ot { color: #8f5902; } /* Other */
+    code span.pp { color: #8f5902; font-style: italic; } /* Preprocessor */
+    code span.sc { color: #ce5c00; font-weight: bold; } /* SpecialChar */
+    code span.ss { color: #4e9a06; } /* SpecialString */
+    code span.st { color: #4e9a06; } /* String */
+    code span.va { color: #000000; } /* Variable */
+    code span.vs { color: #4e9a06; } /* VerbatimString */
+    code span.wa { color: #8f5902; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+  <link rel="stylesheet" href="/Users/tamrat/Documents/Code/takelow/scripts/templates/github-pandoc.css" />
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">TakeLow - README</h1>
+</header>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a href="#takelow" id="toc-takelow"><span
+class="toc-section-number">1</span> TakeLow</a>
+<ul>
+<li><a href="#architecture" id="toc-architecture"><span
+class="toc-section-number">1.1</span> Architecture</a></li>
+<li><a href="#quick-start" id="toc-quick-start"><span
+class="toc-section-number">1.2</span> Quick start</a></li>
+<li><a href="#common-commands" id="toc-common-commands"><span
+class="toc-section-number">1.3</span> Common commands</a></li>
+<li><a href="#seed-credentials" id="toc-seed-credentials"><span
+class="toc-section-number">1.4</span> Seed credentials</a></li>
+<li><a href="#environment" id="toc-environment"><span
+class="toc-section-number">1.5</span> Environment</a></li>
+<li><a href="#testing-verification" id="toc-testing-verification"><span
+class="toc-section-number">1.6</span> Testing &amp;
+verification</a></li>
+<li><a href="#project-layout" id="toc-project-layout"><span
+class="toc-section-number">1.7</span> Project layout</a></li>
+</ul></li>
+</ul>
+</nav>
+<h1 data-number="1" id="takelow"><span
+class="header-section-number">1</span> TakeLow</h1>
+<p>A mobile-first reverse-auction platform using a <strong>Lowest Unique
+Bid (LUB)</strong> mechanism. The winner is the user who submits the
+lowest unique bid amount before the timer expires.</p>
+<blockquote>
+<p>“Take It. Low.”</p>
+</blockquote>
+<h2 data-number="1.1" id="architecture"><span
+class="header-section-number">1.1</span> Architecture</h2>
+<p>Three NestJS microservices + React web + React Native (Expo)
+mobile:</p>
+<table>
+<colgroup>
+<col style="width: 29%" />
+<col style="width: 19%" />
+<col style="width: 51%" />
+</colgroup>
+<thead>
+<tr>
+<th>Service</th>
+<th>Port</th>
+<th>Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>identity-service</code></td>
+<td>3001</td>
+<td>JWT auth, user registration, wallet, PIN, OTP, notifications</td>
+</tr>
+<tr>
+<td><code>auction-engine</code></td>
+<td>3002</td>
+<td>Real-time bidding, WebSockets, Redis bid tracking, BullMQ workers,
+winner determination, payments</td>
+</tr>
+<tr>
+<td><code>query-service</code></td>
+<td>3003</td>
+<td>Read-optimized auction/product queries, favorites, admin stats (uses
+Postgres read replica when <code>READ_REPLICA_URL</code> is set)</td>
+</tr>
+<tr>
+<td><code>takelow-web</code></td>
+<td>5173 (dev) / 80 (docker)</td>
+<td>React + Tailwind SPA</td>
+</tr>
+<tr>
+<td><code>takelow-app</code></td>
+<td>Expo</td>
+<td>React Native mobile app</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Data layer:</strong> PostgreSQL 15 (Citus) + Redis 7 (bid
+tracking, rate limiting, queues) + BullMQ (batched bid persistence).</p>
+<h2 data-number="1.2" id="quick-start"><span
+class="header-section-number">1.2</span> Quick start</h2>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># One-time: install deps + start infra + migrate + seed</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="ex">npm</span> run setup</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Full stack (Docker -&gt; backends -&gt; web frontend)</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="ex">npm</span> run dev</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Mobile app (Expo)</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="ex">npm</span> run app</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Backends only (requires Docker for Postgres/Redis)</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="ex">npm</span> run services</span></code></pre></div>
+<h2 data-number="1.3" id="common-commands"><span
+class="header-section-number">1.3</span> Common commands</h2>
+<table>
+<colgroup>
+<col style="width: 40%" />
+<col style="width: 59%" />
+</colgroup>
+<thead>
+<tr>
+<th>Command</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>npm run docker:up</code></td>
+<td>Start Postgres + Redis containers</td>
+</tr>
+<tr>
+<td><code>npm run docker:down</code></td>
+<td>Stop containers</td>
+</tr>
+<tr>
+<td><code>npm run db:setup</code></td>
+<td>Docker -&gt; wait -&gt; migrate -&gt; seed</td>
+</tr>
+<tr>
+<td><code>npm run db:reset</code></td>
+<td>Wipe volumes -&gt; migrate -&gt; seed</td>
+</tr>
+<tr>
+<td><code>npm run db:migrate</code></td>
+<td>Apply SQL migrations (tracked in
+<code>schema_migrations</code>)</td>
+</tr>
+<tr>
+<td><code>npm run seed</code></td>
+<td>Seed 30 users + 2 admins + 10 auctions</td>
+</tr>
+</tbody>
+</table>
+<h2 data-number="1.4" id="seed-credentials"><span
+class="header-section-number">1.4</span> Seed credentials</h2>
+<ul>
+<li>Users: <code>0913320001</code>–<code>0913320028</code>, password
+<code>0000</code>, wallet 100 ETB</li>
+<li>Admins: <code>0911111111</code> / <code>0912222222</code>, password
+<code>1234</code></li>
+</ul>
+<h2 data-number="1.5" id="environment"><span
+class="header-section-number">1.5</span> Environment</h2>
+<p>Each service has a <code>.env.example</code>. Copy to
+<code>.env</code> and fill in. Critical vars: - <code>JWT_SECRET</code>,
+<code>JWT_REFRESH_SECRET</code> (must NOT be
+<code>takelow-jwt-secret</code> — app refuses to start) -
+<code>INTERNAL_API_KEY</code> (service-to-service auth) -
+<code>DATABASE_URL</code>, <code>REDIS_URL</code> -
+<code>CORS_ORIGINS</code> (comma-separated) - Payment:
+<code>SIKINA_*</code>, <code>AWASH_*</code> (optional)</p>
+<h2 data-number="1.6" id="testing-verification"><span
+class="header-section-number">1.6</span> Testing &amp; verification</h2>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Backend tests (per service)</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> auction-engine <span class="kw">&amp;&amp;</span> <span class="ex">npm</span> test        <span class="co"># 27 tests</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> identity-service <span class="kw">&amp;&amp;</span> <span class="ex">npm</span> test      <span class="co"># 2 tests</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> query-service <span class="kw">&amp;&amp;</span> <span class="ex">npm</span> test         <span class="co"># 3 tests</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Type checking (per service/project)</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="ex">npx</span> tsc <span class="at">--noEmit</span></span></code></pre></div>
+<h2 data-number="1.7" id="project-layout"><span
+class="header-section-number">1.7</span> Project layout</h2>
+<pre><code>auction-engine/      NestJS bidding + winner + payments
+identity-service/    NestJS auth + wallet
+query-service/       NestJS read APIs
+takelow-web/         React + Vite + Tailwind
+takelow-app/         React Native (Expo)
+database/migrations/ 23 raw SQL migrations (idempotent, tracked)
+k8s/                 Kubernetes manifests (config, deployments, hpa, ingress)
+scripts/             dev/seed/migrate/wait helpers
+load-tests/          k6 bid-flood scenarios</code></pre>
+<p>See <code>SRS.md</code> for the full requirements specification,
+<code>SECURITY.md</code> for the security model, and <code>br.md</code>
+for the business requirements status.</p>
+</body>
+</html>

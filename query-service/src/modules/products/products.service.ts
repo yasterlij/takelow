@@ -1,21 +1,16 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Product } from './entities/product.entity';
+import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class ProductsService {
-  constructor(
-    @InjectRepository(Product)
-    private productRepository: Repository<Product>,
-  ) {}
+  constructor(private prisma: PrismaService) {}
 
-  async findAll(): Promise<Product[]> {
-    return this.productRepository.find({ take: 50 });
+  async findAll(): Promise<any[]> {
+    return this.prisma.product.findMany({ take: 50 });
   }
 
-  async findOne(id: string): Promise<Product> {
-    const product = await this.productRepository.findOne({ where: { id } });
+  async findOne(id: string): Promise<any> {
+    const product = await this.prisma.product.findUnique({ where: { id } });
     if (!product) {
       throw new NotFoundException('Product not found');
     }

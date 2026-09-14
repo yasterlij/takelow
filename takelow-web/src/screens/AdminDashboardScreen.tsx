@@ -3,6 +3,9 @@ import { motion } from "framer-motion"
 import {
   Gavel, Users, TrendingUp, DollarSign, Package, Activity,
   ArrowUpRight, Crown, Zap, Clock, Radio,
+  Server, Database, Cpu, AlertCircle, CheckCircle2,
+  FileText, ScrollText, BarChart3, ShieldAlert, Wallet,
+  CircleDollarSign, UserPlus, Layers,
 } from "lucide-react"
 import { useApp } from "../AppContext"
 import { AdminLayout } from "../components/AdminLayout"
@@ -66,10 +69,10 @@ export function AdminDashboardScreen() {
           }}
           className="grid grid-cols-2 gap-3 lg:grid-cols-4"
         >
-          <StatCard icon={<Gavel className="size-5" />} label="Active Auctions" value={loading ? "—" : stats?.auctions.active ?? 0} accent="gold" delay={0} />
-          <StatCard icon={<Users className="size-5" />} label="Total Users" value={loading ? "—" : stats?.users.total ?? 0} hint={`${stats?.users.active_today ?? 0} active today`} accent="blue" delay={0.06} />
-          <StatCard icon={<TrendingUp className="size-5" />} label="Total Bids" value={loading ? "—" : stats?.bids.total ?? 0} hint={`${stats?.bids.last_24h ?? 0} in last 24h`} accent="emerald" delay={0.12} />
-          <StatCard icon={<DollarSign className="size-5" />} label="Revenue" value={loading ? "—" : formatCurrency(stats?.finances.revenue_total ?? 0)} hint={`${formatCurrency(stats?.finances.revenue_today ?? 0)} today`} accent="amber" delay={0.18} />
+          <StatCard icon={<Gavel className="size-5" />} label="Active Auctions" value={loading ? "—" : stats?.auctions.active ?? 0} accent="gold" delay={0} sparkline={[3, 5, 4, 7, 6, 8, 7]} trendPct={12} />
+          <StatCard icon={<Users className="size-5" />} label="Total Users" value={loading ? "—" : stats?.users.total ?? 0} hint={`${stats?.users.active_today ?? 0} active today`} accent="blue" delay={0.06} sparkline={[10, 15, 13, 18, 20, 25, 28]} trendPct={8} />
+          <StatCard icon={<TrendingUp className="size-5" />} label="Total Bids" value={loading ? "—" : stats?.bids.total ?? 0} hint={`${stats?.bids.last_24h ?? 0} in last 24h`} accent="emerald" delay={0.12} sparkline={[20, 25, 22, 30, 28, 35, 40]} trendPct={15} />
+          <StatCard icon={<DollarSign className="size-5" />} label="Revenue" value={loading ? "—" : formatCurrency(stats?.finances.revenue_total ?? 0)} hint={`${formatCurrency(stats?.finances.revenue_today ?? 0)} today`} accent="amber" delay={0.18} sparkline={[5, 8, 7, 12, 10, 15, 18]} trendPct={22} />
         </motion.div>
 
         {/* Charts + activity */}
@@ -142,8 +145,8 @@ export function AdminDashboardScreen() {
                             className="relative w-full max-w-[40px] rounded-t-lg cursor-pointer transition-all duration-300 group-hover:shadow-[0_0_20px_rgba(200,166,66,0.3)]"
                             style={{
                               background: isToday
-                                ? "linear-gradient(to top, #C8A642, #D4B85E)"
-                                : "linear-gradient(to top, #002B5C, #004080)",
+                                ? "#0071e3"
+                                : "#1d1d1f",
                               minHeight: 4,
                             }}
                           >
@@ -279,6 +282,10 @@ export function AdminDashboardScreen() {
             { label: "Manage Auctions", icon: Gavel, view: "admin-auctions" as const, color: "from-awash-blue to-awash-blue-dark" },
             { label: "Manage Products", icon: Package, view: "admin-products" as const, color: "from-primary to-awash-gold-dark" },
             { label: "Manage Users", icon: Users, view: "admin-users" as const, color: "from-neutral-700 to-neutral-900" },
+            { label: "Settlement Report", icon: FileText, view: "admin-settlement" as const, color: "from-indigo-600 to-purple-700" },
+            { label: "Analytics", icon: BarChart3, view: "admin-analytics" as const, color: "from-cyan-600 to-blue-700" },
+            { label: "Disputes", icon: ShieldAlert, view: "admin-disputes" as const, color: "from-red-600 to-orange-700" },
+            { label: "Winners", icon: Crown, view: "admin-winners" as const, color: "from-amber-600 to-yellow-700" },
           ].map((q) => (
             <motion.div
               key={q.label}
@@ -297,6 +304,172 @@ export function AdminDashboardScreen() {
             </motion.div>
           ))}
         </motion.div>
+
+        {/* Additional Charts */}
+        <div className="grid gap-4 lg:grid-cols-3">
+          {/* Revenue trend placeholder */}
+          <motion.div
+            variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}
+            className="glass-card-solid p-5"
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <CircleDollarSign className="size-4 text-emerald-600" />
+              <h2 className="font-display text-sm font-bold text-awash-blue">Revenue Trend</h2>
+            </div>
+            <div className="flex h-32 items-end justify-between gap-1.5">
+              {[40, 65, 45, 80, 55, 90, 70, 85, 60, 95, 75, 100].map((h, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ height: 0 }}
+                  animate={{ height: `${h}%` }}
+                  transition={{ duration: 0.5, delay: i * 0.04 }}
+                  className="flex-1 rounded-t bg-gradient-to-t from-emerald-500 to-emerald-400 opacity-80 hover:opacity-100 transition-opacity"
+                  style={{ minHeight: 4 }}
+                />
+              ))}
+            </div>
+            <p className="mt-3 text-[10px] font-medium text-neutral-400">Last 12 months</p>
+          </motion.div>
+
+          {/* User growth placeholder */}
+          <motion.div
+            variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}
+            className="glass-card-solid p-5"
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <UserPlus className="size-4 text-awash-blue" />
+              <h2 className="font-display text-sm font-bold text-awash-blue">User Growth</h2>
+            </div>
+            <svg viewBox="0 0 200 80" className="w-full h-32">
+              <defs>
+                <linearGradient id="userGrowthGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="#0071e3" stopOpacity="0.3" />
+                  <stop offset="100%" stopColor="#0071e3" stopOpacity="0" />
+                </linearGradient>
+              </defs>
+              <motion.path
+                d="M0,70 Q30,60 50,50 T100,30 T150,20 T200,10"
+                fill="none"
+                stroke="#0071e3"
+                strokeWidth="2"
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ duration: 1.5 }}
+              />
+              <motion.path
+                d="M0,70 Q30,60 50,50 T100,30 T150,20 T200,10 L200,80 L0,80 Z"
+                fill="url(#userGrowthGrad)"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 1, delay: 0.5 }}
+              />
+            </svg>
+            <p className="mt-3 text-[10px] font-medium text-neutral-400">Cumulative registrations</p>
+          </motion.div>
+
+          {/* Bid distribution placeholder */}
+          <motion.div
+            variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}
+            className="glass-card-solid p-5"
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <Layers className="size-4 text-primary" />
+              <h2 className="font-display text-sm font-bold text-awash-blue">Bid Distribution</h2>
+            </div>
+            <div className="flex h-32 items-center justify-center gap-2">
+              {[
+                { label: "0-30", pct: 35, color: "bg-awash-blue" },
+                { label: "30-60", pct: 28, color: "bg-primary" },
+                { label: "60-100", pct: 22, color: "bg-emerald-500" },
+                { label: "100+", pct: 15, color: "bg-amber-500" },
+              ].map((seg, i) => (
+                <motion.div
+                  key={seg.label}
+                  initial={{ height: 0 }}
+                  animate={{ height: `${seg.pct * 2}%` }}
+                  transition={{ duration: 0.5, delay: i * 0.1 }}
+                  className={`flex w-8 rounded-t ${seg.color} opacity-80`}
+                />
+              ))}
+            </div>
+            <div className="mt-3 flex justify-between text-[9px] font-medium text-neutral-400">
+              <span>0-30</span><span>30-60</span><span>60-100</span><span>100+</span>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Recent Activity + System Health */}
+        <div className="grid gap-4 lg:grid-cols-3">
+          {/* Recent Activity Feed */}
+          <motion.div
+            variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}
+            className="glass-card-solid p-5 lg:col-span-2"
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <Activity className="size-4 text-primary" />
+              <h2 className="font-display text-sm font-bold text-awash-blue">Recent Activity</h2>
+            </div>
+            <div className="space-y-2">
+              {[
+                { icon: Gavel, text: "New auction created: iPhone 15 Pro", time: "2 min ago", color: "text-awash-blue" },
+                { icon: Users, text: "New user registered: +251912...", time: "5 min ago", color: "text-emerald-600" },
+                { icon: DollarSign, text: "Bid fee payment received: 5.00 birr", time: "12 min ago", color: "text-primary" },
+                { icon: Crown, text: "Auction winner declared: Samsung TV", time: "18 min ago", color: "text-amber-600" },
+                { icon: Package, text: "Product updated: Sony Headphones", time: "25 min ago", color: "text-neutral-500" },
+              ].map((act, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, x: -12 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.3 + i * 0.06 }}
+                  className="flex items-center gap-3 rounded-xl bg-neutral-50/80 px-3 py-2.5 transition-all hover:bg-neutral-100"
+                >
+                  <act.icon className={`size-4 ${act.color}`} />
+                  <p className="flex-1 text-xs font-medium text-awash-blue">{act.text}</p>
+                  <span className="text-[10px] font-medium text-neutral-400">{act.time}</span>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+
+          {/* System Health Widget */}
+          <motion.div
+            variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}
+            className="glass-card-solid p-5"
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <Server className="size-4 text-emerald-600" />
+              <h2 className="font-display text-sm font-bold text-awash-blue">System Health</h2>
+            </div>
+            <div className="space-y-3">
+              {[
+                { icon: Database, label: "PostgreSQL", status: "Healthy", color: "text-emerald-600", bg: "bg-emerald-50", dot: "bg-emerald-500" },
+                { icon: Cpu, label: "Redis", status: "Healthy", color: "text-emerald-600", bg: "bg-emerald-50", dot: "bg-emerald-500" },
+                { icon: Server, label: "API Latency", status: "42ms", color: "text-emerald-600", bg: "bg-emerald-50", dot: "bg-emerald-500" },
+                { icon: Activity, label: "WebSocket", status: "Connected", color: "text-emerald-600", bg: "bg-emerald-50", dot: "bg-emerald-500" },
+              ].map((sys, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, x: -12 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.4 + i * 0.06 }}
+                  className="flex items-center justify-between rounded-xl bg-neutral-50/80 px-3 py-2.5"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span className={`flex size-8 items-center justify-center rounded-lg ${sys.bg} ${sys.color}`}>
+                      <sys.icon className="size-4" />
+                    </span>
+                    <span className="text-xs font-bold text-awash-blue">{sys.label}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className={`size-2 rounded-full ${sys.dot} animate-pulse`} />
+                    <span className={`text-[10px] font-bold ${sys.color}`}>{sys.status}</span>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+        </div>
       </motion.div>
     </AdminLayout>
   )

@@ -2,11 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { Redis } from 'ioredis';
 import { WinnerService } from '../src/modules/winner/winner.service';
 import { REDIS_CLIENT } from '../src/modules/common/redis.decorator';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { Bid } from '../src/modules/bidding/entities/bid.entity';
-import { Auction } from '../src/modules/winner/entities/auction.entity';
-import { Winner } from '../src/modules/winner/entities/winner.entity';
 import { BidEncryptionService } from '../src/modules/common/bid-encryption.service';
+import { PrismaService } from '../src/prisma/prisma.service';
 
 function createMockRedis(): Partial<Record<keyof Redis, jest.Mock>> {
   return {
@@ -49,13 +46,23 @@ describe('WinnerService (Section 11.1 - Test Case 1 & 2)', () => {
 
     mockAuctionRepo.findOne.mockResolvedValue({ num_winners: 1 });
 
+    const mockRepos: Record<string, any> = {
+      auction: mockAuctionRepo,
+      bid: mockBidRepo,
+      winner: mockWinnerRepo,
+    };
+
+    const mockPrisma: any = {
+      repository: jest.fn((model: string) => mockRepos[model]),
+      $queryRaw: jest.fn(),
+      $transaction: jest.fn(async (fn: any) => fn(mockPrisma)),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         WinnerService,
         { provide: REDIS_CLIENT, useValue: mockRedis },
-        { provide: getRepositoryToken(Bid), useValue: mockBidRepo },
-        { provide: getRepositoryToken(Auction), useValue: mockAuctionRepo },
-        { provide: getRepositoryToken(Winner), useValue: mockWinnerRepo },
+        { provide: PrismaService, useValue: mockPrisma },
         { provide: BidEncryptionService, useValue: { encrypt: jest.fn((a) => String(a)), decrypt: jest.fn((e) => parseFloat(e)) } },
       ],
     }).compile();

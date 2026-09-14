@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
-import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet } from 'react-native'
-import { Wallet, ArrowDown, CheckCircle2, Loader2 } from 'lucide-react-native'
+import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native'
+import { Wallet, ArrowDown, CheckCircle2, TrendingUp, Sparkles, ShieldCheck } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { api } from '../api'
 import { AppBar, CTAButton, Card } from '../components/AuctionUI'
@@ -18,6 +18,7 @@ export function DepositScreen() {
 
   const numericAmount = parseFloat(amount || '0')
   const valid = numericAmount > 0
+  const estimatedNewBalance = walletBalance + (valid ? numericAmount : 0)
 
   const handleDeposit = async () => {
     if (!valid || loading) return
@@ -27,7 +28,7 @@ export function DepositScreen() {
       await api.wallet.deposit(numericAmount)
       await refreshWallet()
       setSuccess(true)
-      setTimeout(() => { setSuccess(false); go('home') }, 2000)
+      setTimeout(() => { setSuccess(false); go('home') }, 1800)
     } catch (e: any) {
       setError(e?.message || 'Deposit failed. Please try again.')
     } finally {
@@ -42,18 +43,20 @@ export function DepositScreen() {
         <AppBar title="Top Up Wallet" onBack={goBack} />
       </View>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 120 }}>
+        {/* ── Balance Card ── */}
         <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16 }}>
           <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: colors.secondary, justifyContent: 'center', alignItems: 'center' }}>
             <Wallet size={22} color={colors.navy} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={{ fontSize: 12, fontWeight: '500', color: colors.mutedForeground }}>Current Balance</Text>
-            <Text style={{ fontSize: 18, fontWeight: '800', color: colors.navy }}>{formatCurrency(walletBalance)}</Text>
+            <Text style={{ fontSize: 20, fontWeight: '800', color: colors.navy }}>{formatCurrency(walletBalance)}</Text>
           </View>
           <ArrowDown size={20} color={colors.emerald600} />
         </Card>
 
-        <Text style={{ fontSize: 14, fontWeight: '700', color: colors.navy, marginTop: 24, marginBottom: 8 }}>Amount</Text>
+        {/* ── Amount Input ── */}
+        <Text style={{ fontSize: 14, fontWeight: '700', color: colors.navy, marginTop: 24, marginBottom: 8 }}>Top Up Amount</Text>
         <View style={s.inputRow}>
           <TextInput
             value={amount}
@@ -66,20 +69,46 @@ export function DepositScreen() {
           <Text style={s.currency}>{CURRENCY}</Text>
         </View>
 
-        <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+        {/* ── Quick Amount Chips ── */}
+        <View style={{ flexDirection: 'row', gap: 8, marginTop: 14 }}>
           {QUICK_AMOUNTS.map((a) => (
             <TouchableOpacity
               key={a}
               onPress={() => setAmount(String(a))}
               style={[s.quickBtn, numericAmount === a && s.quickBtnActive]}
             >
-              <Text style={[s.quickBtnText, numericAmount === a && s.quickBtnTextActive]}>{formatCurrency(a)}</Text>
+              <Text style={[s.quickBtnText, numericAmount === a && s.quickBtnTextActive]}>+{a}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
+        {/* ── Balance Preview ── */}
+        {valid && (
+          <Card style={s.previewCard}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={s.previewLabel}>Deposit Amount</Text>
+              <Text style={s.previewValue}>+{formatCurrency(numericAmount)}</Text>
+            </View>
+            <View style={s.divider} />
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <TrendingUp size={14} color={colors.emerald600} />
+                <Text style={[s.previewLabel, { fontWeight: '700', color: colors.navy }]}>New Balance</Text>
+              </View>
+              <Text style={[s.previewValue, { fontSize: 16, color: colors.emerald600 }]}>{formatCurrency(estimatedNewBalance)}</Text>
+            </View>
+          </Card>
+        )}
+
+        <View style={s.securityBanner}>
+          <ShieldCheck size={16} color={colors.primary} />
+          <Text style={s.securityText}>Instant deposit credited to your TakeLow bidding wallet.</Text>
+        </View>
+
         {error ? (
-          <Text style={{ fontSize: 13, fontWeight: '600', color: colors.destructive, marginTop: 12, textAlign: 'center' }}>{error}</Text>
+          <View style={s.errorBox}>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: colors.destructive, textAlign: 'center' }}>{error}</Text>
+          </View>
         ) : null}
 
         {success ? (
@@ -90,7 +119,7 @@ export function DepositScreen() {
           </Card>
         ) : (
           <CTAButton disabled={!valid || loading} onPress={handleDeposit} style={{ marginTop: 24 }}>
-            {loading ? <Loader2 size={18} color="#fff" /> : `Deposit ${formatCurrency(numericAmount || 0)}`}
+            {loading ? <ActivityIndicator size={18} color="#fff" /> : `Deposit ${formatCurrency(numericAmount || 0)}`}
           </CTAButton>
         )}
       </ScrollView>
@@ -106,10 +135,17 @@ function StatusBarCustom() {
 
 const s = StyleSheet.create({
   inputRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', gap: 8 },
-  amountInput: { width: 200, borderRadius: 12, borderWidth: 2, borderColor: colors.border, backgroundColor: colors.card, paddingVertical: 12, textAlign: 'center', fontSize: 36, fontWeight: '800', color: colors.navy },
+  amountInput: { width: 220, borderRadius: 16, borderWidth: 2, borderColor: colors.border, backgroundColor: colors.card, paddingVertical: 12, textAlign: 'center', fontSize: 36, fontWeight: '800', color: colors.navy },
   currency: { paddingBottom: 16, fontSize: 14, fontWeight: '700', color: colors.mutedForeground },
-  quickBtn: { flex: 1, borderRadius: 8, borderWidth: 1, borderColor: colors.border, paddingVertical: 10, alignItems: 'center' },
+  quickBtn: { flex: 1, borderRadius: 10, borderWidth: 1, borderColor: colors.border, paddingVertical: 10, alignItems: 'center', backgroundColor: colors.card },
   quickBtnActive: { borderColor: colors.primary, backgroundColor: colors.accent },
-  quickBtnText: { fontSize: 12, fontWeight: '600', color: colors.mutedForeground },
-  quickBtnTextActive: { color: colors.primary, fontWeight: '700' },
+  quickBtnText: { fontSize: 12, fontWeight: '700', color: colors.mutedForeground },
+  quickBtnTextActive: { color: colors.primary, fontWeight: '800' },
+  previewCard: { marginTop: 16, padding: 14, borderRadius: 14, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
+  previewLabel: { fontSize: 12, color: colors.mutedForeground },
+  previewValue: { fontSize: 14, fontWeight: '700', color: colors.navy },
+  divider: { height: 1, backgroundColor: colors.border, marginVertical: 8 },
+  securityBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 16, padding: 10, borderRadius: 10, backgroundColor: colors.primary + '10', borderWidth: 1, borderColor: colors.primary + '25' },
+  securityText: { fontSize: 11, fontWeight: '500', color: colors.navy, flex: 1 },
+  errorBox: { marginTop: 12, padding: 12, borderRadius: 10, backgroundColor: colors.destructive + '15' },
 })

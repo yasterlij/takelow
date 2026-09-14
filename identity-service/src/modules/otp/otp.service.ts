@@ -1,11 +1,8 @@
-import { Injectable, BadRequestException, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan } from 'typeorm';
+import { Injectable, BadRequestException, Logger, Inject } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Redis } from 'ioredis';
-import { Inject } from '@nestjs/common';
 import * as crypto from 'crypto';
-import { Otp } from './entities/otp.entity';
+import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class OtpService {
@@ -13,75 +10,52 @@ export class OtpService {
   private readonly MAX_VERIFY_ATTEMPTS = 5;
 
   constructor(
-    @InjectRepository(Otp)
-    private otpRepository: Repository<Otp>,
+    private prisma: PrismaService,
     @Inject('REDIS_CLIENT') private redis: Redis,
   ) {}
 
   async generateOtp(phoneNumber: string): Promise<{ expires_in: number }> {
     const rateKey = `otp:rate:${phoneNumber}`;
     const attempts = await this.redis.incr(rateKey);
-    if (attempts === 1) {
-      await this.redis.pexpire(rateKey, 60000);
-    }
-    if (attempts > 3) {
-      throw new BadRequestException('Too many OTP requests. Wait 60 seconds.');
-    }
+    if (attempts === 1) await this.redis.pexpire(rateKey, 60000);
+    if (attempts > 3) throw new BadRequestException('Too many OTP requests. Wait 60 seconds.');
 
     const code = String(crypto.randomInt(100000, 1000000));
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
-    await this.otpRepository.upsert(
-      { phone_number: phoneNumber, code, expires_at: expiresAt, verified: false },
-      ['phone_number'],
-    );
+    const existing = await this.prisma.otp.findUnique({ where: { phone_number: phoneNumber } });
+    if (existing) {
+      await this.prisma.otp.update({ where: { phone_number: phoneNumber }, data: { code, expires_at: expiresAt, verified: false } });
+    } else {
+      await this.prisma.otp.create({ data: { phone_number: phoneNumber, code, expires_at: expiresAt, verified: false } });
+    }
 
     this.logger.log(`OTP generated for ${phoneNumber.replace(/\d(?=\d{2})/g, '*')}`);
-
     return { expires_in: 300 };
   }
 
   async verifyOtp(phoneNumber: string, code: string): Promise<boolean> {
     const verifyKey = `otp:verify:rate:${phoneNumber}`;
     const attempts = await this.redis.incr(verifyKey);
-    if (attempts === 1) {
-      await this.redis.pexpire(verifyKey, 5 * 60 * 1000);
-    }
-    if (attempts > this.MAX_VERIFY_ATTEMPTS) {
-      throw new BadRequestException('Too many OTP attempts. Wait 5 minutes.');
-    }
+    if (attempts === 1) await this.redis.pexpire(verifyKey, 5 * 60 * 1000);
+    if (attempts > this.MAX_VERIFY_ATTEMPTS) throw new BadRequestException('Too many OTP attempts. Wait 5 minutes.');
 
-    const otp = await this.otpRepository.findOne({
-      where: { phone_number: phoneNumber, verified: false },
-    });
-
-    if (!otp) {
-      throw new BadRequestException('Invalid or expired OTP');
-    }
-
+    const otp = await this.prisma.otp.findFirst({ where: { phone_number: phoneNumber, verified: false } });
+    if (!otp) throw new BadRequestException('Invalid or expired OTP');
     if (new Date() > otp.expires_at) {
-      await this.otpRepository.delete({ id: otp.id });
+      await this.prisma.otp.delete({ where: { id: otp.id } });
       throw new BadRequestException('OTP has expired');
     }
+    if (otp.code !== code) throw new BadRequestException('Invalid or expired OTP');
 
-    if (otp.code !== code) {
-      throw new BadRequestException('Invalid or expired OTP');
-    }
-
-    otp.verified = true;
-    await this.otpRepository.save(otp);
+    await this.prisma.otp.update({ where: { id: otp.id }, data: { verified: true } });
     await this.redis.del(verifyKey);
-
     return true;
   }
 
   @Cron(CronExpression.EVERY_HOUR)
   async cleanupExpiredOtps(): Promise<void> {
-    const result = await this.otpRepository.delete({
-      expires_at: LessThan(new Date()),
-    });
-    if (result.affected && result.affected > 0) {
-      this.logger.log(`Cleaned up ${result.affected} expired OTPs`);
-    }
+    const result = await this.prisma.otp.deleteMany({ where: { expires_at: { lt: new Date() } } });
+    if (result.count > 0) this.logger.log(`Cleaned up ${result.count} expired OTPs`);
   }
 }

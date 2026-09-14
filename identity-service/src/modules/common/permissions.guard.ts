@@ -1,18 +1,14 @@
 import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { PERMISSIONS_KEY } from './permissions.decorator';
-import { UserPermission } from '../admin/entities/user-permission.entity';
-import { UserRole } from '../auth/entities/user.entity';
+import { PrismaService } from '../../prisma/prisma.service';
 import { Permission } from '../admin/constants/permissions';
 
 @Injectable()
 export class PermissionsGuard implements CanActivate {
   constructor(
     private reflector: Reflector,
-    @InjectRepository(UserPermission)
-    private userPermissionRepository: Repository<UserPermission>,
+    private prisma: PrismaService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -25,11 +21,11 @@ export class PermissionsGuard implements CanActivate {
     const { user } = context.switchToHttp().getRequest();
     if (!user) throw new ForbiddenException('Not authenticated');
 
-    if (user.role === UserRole.ADMIN) return true;
+    if (user.role === 'admin') return true;
 
-    const permissions = await this.userPermissionRepository.find({
+    const permissions = await this.prisma.userPermission.findMany({
       where: { user_id: user.id },
-      select: ['permission'],
+      select: { permission: true },
     });
     const userPermissions = new Set(permissions.map((p) => p.permission));
 

@@ -1,15 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { JwtService } from '@nestjs/jwt';
 import { BiddingController } from '../src/modules/bidding/bidding.controller';
 import { BiddingService } from '../src/modules/bidding/bidding.service';
 import { WinnerService } from '../src/modules/winner/winner.service';
 import { BidEncryptionService } from '../src/modules/common/bid-encryption.service';
 import { AuctionReviewService } from '../src/modules/admin/auction-review.service';
-import { Auction } from '../src/modules/winner/entities/auction.entity';
-import { Bid } from '../src/modules/bidding/entities/bid.entity';
-import { Winner } from '../src/modules/winner/entities/winner.entity';
 import { REDIS_CLIENT } from '../src/modules/common/redis.decorator';
 import { NotificationDispatchService } from '../src/modules/worker/notification-dispatch.service';
+import { ConfigService } from '@nestjs/config';
+import { PrismaService } from '../src/prisma/prisma.service';
 
 function createMockRepo() {
   return {
@@ -32,6 +31,21 @@ describe('BiddingController', () => {
     mockBidRepo = createMockRepo();
     mockBidEncryption = { decrypt: jest.fn().mockReturnValue('30.50') };
     mockAuctionReviewService = { drawWinner: jest.fn() };
+
+    const mockAuctionRepo = createMockRepo();
+
+    const mockRepos: Record<string, any> = {
+      auction: mockAuctionRepo,
+      bid: mockBidRepo,
+      winner: createMockRepo(),
+    };
+
+    const mockPrisma: any = {
+      repository: jest.fn((model: string) => mockRepos[model]),
+      $queryRaw: jest.fn(),
+      $transaction: jest.fn(async (fn: any) => fn(mockPrisma)),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [BiddingController],
       providers: [
@@ -41,8 +55,9 @@ describe('BiddingController', () => {
         { provide: BidEncryptionService, useValue: mockBidEncryption },
         { provide: REDIS_CLIENT, useValue: {} },
         { provide: NotificationDispatchService, useValue: { dispatch: jest.fn() } },
-        { provide: getRepositoryToken(Auction), useValue: createMockRepo() },
-        { provide: getRepositoryToken(Bid), useValue: mockBidRepo },
+        { provide: PrismaService, useValue: mockPrisma },
+        { provide: ConfigService, useValue: { get: () => 'test-secret' } },
+        { provide: JwtService, useValue: { verify: jest.fn(), sign: jest.fn() } },
       ],
     }).compile();
     controller = module.get<BiddingController>(BiddingController);

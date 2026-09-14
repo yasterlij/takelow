@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
+import { SmartImage } from "./SmartImage"
 
 type ImageCarouselProps = {
   images: string[]
@@ -114,14 +115,11 @@ export function ImageCarousel({
             className="absolute inset-0 flex items-center justify-center"
             style={slideStyle(i)}
           >
-            <img
+            <SmartImage
               src={src}
               alt={`${alt} ${i + 1}`}
               loading={i === 0 ? "eager" : "lazy"}
-              decoding="async"
-              draggable={false}
-              onClick={() => onImageClick?.(i)}
-              className={`h-full w-full object-cover ${onImageClick ? "cursor-zoom-in" : ""}`}
+              className={onImageClick ? "cursor-zoom-in" : ""}
             />
           </div>
         ))}
@@ -190,6 +188,8 @@ export function ImageCarousel({
                 alt=""
                 className="size-10 object-cover"
                 draggable={false}
+                loading="lazy"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
               />
             </button>
           ))}

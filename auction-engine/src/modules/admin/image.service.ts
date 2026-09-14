@@ -119,6 +119,15 @@ export class ImageService {
     }
   }
 
+  saveUploadedFile(file: Express.Multer.File): string {
+    const ext = this.extensionFromMime(file.mimetype) || ".jpg";
+    const filename = `${uuidv4()}${ext}`;
+    const filePath = path.join(UPLOADS_DIR, filename);
+    fs.writeFileSync(filePath, file.buffer);
+    this.logger.log(`Saved uploaded image -> ${filePath}`);
+    return `${this.uploadBaseUrl}/uploads/products/${filename}`;
+  }
+
   async processImageUrls(urls: string[]): Promise<string[]> {
     const results: string[] = [];
     for (const url of urls) {

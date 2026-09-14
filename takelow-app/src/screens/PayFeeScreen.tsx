@@ -742,18 +742,40 @@ export function PayFeeScreen() {
       </ScrollView>
 
       <Card style={s.bottomCta}>
-        {walletBalance < auction.bidFee && (
-          <Text
-            style={{
-              fontSize: 12,
-              fontWeight: "600",
-              color: colors.destructive,
-              textAlign: "center",
-              marginBottom: 8,
-            }}
-          >
-            Insufficient balance — top up before paying
-          </Text>
+        {selected === "AWASH" && walletBalance < auction.bidFee && (
+          <View style={{ marginBottom: 10, gap: 6 }}>
+            <Text
+              style={{
+                fontSize: 12,
+                fontWeight: "600",
+                color: colors.destructive,
+                textAlign: "center",
+              }}
+            >
+              Insufficient balance: {formatCurrency(walletBalance)} (fee: {formatCurrency(auction.bidFee)})
+            </Text>
+            <TouchableOpacity
+              onPress={() => go("deposit")}
+              style={{
+                borderRadius: 10,
+                backgroundColor: colors.primary,
+                paddingVertical: 10,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+              activeOpacity={0.85}
+            >
+              <Text
+                style={{
+                  color: colors.primaryForeground,
+                  fontWeight: "700",
+                  fontSize: 13,
+                }}
+              >
+                + Top Up Wallet
+              </Text>
+            </TouchableOpacity>
+          </View>
         )}
         <CTAButton
           onPress={handlePayPress}

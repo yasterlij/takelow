@@ -1,29 +1,30 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import * as bcrypt from 'bcryptjs';
 import { AuthService } from '../src/modules/auth/auth.service';
-import { User, UserRole } from '../src/modules/auth/entities/user.entity';
 import { SuperAppRegistry } from '../src/modules/auth/adapters/super-app-registry';
 import { AuthTokenService } from '../src/modules/auth/auth-token.service';
 import { AuthAuditService } from '../src/modules/auth/auth-audit.service';
+import { PrismaService } from '../src/prisma/prisma.service';
 
-function createMockRepo() {
+function createMockPrisma() {
   return {
-    findOne: jest.fn(),
-    save: jest.fn(),
-    create: jest.fn((value) => value),
-    update: jest.fn(),
+    user: {
+      findFirst: jest.fn(),
+      findUnique: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+    },
   };
 }
 
 describe('AuthService', () => {
   let service: AuthService;
-  let mockUserRepo: ReturnType<typeof createMockRepo>;
+  let mockPrisma: ReturnType<typeof createMockPrisma>;
   let mockTokenService: { generateTokens: jest.Mock; verifyRefreshToken: jest.Mock };
   let mockAuditService: { logFailedLogin: jest.Mock };
 
   beforeEach(async () => {
-    mockUserRepo = createMockRepo();
+    mockPrisma = createMockPrisma();
     mockTokenService = {
       generateTokens: jest.fn().mockResolvedValue({ access_token: 'access', refresh_token: 'refresh' }),
       verifyRefreshToken: jest.fn(),
@@ -35,7 +36,7 @@ describe('AuthService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
-        { provide: getRepositoryToken(User), useValue: mockUserRepo },
+        { provide: PrismaService, useValue: mockPrisma },
         { provide: SuperAppRegistry, useValue: { get: jest.fn() } },
         { provide: AuthTokenService, useValue: mockTokenService },
         { provide: AuthAuditService, useValue: mockAuditService },
@@ -46,21 +47,14 @@ describe('AuthService', () => {
   });
 
   it('registers a new local user and stores a hashed refresh token', async () => {
-    mockUserRepo.findOne.mockResolvedValue(null);
-    mockUserRepo.save
-      .mockResolvedValueOnce({
-        id: 'user-1',
-        phone_number: '0911000000',
-        role: UserRole.USER,
-        wallet_balance: 0,
-      })
-      .mockResolvedValueOnce({
-        id: 'user-1',
-        phone_number: '0911000000',
-        role: UserRole.USER,
-        wallet_balance: 0,
-        hashed_refresh_token: 'hashed-refresh',
-      });
+    mockPrisma.user.findFirst.mockResolvedValue(null);
+    mockPrisma.user.create.mockResolvedValue({
+      id: 'user-1',
+      phone_number: '0911000000',
+      role: 'user',
+      wallet_balance: 0,
+    });
+    mockPrisma.user.update.mockResolvedValue({});
 
     const result = await service.register({
       phone_number: '0911000000',
@@ -69,7 +63,8 @@ describe('AuthService', () => {
     });
 
     expect(mockTokenService.generateTokens).toHaveBeenCalled();
-    expect(mockUserRepo.save).toHaveBeenCalledTimes(2);
+    expect(mockPrisma.user.create).toHaveBeenCalled();
+    expect(mockPrisma.user.update).toHaveBeenCalled();
     expect(result.access_token).toBe('access');
     expect(result.refresh_token).toBe('refresh');
   });
@@ -77,13 +72,14 @@ describe('AuthService', () => {
   it('rotates refresh tokens for a valid refresh request', async () => {
     const hashedRefresh = await bcrypt.hash('refresh-token', 10);
     mockTokenService.verifyRefreshToken.mockReturnValue({ sub: 'user-1' });
-    mockUserRepo.findOne.mockResolvedValue({
+    mockPrisma.user.findUnique.mockResolvedValue({
       id: 'user-1',
       phone_number: '0911000000',
-      role: UserRole.USER,
+      role: 'user',
       wallet_balance: 50,
       hashed_refresh_token: hashedRefresh,
     });
+    mockPrisma.user.update.mockResolvedValue({});
 
     const result = await service.refreshToken('refresh-token');
 

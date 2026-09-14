@@ -1,13 +1,14 @@
-import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { AuthGuard } from '@nestjs/passport';
+import { JwtService } from '@nestjs/jwt';
 import * as crypto from 'crypto';
 
 @Injectable()
-export class AuthOrInternalGuard extends AuthGuard('jwt') {
-  constructor(private configService: ConfigService) {
-    super();
-  }
+export class AuthOrInternalGuard implements CanActivate {
+  constructor(
+    private configService: ConfigService,
+    private jwtService: JwtService,
+  ) {}
 
   private matchesInternalKey(apiKey: unknown, expected: string | undefined): boolean {
     if (!expected || !apiKey) return false;
@@ -25,18 +26,16 @@ export class AuthOrInternalGuard extends AuthGuard('jwt') {
       return true;
     }
 
-    return (super.canActivate(context) as Promise<boolean>);
-  }
+    const authHeader = request.headers.authorization;
+    if (!authHeader) throw new UnauthorizedException('No auth token');
 
-  handleRequest(err: any, user: any, info: any, context: ExecutionContext) {
-    const request = context.switchToHttp().getRequest();
-    const apiKey = request.headers['x-internal-api-key'];
-    const expected = this.configService.get<string>('app.internalApiKey');
-
-    if (this.matchesInternalKey(apiKey, expected)) {
-      return null;
+    const token = authHeader.replace('Bearer ', '');
+    try {
+      const payload = await this.jwtService.verifyAsync(token);
+      request.user = payload;
+      return true;
+    } catch {
+      throw new UnauthorizedException('Invalid token');
     }
-
-    return super.handleRequest(err, user, info, context);
   }
 }

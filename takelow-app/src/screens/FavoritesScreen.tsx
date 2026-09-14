@@ -1,6 +1,6 @@
-import React, { useMemo } from 'react'
-import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
-import { Heart, HeartOff } from 'lucide-react-native'
+import React, { useMemo, useState, useCallback } from 'react'
+import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, RefreshControl, TextInput } from 'react-native'
+import { Heart, HeartOff, Search, X, Gavel, ArrowRight } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { AppBar, Badge, Card, CTAButton } from '../components/AuctionUI'
 import { EmptyState } from '../components/EmptyState'
@@ -19,23 +19,89 @@ export function FavoritesScreen() {
     toggleFavorite,
   } = useApp()
 
+  const [searchQuery, setSearchQuery] = useState('')
+  const [filterTab, setFilterTab] = useState<'all' | 'live' | 'closed'>('all')
+  const [refreshing, setRefreshing] = useState(false)
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true)
+    try {
+      await refreshFavorites()
+    } finally {
+      setRefreshing(false)
+    }
+  }, [refreshFavorites])
+
   const favorites = useMemo(() => {
     const favoriteSet = new Set(favoriteAuctionIds)
-    return auctions.filter((auction) => favoriteSet.has(auction.id))
-  }, [auctions, favoriteAuctionIds])
+    let list = auctions.filter((auction) => favoriteSet.has(auction.id))
+
+    if (filterTab === 'live') {
+      list = list.filter((a) => a.status !== 'closed')
+    } else if (filterTab === 'closed') {
+      list = list.filter((a) => a.status === 'closed')
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim()
+      list = list.filter((a) =>
+        a.name.toLowerCase().includes(q) ||
+        (a.category && a.category.toLowerCase().includes(q))
+      )
+    }
+
+    return list
+  }, [auctions, favoriteAuctionIds, filterTab, searchQuery])
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={{ backgroundColor: colors.navy }}>
-        <AppBar title="Favorites" onBack={goBack} />
+        <AppBar title="Watchlist" onBack={goBack} />
       </View>
-      <ScrollView contentContainerStyle={s.container}>
+      <ScrollView
+        contentContainerStyle={s.container}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}
+      >
         <View style={s.headerRow}>
-          <Text style={s.subtitle}>Your watchlist of auctions to revisit quickly</Text>
-          <Badge tone={favorites.length > 0 ? 'navy' : 'muted'}>{favorites.length} saved</Badge>
+          <Text style={s.subtitle}>Your saved auctions to revisit quickly</Text>
+          <Badge tone={favoriteAuctionIds.length > 0 ? 'navy' : 'muted'}>{favoriteAuctionIds.length} saved</Badge>
         </View>
 
-        {favoritesLoading ? (
+        {/* ── Search Bar ── */}
+        <View style={s.searchBarContainer}>
+          <Search size={16} color={colors.mutedForeground} />
+          <TextInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search saved auctions..."
+            placeholderTextColor={colors.mutedForeground}
+            style={s.searchInput}
+            returnKeyType="search"
+          />
+          {searchQuery.length > 0 ? (
+            <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <X size={16} color={colors.mutedForeground} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        {/* ── Filter Tabs ── */}
+        <View style={s.filterTabsRow}>
+          {(['all', 'live', 'closed'] as const).map((tab) => (
+            <TouchableOpacity
+              key={tab}
+              onPress={() => setFilterTab(tab)}
+              style={[s.tabBtn, filterTab === tab && s.tabBtnActive]}
+            >
+              <Text style={[s.tabBtnText, filterTab === tab && s.tabBtnTextActive]}>
+                {tab === 'all' ? `All (${favoriteAuctionIds.length})` : tab === 'live' ? 'Live Only' : 'Closed'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {favoritesLoading && favoriteAuctionIds.length === 0 ? (
           <View style={{ gap: 10 }}>
             {Array.from({ length: 3 }).map((_, index) => (
               <Card key={index} style={s.skeletonCard}>
@@ -43,11 +109,12 @@ export function FavoritesScreen() {
               </Card>
             ))}
           </View>
-        ) : favorites.length === 0 ? (
+        ) : favoriteAuctionIds.length === 0 ? (
           <EmptyState icon="inbox" title="No favorites yet" message="Save auctions you want to track so you can come back before bidding closes." actionLabel="Browse auctions" onAction={() => go('auctions')} />
+        ) : favorites.length === 0 ? (
+          <EmptyState icon="search-x" title="No matching favorites" message="No saved auctions match your filter." actionLabel="Reset Filter" onAction={() => { setSearchQuery(''); setFilterTab('all') }} />
         ) : (
           <View style={{ gap: 10 }}>
-            <CTAButton variant="outline" onPress={refreshFavorites}>Refresh watchlist</CTAButton>
             {favorites.map((auction) => (
               <Card key={auction.id} style={s.card}>
                 <View style={s.cardRow}>
@@ -67,7 +134,13 @@ export function FavoritesScreen() {
                         </Badge>
                       </View>
                       <Text style={s.meta}>{auction.category}</Text>
-                      <Text style={s.price}>Bid fee {formatCurrency(auction.bidFee)}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+                        <Text style={s.price}>Bid Fee: {formatCurrency(auction.bidFee)}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>View</Text>
+                          <ArrowRight size={12} color={colors.primary} />
+                        </View>
+                      </View>
                     </View>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => toggleFavorite(auction.id)} style={s.removeBtn} activeOpacity={0.85}>
@@ -84,11 +157,55 @@ export function FavoritesScreen() {
 }
 
 const s = StyleSheet.create({
-  container: { padding: 16, paddingBottom: 32, gap: 16 },
+  container: { padding: 16, paddingBottom: 100, gap: 14 },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   subtitle: { flex: 1, fontSize: 13, fontWeight: '500', color: colors.mutedForeground },
+  searchBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 12.5,
+    color: colors.foreground,
+    padding: 0,
+  },
+  filterTabsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  tabBtn: {
+    flex: 1,
+    paddingVertical: 7,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabBtnActive: {
+    backgroundColor: colors.navy,
+    borderColor: colors.navy,
+  },
+  tabBtnText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.mutedForeground,
+  },
+  tabBtnTextActive: {
+    color: colors.navyForeground,
+    fontWeight: '700',
+  },
   skeletonCard: { height: 84 },
-  card: { padding: 12 },
+  card: { padding: 12, borderRadius: 16 },
   cardRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   rowPressable: { flex: 1, flexDirection: 'row', gap: 12 },
   thumbWrap: { width: 72, height: 72, borderRadius: 12, backgroundColor: colors.secondary, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
@@ -96,6 +213,6 @@ const s = StyleSheet.create({
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
   title: { flex: 1, fontSize: 14, fontWeight: '800', color: colors.navy },
   meta: { fontSize: 12, fontWeight: '500', color: colors.mutedForeground },
-  price: { marginTop: 8, fontSize: 13, fontWeight: '700', color: colors.foreground },
+  price: { fontSize: 12.5, fontWeight: '700', color: colors.primary },
   removeBtn: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, justifyContent: 'center', alignItems: 'center' },
 })

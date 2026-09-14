@@ -17,7 +17,7 @@ echo "  → Waiting for backend services (up to ${TIMEOUT}s)..."
 while [ $elapsed -lt $TIMEOUT ]; do
   all_ok=true
   for entry in "${services[@]}"; do
-    url="${entry%%:*}"
+    url="${entry%:*}"
     name="${entry##*:}"
     if ! curl -sf "$url" > /dev/null 2>&1; then
       all_ok=false

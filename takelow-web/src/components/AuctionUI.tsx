@@ -1,5 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react"
-import { ChevronLeft, Trophy, Zap } from "lucide-react"
+import { ChevronLeft, Trophy, Zap, Flame, Star, Crown, Sparkles } from "lucide-react"
 
 // ─── Awash Bank Brand Logo ───────────────────────────────────────────
 
@@ -13,17 +13,11 @@ export function AwashMark({ className, size = 32 }: { className?: string; size?:
       role="img"
       aria-label="Awash Bank logo"
     >
-      <defs>
-        <linearGradient id="awashBlueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#002B5C" />
-          <stop offset="100%" stopColor="#001F3F" />
-        </linearGradient>
-      </defs>
-      <circle cx="24" cy="24" r="23" fill="url(#awashBlueGrad)" />
+      <circle cx="24" cy="24" r="23" fill="#1d1d1f" />
       <path
         d="M9 27c4-6 9-9 15-9s11 3 15 9"
         fill="none"
-        stroke="#C8A642"
+        stroke="#FFFFFF"
         strokeWidth="3.4"
         strokeLinecap="round"
       />
@@ -33,9 +27,9 @@ export function AwashMark({ className, size = 32 }: { className?: string; size?:
         stroke="#FFFFFF"
         strokeWidth="3"
         strokeLinecap="round"
-        opacity="0.9"
+        opacity="0.55"
       />
-      <circle cx="24" cy="30.5" r="3.2" fill="#C8A642" />
+      <circle cx="24" cy="30.5" r="3.2" fill="#0071e3" />
     </svg>
   )
 }
@@ -215,30 +209,66 @@ export function Badge({
   className,
 }: {
   children: ReactNode
-  tone?: "gold" | "navy" | "green" | "muted" | "blue" | "orange"
+  tone?: "gold" | "navy" | "green" | "muted" | "blue" | "orange" | "hot" | "featured" | "premium" | "new"
   className?: string
 }) {
   const tones = {
-    orange: "bg-orange-50/80 backdrop-blur-sm text-orange-700 border border-orange-200/60",
-    gold: "bg-awash-gold/15 backdrop-blur-sm text-awash-gold-dark border border-primary/20",
-    navy: "bg-awash-blue/10 backdrop-blur-sm text-awash-blue border border-awash-blue/20",
-    green: "bg-emerald-50/80 backdrop-blur-sm text-emerald-700 border border-emerald-200/60",
-    muted: "bg-neutral-100/80 backdrop-blur-sm text-neutral-500 border border-neutral-200/60",
-    blue: "bg-awash-blue/90 backdrop-blur-sm text-white border border-awash-blue-light/30",
+    orange: "bg-ember/10 text-ember",
+    gold: "bg-primary/10 text-primary",
+    navy: "bg-ink/5 text-ink",
+    green: "bg-emerald-50 text-emerald-700",
+    muted: "bg-canvas text-neutral-500",
+    blue: "bg-ink text-white",
+    hot: "bg-ember text-white",
+    featured: "bg-primary/10 text-primary",
+    premium: "bg-ink text-white",
+    new: "bg-emerald-500 text-white",
   }[tone]
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold shadow-sm ${tones} ${className || ""}`}
+      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold ${tones} ${className || ""}`}
     >
       {children}
     </span>
   )
 }
 
+export function HotBadge({ className }: { className?: string }) {
+  return (
+    <Badge tone="hot" className={className}>
+      <Flame className="size-3" /> Hot
+    </Badge>
+  )
+}
+
+export function FeaturedBadge({ className }: { className?: string }) {
+  return (
+    <Badge tone="featured" className={className}>
+      <Star className="size-3" /> Featured
+    </Badge>
+  )
+}
+
+export function PremiumBadge({ className }: { className?: string }) {
+  return (
+    <Badge tone="premium" className={className}>
+      <Crown className="size-3" /> Premium
+    </Badge>
+  )
+}
+
+export function NewBadge({ className }: { className?: string }) {
+  return (
+    <Badge tone="new" className={className}>
+      <Sparkles className="size-3" /> New
+    </Badge>
+  )
+}
+
 export function BadgeGold({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-awash-gold/15 to-awash-gold-light/10 backdrop-blur-sm px-3.5 py-1.5 text-xs font-bold text-awash-gold-dark border border-primary/20 shadow-sm ${className || ""}`}
+      className={`inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3.5 py-1.5 text-xs font-semibold text-primary ${className || ""}`}
     >
       {children}
     </span>
@@ -258,8 +288,8 @@ export function CountdownPill({
     <span
       className={`countdown-pill ${
         urgent
-          ? "bg-primary/20 text-awash-gold border border-primary/30 animate-glow-pulse"
-          : "bg-awash-blue/80 backdrop-blur-md text-white border border-white/10"
+          ? "bg-ember/10 text-ember"
+          : "bg-ink text-white"
       }`}
     >
       {time.d !== "00" && <>{parseInt(time.d)}d </>}
@@ -299,10 +329,8 @@ export function SectionHeader({
       <div className="flex items-center gap-3">
         {Icon && (
           <span
-            className={`flex size-11 items-center justify-center rounded-xl backdrop-blur-sm border ${
-              gold
-                ? "bg-primary/10 border-primary/20 text-primary"
-                : "bg-awash-blue/10 border-awash-blue/20 text-awash-blue"
+            className={`flex size-11 items-center justify-center rounded-2xl ${
+              gold ? "bg-primary/10 text-primary" : "bg-canvas text-foreground"
             }`}
           >
             <Icon className="size-5" />
@@ -310,8 +338,8 @@ export function SectionHeader({
         )}
         <div>
           <h2
-            className={`font-display text-xl font-extrabold tracking-tight ${
-              gold ? "text-gradient-gold" : "text-foreground"
+            className={`font-display text-2xl font-semibold tracking-[-0.022em] ${
+              gold ? "text-primary" : "text-foreground"
             }`}
           >
             {title}
@@ -330,8 +358,8 @@ export function SectionHeader({
 
 export function WinnerBadge({ name, amount }: { name: string; amount: string }) {
   return (
-    <div className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-awash-gold/15 to-awash-gold-light/10 backdrop-blur-sm px-4 py-2 text-sm font-bold text-awash-gold-dark border border-primary/20 shadow-sm hover:shadow-gold-glow transition-all duration-300">
-      <Trophy className="size-4 text-awash-gold" />
+    <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-2 text-sm font-semibold text-primary transition-colors duration-200">
+      <Trophy className="size-4 text-primary" />
       <span>{name}</span>
       <span className="text-neutral-400">·</span>
       <span className="tabular-nums">{amount}</span>
@@ -389,7 +417,7 @@ export function BottomTabBar({
   onTabChange?: (id: string) => void
 }) {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 flex h-[88px] items-start justify-around border-t border-border bg-white pt-2 pb-safe-area-bottom shadow-[0_-4px_20px_rgba(0,43,92,0.06)]">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 flex h-[88px] items-start justify-around border-t border-border bg-white pt-2 pb-safe-area-bottom">
       {items.map((item) => {
         const isActive = item.id === activeTab
         return (
@@ -415,7 +443,7 @@ export function ConfettiOverlay({ show }: { show: boolean }) {
     left: `${Math.random() * 100}%`,
     delay: `${Math.random() * 0.5}s`,
     duration: `${0.6 + Math.random() * 0.6}s`,
-    color: i % 3 === 0 ? "#C8A642" : i % 3 === 1 ? "#002B5C" : "#D4B85E",
+    color: i % 3 === 0 ? "#0071e3" : i % 3 === 1 ? "#1d1d1f" : "#86868b",
   }))
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden z-10">

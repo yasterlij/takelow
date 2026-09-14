@@ -360,7 +360,7 @@ export function ProductScreen() {
                         (auction.totalBids || auction.bidders) /
                           auction.maxBid >
                         0.8
-                          ? "#C8A642"
+                          ? "#0071e3"
                           : "#10B981",
                     }}
                   />

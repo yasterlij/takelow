@@ -13,7 +13,6 @@ import {
   HttpStatus,
   Inject,
 } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
 import { Redis } from 'ioredis';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -23,15 +22,20 @@ import { RegisterPushTokenDto } from './dto/register-push-token.dto';
 import { SuperAppLoginDto } from './dto/super-app-login.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { SuperAppRegistry } from './adapters/super-app-registry';
+import { BetterAuthGuard } from '../../auth/better-auth.guard';
+import { JwtService } from '@nestjs/jwt';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 
 const LOGIN_RATE_LIMIT_WINDOW_MS = 60000;
 const LOGIN_RATE_LIMIT_MAX_ATTEMPTS = 5;
 
+@ApiTags('auth')
 @Controller('auth')
 export class AuthController {
   constructor(
     private authService: AuthService,
     private superAppRegistry: SuperAppRegistry,
+    private jwtService: JwtService,
     @Inject('REDIS_CLIENT') private redis: Redis,
   ) {}
 
@@ -50,11 +54,13 @@ export class AuthController {
   }
 
   @Post('register')
+  @ApiOperation({ summary: 'Register a new user' })
   async register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
   }
 
   @Post('login/email')
+  @ApiOperation({ summary: 'Login with email' })
   async loginWithEmail(@Body() dto: LoginDto) {
     if (!dto.email || !dto.password) {
       throw new UnauthorizedException('Email and password required');
@@ -69,6 +75,7 @@ export class AuthController {
   }
 
   @Post('login/phone')
+  @ApiOperation({ summary: 'Login with phone number' })
   async loginWithPhone(@Body() dto: LoginDto) {
     if (!dto.phone_number || !dto.password) {
       throw new UnauthorizedException('Phone number and password required');
@@ -82,19 +89,22 @@ export class AuthController {
     return this.authService.login(user);
   }
 
-  @UseGuards(AuthGuard('telebirr'))
   @Post('login/telebirr')
-  async loginWithTeleBirr(@Req() req: any) {
-    return this.authService.login(req.user);
+  @ApiOperation({ summary: 'Login with TeleBirr' })
+  async loginWithTeleBirr(@Body() body: { access_token: string; phone_number: string }) {
+    const user = await this.authService.validateTeleBirrUser(body.access_token, body.phone_number);
+    return this.authService.login(user);
   }
 
-  @UseGuards(AuthGuard('banking-api'))
   @Post('login/banking')
-  async loginWithBanking(@Req() req: any) {
-    return this.authService.login(req.user);
+  @ApiOperation({ summary: 'Login with banking credentials' })
+  async loginWithBanking(@Body() body: { api_token: string; bank_account?: string }) {
+    const user = await this.authService.validateBankingUser(body.api_token, body.bank_account);
+    return this.authService.login(user);
   }
 
   @Post('login/super-app/:provider')
+  @ApiOperation({ summary: 'Login with super app provider' })
   async loginWithSuperApp(
     @Param('provider') provider: string,
     @Body() dto: SuperAppLoginDto,
@@ -108,6 +118,7 @@ export class AuthController {
   }
 
   @Get('super-app/:provider/authorize')
+  @ApiOperation({ summary: 'Get super app authorization URL' })
   getSuperAppAuthorizationUrl(
     @Param('provider') provider: string,
     @Query('state') state: string,
@@ -117,18 +128,23 @@ export class AuthController {
   }
 
   @Post('refresh')
+  @ApiOperation({ summary: 'Refresh access token' })
   async refresh(@Body() dto: RefreshTokenDto) {
     return this.authService.refreshToken(dto.refresh_token);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(BetterAuthGuard)
   @Get('profile')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get user profile' })
   async getProfile(@Req() req: any) {
     return this.authService.getProfile(req.user.id);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(BetterAuthGuard)
   @Patch('profile')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update user profile' })
   async updateProfile(
     @Req() req: any,
     @Body() data: UpdateProfileDto,
@@ -140,8 +156,18 @@ export class AuthController {
     return { id: user.id, full_name: user.full_name, email: user.email };
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(BetterAuthGuard)
+  @Post('logout')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Logout user' })
+  async logout(@Req() req: any) {
+    return this.authService.logout(req.user.id);
+  }
+
+  @UseGuards(BetterAuthGuard)
   @Post('fcm-token')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Register FCM push token' })
   async registerFcmToken(
     @Req() req: any,
     @Body() dto: RegisterPushTokenDto,

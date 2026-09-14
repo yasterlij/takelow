@@ -8,6 +8,7 @@ import {
   ScrollView,
   ActivityIndicator,
   TouchableOpacity,
+  Share,
 } from "react-native";
 import {
   Trophy,
@@ -20,6 +21,8 @@ import {
   CheckCircle2,
   XCircle,
   Info,
+  Share2,
+  ArrowLeft,
 } from "lucide-react-native";
 import { useApp } from "../AppContext";
 import { CTAButton, Card } from "../components/AuctionUI";
@@ -152,16 +155,32 @@ export function WinnerScreen() {
     lowerBidsGrouped.length === 0 ? 0 : currentBidsPage * BIDS_PAGE_SIZE + 1;
   const pageEnd = currentBidsPage * BIDS_PAGE_SIZE + pagedBids.length;
 
+  const handleShareWinner = async () => {
+    try {
+      const winStr = winningAmount != null ? formatCurrency(winningAmount) : 'Pending'
+      await Share.share({
+        message: `🏆 TakeLow Auction Winner: ${auction.name} won at ${winStr}! Check out live reverse auctions on TakeLow.`,
+      })
+    } catch {}
+  }
+
   return (
     <View style={{ flex: 1 }}>
       <View style={s.gradient}>
         <StatusBarCustom />
-        <View style={s.body}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8 }}>
+          <TouchableOpacity onPress={() => go('home')} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' }}>
+            <ArrowLeft size={18} color="#FFF" />
+          </TouchableOpacity>
           <View style={s.winnerBadge}>
             <PartyPopper size={14} color={colors.primary} />
             <Text style={s.winnerBadgeText}>Winner Results</Text>
           </View>
-
+          <TouchableOpacity onPress={handleShareWinner} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' }}>
+            <Share2 size={18} color="#FFF" />
+          </TouchableOpacity>
+        </View>
+        <View style={s.body}>
           <View style={{ position: "relative", marginTop: 16 }}>
             <Animated.View
               style={[

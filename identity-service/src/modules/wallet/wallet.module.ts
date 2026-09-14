@@ -1,15 +1,24 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
 import { HttpModule } from '@nestjs/axios';
 import { ConfigModule } from '@nestjs/config';
+import { JwtModule } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import { WalletController } from './wallet.controller';
 import { WalletPinService } from './wallet-pin.service';
 import { WalletService } from './wallet.service';
-import { User } from '../auth/entities/user.entity';
-import { Transaction } from './entities/transaction.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, Transaction]), HttpModule, ConfigModule],
+  imports: [
+    HttpModule,
+    ConfigModule,
+    JwtModule.registerAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        secret: config.get<string>('app.jwtSecret'),
+        signOptions: { expiresIn: '15m' },
+      }),
+    }),
+  ],
   controllers: [WalletController],
   providers: [WalletService, WalletPinService],
   exports: [WalletService, WalletPinService],

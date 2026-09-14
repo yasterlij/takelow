@@ -1,3 +1,4 @@
+import { BetterAuthGuard } from '../../auth/better-auth.guard';
 import {
   Controller,
   Post,
@@ -11,10 +12,12 @@ import {
   Req,
   Query,
 } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
+
 import { InternalAuthGuard } from '../common/internal-auth.guard';
 import { NotificationService, WinnerNotificationPayload } from './notification.service';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 
+@ApiTags('notifications')
 @Controller('notify')
 export class NotificationController {
   private readonly logger = new Logger(NotificationController.name);
@@ -24,6 +27,7 @@ export class NotificationController {
   @UseGuards(InternalAuthGuard)
   @Post('winner')
   @HttpCode(200)
+  @ApiOperation({ summary: 'Notify winner' })
   async notifyWinner(
     @Body('user_id') userId: string,
     @Body('auction_id') auctionId: string,
@@ -58,6 +62,7 @@ export class NotificationController {
   @UseGuards(InternalAuthGuard)
   @Post('winner-bulk')
   @HttpCode(200)
+  @ApiOperation({ summary: 'Notify winners in bulk' })
   async notifyWinnersBulk(
     @Body('winners') winners: Array<{
       user_id: string;
@@ -97,6 +102,7 @@ export class NotificationController {
   @UseGuards(InternalAuthGuard)
   @Post('bid-confirmation')
   @HttpCode(200)
+  @ApiOperation({ summary: 'Send bid confirmation SMS' })
   async sendBidConfirmationSms(
     @Body('phone') phone: string,
     @Body('product_name') productName: string,
@@ -114,6 +120,7 @@ export class NotificationController {
   @UseGuards(InternalAuthGuard)
   @Post('outbid')
   @HttpCode(200)
+  @ApiOperation({ summary: 'Notify outbid' })
   async notifyOutbid(
     @Body('user_id') userId: string,
     @Body('auction_id') auctionId: string,
@@ -129,6 +136,7 @@ export class NotificationController {
   @UseGuards(InternalAuthGuard)
   @Post('auction-started')
   @HttpCode(200)
+  @ApiOperation({ summary: 'Notify auction started' })
   async notifyAuctionStarted(
     @Body('auction_id') auctionId: string,
     @Body('product_name') productName: string,
@@ -143,6 +151,7 @@ export class NotificationController {
   @UseGuards(InternalAuthGuard)
   @Post('auction-extended')
   @HttpCode(200)
+  @ApiOperation({ summary: 'Notify auction extended' })
   async notifyAuctionExtended(
     @Body('auction_id') auctionId: string,
     @Body('current_bids') currentBids: number,
@@ -157,6 +166,7 @@ export class NotificationController {
   @UseGuards(InternalAuthGuard)
   @Post('max-bid-reached')
   @HttpCode(200)
+  @ApiOperation({ summary: 'Notify max bids reached' })
   async notifyMaxBidReached(
     @Body('auction_id') auctionId: string,
     @Body('total_bids') totalBids: number,
@@ -171,6 +181,7 @@ export class NotificationController {
   @UseGuards(InternalAuthGuard)
   @Post('auction-fair-play-extended')
   @HttpCode(200)
+  @ApiOperation({ summary: 'Notify fair play extension' })
   async notifyFairPlayExtended(
     @Body('auction_id') auctionId: string,
     @Body('product_name') productName: string,
@@ -187,6 +198,7 @@ export class NotificationController {
   @UseGuards(InternalAuthGuard)
   @Post('auction-forced-closure')
   @HttpCode(200)
+  @ApiOperation({ summary: 'Notify forced closure' })
   async notifyForcedClosure(
     @Body('auction_id') auctionId: string,
     @Body('product_name') productName: string,
@@ -202,6 +214,7 @@ export class NotificationController {
   @UseGuards(InternalAuthGuard)
   @Post('ending-soon')
   @HttpCode(200)
+  @ApiOperation({ summary: 'Notify auction ending soon' })
   async notifyEndingSoon(
     @Body('user_ids') userIds: string[],
     @Body('auction_id') auctionId: string,
@@ -214,8 +227,10 @@ export class NotificationController {
     return { notified: userIds.length };
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(BetterAuthGuard)
   @Get('inbox')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get in-app notifications' })
   async getInAppNotifications(
     @Req() req: any,
     @Query('unread') unreadOnly?: string,
@@ -223,17 +238,21 @@ export class NotificationController {
     return this.notificationService.getInAppNotifications(req.user.id, unreadOnly === 'true');
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(BetterAuthGuard)
   @Post('inbox/:id/read')
   @HttpCode(200)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Mark notification as read' })
   async markNotificationRead(@Param('id') id: string) {
     await this.notificationService.markNotificationRead(id);
     return { read: true };
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(BetterAuthGuard)
   @Post('inbox/read-all')
   @HttpCode(200)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Mark all notifications as read' })
   async markAllNotificationsRead(@Req() req: any) {
     await this.notificationService.markAllNotificationsRead(req.user.id);
     return { read: true };

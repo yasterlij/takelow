@@ -1,14 +1,13 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { ScheduleModule } from '@nestjs/schedule';
 import { NotificationController } from './notification.controller';
 import { NotificationService } from './notification.service';
-import { User } from '../auth/entities/user.entity';
-import { NotificationLog } from './entities/notification-log.entity';
+import { SmsReminderService } from './sms-reminder.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, NotificationLog])],
+  imports: [ScheduleModule.forRoot()],
   controllers: [NotificationController],
-  providers: [NotificationService],
+  providers: [NotificationService, SmsReminderService],
   exports: [NotificationService],
 })
 export class NotificationModule {}

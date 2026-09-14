@@ -29,7 +29,7 @@ if (!AUCTION_ID) {
 
 // Pre-seeded tokens from seed-tokens.js
 const tokens = new SharedArray('tokens', function () {
-  const raw = open('/tmp/k6-tokens.json');
+  const raw = open('./k6-tokens.json');
   return JSON.parse(raw);
 });
 

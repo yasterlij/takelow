@@ -1,10 +1,9 @@
 import { Global, Module } from "@nestjs/common";
-import { TypeOrmModule } from "@nestjs/typeorm";
+import { APP_INTERCEPTOR } from "@nestjs/core";
 import { BullModule } from "@nestjs/bullmq";
-import { PassportModule } from "@nestjs/passport";
 import { JwtModule } from "@nestjs/jwt";
 import { ConfigModule, ConfigService } from "@nestjs/config";
-import { typeOrmConfig } from "./config/typeorm.config";
+import { PrismaModule } from "./prisma/prisma.module";
 import { appConfig } from "./config/env.config";
 import { validate } from "./config/env.validation";
 import { BiddingModule } from "./modules/bidding/bidding.module";
@@ -12,9 +11,12 @@ import { WinnerModule } from "./modules/winner/winner.module";
 import { WorkerModule } from "./modules/worker/worker.module";
 import { AdminModule } from "./modules/admin/admin.module";
 import { PaymentModule } from "./modules/payment/payment.module";
-import { JwtStrategy } from "./modules/common/jwt.strategy";
 import { redisProvider } from "./modules/common/redis.provider";
 import { HealthController } from "./modules/common/health.controller";
+import { MetricsController } from "./modules/common/metrics.controller";
+import { MetricsService } from "./modules/common/metrics.service";
+import { MetricsInterceptor } from "./modules/common/metrics.interceptor";
+import { LoggingInterceptor } from "./modules/common/logging.interceptor";
 
 @Global()
 @Module({
@@ -24,7 +26,7 @@ import { HealthController } from "./modules/common/health.controller";
       load: [appConfig],
       validate,
     }),
-    TypeOrmModule.forRoot(typeOrmConfig),
+    PrismaModule,
     BullModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
@@ -37,7 +39,6 @@ import { HealthController } from "./modules/common/health.controller";
         },
       }),
     }),
-    PassportModule,
     JwtModule.registerAsync({
       global: true,
       inject: [ConfigService],
@@ -52,8 +53,13 @@ import { HealthController } from "./modules/common/health.controller";
     AdminModule,
     PaymentModule,
   ],
-  controllers: [HealthController],
-  providers: [JwtStrategy, redisProvider],
-  exports: [redisProvider],
+  controllers: [HealthController, MetricsController],
+  providers: [
+    redisProvider,
+    MetricsService,
+    { provide: APP_INTERCEPTOR, useClass: MetricsInterceptor },
+    { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
+  ],
+  exports: [redisProvider, MetricsService],
 })
 export class AppModule {}

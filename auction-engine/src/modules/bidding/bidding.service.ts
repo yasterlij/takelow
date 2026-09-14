@@ -8,19 +8,11 @@ import {
 } from "@nestjs/common";
 import { Redis } from "ioredis";
 import { InjectRedis } from "../common/redis.decorator";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
-import { Auction } from "../winner/entities/auction.entity";
-import { Bid } from "./entities/bid.entity";
+import { PrismaService } from "../../prisma/prisma.service";
 import { AuctionClosureService } from "../winner/auction-closure.service";
 import { AuctionGateway } from "./gateway/auction.gateway";
 import { InjectQueue } from "@nestjs/bullmq";
 import { Queue } from "bullmq";
-import {
-  PaymentTransaction,
-  PaymentTransactionStatus,
-  PaymentType,
-} from "../payment/entities/payment-transaction.entity";
 import { BidEncryptionService } from "../common/bid-encryption.service";
 import { NotificationDispatchService } from "../worker/notification-dispatch.service";
 
@@ -43,7 +35,7 @@ export class BiddingService {
 
   private async getPersistedBidCount(auctionId: string): Promise<number> {
     try {
-      return await this.bidRepository.count({
+      return await this.prisma.repository("bid").count({
         where: { auction_id: auctionId },
       });
     } catch (e) {
@@ -58,12 +50,7 @@ export class BiddingService {
     @InjectRedis() private readonly redis: Redis,
     private readonly auctionGateway: AuctionGateway,
     @InjectQueue("incoming-bids") private readonly bidQueue: Queue,
-    @InjectRepository(Auction)
-    private readonly auctionRepository: Repository<Auction>,
-    @InjectRepository(Bid)
-    private readonly bidRepository: Repository<Bid>,
-    @InjectRepository(PaymentTransaction)
-    private readonly paymentTransactionRepository: Repository<PaymentTransaction>,
+    private readonly prisma: PrismaService,
     private readonly closureService: AuctionClosureService,
     private readonly bidEncryptionService: BidEncryptionService,
     private readonly notificationDispatchService: NotificationDispatchService,
@@ -101,7 +88,7 @@ export class BiddingService {
         throw new ForbiddenException("Auction has closed");
       }
 
-      const userBidCount = await this.bidRepository.count({
+      const userBidCount = await this.prisma.repository("bid").count({
         where: { auction_id: auctionId, user_id: userId },
       });
       if (userBidCount >= MAX_USER_BIDS_PER_AUCTION) {
@@ -118,7 +105,7 @@ export class BiddingService {
         );
       }
 
-      const existingBid = await this.bidRepository.findOne({
+      const existingBid = await this.prisma.repository("bid").findOne({
         where: { auction_id: auctionId, user_id: userId, amount },
       });
       if (existingBid) {
@@ -129,16 +116,14 @@ export class BiddingService {
 
       const encryptedAmount = this.bidEncryptionService.encrypt(amount);
 
-      await this.bidRepository.save(
-        this.bidRepository.create({
-          auction_id: auctionId,
-          user_id: userId,
-          amount,
-          bid_time: new Date(),
-          encrypted_amount: encryptedAmount,
-          ticket_number: ticketNumber,
-        }),
-      );
+      await this.prisma.repository("bid").save({
+        auction_id: auctionId,
+        user_id: userId,
+        amount,
+        bid_time: new Date(),
+        encrypted_amount: encryptedAmount,
+        ticket_number: ticketNumber,
+      });
 
       let totalBids = 1;
       try {
@@ -175,9 +160,9 @@ export class BiddingService {
         `Bid placed: auction=${auctionId} user=${userId} amount=${amount} total_bids=${totalBids}`,
       );
 
-      const auction = await this.auctionRepository.findOne({
+      const auction = await this.prisma.repository("auction").findOne({
         where: { id: auctionId },
-        select: ["max_bid"],
+        select: { max_bid: true },
       });
       if (auction?.max_bid != null && totalBids >= auction.max_bid) {
         this.logger.log(
@@ -192,9 +177,9 @@ export class BiddingService {
         await this.closureService.closeSingleAuction(auctionId);
       }
 
-      const auctionFull = await this.auctionRepository.findOne({
+      const auctionFull = await this.prisma.repository("auction").findOne({
         where: { id: auctionId },
-        relations: ["product"],
+        include: { product: true },
       });
       const productName = auctionFull?.product?.name || "Unknown Product";
 
@@ -219,9 +204,9 @@ export class BiddingService {
       amountKey,
     );
     if (freq && Number(freq) > 1) {
-      const prevBids = await this.bidRepository.find({
+      const prevBids = await this.prisma.repository("bid").find({
         where: { auction_id: auctionId },
-        select: ["user_id", "encrypted_amount", "amount"],
+        select: { user_id: true, encrypted_amount: true, amount: true },
         order: { bid_time: "DESC" },
         take: 20,
       });
@@ -281,14 +266,16 @@ export class BiddingService {
     userId: string,
     auctionId: string,
   ): Promise<boolean> {
-    const transaction = await this.paymentTransactionRepository.findOne({
-      where: {
-        auction_id: auctionId,
-        user_id: userId,
-        payment_type: PaymentType.BID_FEE,
-        status: PaymentTransactionStatus.SUCCESSFUL,
-      },
-    });
+    const transaction = await this.prisma
+      .repository("paymentTransaction")
+      .findOne({
+        where: {
+          auction_id: auctionId,
+          user_id: userId,
+          payment_type: "BID_FEE",
+          status: "SUCCESSFUL",
+        },
+      });
     return !!transaction;
   }
 

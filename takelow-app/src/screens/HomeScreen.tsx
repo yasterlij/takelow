@@ -1,16 +1,17 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Modal, Pressable, Dimensions, RefreshControl, Image } from 'react-native'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Modal, Pressable, Dimensions, RefreshControl, TextInput } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
-import { Gavel, Wallet, ArrowRight, Eye, EyeOff, Shield, LogOut, Sparkles, Trophy } from 'lucide-react-native'
+import { Gavel, Wallet, ArrowRight, Eye, EyeOff, Shield, LogOut, Sparkles, Trophy, Bell, Heart, Search, TicketCheck } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { AwashMark } from '../components/AuctionUI'
+import { SmartImage } from '../components/SmartImage'
 import { colors } from '../theme'
 import { formatCurrency, formatETB, formatCountdown } from '../mockDataV0'
 import { useCountdown } from '../components/Countdown'
 import { AuctionCard } from './AuctionsScreen'
 
 const { width: SCREEN_W } = Dimensions.get('window')
-const CARD_W = (SCREEN_W - 20 * 2 - 12) / 2
+const CARD_W = SCREEN_W - 16 * 2
 
 function getInitials(name: string) {
   return name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
@@ -44,7 +45,7 @@ function HeroSlide({ item, onJoin, counter }: { item: any; onJoin: () => void; c
       borderRadius: 16, overflow: 'hidden',
       shadowColor: colors.awashBlue, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.15, shadowRadius: 16, elevation: 8,
     }}>
-      <Image source={{ uri: item.images[0] }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+      <SmartImage uri={item.images[0]} alt={item.name} style={StyleSheet.absoluteFill} resizeMode="cover" />
       <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.35)' }]} />
       <View style={{ position: 'absolute', top: 8, left: 10, right: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', zIndex: 10 }}>
         <View style={{ gap: 6 }}>
@@ -128,7 +129,7 @@ function WinnerSlide({ auction, index }: { auction: any; index: number }) {
 }
 
 export function HomeScreen() {
-  const { go, walletBalance, user, logout, auctions, auctionsLoading, selectAuction, refreshAuctions, myBids, getAuction } = useApp()
+  const { go, walletBalance, user, logout, auctions, auctionsLoading, selectAuction, refreshAuctions, myBids, getAuction, unreadNotificationCount, isFavorite, toggleFavorite } = useApp()
   const isAdmin = user?.role === 'admin'
   const [showBalance, setShowBalance] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -198,14 +199,24 @@ export function HomeScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.neutralGray50 }}>
       {/* ── Header ── */}
-      <View style={{ backgroundColor: colors.awashBlue, paddingBottom: 24 }}>
+      <View style={{ backgroundColor: colors.awashBlue, paddingBottom: 20 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8 }}>
           <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFF', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 4, elevation: 3 }}>
             <AwashMark size={26} />
           </View>
-          <TouchableOpacity onPress={() => setMenuOpen(true)} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' }}>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: '#FFF' }}>{getInitials(user?.name || '?')}</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <TouchableOpacity onPress={() => go('notifications')} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center', position: 'relative' }}>
+              <Bell size={18} color="#FFF" />
+              {unreadNotificationCount > 0 && (
+                <View style={{ position: 'absolute', top: -2, right: -2, backgroundColor: colors.primary, borderRadius: 8, minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 3 }}>
+                  <Text style={{ color: colors.primaryForeground, fontSize: 9, fontWeight: '800' }}>{unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setMenuOpen(true)} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: '#FFF' }}>{getInitials(user?.name || '?')}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <LinearGradient colors={['#003366', '#001F3F']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ marginHorizontal: 16, marginTop: 8, borderRadius: 16, borderWidth: 1, borderColor: colors.primary + '33', padding: 16, overflow: 'hidden' }}>
@@ -229,6 +240,22 @@ export function HomeScreen() {
             {showBalance ? formatCurrency(walletBalance) : '••••••'}
           </Text>
           <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>Account ****091332</Text>
+
+          {/* Quick Nav Chips */}
+          <View style={{ flexDirection: 'row', gap: 8, marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.1)' }}>
+            <TouchableOpacity onPress={() => go('auctions')} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.1)', paddingVertical: 6, borderRadius: 8 }}>
+              <Gavel size={12} color="#FFF" />
+              <Text style={{ fontSize: 11, fontWeight: '600', color: '#FFF' }}>Auctions</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => go('my-bids')} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.1)', paddingVertical: 6, borderRadius: 8 }}>
+              <TicketCheck size={12} color="#FFF" />
+              <Text style={{ fontSize: 11, fontWeight: '600', color: '#FFF' }}>My Bids</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => go('favorites')} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.1)', paddingVertical: 6, borderRadius: 8 }}>
+              <Heart size={12} color="#FFF" />
+              <Text style={{ fontSize: 11, fontWeight: '600', color: '#FFF' }}>Watchlist</Text>
+            </TouchableOpacity>
+          </View>
         </LinearGradient>
       </View>
 
@@ -315,7 +342,15 @@ export function HomeScreen() {
                 <View key={i} style={{ width: CARD_W, height: CARD_W * 0.75, borderTopLeftRadius: 16, borderTopRightRadius: 16, backgroundColor: colors.neutralGray200 }} />
               ))
             ) : liveGrid.length > 0 ? (
-              liveGrid.slice(0, 4).map((a) => <AuctionCard key={a.id} auction={a} onOpen={() => selectAuction(a.id)} />)
+              liveGrid.slice(0, 4).map((a) => (
+                <AuctionCard
+                  key={a.id}
+                  auction={a}
+                  onOpen={() => selectAuction(a.id)}
+                  isFav={isFavorite(a.id)}
+                  onToggleFavorite={() => toggleFavorite(a.id)}
+                />
+              ))
             ) : null}
           </View>
 
@@ -350,7 +385,15 @@ export function HomeScreen() {
               </TouchableOpacity>
             </View>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-              {suggestedAuctions.slice(0, 4).map((a) => <AuctionCard key={a.id} auction={a} onOpen={() => selectAuction(a.id)} />)}
+              {suggestedAuctions.slice(0, 4).map((a) => (
+                <AuctionCard
+                  key={a.id}
+                  auction={a}
+                  onOpen={() => selectAuction(a.id)}
+                  isFav={isFavorite(a.id)}
+                  onToggleFavorite={() => toggleFavorite(a.id)}
+                />
+              ))}
             </View>
           </View>
         )}

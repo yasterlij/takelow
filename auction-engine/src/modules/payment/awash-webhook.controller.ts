@@ -2,7 +2,9 @@ import { Controller, Post, HttpCode, Req, Res, Logger } from "@nestjs/common";
 import { Request, Response } from "express";
 import { AwashService } from "./awash.service";
 import { PaymentService } from "./payment.service";
+import { ApiTags, ApiOperation } from "@nestjs/swagger";
 
+@ApiTags("payments-webhooks")
 @Controller("payments")
 export class AwashWebhookController {
   private readonly logger = new Logger(AwashWebhookController.name);
@@ -14,6 +16,7 @@ export class AwashWebhookController {
 
   @Post("webhook/awash")
   @HttpCode(200)
+  @ApiOperation({ summary: "Handle Awash webhook" })
   async handleWebhook(
     @Req() req: Request,
     @Res() res: Response,

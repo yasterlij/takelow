@@ -1,39 +1,81 @@
 import { Controller, Get, Inject, Res, HttpCode } from '@nestjs/common';
-import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
 import { Redis } from 'ioredis';
 import { Response } from 'express';
+import { PrismaService } from '../../prisma/prisma.service';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
 
+const VERSION = '1.0.0';
+
+@ApiTags('health')
 @Controller('health')
 export class HealthController {
   constructor(
-    @InjectDataSource() private dataSource: DataSource,
+    private prisma: PrismaService,
     @Inject('REDIS_CLIENT') private redis: Redis,
   ) {}
 
   @Get()
+  @ApiOperation({ summary: 'Health check' })
   async check(@Res({ passthrough: true }) res: Response) {
-    const checks: Record<string, string> = { status: 'ok' };
+    const dependencies: Record<string, string> = {};
+    let status: 'ok' | 'degraded' = 'ok';
 
     try {
-      await this.dataSource.query('SELECT 1');
-      checks['database'] = 'connected';
+      await this.prisma.$queryRaw`SELECT 1`;
+      dependencies['database'] = 'connected';
     } catch {
-      checks['database'] = 'disconnected';
-      checks['status'] = 'degraded';
+      dependencies['database'] = 'disconnected';
+      status = 'degraded';
     }
 
     try {
       await this.redis.ping();
-      checks['redis'] = 'connected';
+      dependencies['redis'] = 'connected';
     } catch {
-      checks['redis'] = 'disconnected';
-      checks['status'] = 'degraded';
+      dependencies['redis'] = 'disconnected';
+      status = 'degraded';
     }
 
-    if (checks['status'] === 'degraded') {
+    if (status === 'degraded') {
       res.status(503);
     }
-    return checks;
+
+    return {
+      status,
+      uptime: process.uptime(),
+      version: VERSION,
+      environment: process.env.NODE_ENV || 'development',
+      dependencies,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Get('ready')
+  @ApiOperation({ summary: 'Readiness check' })
+  async readiness(@Res({ passthrough: true }) res: Response) {
+    try {
+      await this.prisma.$queryRaw`SELECT 1`;
+      return {
+        status: 'ready',
+        timestamp: new Date().toISOString(),
+      };
+    } catch {
+      res.status(503);
+      return {
+        status: 'not ready',
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  @Get('live')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Liveness check' })
+  liveness() {
+    return {
+      status: 'alive',
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+    };
   }
 }

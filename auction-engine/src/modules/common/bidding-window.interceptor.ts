@@ -6,16 +6,11 @@ import {
   ForbiddenException,
 } from "@nestjs/common";
 import { Observable } from "rxjs";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
-import { Auction, AuctionStatus } from "../winner/entities/auction.entity";
+import { PrismaService } from "../../prisma/prisma.service";
 
 @Injectable()
 export class BiddingWindowInterceptor implements NestInterceptor {
-  constructor(
-    @InjectRepository(Auction)
-    private auctionRepository: Repository<Auction>,
-  ) {}
+  constructor(private prisma: PrismaService) {}
 
   async intercept(
     context: ExecutionContext,
@@ -24,8 +19,8 @@ export class BiddingWindowInterceptor implements NestInterceptor {
     const request = context.switchToHttp().getRequest();
     const auctionId = request.params.id;
 
-    const auction = await this.auctionRepository.findOne({
-      where: { id: auctionId, status: AuctionStatus.ACTIVE },
+    const auction = await this.prisma.repository("auction").findOne({
+      where: { id: auctionId, status: "ACTIVE" },
     });
 
     if (!auction) {

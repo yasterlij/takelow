@@ -4,47 +4,26 @@ import {
   HttpException,
   ServiceUnavailableException,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, LessThan, IsNull, Not, In } from "typeorm";
 import { Cron, CronExpression } from "@nestjs/schedule";
 import { InjectRedis } from "../common/redis.decorator";
 import { Redis } from "ioredis";
-import {
-  Auction,
-  AuctionStatus as AS,
-  PaymentStatus,
-} from "../winner/entities/auction.entity";
-import { Winner, WinnerPaymentStatus } from "../winner/entities/winner.entity";
-import { Bid } from "../bidding/entities/bid.entity";
 import { WinnerService } from "../winner/winner.service";
 import { SikinaService } from "./sikina.service";
 import { AwashService } from "./awash.service";
-import {
-  PaymentTransaction,
-  PaymentTransactionStatus,
-  PaymentType,
-  PaymentGateway,
-} from "./entities/payment-transaction.entity";
 import { BidEncryptionService } from "../common/bid-encryption.service";
 import { NotificationDispatchService } from "../worker/notification-dispatch.service";
 import { PaymentLinkService } from "./payment-link.service";
+import { PrismaService } from "../../prisma/prisma.service";
 
 const PAYMENT_DEADLINE_HOURS = 24;
-const WINNING_PAYMENT_TYPES = [PaymentType.WINNING_BID, PaymentType.WALLET];
+const WINNING_PAYMENT_TYPES = ["WINNING_BID", "WALLET"];
 
 @Injectable()
 export class PaymentService {
   private readonly logger = new Logger(PaymentService.name);
 
   constructor(
-    @InjectRepository(Auction)
-    private auctionRepository: Repository<Auction>,
-    @InjectRepository(Bid)
-    private bidRepository: Repository<Bid>,
-    @InjectRepository(Winner)
-    private winnerRepository: Repository<Winner>,
-    @InjectRepository(PaymentTransaction)
-    private paymentTransactionRepository: Repository<PaymentTransaction>,
+    private readonly prisma: PrismaService,
     private winnerService: WinnerService,
     private sikinaService: SikinaService,
     private awashService: AwashService,
@@ -89,13 +68,13 @@ export class PaymentService {
   async findTransaction(
     auctionId: string,
     userId: string,
-  ): Promise<PaymentTransaction | null> {
+  ): Promise<any> {
     return this.paymentLinkService.findTransaction(auctionId, userId);
   }
 
   async findTransactionById(
     transactionId: string,
-  ): Promise<PaymentTransaction | null> {
+  ): Promise<any> {
     return this.paymentLinkService.findTransactionById(transactionId);
   }
 
@@ -148,12 +127,12 @@ export class PaymentService {
     userId: string,
     amount: number,
   ): Promise<void> {
-    const existing = await this.paymentTransactionRepository.findOne({
+    const existing = await this.prisma.repository("paymentTransaction").findOne({
       where: {
         auction_id: auctionId,
         user_id: userId,
-        payment_type: PaymentType.BID_FEE,
-        status: PaymentTransactionStatus.SUCCESSFUL,
+        payment_type: "BID_FEE",
+        status: "SUCCESSFUL",
       },
     });
     if (existing) return;
@@ -167,17 +146,17 @@ export class PaymentService {
     const shortAuctionId = auctionId.split("-")[0];
     const clientReferenceId = `fee-${shortAuctionId}-${userId.split("-")[0]}-${Date.now()}`;
 
-    const transaction = this.paymentTransactionRepository.create({
+    const transaction = {
       auction_id: auctionId,
       user_id: userId,
       amount,
       client_reference_id: clientReferenceId,
-      status: PaymentTransactionStatus.SUCCESSFUL,
+      status: "SUCCESSFUL",
       currency: "ETB",
-      payment_type: PaymentType.BID_FEE,
-      gateway: PaymentGateway.AWASH,
-    });
-    await this.paymentTransactionRepository.save(transaction);
+      payment_type: "BID_FEE",
+      gateway: "AWASH",
+    };
+    await this.prisma.repository("paymentTransaction").save(transaction);
     this.logger.log(
       `Bid fee paid via wallet for auction ${auctionId}, user ${userId}`,
     );
@@ -188,12 +167,12 @@ export class PaymentService {
     userId: string,
     amount: number,
   ): Promise<void> {
-    const existing = await this.paymentTransactionRepository.findOne({
+    const existing = await this.prisma.repository("paymentTransaction").findOne({
       where: {
         auction_id: auctionId,
         user_id: userId,
-        payment_type: PaymentType.WALLET,
-        status: PaymentTransactionStatus.SUCCESSFUL,
+        payment_type: "WALLET",
+        status: "SUCCESSFUL",
       },
     });
     if (existing) return;
@@ -209,18 +188,18 @@ export class PaymentService {
 
     const encryptedAmount = this.bidEncryptionService.encrypt(amount);
 
-    const transaction = this.paymentTransactionRepository.create({
+    const transaction = {
       auction_id: auctionId,
       user_id: userId,
       amount,
       encrypted_amount: encryptedAmount,
       client_reference_id: clientReferenceId,
-      status: PaymentTransactionStatus.SUCCESSFUL,
+      status: "SUCCESSFUL",
       currency: "ETB",
-      payment_type: PaymentType.WALLET,
-      gateway: PaymentGateway.AWASH,
-    });
-    await this.paymentTransactionRepository.save(transaction);
+      payment_type: "WALLET",
+      gateway: "AWASH",
+    };
+    await this.prisma.repository("paymentTransaction").save(transaction);
 
     await this.markAsPaid(auctionId, userId);
 
@@ -235,11 +214,11 @@ export class PaymentService {
   ): Promise<{ status: string; payment_url: string | null }> {
     const where: any = {
       auction_id: auctionId,
-      payment_type: PaymentType.BID_FEE,
+      payment_type: "BID_FEE",
     };
     if (userId) where.user_id = userId;
 
-    const transaction = await this.paymentTransactionRepository.findOne({
+    const transaction = await this.prisma.repository("paymentTransaction").findOne({
       where,
       order: { created_at: "DESC" },
     });
@@ -271,9 +250,9 @@ export class PaymentService {
         } else if (
           ["FAILED", "EXPIRED", "CANCELLED", "REVOKED"].includes(remoteStatus)
         ) {
-          await this.paymentTransactionRepository.update(
+          await this.prisma.repository("paymentTransaction").update(
             { id: transaction.id },
-            { status: remoteStatus as PaymentTransactionStatus },
+            { status: remoteStatus },
           );
           status = remoteStatus;
         }
@@ -299,11 +278,11 @@ export class PaymentService {
   ): Promise<{ status: string; payment_url: string | null; gateway?: string }> {
     const where: any = {
       auction_id: auctionId,
-      payment_type: In(WINNING_PAYMENT_TYPES),
+      payment_type: { in: WINNING_PAYMENT_TYPES },
     };
     if (userId) where.user_id = userId;
 
-    const transaction = await this.paymentTransactionRepository.findOne({
+    const transaction = await this.prisma.repository("paymentTransaction").findOne({
       where,
       order: { created_at: "DESC" },
     });
@@ -317,7 +296,7 @@ export class PaymentService {
           .toISOString()
           .split("T")[0];
         const remoteStatus =
-          transaction.gateway === PaymentGateway.AWASH
+          transaction.gateway === "AWASH"
             ? await this.awashService.getPaymentStatus(
                 transaction.client_reference_id,
               )
@@ -335,9 +314,9 @@ export class PaymentService {
         } else if (
           ["FAILED", "EXPIRED", "CANCELLED", "REVOKED"].includes(remoteStatus)
         ) {
-          await this.paymentTransactionRepository.update(
+          await this.prisma.repository("paymentTransaction").update(
             { id: transaction.id },
-            { status: remoteStatus as PaymentTransactionStatus },
+            { status: remoteStatus },
           );
           status = remoteStatus;
         }
@@ -362,7 +341,7 @@ export class PaymentService {
     auctionId: string,
     userId: string,
   ): Promise<void> {
-    const auction = await this.auctionRepository.findOne({
+    const auction = await this.prisma.repository("auction").findOne({
       where: { id: auctionId },
     });
     if (!auction) throw new Error("Auction not found");
@@ -370,12 +349,12 @@ export class PaymentService {
       throw new Error("Only the winner can confirm payment");
     }
 
-    const transaction = await this.paymentTransactionRepository.findOne({
+    const transaction = await this.prisma.repository("paymentTransaction").findOne({
       where: {
         auction_id: auctionId,
         user_id: userId,
-        payment_type: In(WINNING_PAYMENT_TYPES),
-        status: PaymentTransactionStatus.SUCCESSFUL,
+        payment_type: { in: WINNING_PAYMENT_TYPES },
+        status: "SUCCESSFUL",
       },
       order: { created_at: "DESC" },
     });
@@ -383,17 +362,17 @@ export class PaymentService {
       throw new Error("Winning payment not yet confirmed");
     }
 
-    if (auction.payment_status === PaymentStatus.PAID) {
+    if (auction.payment_status === "PAID") {
       return;
     }
 
-    const winner = await this.winnerRepository.findOne({
+    const winner = await this.prisma.repository("winner").findOne({
       where: {
         auction_id: auctionId,
         user_id: userId,
       },
     });
-    if (winner?.payment_status === WinnerPaymentStatus.PAID) {
+    if (winner?.payment_status === "PAID") {
       return;
     }
 
@@ -401,13 +380,13 @@ export class PaymentService {
   }
 
   async markAsPaid(auctionId: string, userId?: string): Promise<void> {
-    const auction = await this.auctionRepository.findOne({
+    const auction = await this.prisma.repository("auction").findOne({
       where: { id: auctionId },
     });
     if (!auction) throw new Error("Auction not found");
     if (
-      auction.status !== AS.CLOSED ||
-      auction.payment_status !== PaymentStatus.PENDING
+      auction.status !== "CLOSED" ||
+      auction.payment_status !== "PENDING"
     ) {
       throw new Error("Auction is not eligible for payment");
     }
@@ -416,20 +395,20 @@ export class PaymentService {
       await this.winnerService.updateWinnerPaymentStatus(
         auctionId,
         userId,
-        WinnerPaymentStatus.PAID,
+        "PAID",
       );
 
-      const remainingUnpaid = await this.winnerRepository.count({
+      const remainingUnpaid = await this.prisma.repository("winner").count({
         where: {
           auction_id: auctionId,
-          payment_status: WinnerPaymentStatus.PENDING,
+          payment_status: "PENDING",
         },
       });
 
       if (remainingUnpaid === 0) {
-        auction.payment_status = PaymentStatus.PAID;
+        auction.payment_status = "PAID";
         auction.last_payment_update = new Date();
-        await this.auctionRepository.save(auction);
+        await this.prisma.repository("auction").save(auction);
         await this.redis.set(
           `takelow:auction:${auctionId}:payment_status`,
           "PAID",
@@ -449,8 +428,8 @@ export class PaymentService {
           auction.last_payment_update = new Date();
           nextWinner.payment_deadline = nextDeadline;
 
-          await this.winnerRepository.save(nextWinner);
-          await this.auctionRepository.save(auction);
+          await this.prisma.repository("winner").save(nextWinner);
+          await this.prisma.repository("auction").save(auction);
         }
 
         this.logger.log(
@@ -458,9 +437,9 @@ export class PaymentService {
         );
       }
     } else {
-      auction.payment_status = PaymentStatus.PAID;
+      auction.payment_status = "PAID";
       auction.last_payment_update = new Date();
-      await this.auctionRepository.save(auction);
+      await this.prisma.repository("auction").save(auction);
       await this.redis.set(
         `takelow:auction:${auctionId}:payment_status`,
         "PAID",
@@ -476,25 +455,25 @@ export class PaymentService {
     paymentReferenceId: string,
     webhookPayload: Record<string, any>,
   ): Promise<void> {
-    const result = await this.paymentTransactionRepository.update(
+    const result = await this.prisma.repository("paymentTransaction").update(
       {
         client_reference_id: clientReferenceId,
-        status: Not(PaymentTransactionStatus.SUCCESSFUL),
+        status: { not: "SUCCESSFUL" },
       },
       {
-        status: PaymentTransactionStatus.SUCCESSFUL,
+        status: "SUCCESSFUL",
         webhook_payload: webhookPayload,
       },
     );
 
-    if (!result.affected) {
+    if (!result.count) {
       this.logger.debug(
         `Transaction ${clientReferenceId} already successful, skipping`,
       );
       return;
     }
 
-    const transaction = await this.paymentTransactionRepository.findOne({
+    const transaction = await this.prisma.repository("paymentTransaction").findOne({
       where: { client_reference_id: clientReferenceId },
     });
     if (!transaction) {
@@ -503,16 +482,16 @@ export class PaymentService {
       );
       return;
     }
-    if (transaction.gateway === PaymentGateway.AWASH) {
+    if (transaction.gateway === "AWASH") {
       transaction.awash_transaction_id = paymentReferenceId;
     } else {
       transaction.sikina_payment_reference_id = paymentReferenceId;
     }
-    await this.paymentTransactionRepository.save(transaction);
+    await this.prisma.repository("paymentTransaction").save(transaction);
 
     if (
-      transaction.payment_type === PaymentType.WALLET ||
-      transaction.payment_type === PaymentType.WINNING_BID
+      transaction.payment_type === "WALLET" ||
+      transaction.payment_type === "WINNING_BID"
     ) {
       await this.markAsPaid(transaction.auction_id, transaction.user_id);
     } else {
@@ -526,10 +505,10 @@ export class PaymentService {
     clientReferenceId: string,
     webhookPayload: Record<string, any>,
   ): Promise<void> {
-    await this.paymentTransactionRepository.update(
+    await this.prisma.repository("paymentTransaction").update(
       { client_reference_id: clientReferenceId },
       {
-        status: PaymentTransactionStatus.FAILED,
+        status: "FAILED",
         webhook_payload: webhookPayload,
       },
     );
@@ -539,10 +518,10 @@ export class PaymentService {
     clientReferenceId: string,
     webhookPayload: Record<string, any>,
   ): Promise<void> {
-    await this.paymentTransactionRepository.update(
+    await this.prisma.repository("paymentTransaction").update(
       { client_reference_id: clientReferenceId },
       {
-        status: PaymentTransactionStatus.EXPIRED,
+        status: "EXPIRED",
         webhook_payload: webhookPayload,
       },
     );
@@ -552,10 +531,10 @@ export class PaymentService {
     clientReferenceId: string,
     webhookPayload: Record<string, any>,
   ): Promise<void> {
-    await this.paymentTransactionRepository.update(
+    await this.prisma.repository("paymentTransaction").update(
       { client_reference_id: clientReferenceId },
       {
-        status: PaymentTransactionStatus.CANCELLED,
+        status: "CANCELLED",
         webhook_payload: webhookPayload,
       },
     );
@@ -564,14 +543,14 @@ export class PaymentService {
   @Cron(CronExpression.EVERY_30_SECONDS)
   async expireOverduePayments(): Promise<void> {
     const now = new Date();
-    const overdue = await this.auctionRepository.find({
+    const overdue = await this.prisma.repository("auction").find({
       where: {
-        status: AS.CLOSED,
-        payment_status: PaymentStatus.PENDING,
-        payment_deadline: LessThan(now),
-        winner_user_id: Not(IsNull()),
+        status: "CLOSED",
+        payment_status: "PENDING",
+        payment_deadline: { lt: now },
+        winner_user_id: { not: null },
       },
-      relations: ["product"],
+      include: { product: true },
       take: 50,
     });
 
@@ -588,8 +567,8 @@ export class PaymentService {
 
   @Cron(CronExpression.EVERY_30_MINUTES)
   async reconcilePendingPayments(): Promise<void> {
-    const pendingTransactions = await this.paymentTransactionRepository.find({
-      where: { status: PaymentTransactionStatus.PENDING },
+    const pendingTransactions = await this.prisma.repository("paymentTransaction").find({
+      where: { status: "PENDING" },
       take: 100,
     });
 
@@ -604,7 +583,7 @@ export class PaymentService {
         const transactionDate = txn.created_at.toISOString().split("T")[0];
 
         const status =
-          txn.gateway === PaymentGateway.AWASH
+          txn.gateway === "AWASH"
             ? await this.awashService.getPaymentStatus(txn.client_reference_id)
             : await this.sikinaService.getPaymentStatus(
                 txn.client_reference_id,
@@ -622,16 +601,16 @@ export class PaymentService {
           this.logger.log(
             `Reconciliation: payment ${txn.client_reference_id} is ${status}`,
           );
-          await this.paymentTransactionRepository.update(
+          await this.prisma.repository("paymentTransaction").update(
             { id: txn.id },
-            { status: status as PaymentTransactionStatus },
+            { status: status },
           );
         }
       } catch (error) {
         this.logger.warn(
           `Reconciliation failed for transaction ${txn.id}: ${error.message}`,
         );
-        await this.paymentTransactionRepository.increment(
+        await this.prisma.repository("paymentTransaction").increment(
           { id: txn.id },
           "retry_count",
           1,
@@ -640,12 +619,12 @@ export class PaymentService {
     }
   }
 
-  private async handleExpiredPayment(auction: Auction): Promise<void> {
+  private async handleExpiredPayment(auction: any): Promise<void> {
     this.logger.log(
       `Auction ${auction.id}: Payment deadline passed for winner ${auction.winner_user_id}`,
     );
 
-    const currentWinner = await this.winnerRepository.findOne({
+    const currentWinner = await this.prisma.repository("winner").findOne({
       where: {
         auction_id: auction.id,
         user_id: auction.winner_user_id,
@@ -653,8 +632,8 @@ export class PaymentService {
     });
 
     if (currentWinner) {
-      currentWinner.payment_status = WinnerPaymentStatus.EXPIRED;
-      await this.winnerRepository.save(currentWinner);
+      currentWinner.payment_status = "EXPIRED";
+      await this.prisma.repository("winner").save(currentWinner);
       this.logger.log(
         `Auction ${auction.id}: Winner ${auction.winner_user_id} payment expired`,
       );
@@ -665,13 +644,13 @@ export class PaymentService {
     if (nextWinner) {
       auction.winner_user_id = nextWinner.user_id;
       auction.winning_bid_amount = nextWinner.amount;
-      auction.payment_status = PaymentStatus.PENDING;
+      auction.payment_status = "PENDING";
       auction.payment_deadline = new Date(
         Date.now() + PAYMENT_DEADLINE_HOURS * 60 * 60 * 1000,
       );
       nextWinner.payment_deadline = auction.payment_deadline;
-      await this.winnerRepository.save(nextWinner);
-      await this.auctionRepository.save(auction);
+      await this.prisma.repository("winner").save(nextWinner);
+      await this.prisma.repository("auction").save(auction);
       this.logger.log(
         `Auction ${auction.id}: Payment expired, new winner ${nextWinner.user_id} with bid ${nextWinner.amount}`,
       );
@@ -683,15 +662,15 @@ export class PaymentService {
         this.logger.warn(`Failed to notify new winner: ${e.message}`),
       );
     } else {
-      auction.payment_status = PaymentStatus.EXPIRED;
-      auction.status = AS.EXPIRED;
+      auction.payment_status = "EXPIRED";
+      auction.status = "EXPIRED";
 
-      await this.winnerRepository.update(
-        { auction_id: auction.id, payment_status: WinnerPaymentStatus.PENDING },
-        { payment_status: WinnerPaymentStatus.EXPIRED },
+      await this.prisma.repository("winner").update(
+        { auction_id: auction.id, payment_status: "PENDING" },
+        { payment_status: "EXPIRED" },
       );
 
-      await this.auctionRepository.save(auction);
+      await this.prisma.repository("auction").save(auction);
       this.logger.log(
         `Auction ${auction.id}: Payment expired, no more winners, auction expired`,
       );
@@ -750,9 +729,9 @@ export class PaymentService {
     amount: number,
   ): Promise<void> {
     try {
-      const auction = await this.auctionRepository.findOne({
+      const auction = await this.prisma.repository("auction").findOne({
         where: { id: auctionId },
-        relations: ["product"],
+        include: { product: true },
       });
       const productName = auction?.product?.name || auctionId;
       const deadline = auction?.payment_deadline?.toISOString();

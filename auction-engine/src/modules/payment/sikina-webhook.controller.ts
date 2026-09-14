@@ -2,7 +2,9 @@ import { Controller, Post, HttpCode, Req, Res, Logger } from "@nestjs/common";
 import { Request, Response } from "express";
 import { SikinaService } from "./sikina.service";
 import { PaymentService } from "./payment.service";
+import { ApiTags, ApiOperation } from "@nestjs/swagger";
 
+@ApiTags("payments-webhooks")
 @Controller("payments")
 export class SikinaWebhookController {
   private readonly logger = new Logger(SikinaWebhookController.name);
@@ -14,6 +16,7 @@ export class SikinaWebhookController {
 
   @Post("webhook/sikina")
   @HttpCode(200)
+  @ApiOperation({ summary: "Handle SikinaPay webhook" })
   async handleWebhook(
     @Req() req: Request,
     @Res() res: Response,

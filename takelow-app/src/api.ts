@@ -1,9 +1,14 @@
 import { Platform } from 'react-native'
 
-const HOST = Platform.OS === 'android' ? '10.0.2.2' : 'localhost'
-const IDENTITY_API = `http://${HOST}:3001/api/v1`
-const QUERY_API = `http://${HOST}:3003/api/v1`
-const ENGINE_API = `http://${HOST}:3002/api/v1`
+const PROD_HOST = '196.189.237.158'
+const DEV_HOST = Platform.OS === 'android' ? '10.0.2.2' : 'localhost'
+const USE_PROD = true
+
+const HOST = USE_PROD ? PROD_HOST : DEV_HOST
+const PORT = USE_PROD ? '' : ':3001'
+const IDENTITY_API = `http://${HOST}${USE_PROD ? '' : ':3001'}/api/v1`
+const QUERY_API = `http://${HOST}${USE_PROD ? '' : ':3003'}/api/v1`
+const ENGINE_API = `http://${HOST}${USE_PROD ? '' : ':3002'}/api/v1`
 
 let _token: string | null = null
 let _refreshToken: string | null = null
@@ -218,10 +223,13 @@ async function request<T>(method: string, path: string, body?: unknown, base?: s
   if (extraHeaders) Object.assign(headers, extraHeaders)
   const url = `${base || IDENTITY_API}${path}`
 
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 15000)
+
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const res = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined })
-      if (res.ok) return res.json()
+      const res = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined, signal: controller.signal })
+      if (res.ok) { clearTimeout(timeoutId); return res.json() }
 
       if (res.status === 401 && _refreshToken && attempt < MAX_RETRIES) {
         await refreshAuth()
@@ -255,6 +263,116 @@ async function request<T>(method: string, path: string, body?: unknown, base?: s
   }
 
   throw new ApiError(0, 'The server is not responding. Please try again later.', 'ERR_TIMEOUT')
+}
+
+export type ApiSettlementReport = {
+  start_date: string
+  end_date: string
+  participation_fee_revenue: number
+  winning_price_total: number
+  platform_share: number
+  tax: number
+  commission: number
+  net_revenue: number
+  auction_count: number
+  transaction_count: number
+  details: ApiSettlementRow[]
+}
+
+export type ApiSettlementRow = {
+  auction_id: string
+  product_name: string
+  winning_amount: number
+  participation_fee_revenue: number
+  platform_share: number
+  tax: number
+  commission: number
+  net_to_seller: number
+  payment_status: string
+  settled_at: string | null
+}
+
+export type ApiDailySettlement = {
+  date: string
+  participation_fee_revenue: number
+  winning_price_total: number
+  platform_share: number
+  tax: number
+  commission: number
+  net_revenue: number
+  auction_count: number
+}
+
+export type ApiPendingWinner = {
+  id: string
+  auction_id: string
+  user_id: string
+  amount: number
+  rank: number
+  payment_status: string
+  payment_deadline: string | null
+  created_at: string
+  user?: {
+    id: string
+    phone_number: string
+    full_name: string | null
+    email: string | null
+  }
+  auction?: {
+    id: string
+    public_code: string
+    payment_deadline: string | null
+    product?: { id: string; name: string }
+  }
+}
+
+export type ApiWinnerStats = {
+  total_winners: number
+  paid_winners: number
+  pending_winners: number
+  expired_winners: number
+  average_payment_time_hours?: number
+}
+
+export type ApiDispute = {
+  id: string
+  user_id: string
+  auction_id: string | null
+  type: string
+  description: string
+  status: 'OPEN' | 'IN_REVIEW' | 'RESOLVED' | 'REJECTED'
+  resolution: string | null
+  created_at: string
+  updated_at: string
+  user?: {
+    id: string
+    phone_number: string
+    full_name: string | null
+  }
+  auction?: {
+    id: string
+    title?: string
+    public_code?: string
+  }
+}
+
+export type ApiRbacOverride = {
+  id: string
+  user_id: string
+  role: string
+  permissions: Record<string, string[]>
+  reason: string
+  expires_at: string | null
+  active: boolean
+}
+
+export type ApiAccessDecision = {
+  id: string
+  user_id: string
+  action: string
+  subject: string
+  granted: boolean
+  timestamp: string
 }
 
 export type ApiProduct = {
@@ -542,5 +660,104 @@ export const api = {
   },
   markAllNotificationsRead() {
     return request<{ read: boolean }>('POST', '/notify/inbox/read-all', undefined, IDENTITY_API)
+  },
+
+  // Settlement
+  adminGetSettlementReport(start: string, end: string) {
+    return request<ApiSettlementReport>(
+      'GET',
+      `/admin/settlement/report?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`,
+      undefined,
+      QUERY_API,
+    )
+  },
+  adminGetDailySettlement(date: string) {
+    return request<ApiDailySettlement>(
+      'GET',
+      `/admin/settlement/daily?date=${encodeURIComponent(date)}`,
+      undefined,
+      QUERY_API,
+    )
+  },
+  adminExportSettlementCsv(start: string, end: string) {
+    return request<string>(
+      'GET',
+      `/admin/settlement/export?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`,
+      undefined,
+      QUERY_API,
+    )
+  },
+
+  // Winner Management
+  adminGetPendingWinners() {
+    return request<ApiPendingWinner[]>('GET', '/admin/winners/pending', undefined, QUERY_API)
+  },
+  adminGetExpiredWinners() {
+    return request<ApiPendingWinner[]>('GET', '/admin/winners/expired', undefined, QUERY_API)
+  },
+  adminGetWinnerStats() {
+    return request<ApiWinnerStats>('GET', '/admin/winners/stats', undefined, QUERY_API)
+  },
+  adminExtendWinnerDeadline(winnerId: string, new_deadline: string) {
+    return request<any>(
+      'POST',
+      `/admin/winners/${winnerId}/extend-deadline`,
+      { new_deadline },
+      QUERY_API,
+    )
+  },
+  adminReassignWinner(winnerId: string) {
+    return request<any>('POST', `/admin/winners/${winnerId}/reassign`, undefined, QUERY_API)
+  },
+  adminCancelWinner(winnerId: string, reason?: string) {
+    return request<any>('POST', `/admin/winners/${winnerId}/cancel`, { reason }, QUERY_API)
+  },
+
+  // Disputes
+  getUserDisputes() {
+    return request<ApiDispute[]>('GET', '/disputes', undefined, IDENTITY_API)
+  },
+  createDispute(data: { auction_id?: string; type: string; description: string }) {
+    return request<ApiDispute>('POST', '/disputes', data, IDENTITY_API)
+  },
+  adminListAllDisputes(status?: string, page = 1, limit = 50) {
+    const q = new URLSearchParams({ page: String(page), limit: String(limit) })
+    if (status && status !== 'ALL') q.append('status', status)
+    return request<{ disputes: ApiDispute[]; total: number } | ApiDispute[]>(
+      'GET',
+      `/disputes/all?${q.toString()}`,
+      undefined,
+      IDENTITY_API,
+    )
+  },
+  adminUpdateDisputeStatus(id: string, status: string, resolution?: string) {
+    return request<ApiDispute>(
+      'PATCH',
+      `/disputes/${id}/status`,
+      { status, resolution },
+      IDENTITY_API,
+    )
+  },
+
+  // RBAC
+  adminGetRbacAbilities() {
+    return request<any>('GET', '/rbac/abilities', undefined, IDENTITY_API)
+  },
+  adminGetAccessDecisions(page = 1, limit = 50) {
+    return request<any>('GET', `/rbac/access-decisions?page=${page}&limit=${limit}`, undefined, IDENTITY_API)
+  },
+  adminGetRbacOverrides(activeOnly = false) {
+    return request<ApiRbacOverride[]>('GET', `/rbac/overrides${activeOnly ? '?active=true' : ''}`, undefined, IDENTITY_API)
+  },
+
+  // Product Approvals
+  adminGetPendingProducts(page = 1, limit = 20) {
+    return request<any>('GET', `/admin/products/pending?page=${page}&limit=${limit}`, undefined, ENGINE_API)
+  },
+  adminApproveProduct(id: string) {
+    return request<any>('POST', `/admin/products/${id}/approve`, undefined, ENGINE_API)
+  },
+  adminRejectProduct(id: string, reason?: string) {
+    return request<any>('POST', `/admin/products/${id}/reject`, { reason }, ENGINE_API)
   },
 }

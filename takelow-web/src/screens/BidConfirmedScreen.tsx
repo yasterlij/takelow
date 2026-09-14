@@ -9,7 +9,7 @@ const particles = Array.from({ length: 16 }, (_, i) => ({
   left: `${Math.random() * 100}%`,
   delay: `${Math.random() * 0.6}s`,
   duration: `${0.8 + Math.random() * 0.8}s`,
-  color: i % 3 === 0 ? "#C8A642" : i % 3 === 1 ? "#002B5C" : "#D4B85E",
+  color: i % 3 === 0 ? "#0071e3" : i % 3 === 1 ? "#1d1d1f" : "#86868b",
 }))
 
 export function BidConfirmedScreen() {

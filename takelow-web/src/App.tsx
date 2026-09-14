@@ -32,6 +32,11 @@ import { AdminTransactionsScreen } from "./screens/AdminTransactionsScreen"
 import { AdminAuditScreen } from "./screens/AdminAuditScreen"
 import { AdminMonitorListScreen } from "./screens/AdminMonitorListScreen"
 import { AdminAuctionMonitorScreen } from "./screens/AdminAuctionMonitorScreen"
+import { SettlementReportScreen } from "./screens/SettlementReportScreen"
+import { AnalyticsScreen } from "./screens/AnalyticsScreen"
+import { DisputesScreen } from "./screens/DisputesScreen"
+import { WinnerManagementScreen } from "./screens/WinnerManagementScreen"
+import { RbacScreen } from "./screens/RbacScreen"
 import { AwashMark, BottomTabBar } from "./components/AuctionUI"
 import { NotificationBell } from "./components/NotificationBell"
 import { ErrorBoundary } from "./components/ErrorBoundary"
@@ -42,7 +47,21 @@ import { Gavel, Wallet, Shield, LogOut, Trophy, Menu, X, User, TicketCheck } fro
 function ScreenRouter() {
   const { view, user } = useApp()
   const isAdmin = user?.role === "admin"
-  const adminViews = ["admin-dashboard", "admin-auctions", "admin-products", "admin-users", "admin-transactions", "admin-audit", "admin-monitor", "admin-auction-monitor"]
+  const adminViews = [
+    "admin-dashboard",
+    "admin-auctions",
+    "admin-products",
+    "admin-users",
+    "admin-transactions",
+    "admin-audit",
+    "admin-monitor",
+    "admin-auction-monitor",
+    "admin-settlement",
+    "admin-analytics",
+    "admin-disputes",
+    "admin-winners",
+    "admin-rbac",
+  ]
   const isAdminView = adminViews.includes(view)
 
   let screen
@@ -78,6 +97,11 @@ function ScreenRouter() {
     case "admin-audit": screen = isAdmin ? <AdminAuditScreen /> : <HomeScreen />; break
     case "admin-monitor": screen = isAdmin ? <AdminMonitorListScreen /> : <HomeScreen />; break
     case "admin-auction-monitor": screen = isAdmin ? <AdminAuctionMonitorScreen /> : <HomeScreen />; break
+    case "admin-settlement": screen = isAdmin ? <SettlementReportScreen /> : <HomeScreen />; break
+    case "admin-analytics": screen = isAdmin ? <AnalyticsScreen /> : <HomeScreen />; break
+    case "admin-disputes": screen = isAdmin ? <DisputesScreen /> : <HomeScreen />; break
+    case "admin-winners": screen = isAdmin ? <WinnerManagementScreen /> : <HomeScreen />; break
+    case "admin-rbac": screen = isAdmin ? <RbacScreen /> : <HomeScreen />; break
     default: screen = user ? <HomeScreen /> : <LoginScreen />
   }
 
@@ -106,17 +130,17 @@ function Navbar() {
   return (
     <>
       <nav className="glass-nav sticky top-0 z-50">
-        <div className="mx-auto flex h-14 sm:h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
+        <div className="mx-auto flex h-12 sm:h-12 max-w-7xl items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-8">
             <button onClick={() => go("home")} className="flex items-center gap-2 sm:gap-3 group">
               <div className="transition-transform duration-300 group-hover:scale-105">
-                <AwashMark size={26} />
+                <AwashMark size={22} />
               </div>
               <div className="leading-tight">
-                <div className="font-display text-sm sm:text-base font-extrabold tracking-tight text-awash-blue">
+                <div className="font-display text-sm sm:text-base font-semibold tracking-tight text-foreground">
                   Awash Bank
                 </div>
-                <div className="text-[9px] sm:text-[10px] font-semibold tracking-wide text-gradient-gold">
+                <div className="text-[9px] sm:text-[10px] font-medium tracking-wide text-link-blue">
                   Reverse Auction
                 </div>
               </div>
@@ -143,14 +167,14 @@ function Navbar() {
             </span>
             <button
               onClick={() => logout()}
-              className="hidden sm:flex items-center gap-1.5 rounded-lg border border-border/60 bg-white/50 backdrop-blur-sm px-3 py-1.5 text-xs font-medium text-neutral-500 transition-all duration-300 hover:bg-red-50 hover:border-red-200 hover:text-red-600 hover:shadow-sm"
+              className="hidden sm:flex items-center gap-1.5 rounded-full border border-border/60 bg-white px-4 py-1.5 text-xs font-normal text-neutral-500 transition-colors duration-200 hover:text-foreground"
             >
               <LogOut className="size-3.5" />
               Sign Out
             </button>
             <button
               onClick={() => setDrawerOpen(!drawerOpen)}
-              className="flex sm:hidden items-center justify-center size-9 rounded-lg border border-border/60 bg-white/50 backdrop-blur-sm text-neutral-500 hover:bg-neutral-100 transition-colors"
+              className="flex sm:hidden items-center justify-center size-9 rounded-full border border-border/60 bg-white text-neutral-500 hover:bg-cool-wash transition-colors"
             >
               {drawerOpen ? <X className="size-4" /> : <Menu className="size-4" />}
             </button>
@@ -252,9 +276,9 @@ function AppContent() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-dots">
+    <div className="flex min-h-screen flex-col bg-white">
       <Navbar />
-      <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 sm:px-6 py-4 sm:py-6 pb-[88px] sm:pb-6 min-h-0">
+      <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 sm:px-6 py-6 sm:py-8 pb-[88px] sm:pb-8 min-h-0">
         <ScreenRouter />
       </main>
       <BottomNav />

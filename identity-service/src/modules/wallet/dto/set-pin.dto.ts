@@ -1,6 +1,8 @@
-import { Matches } from 'class-validator';
+import { IsString, Length, Matches } from 'class-validator';
 
 export class SetPinDto {
-  @Matches(/^\d{4,6}$/)
+  @IsString()
+  @Length(4, 6)
+  @Matches(/^[0-9]+$/)
   pin: string;
 }

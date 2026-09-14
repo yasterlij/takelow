@@ -159,6 +159,9 @@ function getCategory(status: number, errorCode: string): ErrorCategory {
 
 export function getUserFriendlyMessage(err: unknown): string {
   if (err instanceof ApiError) {
+    if (err.errorCode === "ERR_VALIDATION" && err.message) {
+      return err.message;
+    }
     return FRIENDLY_ERRORS[err.errorCode] || err.message;
   }
   if (err instanceof TypeError && err.message === "Failed to fetch") {
@@ -244,9 +247,9 @@ async function request<T>(
   base?: string,
   extraHeaders?: Record<string, string>,
 ): Promise<T> {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
+  const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
+  const headers: Record<string, string> = {};
+  if (!isFormData) headers["Content-Type"] = "application/json";
   if (_token) headers["Authorization"] = `Bearer ${_token}`;
   if (extraHeaders) Object.assign(headers, extraHeaders);
   const url = `${base || IDENTITY_API}${path}`;
@@ -256,7 +259,7 @@ async function request<T>(
       const res = await fetch(url, {
         method,
         headers,
-        body: body ? JSON.stringify(body) : undefined,
+        body: body ? (isFormData ? (body as FormData) : JSON.stringify(body)) : undefined,
       });
       if (res.ok) return res.json();
 
@@ -423,6 +426,116 @@ export type ApiFavorite = {
   user_id: string;
   auction_id: string;
   created_at: string;
+};
+
+export type ApiSettlementReport = {
+  start_date: string;
+  end_date: string;
+  participation_fee_revenue: number;
+  winning_price_total: number;
+  platform_share: number;
+  tax: number;
+  commission: number;
+  net_revenue: number;
+  auction_count: number;
+  transaction_count: number;
+  details: ApiSettlementRow[];
+};
+
+export type ApiSettlementRow = {
+  auction_id: string;
+  product_name: string;
+  winning_amount: number;
+  participation_fee_revenue: number;
+  platform_share: number;
+  tax: number;
+  commission: number;
+  net_to_seller: number;
+  payment_status: string;
+  settled_at: string | null;
+};
+
+export type ApiDailySettlement = {
+  date: string;
+  participation_fee_revenue: number;
+  winning_price_total: number;
+  platform_share: number;
+  tax: number;
+  commission: number;
+  net_revenue: number;
+  auction_count: number;
+};
+
+export type ApiPendingWinner = {
+  id: string;
+  auction_id: string;
+  user_id: string;
+  amount: number;
+  rank: number;
+  payment_status: string;
+  payment_deadline: string | null;
+  created_at: string;
+  user?: {
+    id: string;
+    phone_number: string;
+    full_name: string | null;
+    email: string | null;
+  };
+  auction?: {
+    id: string;
+    public_code: string;
+    payment_deadline: string | null;
+    product?: { id: string; name: string };
+  };
+};
+
+export type ApiWinnerStats = {
+  total_winners: number;
+  paid_winners: number;
+  pending_winners: number;
+  expired_winners: number;
+  average_payment_time_hours?: number;
+};
+
+export type ApiDispute = {
+  id: string;
+  user_id: string;
+  auction_id: string | null;
+  type: string;
+  description: string;
+  status: "OPEN" | "IN_REVIEW" | "RESOLVED" | "REJECTED";
+  resolution: string | null;
+  created_at: string;
+  updated_at: string;
+  user?: {
+    id: string;
+    phone_number: string;
+    full_name: string | null;
+  };
+  auction?: {
+    id: string;
+    title?: string;
+    public_code?: string;
+  };
+};
+
+export type ApiRbacOverride = {
+  id: string;
+  user_id: string;
+  role: string;
+  permissions: Record<string, string[]>;
+  reason: string;
+  expires_at: string | null;
+  active: boolean;
+};
+
+export type ApiAccessDecision = {
+  id: string;
+  user_id: string;
+  action: string;
+  subject: string;
+  granted: boolean;
+  timestamp: string;
 };
 
 export const api = {
@@ -729,6 +842,7 @@ export const api = {
     image_urls?: string[];
     current_market_price: number;
     category?: string;
+    brand?: string;
     specs?: Record<string, string>;
   }) {
     return request<ApiProduct>("POST", "/admin/products", data, ENGINE_API);
@@ -741,6 +855,7 @@ export const api = {
       image_urls: string[];
       current_market_price: number;
       category: string;
+      brand: string;
       specs: Record<string, string>;
     }>,
   ) {
@@ -748,6 +863,47 @@ export const api = {
       "PATCH",
       `/admin/products/${id}`,
       data,
+      ENGINE_API,
+    );
+  },
+  uploadProductImage(file: File) {
+    const form = new FormData();
+    form.append("file", file);
+    return request<{ url: string }>(
+      "POST",
+      "/admin/products/upload-image",
+      form,
+      ENGINE_API,
+    );
+  },
+  downloadProductImages(id: string) {
+    return request<{
+      downloaded: number;
+      total: number;
+      message?: string;
+    }>("POST", `/admin/products/${id}/download-images`, undefined, ENGINE_API);
+  },
+  listPendingProducts(page = 1, limit = 20) {
+    return request<{ data: ApiProduct[]; meta: any }>(
+      "GET",
+      `/admin/products/pending?page=${page}&limit=${limit}`,
+      undefined,
+      ENGINE_API,
+    );
+  },
+  approveProduct(id: string) {
+    return request<ApiProduct>(
+      "POST",
+      `/admin/products/${id}/approve`,
+      undefined,
+      ENGINE_API,
+    );
+  },
+  rejectProduct(id: string, reason?: string) {
+    return request<ApiProduct>(
+      "POST",
+      `/admin/products/${id}/reject`,
+      { reason },
       ENGINE_API,
     );
   },
@@ -964,6 +1120,165 @@ export const api = {
       "/notify/inbox/read-all",
       undefined,
       IDENTITY_API,
+    );
+  },
+
+  // Settlement
+  adminGetSettlementReport(start: string, end: string) {
+    return request<ApiSettlementReport>(
+      "GET",
+      `/admin/settlement/report?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`,
+      undefined,
+      QUERY_API,
+    );
+  },
+  adminGetDailySettlement(date: string) {
+    return request<ApiDailySettlement>(
+      "GET",
+      `/admin/settlement/daily?date=${encodeURIComponent(date)}`,
+      undefined,
+      QUERY_API,
+    );
+  },
+  adminExportSettlementCsv(start: string, end: string) {
+    return request<string>(
+      "GET",
+      `/admin/settlement/export?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`,
+      undefined,
+      QUERY_API,
+    );
+  },
+
+  // Winner Management
+  adminGetPendingWinners() {
+    return request<ApiPendingWinner[]>(
+      "GET",
+      "/admin/winners/pending",
+      undefined,
+      QUERY_API,
+    );
+  },
+  adminGetExpiredWinners() {
+    return request<ApiPendingWinner[]>(
+      "GET",
+      "/admin/winners/expired",
+      undefined,
+      QUERY_API,
+    );
+  },
+  adminGetWinnerStats() {
+    return request<ApiWinnerStats>(
+      "GET",
+      "/admin/winners/stats",
+      undefined,
+      QUERY_API,
+    );
+  },
+  adminExtendWinnerDeadline(winnerId: string, new_deadline: string) {
+    return request<any>(
+      "POST",
+      `/admin/winners/${winnerId}/extend-deadline`,
+      { new_deadline },
+      QUERY_API,
+    );
+  },
+  adminReassignWinner(winnerId: string) {
+    return request<any>(
+      "POST",
+      `/admin/winners/${winnerId}/reassign`,
+      undefined,
+      QUERY_API,
+    );
+  },
+  adminCancelWinner(winnerId: string, reason?: string) {
+    return request<any>(
+      "POST",
+      `/admin/winners/${winnerId}/cancel`,
+      { reason },
+      QUERY_API,
+    );
+  },
+
+  // Disputes
+  getUserDisputes() {
+    return request<ApiDispute[]>(
+      "GET",
+      "/disputes",
+      undefined,
+      IDENTITY_API,
+    );
+  },
+  createDispute(data: { auction_id?: string; type: string; description: string }) {
+    return request<ApiDispute>(
+      "POST",
+      "/disputes",
+      data,
+      IDENTITY_API,
+    );
+  },
+  adminListAllDisputes(status?: string, page = 1, limit = 50) {
+    const q = new URLSearchParams({ page: String(page), limit: String(limit) });
+    if (status && status !== "ALL") q.append("status", status);
+    return request<{ disputes: ApiDispute[]; total: number } | ApiDispute[]>(
+      "GET",
+      `/disputes/all?${q.toString()}`,
+      undefined,
+      IDENTITY_API,
+    );
+  },
+  adminUpdateDisputeStatus(id: string, status: string, resolution?: string) {
+    return request<ApiDispute>(
+      "PATCH",
+      `/disputes/${id}/status`,
+      { status, resolution },
+      IDENTITY_API,
+    );
+  },
+
+  // RBAC
+  adminGetRbacAbilities() {
+    return request<any>("GET", "/rbac/abilities", undefined, IDENTITY_API);
+  },
+  adminGetAccessDecisions(page = 1, limit = 50) {
+    return request<any>(
+      "GET",
+      `/rbac/access-decisions?page=${page}&limit=${limit}`,
+      undefined,
+      IDENTITY_API,
+    );
+  },
+  adminGetRbacOverrides(activeOnly = false) {
+    return request<ApiRbacOverride[]>(
+      "GET",
+      `/rbac/overrides${activeOnly ? "?active=true" : ""}`,
+      undefined,
+      IDENTITY_API,
+    );
+  },
+
+  // Product Approvals
+  adminGetPendingProducts(page = 1, limit = 20) {
+    return request<any>(
+      "GET",
+      `/admin/products/pending?page=${page}&limit=${limit}`,
+      undefined,
+      ENGINE_API,
+    );
+  },
+  adminApproveProduct(id: string) {
+    return request<any>(
+      "POST",
+      `/admin/products/${id}/approve`,
+      undefined,
+      ENGINE_API,
+    );
+  },
+  adminRejectProduct(id: string, reason?: string) {
+    return request<any>(
+      "POST",
+      `/admin/products/${id}/reject`,
+      { reason },
+      ENGINE_API,
     );
   },
 };

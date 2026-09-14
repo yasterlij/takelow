@@ -1,9 +1,10 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react'
 import {
-  View, Image, TouchableOpacity, ScrollView, Dimensions, StyleSheet, Text,
+  View, TouchableOpacity, ScrollView, Dimensions, StyleSheet, Text,
 } from 'react-native'
 import { ChevronLeft, ChevronRight, ZoomIn } from 'lucide-react-native'
 import { LinearGradient } from 'expo-linear-gradient'
+import { SmartImage } from './SmartImage'
 import { colors } from '../theme'
 
 const { width: SCREEN_W } = Dimensions.get('window')
@@ -90,8 +91,9 @@ export function ImageCarousel({
             onPress={() => onImagePress?.(i)}
             style={[styles.slide, { width: CARD_W, height: SLIDE_H }]}
           >
-            <Image
-              source={{ uri: src }}
+            <SmartImage
+              uri={src}
+              alt={`${alt} ${i + 1}`}
               style={styles.image}
               resizeMode="cover"
             />
@@ -138,7 +140,7 @@ export function ImageCarousel({
             {images.map((src, i) => (
               <TouchableOpacity key={i} onPress={() => goTo(i)} activeOpacity={0.7}>
                 <View style={[styles.thumb, i === current && styles.thumbActive]}>
-                  <Image source={{ uri: src }} style={styles.thumbImg} resizeMode="cover" />
+                  <SmartImage uri={src} alt="" style={styles.thumbImg} resizeMode="cover" />
                 </View>
               </TouchableOpacity>
             ))}

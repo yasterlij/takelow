@@ -107,7 +107,7 @@ show_status() {
   echo -e "  Identity Service: ${CYAN}http://localhost:3001${NC}"
   echo -e "  Auction Engine:   ${CYAN}http://localhost:3002${NC}"
   echo -e "  Query Service:    ${CYAN}http://localhost:3003${NC}"
-  echo -e "  PostgreSQL:       ${CYAN}localhost:5432${NC}"
+  echo -e "  PostgreSQL:       ${CYAN}localhost:5433${NC}"
   echo -e "  Redis:            ${CYAN}localhost:6379${NC}"
   echo ""
   echo -e "  Press ${RED}Ctrl+C${NC} to stop all services"

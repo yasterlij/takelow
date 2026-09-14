@@ -13,3 +13,6 @@ Dockerfile
 .dockerignore
 jest.config.ts
 test
+*.md
+.expo
+npm-cache*

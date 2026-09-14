@@ -38,28 +38,15 @@ export function LoginScreen() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.4 }}
-      className="relative flex min-h-screen flex-col overflow-y-auto bg-gradient-to-br from-awash-blue via-awash-blue-dark to-[#001224] px-6"
+      className="relative flex min-h-screen flex-col overflow-y-auto bg-white px-6"
     >
-      {/* Decorative orbs */}
-      <motion.div
-        animate={{ y: [0, -30, 0], rotate: [0, 8, 0] }}
-        transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
-        className="pointer-events-none absolute -left-20 top-10 size-72 rounded-full bg-primary/10 blur-3xl"
-      />
-      <motion.div
-        animate={{ y: [0, 40, 0], rotate: [0, -6, 0] }}
-        transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
-        className="pointer-events-none absolute -right-24 bottom-10 size-80 rounded-full bg-awash-blue-light/20 blur-3xl"
-      />
-
       <div className="relative flex flex-1 flex-col items-center justify-center py-12">
         <motion.div
           initial={{ opacity: 0, scale: 0.85, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="animate-float-rotate"
         >
-          <AwashLogo variant="light" size={40} />
+          <AwashLogo variant="dark" size={40} />
         </motion.div>
 
         <motion.div
@@ -68,9 +55,8 @@ export function LoginScreen() {
           transition={{ duration: 0.5, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
           className="mt-8 text-center"
         >
-          <h1 className="font-display text-2xl font-extrabold text-white">Welcome Back</h1>
-          <p className="mt-1.5 flex items-center justify-center gap-1.5 text-sm font-medium text-white/60">
-            <Sparkles className="size-3.5 text-primary" />
+          <h1 className="font-display text-3xl font-semibold tracking-[-0.022em] text-ink">Welcome Back</h1>
+          <p className="mt-1.5 flex items-center justify-center gap-1.5 text-sm font-normal text-neutral-500">
             Sign in to your TakeLow account
           </p>
         </motion.div>
@@ -95,7 +81,7 @@ export function LoginScreen() {
               initial={{ opacity: 0, height: 0, y: -8 }}
               animate={{ opacity: 1, height: "auto", y: 0 }}
               exit={{ opacity: 0, height: 0 }}
-              className="mt-6 flex w-full max-w-xs items-center gap-2 rounded-xl border border-primary/40 bg-primary/10 p-3 text-xs font-semibold text-awash-gold-light backdrop-blur-sm"
+              className="mt-6 flex w-full max-w-xs items-center gap-2 rounded-xl border border-border/60 bg-canvas p-3 text-xs font-medium text-ink"
             >
               <LogOut className="size-4 shrink-0" />
               <span>{SESSION_END_MESSAGES[sessionEndReason]}</span>
@@ -127,10 +113,10 @@ export function LoginScreen() {
               onKeyDown={(e) => e.key === "Enter" && pwRef.current?.focus()}
               placeholder="091 XXX XXXX"
               maxLength={15}
-              className={`w-full rounded-xl border bg-white/10 px-4 py-3 pl-11 text-sm font-medium text-white outline-none transition-all backdrop-blur-sm placeholder:text-white/30 focus:bg-white/15 ${
+              className={`w-full rounded-xl border bg-white px-4 py-3 pl-11 text-sm font-normal text-ink outline-none transition-colors placeholder:text-neutral-400 ${
                 form.errors.phone_number && form.touched.phone_number
                   ? "border-destructive/60 focus:border-destructive"
-                  : "border-white/10 focus:border-awash-gold/50"
+                  : "border-border/60 focus:border-primary/50"
               }`}
             />
           </FormField>
@@ -142,10 +128,10 @@ export function LoginScreen() {
             icon={<Lock className="size-4" />}
           >
             <div className="relative">
-              <Lock className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-white/60" />
+              <Lock className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
               <FormPasswordInput
                 ref={pwRef}
-                theme="dark"
+                theme="light"
                 hasIcon
                 value={form.values.password}
                 onChange={(e) => {
@@ -169,7 +155,7 @@ export function LoginScreen() {
           onClick={() => form.handleSubmit(onSubmit)}
           disabled={form.isSubmitting}
           whileTap={{ scale: 0.98 }}
-          className="mt-8 flex w-full max-w-xs items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-awash-gold to-awash-gold-light py-3.5 text-sm font-bold text-awash-blue shadow-lg shadow-primary/30 transition-all hover:shadow-primary/40 disabled:opacity-60"
+          className="mt-8 flex w-full max-w-xs items-center justify-center gap-2 rounded-full bg-primary py-3.5 text-[17px] font-normal tracking-[-0.022em] text-primary-foreground transition-colors hover:bg-[#B89A38] disabled:opacity-60"
         >
           {form.isSubmitting ? <Loader2 className="size-4 animate-spin" /> : null}
           {form.isSubmitting ? "Signing in…" : "Sign In"}
@@ -179,10 +165,10 @@ export function LoginScreen() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5 }}
-          className="mt-6 text-xs font-medium text-white/50"
+          className="mt-6 text-xs font-normal text-neutral-500"
         >
           Don't have an account?{" "}
-          <button onClick={() => go("register")} className="font-bold text-awash-gold transition-colors hover:text-awash-gold-light">
+          <button onClick={() => go("register")} className="font-medium text-link-blue hover:underline">
             Register
           </button>
         </motion.p>

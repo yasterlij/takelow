@@ -1,11 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { Redis } from 'ioredis';
 import { BiddingService } from '../src/modules/bidding/bidding.service';
-import { Auction } from '../src/modules/winner/entities/auction.entity';
-import { Bid } from '../src/modules/bidding/entities/bid.entity';
-import { PaymentTransaction, PaymentTransactionStatus, PaymentType } from '../src/modules/payment/entities/payment-transaction.entity';
+import { PaymentTransactionStatus, PaymentType } from '@prisma/client';
 import { AuctionClosureService } from '../src/modules/winner/auction-closure.service';
 import { AuctionGateway } from '../src/modules/bidding/gateway/auction.gateway';
 import { InjectQueue } from '@nestjs/bullmq';
@@ -13,6 +10,8 @@ import { Queue } from 'bullmq';
 import { REDIS_CLIENT } from '../src/modules/common/redis.decorator';
 import { BidEncryptionService } from '../src/modules/common/bid-encryption.service';
 import { NotificationDispatchService } from '../src/modules/worker/notification-dispatch.service';
+import { AuditService } from '../src/modules/audit/audit.service';
+import { PrismaService } from '../src/prisma/prisma.service';
 
 function createMockRedis(): Partial<Record<keyof Redis, jest.Mock>> {
   return {
@@ -66,15 +65,15 @@ describe('BiddingService - Bid Fee Payment Check', () => {
     mockAuctionRepo = createMockRepo();
     mockBidRepo = createMockRepo();
     mockPaymentTransactionRepo = createMockRepo();
-    
+
     mockClosureService = {
       closeSingleAuction: jest.fn(),
     };
-    
+
     mockAuctionGateway = {
       broadcastAuctionUpdate: jest.fn(),
     };
-    
+
     mockBidQueue = {
       add: jest.fn(),
     };
@@ -83,18 +82,34 @@ describe('BiddingService - Bid Fee Payment Check', () => {
       dispatch: jest.fn(),
     };
 
+    const mockAuditService = {
+      log: jest.fn().mockResolvedValue(undefined),
+      logBatch: jest.fn().mockResolvedValue(undefined),
+    };
+
+    const mockRepos: Record<string, any> = {
+      auction: mockAuctionRepo,
+      bid: mockBidRepo,
+      paymentTransaction: mockPaymentTransactionRepo,
+    };
+
+    const mockPrisma: any = {
+      repository: jest.fn((model: string) => mockRepos[model]),
+      $queryRaw: jest.fn(),
+      $transaction: jest.fn(async (fn: any) => fn(mockPrisma)),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BiddingService,
         { provide: REDIS_CLIENT, useValue: mockRedis },
-        { provide: getRepositoryToken(Auction), useValue: mockAuctionRepo },
-        { provide: getRepositoryToken(Bid), useValue: mockBidRepo },
-        { provide: getRepositoryToken(PaymentTransaction), useValue: mockPaymentTransactionRepo },
+        { provide: PrismaService, useValue: mockPrisma },
         { provide: AuctionClosureService, useValue: mockClosureService },
         { provide: AuctionGateway, useValue: mockAuctionGateway },
         { provide: 'BullQueue_incoming-bids', useValue: mockBidQueue },
         { provide: BidEncryptionService, useValue: { encrypt: jest.fn((a) => String(a)), decrypt: jest.fn((e) => parseFloat(e)) } },
         { provide: NotificationDispatchService, useValue: mockNotificationDispatchService },
+        { provide: AuditService, useValue: mockAuditService },
       ],
     }).compile();
 

@@ -3,11 +3,8 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { In, Repository } from "typeorm";
-import { Auction, AuctionStatus } from "../winner/entities/auction.entity";
-import { Bid } from "../bidding/entities/bid.entity";
-import { Product } from "./entities/product.entity";
+import { PrismaService } from "../../prisma/prisma.service";
+import { AuctionStatus } from "@prisma/client";
 import { CreateAuctionDto, UpdateAuctionDto } from "./dto/admin.dto";
 import { AuctionClosureService } from "../winner/auction-closure.service";
 import { normalizeProductCategory } from "./product-categories";
@@ -15,12 +12,7 @@ import { normalizeProductCategory } from "./product-categories";
 @Injectable()
 export class AuctionAdminService {
   constructor(
-    @InjectRepository(Auction)
-    private auctionRepository: Repository<Auction>,
-    @InjectRepository(Product)
-    private productRepository: Repository<Product>,
-    @InjectRepository(Bid)
-    private bidRepository: Repository<Bid>,
+    private prisma: PrismaService,
     private closureService: AuctionClosureService,
   ) {}
 
@@ -42,7 +34,7 @@ export class AuctionAdminService {
       where = `WHERE a.status = $${params.length}`;
     }
     params.push(limit, offset);
-    const rows = await this.auctionRepository.query(
+    const rows = await this.prisma.repository("auction").query(
       `WITH ranked AS (
          SELECT id, LPAD(ROW_NUMBER() OVER (ORDER BY created_at ASC)::text, 5, '0') AS public_code
          FROM auctions
@@ -63,7 +55,7 @@ export class AuctionAdminService {
        LIMIT $${params.length - 1} OFFSET $${params.length}`,
       params,
     );
-    const countRows = await this.auctionRepository.query(
+    const countRows = await this.prisma.repository("auction").query(
       `SELECT COUNT(*)::int AS total FROM auctions a ${status ? "WHERE a.status = $1" : ""}`,
       status ? [status] : [],
     );
@@ -77,9 +69,9 @@ export class AuctionAdminService {
     try {
       const where: any = {};
       if (status) where.status = status;
-      const result = await this.auctionRepository.findAndCount({
+      const result = await this.prisma.repository("auction").findAndCount({
         where,
-        relations: ["product"],
+        include: { product: true },
         order: { created_at: "DESC" },
         skip: (page - 1) * limit,
         take: limit,
@@ -114,14 +106,11 @@ export class AuctionAdminService {
 
     const auctionIds = data.map((a) => a.id);
     const bidCounts = auctionIds.length
-      ? await this.bidRepository
-          .createQueryBuilder("bid")
-          .select("bid.auction_id", "auction_id")
-          .addSelect("COUNT(*)", "total_bids")
-          .addSelect("COUNT(DISTINCT bid.user_id)", "unique_bidders")
-          .where("bid.auction_id IN (:...ids)", { ids: auctionIds })
-          .groupBy("bid.auction_id")
-          .getRawMany()
+      ? await this.prisma.repository("bid").query(
+          `SELECT auction_id, COUNT(*)::int AS total_bids, COUNT(DISTINCT user_id)::int AS unique_bidders
+           FROM bids WHERE auction_id = ANY($1::uuid[]) GROUP BY auction_id`,
+          [auctionIds],
+        )
       : [];
     const countMap = new Map(
       bidCounts.map((r: any) => [
@@ -145,19 +134,24 @@ export class AuctionAdminService {
   async createAuction(dto: CreateAuctionDto) {
     let product = null as any;
     try {
-      product = await this.productRepository.findOne({
+      product = await this.prisma.repository("product").findOne({
         where: { id: dto.product_id },
       });
     } catch (error) {
       if (!this.isMissingColumnError(error)) throw error;
-      const rows = await this.productRepository.query(
-        `SELECT id FROM products WHERE id = $1 LIMIT 1`,
+      const rows = await this.prisma.repository("product").query(
+        `SELECT id, approval_status FROM products WHERE id = $1 LIMIT 1`,
         [dto.product_id],
       );
       product = rows[0] || null;
     }
     if (!product) throw new NotFoundException("Product not found");
-    const entity = this.auctionRepository.create() as Auction;
+    if (product.approval_status && product.approval_status !== "APPROVED") {
+      throw new BadRequestException(
+        "Product must be approved before it can be used for auction creation",
+      );
+    }
+    const entity = this.prisma.repository("auction").create({}) as any;
     entity.product_id = dto.product_id;
     entity.start_time = new Date(dto.start_time);
     entity.end_time = new Date(dto.end_time);
@@ -166,10 +160,10 @@ export class AuctionAdminService {
     if (dto.max_bid != null) entity.max_bid = dto.max_bid;
     if (dto.bid_fee != null) entity.bid_fee = dto.bid_fee;
     try {
-      return await this.auctionRepository.save(entity);
+      return await this.prisma.repository("auction").save(entity);
     } catch (error) {
       if (!this.isMissingColumnError(error)) throw error;
-      const rows = await this.auctionRepository.query(
+      const rows = await this.prisma.repository("auction").query(
         `INSERT INTO auctions (product_id, start_time, end_time, status, min_bid, max_bid, bid_fee)
          VALUES ($1, $2, $3, $4, $5, $6, $7)
          RETURNING *`,
@@ -190,10 +184,10 @@ export class AuctionAdminService {
   async updateAuction(id: string, dto: UpdateAuctionDto) {
     let auction = null as any;
     try {
-      auction = await this.auctionRepository.findOne({ where: { id } });
+      auction = await this.prisma.repository("auction").findOne({ where: { id } });
     } catch (error) {
       if (!this.isMissingColumnError(error)) throw error;
-      const rows = await this.auctionRepository.query(
+      const rows = await this.prisma.repository("auction").query(
         `SELECT * FROM auctions WHERE id = $1 LIMIT 1`,
         [id],
       );
@@ -201,7 +195,7 @@ export class AuctionAdminService {
     }
     if (!auction) throw new NotFoundException("Auction not found");
     if (dto.product_id != null) {
-      const product = await this.productRepository.findOne({
+      const product = await this.prisma.repository("product").findOne({
         where: { id: dto.product_id },
       });
       if (!product) throw new NotFoundException("Product not found");
@@ -214,10 +208,10 @@ export class AuctionAdminService {
     if (dto.max_bid != null) auction.max_bid = dto.max_bid;
     if (dto.bid_fee != null) auction.bid_fee = dto.bid_fee;
     try {
-      return await this.auctionRepository.save(auction);
+      return await this.prisma.repository("auction").save(auction);
     } catch (error) {
       if (!this.isMissingColumnError(error)) throw error;
-      const rows = await this.auctionRepository.query(
+      const rows = await this.prisma.repository("auction").query(
         `UPDATE auctions
          SET product_id = $2, start_time = $3, end_time = $4, status = $5, min_bid = $6, max_bid = $7, bid_fee = $8
          WHERE id = $1
@@ -238,35 +232,35 @@ export class AuctionAdminService {
   }
 
   async deleteAuction(id: string) {
-    const auction = await this.auctionRepository.findOne({ where: { id } });
+    const auction = await this.prisma.repository("auction").findOne({ where: { id } });
     if (!auction) throw new NotFoundException("Auction not found");
-    await this.auctionRepository.remove(auction);
+    await this.prisma.repository("auction").remove(auction);
     return { deleted: true, id };
   }
 
   async bulkDeleteAuctions(ids: string[]) {
-    const auctions = await this.auctionRepository.find({
-      where: { id: In(ids) },
+    const auctions = await this.prisma.repository("auction").find({
+      where: { id: { in: ids } },
     });
-    await this.auctionRepository.remove(auctions);
+    await this.prisma.repository("auction").remove(auctions);
     return { deleted: auctions.length };
   }
 
   async closeAuctionEarly(id: string, actorId?: string) {
-    const auction = await this.auctionRepository.findOne({ where: { id } });
+    const auction = await this.prisma.repository("auction").findOne({ where: { id } });
     if (!auction) throw new NotFoundException("Auction not found");
     if (auction.status !== AuctionStatus.ACTIVE) {
       throw new BadRequestException("Auction is not active");
     }
     await this.closureService.closeSingleAuction(id, actorId || "admin");
-    return this.auctionRepository.findOne({
+    return this.prisma.repository("auction").findOne({
       where: { id },
-      relations: ["product"],
+      include: { product: true },
     });
   }
 
   async forceCloseAuction(id: string, actorId?: string) {
-    const auction = await this.auctionRepository.findOne({ where: { id } });
+    const auction = await this.prisma.repository("auction").findOne({ where: { id } });
     if (!auction) throw new NotFoundException("Auction not found");
     if (auction.status !== AuctionStatus.ACTIVE) {
       throw new BadRequestException("Auction is not active");
@@ -277,9 +271,9 @@ export class AuctionAdminService {
   async exportAuctionsCsv(status?: AuctionStatus) {
     const where: any = {};
     if (status) where.status = status;
-    const auctions = await this.auctionRepository.find({
+    const auctions = await this.prisma.repository("auction").find({
       where,
-      relations: ["product"],
+      include: { product: true },
       order: { created_at: "DESC" },
     });
     const header =

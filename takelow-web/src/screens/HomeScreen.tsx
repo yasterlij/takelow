@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { Gavel, Wallet, ArrowRight, Eye, EyeOff, Trophy, Sparkles, ChevronLeft, ChevronRight, TrendingDown, Users, Flame } from "lucide-react"
+import { Gavel, Wallet, ArrowRight, Eye, EyeOff, Trophy, Sparkles, ChevronLeft, ChevronRight, TrendingDown, Users, Flame, Smartphone, Headphones, Gamepad2, Laptop, Tv, Tablet, ShieldCheck, Lock, Eye as EyeIcon, Headset, Search, CreditCard, Award, Clock, Zap, Package, CheckCircle2 } from "lucide-react"
 import { useApp } from "../AppContext"
 import { formatCurrency, formatCountdown } from "../mockDataV0"
 import { useCountdown } from "../components/Countdown"
+import { SmartImage } from "../components/SmartImage"
 import { AuctionCard, SkeletonCard } from "./AuctionsScreen"
 
 
@@ -41,7 +42,7 @@ function LiveAuctionsCarousel({ auctions, onJoin }: { auctions: any[]; onJoin: (
 
   return (
     <div
-      className="group relative h-full w-full overflow-hidden rounded-3xl shadow-[0_20px_60px_rgba(0,43,92,0.25)] ring-1 ring-awash-blue/10"
+      className="group relative h-full w-full overflow-hidden rounded-2xl"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
@@ -49,16 +50,22 @@ function LiveAuctionsCarousel({ auctions, onJoin }: { auctions: any[]; onJoin: (
         <AnimatePresence mode="sync">
           <motion.div
             key={auction.id}
-            initial={{ opacity: 0, scale: 1.05 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 1.02 }}
-            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+            initial={{ opacity: 0, scale: 1.08, x: 30 }}
+            animate={{ opacity: 1, scale: 1, x: 0 }}
+            exit={{ opacity: 0, scale: 1.02, x: -30 }}
+            transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
             className="absolute inset-0"
           >
             {auction.images?.length ? (
-              <img src={auction.images[0]} alt={auction.name} className="h-full w-full object-cover" loading="eager" decoding="async" />
+              <motion.div
+                className="h-full w-full"
+                animate={{ scale: [1, 1.04, 1] }}
+                transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+              >
+                <SmartImage src={auction.images[0]} alt={auction.name} loading="eager" className="h-full w-full object-cover" />
+              </motion.div>
             ) : (
-              <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-awash-blue via-awash-blue-dark to-[#001224]">
+              <div className="flex h-full w-full items-center justify-center bg-ink">
                 <Gavel className="size-14 text-white/20" />
               </div>
             )}
@@ -68,28 +75,28 @@ function LiveAuctionsCarousel({ auctions, onJoin }: { auctions: any[]; onJoin: (
       </div>
 
       <div className="relative z-10 flex h-full flex-col justify-between p-6 sm:p-8">
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start justify-start gap-3">
           <div className="flex flex-col gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-awash-gold/20 px-3 py-1.5 text-xs font-bold text-awash-gold-light border border-awash-gold/30 backdrop-blur-md">
-              <Flame className="size-3.5" /> Live Auction
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-1.5 text-xs font-semibold text-ink backdrop-blur-md">
+              <Flame className="size-3.5 text-ember" /> Live Auction
             </span>
-            <span className="inline-flex items-center rounded-full bg-white/14 backdrop-blur-md px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-white border border-white/10">
+            <span className="inline-flex items-center rounded-full bg-white/14 backdrop-blur-md px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-white">
               Code {publicCode}
             </span>
           </div>
-          <span className={`inline-flex items-center gap-1.5 rounded-full backdrop-blur-md px-3 py-1.5 text-xs font-bold tabular-nums border ${urgent ? "bg-primary/25 text-primary border-primary/40 animate-glow-pulse" : "bg-white/70 text-awash-blue border-white/20"}`}>
-            {d !== "00" ? `${parseInt(d)}d ` : ""}{h}:{m}:{s}
-          </span>
         </div>
 
         <div>
-          <h2 className="font-display text-2xl font-extrabold text-white drop-shadow-lg sm:text-3xl">{auction.name}</h2>
-          {auction.specSummary && <p className="mt-1.5 text-sm font-semibold text-white/85 sm:text-base">{auction.specSummary}</p>}
+          <h2 className="font-display text-2xl font-semibold tracking-[-0.022em] text-white sm:text-3xl">{auction.name}</h2>
+          {auction.specSummary && <p className="mt-1.5 text-sm font-normal text-white/85 sm:text-base">{auction.specSummary}</p>}
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center rounded-full bg-awash-gold/20 px-3 py-1.5 text-xs font-bold text-awash-gold-light border border-awash-gold/30">
+            <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold tabular-nums ${urgent ? "bg-ember text-white" : "bg-white/85 text-ink"}`}>
+              {d !== "00" ? `${parseInt(d)}d ` : ""}{h}:{m}:{s}
+            </span>
+            <span className="inline-flex items-center rounded-full bg-white/90 px-3 py-1.5 text-xs font-semibold text-ink">
               Bid Amount: {formatCurrency(auction.bidFee)}
             </span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-bold text-emerald-700 border border-emerald-300/40">
+            <span className="inline-flex items-center gap-1 rounded-full bg-white/14 backdrop-blur-md px-2.5 py-1 text-[11px] font-semibold text-white">
               <Users className="size-3.5" /> {auction.totalBids || auction.bidders} bidders
             </span>
           </div>
@@ -103,7 +110,7 @@ function LiveAuctionsCarousel({ auctions, onJoin }: { auctions: any[]; onJoin: (
                   key={a.id}
                   onClick={() => goTo(i)}
                   aria-label={`Show auction ${i + 1}`}
-                  className={`h-2 rounded-full transition-all duration-500 ${i === index ? "w-8 bg-awash-gold shadow-[0_0_10px_rgba(200,166,66,0.6)]" : "w-2 bg-white/40 hover:bg-white/70"}`}
+                  className={`h-2 rounded-full transition-all duration-500 ${i === index ? "w-8 bg-white" : "w-2 bg-white/40 hover:bg-white/70"}`}
                 />
               ))}
               <span className="ml-1 text-[11px] font-bold tabular-nums text-white/60">{index + 1} / {total}</span>
@@ -126,7 +133,7 @@ function LiveAuctionsCarousel({ auctions, onJoin }: { auctions: any[]; onJoin: (
       <div className="absolute bottom-0 left-0 right-0 z-10 h-1 bg-white/10">
         <motion.div
           key={`${auction.id}-${index}`}
-          className="h-full bg-gradient-to-r from-awash-gold to-awash-gold-light"
+          className="h-full bg-white"
           initial={{ width: "0%" }}
           animate={{ width: "100%" }}
           transition={{ duration: paused ? 60 : 6, ease: "linear" }}
@@ -143,56 +150,34 @@ function WinnerShowcaseSlide({ auction, index }: { auction: any; index: number }
   const bidAmount = auction.winning_bid_amount ?? winnerInfo?.amount ?? 0
 
   return (
-    <div className="group relative flex w-[280px] flex-shrink-0 snap-start flex-col overflow-hidden rounded-2xl bg-white shadow-lg transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_24px_64px_rgba(200,166,66,0.15)] border border-primary/10 hover:border-primary/30 border-glow">
-      <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-        {[
-          { left: "18%", bg: "#C8A642", shape: "50%", delay: "0s", dur: "0.8s" },
-          { left: "38%", bg: "#D4B85E", shape: "2px", delay: "0.12s", dur: "1s" },
-          { left: "55%", bg: "#FF6B6B", shape: "50%", delay: "0.05s", dur: "0.9s" },
-          { left: "72%", bg: "#4ECDC4", shape: "2px", delay: "0.18s", dur: "1.1s" },
-          { left: "88%", bg: "#E8D48B", shape: "50%", delay: "0.08s", dur: "0.85s" },
-        ].map((p, i) => (
-          <div
-            key={i}
-            className="absolute size-2 animate-confetti"
-            style={{
-              left: p.left,
-              top: "-4px",
-              background: p.bg,
-              borderRadius: p.shape,
-              animationDelay: p.delay,
-              animationDuration: p.dur,
-            }}
-          />
-        ))}
-      </div>
-      <div className="relative aspect-[4/3] w-full overflow-hidden bg-gradient-to-br from-awash-blue/10 via-neutral-100 to-awash-gold/10 ring-1 ring-awash-blue/10">
-        <img src={auction.images?.[0] || "/placeholder.svg"} alt={auction.name} loading="lazy" decoding="async" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+    <div className="group relative flex w-[280px] flex-shrink-0 snap-start flex-col overflow-hidden rounded-2xl bg-white transition-colors duration-200 hover:border-border/60 border border-transparent">
+      <div className="relative aspect-[4/3] w-full overflow-hidden bg-canvas">
+        <SmartImage src={auction.images?.[0]} alt={auction.name} className="transition-transform duration-700 group-hover:scale-105" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
         <div className="absolute bottom-2 left-3">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-awash-gold to-awash-gold-light px-3 py-1 text-[11px] font-bold text-awash-blue shadow-lg border border-primary/20">
-            <Trophy className="size-3.5" /> #{index + 1}
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-1 text-[11px] font-semibold text-ink">
+            <Trophy className="size-3.5 text-primary" /> #{index + 1}
           </span>
         </div>
       </div>
       <div className="flex flex-col gap-2 p-4 pt-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
-            <p className="truncate font-display text-base font-extrabold text-gradient-gold">
+            <p className="truncate font-display text-base font-semibold text-ink">
               {firstName}
-              {firstName && maskedPhone && <span className="text-[10px] font-medium text-neutral-400 ml-1.5">{maskedPhone}</span>}
+              {firstName && maskedPhone && <span className="text-[10px] font-normal text-neutral-400 ml-1.5">{maskedPhone}</span>}
               {!firstName && (maskedPhone || `Winner #${index + 1}`)}
             </p>
           </div>
-          <span className="shrink-0 rounded-full bg-gradient-to-r from-emerald-50 to-emerald-100/80 px-2.5 py-1 text-[10px] font-bold text-emerald-700 border border-emerald-200/50">
+          <span className="shrink-0 rounded-full bg-canvas px-2.5 py-1 text-[10px] font-semibold tabular-nums text-ink">
             {formatCurrency(bidAmount)}
           </span>
         </div>
         <p className="text-xs font-medium text-neutral-500 leading-tight">{auction.name}</p>
         {auction.specSummary && <p className="truncate text-[11px] font-medium text-neutral-400">{auction.specSummary}</p>}
-        <div className="mt-0.5 inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20 px-3 py-1.5">
-          <Sparkles className="size-3 text-awash-gold" />
-          <span className="text-[11px] font-semibold text-awash-gold-dark">Lowest unique bid won!</span>
+        <div className="mt-0.5 inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5">
+          <Sparkles className="size-3 text-primary" />
+          <span className="text-[11px] font-semibold text-primary">Lowest unique bid won!</span>
         </div>
       </div>
     </div>
@@ -232,27 +217,24 @@ export function HomeScreen() {
       className="flex flex-1 flex-col gap-8 pb-8 stagger-enter"
     >
       {/* ── Wallet Banner ── */}
-      <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-awash-blue via-awash-blue-dark to-[#001224] p-6 shadow-[0_8px_32px_rgba(0,43,92,0.2)]">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-awash-gold/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-        <div className="absolute bottom-0 left-0 w-48 h-48 bg-awash-gold/5 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
-        <div className="absolute -top-8 -right-8 size-40 rounded-full border-[10px] border-white/[0.03]" />
+      <div className="relative overflow-hidden rounded-2xl bg-ink p-6">
         <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex size-12 items-center justify-center rounded-xl bg-white/10 backdrop-blur-sm border border-white/10">
-              <Wallet className="size-6 text-awash-gold" />
+            <div className="flex size-12 items-center justify-center rounded-2xl bg-white/10">
+              <Wallet className="size-6 text-white" />
             </div>
             <div>
-              <p className="text-xs font-medium text-white/60">Wallet Balance</p>
-              <p className="font-display text-2xl font-extrabold text-white tabular-nums tracking-tight">
+              <p className="text-xs font-normal text-white/60">Wallet Balance</p>
+              <p className="font-display text-2xl font-semibold text-white tabular-nums tracking-[-0.022em]">
                 {showBalance ? formatCurrency(walletBalance) : "••••••"}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => setShowBalance((s) => !s)} className="rounded-lg bg-white/10 backdrop-blur-sm px-2.5 py-2 text-xs font-medium text-white/80 transition-all hover:bg-white/20 border border-white/10">
+            <button onClick={() => setShowBalance((s) => !s)} className="rounded-full bg-white/10 px-3 py-2 text-xs font-normal text-white/80 transition-colors hover:bg-white/20">
               {showBalance ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
             </button>
-            <button onClick={() => go("deposit")} className="rounded-lg bg-gradient-to-r from-awash-gold to-awash-gold-light px-3.5 py-2 text-xs font-bold text-awash-blue shadow-lg shadow-primary/20 transition-all hover:shadow-primary/30 hover:scale-105 active:scale-[0.97]">
+            <button onClick={() => go("deposit")} className="rounded-full bg-primary px-4 py-2 text-xs font-medium text-primary-foreground transition-colors hover:bg-[#B89A38] active:opacity-80">
               + Top Up
             </button>
           </div>
@@ -263,13 +245,13 @@ export function HomeScreen() {
       <section>
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <span className="flex size-11 items-center justify-center rounded-xl bg-awash-blue/10 backdrop-blur-sm border border-awash-blue/20 text-awash-blue"><Gavel className="size-5" /></span>
+            <span className="flex size-11 items-center justify-center rounded-2xl bg-canvas text-foreground"><Gavel className="size-5" /></span>
             <div>
-              <h2 className="font-display text-xl font-extrabold tracking-tight text-foreground">Live Auctions</h2>
-              <p className="text-sm font-medium text-neutral-500">{activeAuctions.length} live — bid low, be unique!</p>
+              <h2 className="font-display text-2xl font-semibold tracking-[-0.022em] text-foreground">Live Auctions</h2>
+              <p className="text-sm font-normal text-neutral-500">{activeAuctions.length} live — bid low, be unique!</p>
             </div>
           </div>
-          <button onClick={() => go("auctions")} className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-bold text-primary-foreground transition-all hover:bg-primary/90 hover:shadow-md hover:shadow-primary/30 hover:scale-105 active:scale-[0.97]">
+          <button onClick={() => go("auctions")} className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-normal text-primary-foreground transition-colors hover:bg-[#B89A38] active:opacity-80">
             View All <ArrowRight className="size-4" />
           </button>
         </div>
@@ -290,11 +272,11 @@ export function HomeScreen() {
         )}
 
         {auctionsLoading && auctions.length === 0 ? (
-          <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => <SkeletonCard key={i} />)}
           </div>
         ) : liveGrid.length > 0 ? (
-          <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {liveGrid.slice(0, 8).map((a, i) => (
               <AuctionCard key={a.id} auction={a} index={i} onOpen={() => selectAuction(a.id)} />
             ))}
@@ -302,7 +284,7 @@ export function HomeScreen() {
         ) : null}
 
         {!auctionsLoading && activeAuctions.length > 0 && (
-          <button onClick={() => go("auctions")} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary/5 to-awash-gold/5 backdrop-blur-sm border border-primary/20 px-5 py-3 text-sm font-bold text-awash-gold-dark transition-all hover:from-primary/10 hover:to-awash-gold/10 hover:scale-[1.01] active:scale-[0.97] shadow-sm">
+          <button onClick={() => go("auctions")} className="mt-5 flex w-full items-center justify-center gap-2 rounded-full border border-foreground/80 px-5 py-3 text-sm font-normal text-foreground transition-colors hover:bg-foreground hover:text-white">
             View All Live Auctions <ArrowRight className="size-4" />
           </button>
         )}
@@ -313,19 +295,19 @@ export function HomeScreen() {
         <section>
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <span className="flex size-11 items-center justify-center rounded-xl bg-gradient-to-br from-primary/15 to-awash-gold/15 backdrop-blur-sm border border-primary/20 text-awash-gold-dark shadow-sm shadow-primary/10">
+              <span className="flex size-11 items-center justify-center rounded-2xl bg-canvas text-foreground">
                 <Sparkles className="size-5" />
               </span>
               <div>
-                <h2 className="font-display text-xl font-extrabold tracking-tight text-foreground">Suggested For You</h2>
-                <p className="text-sm font-medium text-neutral-500">Based on the auctions you've joined — bid low, be unique!</p>
+                <h2 className="font-display text-2xl font-semibold tracking-[-0.022em] text-foreground">Suggested For You</h2>
+                <p className="text-sm font-normal text-neutral-500">Based on the auctions you've joined — bid low, be unique!</p>
               </div>
             </div>
-            <button onClick={() => go("auctions")} className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-bold text-primary-foreground transition-all hover:bg-primary/90 hover:shadow-md hover:shadow-primary/30 hover:scale-105 active:scale-[0.97]">
+            <button onClick={() => go("auctions")} className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-normal text-primary-foreground transition-colors hover:bg-[#B89A38] active:opacity-80">
               View All <ArrowRight className="size-4" />
             </button>
           </div>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {suggestedAuctions.slice(0, 8).map((a, i) => (
               <AuctionCard key={a.id} auction={a} index={i} onOpen={() => selectAuction(a.id)} />
             ))}
@@ -334,21 +316,20 @@ export function HomeScreen() {
       )}
 
       {/* ── Recent Auction Winners ── */}
-      <section className="relative overflow-hidden rounded-[28px] border border-primary/15 bg-[radial-gradient(circle_at_top_left,rgba(214,173,60,0.16),transparent_32%),linear-gradient(135deg,rgba(255,255,255,0.96),rgba(255,248,229,0.94))] px-4 py-4 shadow-[0_12px_38px_rgba(205,171,70,0.12)] sm:px-5 sm:py-6">
-        <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-awash-gold/50 to-transparent" />
+      <section className="relative overflow-hidden rounded-2xl bg-canvas px-4 py-5 sm:px-6 sm:py-6">
         <div className="relative mb-4 flex flex-col gap-3 lg:mb-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-start gap-3">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-awash-gold/95 to-awash-gold-light text-awash-blue shadow-[0_10px_24px_rgba(214,173,60,0.28)] ring-1 ring-white/70 sm:size-11">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-2xl bg-ink text-white sm:size-11">
               <Trophy className="size-4 sm:size-[18px]" />
             </span>
             <div className="space-y-1.5 sm:space-y-1.5">
-              <div className="inline-flex items-center gap-2 rounded-full border border-primary/10 bg-white/75 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-awash-gold-dark/80 backdrop-blur-sm sm:px-3 sm:text-[11px] sm:tracking-[0.22em]">
-                <span className="size-1.5 rounded-full bg-awash-gold" />
+              <div className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-ember sm:text-[11px] sm:tracking-[0.22em]">
+                <span className="size-1.5 rounded-full bg-ember" />
                 Winner Spotlight
               </div>
               <div className="hidden sm:block">
-                <h2 className="font-display text-[1.72rem] font-extrabold leading-[1.02] tracking-tight text-awash-blue sm:text-[2rem]">Latest Winners</h2>
-                <p className="mt-1 max-w-xl text-[15px] font-medium leading-relaxed text-neutral-600 sm:text-[15px]">
+                <h2 className="font-display text-[1.72rem] font-semibold leading-[1.05] tracking-[-0.022em] text-ink sm:text-[2rem]">Latest Winners</h2>
+                <p className="mt-1 max-w-xl text-[15px] font-normal leading-relaxed text-neutral-500 sm:text-[15px]">
                   Winning bids from recently closed auctions.
                 </p>
               </div>
@@ -356,14 +337,14 @@ export function HomeScreen() {
           </div>
           <div className="flex items-center justify-between gap-3 sm:flex-row sm:items-center lg:justify-end">
             {closedAuctions.length > 0 && (
-              <div className="hidden items-center gap-2 rounded-full border border-awash-gold/25 bg-white/80 px-3 py-1.5 text-xs font-semibold text-awash-gold-dark shadow-sm shadow-primary/5 backdrop-blur-sm sm:inline-flex">
-                <span className="inline-flex size-6 items-center justify-center rounded-full bg-awash-gold/15 text-awash-gold-dark">
+              <div className="hidden items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-medium text-neutral-500 sm:inline-flex">
+                <span className="inline-flex size-6 items-center justify-center rounded-full bg-primary/10 text-primary">
                   <Trophy className="size-3" />
                 </span>
                 {closedAuctions.length} winners showcased
               </div>
             )}
-            <button onClick={() => go("closed-auctions")} className="inline-flex items-center justify-center gap-2 rounded-full bg-awash-blue px-4 py-2.5 text-sm font-bold text-white shadow-[0_10px_24px_rgba(0,43,92,0.16)] transition-all hover:-translate-y-0.5 hover:bg-awash-blue-dark hover:shadow-[0_16px_34px_rgba(0,43,92,0.22)] active:translate-y-0">
+            <button onClick={() => go("closed-auctions")} className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-normal text-primary-foreground transition-colors hover:bg-[#B89A38] active:opacity-80">
               View All Winners <ArrowRight className="size-4" />
             </button>
           </div>
@@ -372,10 +353,10 @@ export function HomeScreen() {
         <div className="relative">
           {closedAuctions.length > 2 && (
             <>
-              <button onClick={() => scroll(winnerScrollRef, "left", 300)} className="absolute -left-3 top-1/2 z-10 -translate-y-1/2 flex size-10 items-center justify-center rounded-full bg-white/80 backdrop-blur-md shadow-lg border border-white/30 text-awash-gold hover:bg-white transition-all opacity-0 hover:opacity-100">
+              <button onClick={() => scroll(winnerScrollRef, "left", 300)} className="absolute -left-3 top-1/2 z-10 -translate-y-1/2 flex size-10 items-center justify-center rounded-full bg-white border border-border/60 text-foreground hover:bg-cool-wash transition-colors opacity-0 hover:opacity-100">
                 <ChevronLeft className="size-5" />
               </button>
-              <button onClick={() => scroll(winnerScrollRef, "right", 300)} className="absolute -right-3 top-1/2 z-10 -translate-y-1/2 flex size-10 items-center justify-center rounded-full bg-white/80 backdrop-blur-md shadow-lg border border-white/30 text-awash-gold hover:bg-white transition-all opacity-0 hover:opacity-100">
+              <button onClick={() => scroll(winnerScrollRef, "right", 300)} className="absolute -right-3 top-1/2 z-10 -translate-y-1/2 flex size-10 items-center justify-center rounded-full bg-white border border-border/60 text-foreground hover:bg-cool-wash transition-colors opacity-0 hover:opacity-100">
                 <ChevronRight className="size-5" />
               </button>
             </>
@@ -387,13 +368,13 @@ export function HomeScreen() {
               ))}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-primary/20 bg-gradient-to-br from-primary/5 to-awash-gold/5 py-12 text-center">
-              <span className="flex size-14 items-center justify-center rounded-2xl bg-primary/10 border border-primary/20">
-                <Trophy className="size-6 text-awash-gold" />
+            <div className="flex flex-col items-center justify-center gap-3 rounded-2xl bg-white py-12 text-center">
+              <span className="flex size-14 items-center justify-center rounded-2xl bg-primary/10">
+                <Trophy className="size-6 text-primary" />
               </span>
               <div>
-                <p className="font-display text-base font-bold text-awash-gold-dark">Winners announced soon</p>
-                <p className="mt-1 text-sm font-medium text-neutral-500">The lowest unique bid wins. Keep an eye on the live auctions!</p>
+                <p className="font-display text-base font-semibold text-ink">Winners announced soon</p>
+                <p className="mt-1 text-sm font-normal text-neutral-500">The lowest unique bid wins. Keep an eye on the live auctions!</p>
               </div>
             </div>
           )}
@@ -403,38 +384,243 @@ export function HomeScreen() {
 
       {/* ── Promo ── */}
       <section>
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-awash-blue via-awash-blue-dark to-[#001224] p-7 text-white shadow-[0_8px_32px_rgba(0,43,92,0.2)] border border-white/5">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-awash-gold/5 rounded-full blur-3xl -translate-y-1/3 translate-x-1/3" />
-          <div className="absolute -bottom-16 -left-10 size-56 rounded-full border-[12px] border-white/[0.03]" />
-          <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-awash-gold/60 to-transparent" />
+        <div className="relative overflow-hidden rounded-2xl bg-ink p-7 text-white">
           <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="max-w-2xl">
               <div className="flex items-center gap-2 mb-2">
-                <span className="flex size-8 items-center justify-center rounded-full bg-awash-gold/20 border border-awash-gold/30">
-                  <Sparkles className="size-4 text-awash-gold" />
+                <span className="flex size-8 items-center justify-center rounded-full bg-white/10">
+                  <Sparkles className="size-4 text-white" />
                 </span>
-                <p className="font-display text-base font-bold text-gradient-gold">Awash Bank Reverse Auction</p>
+                <p className="font-display text-base font-semibold text-white">Awash Bank Reverse Auction</p>
               </div>
               <p className="text-sm text-white/70 leading-relaxed">
                 Premium phones, TVs, and laptops waiting for their lowest unique bid. The lower your bid, the better your chance to win.
               </p>
-              <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px] font-semibold text-white/60">
-                <span className="inline-flex items-center gap-1.5"><Users className="size-3.5 text-awash-gold" /> {activeAuctions.length} live auctions</span>
-                <span className="inline-flex items-center gap-1.5"><Trophy className="size-3.5 text-awash-gold" /> {closedAuctions.length} winners crowned</span>
-                <span className="inline-flex items-center gap-1.5"><TrendingDown className="size-3.5 text-awash-gold" /> Lowest unique bid wins</span>
+              <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px] font-normal text-white/60">
+                <span className="inline-flex items-center gap-1.5"><Users className="size-3.5 text-white" /> {activeAuctions.length} live auctions</span>
+                <span className="inline-flex items-center gap-1.5"><Trophy className="size-3.5 text-white" /> {closedAuctions.length} winners crowned</span>
+                <span className="inline-flex items-center gap-1.5"><TrendingDown className="size-3.5 text-white" /> Lowest unique bid wins</span>
               </div>
             </div>
             <div className="flex gap-3 lg:shrink-0">
-              <button onClick={() => go("auctions")} className="rounded-xl bg-gradient-to-r from-awash-gold to-awash-gold-light px-6 py-2.5 text-sm font-bold text-awash-blue shadow-lg shadow-primary/20 transition-all hover:shadow-primary/30 hover:scale-105 active:scale-[0.97]">
+              <button onClick={() => go("auctions")} className="rounded-full bg-primary px-6 py-2.5 text-sm font-normal text-primary-foreground transition-colors hover:bg-[#B89A38] active:opacity-80">
                 Browse Auctions
               </button>
-              <button onClick={() => go("my-bids")} className="rounded-xl border border-white/20 bg-white/10 backdrop-blur-sm px-6 py-2.5 text-sm font-bold text-white transition-all hover:bg-white/20 hover:scale-105 active:scale-[0.97]">
+              <button onClick={() => go("my-bids")} className="rounded-full border border-white/40 px-6 py-2.5 text-sm font-normal text-white transition-colors hover:bg-white hover:text-ink">
                 My Bids
               </button>
             </div>
           </div>
         </div>
       </section>
+
+      {/* ── Stats Banner ── */}
+      <StatsBanner
+        totalAuctions={auctions.length}
+        happyWinners={closedAuctions.length}
+        totalBids={auctions.reduce((sum, a) => sum + (a.totalBids || a.bidders), 0)}
+        productsListed={new Set(auctions.map((a) => a.productId || a.id)).size}
+      />
+
+      {/* ── Featured Categories ── */}
+      <FeaturedCategories />
+
+      {/* ── How It Works ── */}
+      <HowItWorks />
+
+      {/* ── Trust Badges ── */}
+      <TrustBadges />
     </motion.div>
+  )
+}
+
+function StatsBanner({ totalAuctions, happyWinners, totalBids, productsListed }: { totalAuctions: number; happyWinners: number; totalBids: number; productsListed: number }) {
+  const stats = [
+    { icon: Gavel, label: "Total Auctions", value: totalAuctions, color: "bg-canvas text-foreground" },
+    { icon: Trophy, label: "Happy Winners", value: happyWinners, color: "bg-canvas text-foreground" },
+    { icon: Zap, label: "Total Bids", value: totalBids, color: "bg-canvas text-foreground" },
+    { icon: Package, label: "Products Listed", value: productsListed, color: "bg-canvas text-foreground" },
+  ]
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 16 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+      className="relative overflow-hidden rounded-2xl bg-canvas p-5 sm:p-6"
+    >
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        {stats.map((s, i) => (
+          <motion.div
+            key={s.label}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: i * 0.08 }}
+            className="flex flex-col items-center text-center gap-2"
+          >
+            <div className={`flex size-12 items-center justify-center rounded-2xl ${s.color}`}>
+              <s.icon className="size-5" />
+            </div>
+            <div>
+              <p className="font-display text-2xl font-semibold tabular-nums text-ink">{s.value.toLocaleString()}</p>
+              <p className="text-[11px] font-medium text-neutral-400">{s.label}</p>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+    </motion.section>
+  )
+}
+
+const categoryItems = [
+  { icon: Smartphone, label: "Smartphones", color: "bg-white text-foreground" },
+  { icon: Headphones, label: "Audio", color: "bg-white text-foreground" },
+  { icon: Gamepad2, label: "Gaming", color: "bg-white text-foreground" },
+  { icon: Laptop, label: "Computers", color: "bg-white text-foreground" },
+  { icon: Tv, label: "Electronics", color: "bg-white text-foreground" },
+  { icon: Tablet, label: "Tablets", color: "bg-white text-foreground" },
+]
+
+function FeaturedCategories() {
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 16 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+    >
+      <div className="mb-4 flex items-center gap-3">
+        <span className="flex size-11 items-center justify-center rounded-2xl bg-canvas text-foreground">
+          <Package className="size-5" />
+        </span>
+        <div>
+          <h2 className="font-display text-2xl font-semibold tracking-[-0.022em] text-foreground">Featured Categories</h2>
+          <p className="text-sm font-medium text-neutral-500">Browse by category — find your next winning bid</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
+        {categoryItems.map((cat, i) => (
+          <motion.button
+            key={cat.label}
+            initial={{ opacity: 0, scale: 0.85 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: i * 0.05 }}
+            whileTap={{ scale: 0.97 }}
+            className="group flex flex-col items-center gap-2.5 rounded-2xl bg-canvas p-4 transition-colors hover:bg-cool-wash"
+          >
+            <div className={`flex size-12 items-center justify-center rounded-2xl ${cat.color}`}>
+              <cat.icon className="size-5" />
+            </div>
+            <span className="text-xs font-bold text-foreground">{cat.label}</span>
+          </motion.button>
+        ))}
+      </div>
+    </motion.section>
+  )
+}
+
+const howItWorksSteps = [
+  { icon: Search, label: "Browse", desc: "Explore live auctions across premium products", color: "bg-white text-foreground" },
+  { icon: CreditCard, label: "Pay Fee", desc: "Pay a small bid fee to enter the auction", color: "bg-white text-foreground" },
+  { icon: Gavel, label: "Place Bid", desc: "Submit your lowest unique bid amount", color: "bg-white text-foreground" },
+  { icon: Trophy, label: "Win", desc: "Lowest unique bid takes home the prize!", color: "bg-white text-foreground" },
+]
+
+function HowItWorks() {
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 16 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+      className="relative overflow-hidden rounded-2xl bg-canvas p-5 sm:p-6"
+    >
+      <div className="mb-5 flex items-center gap-3">
+        <span className="flex size-11 items-center justify-center rounded-2xl bg-white text-foreground">
+          <Zap className="size-5" />
+        </span>
+        <div>
+          <h2 className="font-display text-2xl font-semibold tracking-[-0.022em] text-foreground">How It Works</h2>
+          <p className="text-sm font-medium text-neutral-500">Four simple steps to win premium products</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {howItWorksSteps.map((step, i) => (
+          <motion.div
+            key={step.label}
+            initial={{ opacity: 0, x: -12 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: i * 0.1 }}
+            className="group relative flex flex-col gap-3 rounded-2xl bg-white p-4 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className={`flex size-11 items-center justify-center rounded-2xl ${step.color}`}>
+                <step.icon className="size-5" />
+              </div>
+              <span className="flex size-7 items-center justify-center rounded-full bg-ink text-xs font-semibold text-white">
+                {i + 1}
+              </span>
+            </div>
+            <div>
+              <p className="font-display text-sm font-semibold text-foreground">{step.label}</p>
+              <p className="mt-0.5 text-xs font-medium text-neutral-500 leading-relaxed">{step.desc}</p>
+            </div>
+            {i < howItWorksSteps.length - 1 && (
+              <ArrowRight className="absolute -right-2.5 top-1/2 size-4 -translate-y-1/2 text-primary/40 hidden lg:block" />
+            )}
+          </motion.div>
+        ))}
+      </div>
+    </motion.section>
+  )
+}
+
+const trustBadgeItems = [
+  { icon: Lock, label: "Secure Payments", desc: "Bank-grade encryption" },
+  { icon: Award, label: "Fair Play Guarantee", desc: "Transparent algorithm" },
+  { icon: EyeIcon, label: "Transparent Results", desc: "Verifiable outcomes" },
+  { icon: Headset, label: "24/7 Support", desc: "Always here to help" },
+]
+
+function TrustBadges() {
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 16 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+    >
+      <div className="mb-4 flex items-center gap-3">
+        <span className="flex size-11 items-center justify-center rounded-2xl bg-canvas text-foreground">
+          <ShieldCheck className="size-5" />
+        </span>
+        <div>
+          <h2 className="font-display text-2xl font-semibold tracking-[-0.022em] text-foreground">Why Trust TakeLow?</h2>
+          <p className="text-sm font-medium text-neutral-500">Built on transparency, security, and fairness</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {trustBadgeItems.map((item, i) => (
+          <motion.div
+            key={item.label}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.08 }}
+            whileHover={{ y: -3 }}
+            className="group flex flex-col items-center gap-2.5 rounded-2xl bg-canvas p-5 text-center transition-colors hover:bg-cool-wash"
+          >
+            <div className="flex size-12 items-center justify-center rounded-2xl bg-white text-foreground">
+              <item.icon className="size-5" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-foreground">{item.label}</p>
+              <p className="mt-0.5 text-[11px] font-medium text-neutral-400">{item.desc}</p>
+            </div>
+            <CheckCircle2 className="size-4 text-emerald-500 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+          </motion.div>
+        ))}
+      </div>
+    </motion.section>
   )
 }

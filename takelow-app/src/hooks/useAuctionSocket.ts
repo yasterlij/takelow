@@ -4,8 +4,10 @@ import { io, Socket } from 'socket.io-client'
 import type { Auction } from '../mockDataV0'
 import { getApiToken } from '../api'
 
-const HOST = Platform.OS === 'android' ? '10.0.2.2' : 'localhost'
-const SOCKET_URL = `http://${HOST}:3002/auctions`
+const PROD_HOST = '196.189.237.158'
+const DEV_HOST = Platform.OS === 'android' ? '10.0.2.2' : 'localhost'
+const HOST = true ? PROD_HOST : DEV_HOST
+const SOCKET_URL = `http://${HOST}/auctions`
 
 export type SocketUpdatePayload = {
   auction_id: string

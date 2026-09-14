@@ -1,11 +1,13 @@
 import { AuctionReviewService } from '../src/modules/admin/auction-review.service';
-import { AuctionStatus } from '../src/modules/winner/entities/auction.entity';
+import { AuctionStatus } from '@prisma/client';
+import { PrismaService } from '../src/prisma/prisma.service';
 
 function createMockRepo() {
   return {
     findOne: jest.fn(),
     find: jest.fn(),
     createQueryBuilder: jest.fn(),
+    query: jest.fn(),
   };
 }
 
@@ -29,9 +31,21 @@ describe('AuctionReviewService', () => {
       getAuctionWinners: jest.fn(),
     };
     mockBidEncryption = { decrypt: jest.fn() };
+
+    const mockRepos: Record<string, any> = {
+      auction: mockAuctionRepo,
+      bid: mockBidRepo,
+      winner: createMockRepo(),
+    };
+
+    const mockPrisma: any = {
+      repository: jest.fn((model: string) => mockRepos[model]),
+      $queryRaw: jest.fn(),
+      $transaction: jest.fn(async (fn: any) => fn(mockPrisma)),
+    };
+
     service = new AuctionReviewService(
-      mockAuctionRepo as any,
-      mockBidRepo as any,
+      mockPrisma as unknown as PrismaService,
       mockWinnerService as any,
       mockBidEncryption as any,
     );
@@ -50,27 +64,21 @@ describe('AuctionReviewService', () => {
       payment_status: null,
       payment_deadline: null,
     };
-    const queryBuilder = {
-      select: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      orderBy: jest.fn().mockReturnThis(),
-      getRawMany: jest.fn().mockResolvedValue([
-        {
-          bid_id: 'bid-1',
-          bid_user_id: 'user-1',
-          bid_auction_id: 'auc-1',
-          bid_amount: 12,
-          bid_bid_time: new Date('2026-01-01T00:00:00Z'),
-          bid_service_fee_paid: true,
-        },
-      ]),
-    };
 
     mockAuctionRepo.findOne.mockResolvedValue(auction);
     mockBidRepo.find.mockRejectedValue(
       new Error('column bids.encrypted_amount does not exist'),
     );
-    mockBidRepo.createQueryBuilder.mockReturnValue(queryBuilder);
+    mockBidRepo.query.mockResolvedValue([
+      {
+        bid_id: 'bid-1',
+        bid_user_id: 'user-1',
+        bid_auction_id: 'auc-1',
+        bid_amount: 12,
+        bid_bid_time: new Date('2026-01-01T00:00:00Z'),
+        bid_service_fee_paid: true,
+      },
+    ]);
     mockWinnerService.calculateWinners.mockResolvedValue({
       winningAmounts: [12],
       totalBids: 1,
@@ -81,8 +89,7 @@ describe('AuctionReviewService', () => {
 
     const result = await service.drawWinner('auc-1');
 
-    expect(mockBidRepo.createQueryBuilder).toHaveBeenCalledWith('bid');
-    expect(queryBuilder.getRawMany).toHaveBeenCalled();
+    expect(mockBidRepo.query).toHaveBeenCalled();
     expect(result.total_bids).toBe(1);
     expect(result.bids).toEqual([
       expect.objectContaining({

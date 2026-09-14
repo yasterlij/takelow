@@ -9,7 +9,7 @@ export const appConfig = registerAs('app', () => {
     jwtSecret: process.env.JWT_SECRET,
     databaseUrl:
       process.env.DATABASE_URL ||
-      'postgresql://admin:secret@localhost:5432/takelow_db',
+      'postgresql://admin:secret@localhost:5433/takelow_db',
     readReplicaUrl: process.env.READ_REPLICA_URL || undefined,
   };
 });

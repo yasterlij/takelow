@@ -380,7 +380,7 @@ export function SikinaPayCheckoutScreen() {
                   className="confetti absolute top-2 size-2 rounded-sm"
                   style={{
                     left: `${(i * 7.2 + 4) % 100}%`,
-                    backgroundColor: i % 3 === 0 ? "#C8A642" : i % 3 === 1 ? "#002B5C" : "#10B981",
+                    backgroundColor: i % 3 === 0 ? "#0071e3" : i % 3 === 1 ? "#1d1d1f" : "#10B981",
                     animationDelay: `${(i % 5) * 0.08}s`,
                   }}
                 />

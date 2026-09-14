@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { User } from './entities/user.entity';
 
 @Injectable()
 export class AuthTokenService {
@@ -11,13 +10,15 @@ export class AuthTokenService {
   ) {}
 
   async generateTokens(
-    user: User,
+    user: { id: string; phone_number: string | null; role: string; wallet_balance: any; is_banned: boolean; tc_accepted?: boolean },
   ): Promise<{ access_token: string; refresh_token: string }> {
     const payload = {
       sub: user.id,
       phone: user.phone_number,
       role: user.role,
-      wallet_balance: user.wallet_balance,
+      wallet_balance: Number(user.wallet_balance),
+      is_banned: user.is_banned,
+      tc_accepted: user.tc_accepted ?? false,
     };
 
     const access_token = this.jwtService.sign(payload, {

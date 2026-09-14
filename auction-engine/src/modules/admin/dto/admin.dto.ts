@@ -12,7 +12,7 @@ import {
   ArrayMaxSize,
   IsUUID,
 } from "class-validator";
-import { AuctionStatus } from "../../winner/entities/auction.entity";
+import { AuctionStatus } from "@prisma/client";
 
 export class CreateProductDto {
   @IsString()
@@ -39,6 +39,11 @@ export class CreateProductDto {
   @IsNumber()
   @Min(0)
   current_market_price: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  brand?: string;
 
   @IsOptional()
   @IsObject()
@@ -72,6 +77,11 @@ export class UpdateProductDto {
   @IsNumber()
   @Min(0)
   current_market_price?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  brand?: string;
 
   @IsOptional()
   @IsObject()

@@ -1,9 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, Between } from "typeorm";
 import { Cron, CronExpression } from "@nestjs/schedule";
-import { Auction, AuctionStatus as AS } from "./entities/auction.entity";
-import { Bid } from "../bidding/entities/bid.entity";
+import { PrismaService } from "../../prisma/prisma.service";
 import { NotificationDispatchService } from "../worker/notification-dispatch.service";
 
 const FIVE_MINUTES_MS = 5 * 60 * 1000;
@@ -14,10 +11,7 @@ export class AuctionNotificationService {
   private notified: Set<string> = new Set();
 
   constructor(
-    @InjectRepository(Auction)
-    private auctionRepository: Repository<Auction>,
-    @InjectRepository(Bid)
-    private bidRepository: Repository<Bid>,
+    private readonly prisma: PrismaService,
     private notificationDispatchService: NotificationDispatchService,
   ) {}
 
@@ -27,12 +21,12 @@ export class AuctionNotificationService {
     const windowStart = new Date(now.getTime() - 15000);
     const windowEnd = new Date(now.getTime() + 15000);
 
-    const startedAuctions = await this.auctionRepository.find({
+    const startedAuctions = await this.prisma.repository("auction").find({
       where: {
-        status: AS.ACTIVE,
-        start_time: Between(windowStart, windowEnd),
+        status: "ACTIVE",
+        start_time: { gte: windowStart, lte: windowEnd },
       },
-      relations: ["product"],
+      include: { product: true },
       take: 20,
     });
 
@@ -66,12 +60,12 @@ export class AuctionNotificationService {
     const windowStart = new Date(now + FIVE_MINUTES_MS - 15000);
     const windowEnd = new Date(now + FIVE_MINUTES_MS + 15000);
 
-    const endingAuctions = await this.auctionRepository.find({
+    const endingAuctions = await this.prisma.repository("auction").find({
       where: {
-        status: AS.ACTIVE,
-        end_time: Between(windowStart, windowEnd),
+        status: "ACTIVE",
+        end_time: { gte: windowStart, lte: windowEnd },
       },
-      relations: ["product"],
+      include: { product: true },
       take: 20,
     });
 
@@ -80,13 +74,11 @@ export class AuctionNotificationService {
       this.notified.add(auction.id);
 
       try {
-        const bidders = await this.bidRepository
-          .createQueryBuilder("bid")
-          .where("bid.auction_id = :auctionId", { auctionId: auction.id })
-          .select("DISTINCT bid.user_id", "user_id")
-          .getRawMany();
+        const bidders = await this.prisma.$queryRawUnsafe<
+          { user_id: string }[]
+        >(`SELECT DISTINCT user_id FROM bids WHERE auction_id = $1`, auction.id);
 
-        const userIds: string[] = bidders.map((b: any) => b.user_id);
+        const userIds: string[] = bidders.map((b) => b.user_id);
         if (userIds.length === 0) continue;
 
         const productName = auction.product?.name || auction.id;

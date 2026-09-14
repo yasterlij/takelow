@@ -53,7 +53,7 @@ export function FormInput({ invalid, hasIcon, className = "", ...props }: InputP
   return (
     <input
       {...props}
-      className={`w-full rounded-xl border bg-white/80 backdrop-blur-sm px-4 py-3 text-sm font-medium text-foreground outline-none transition-all duration-300 focus:bg-white focus:shadow-lg focus:shadow-primary/5 ${
+      className={`w-full rounded-xl border bg-white px-4 py-3 text-sm font-normal text-foreground outline-none transition-colors duration-200 ${
         hasIcon ? "pl-11" : ""
       } ${
         invalid
@@ -84,8 +84,8 @@ export const FormPasswordInput = forwardRef<HTMLInputElement, PasswordInputProps
           hasIcon ? "pl-11 pr-11" : "pr-11"
         } ${
           isDark
-            ? "border-white/10 bg-white/10 text-white backdrop-blur-sm placeholder:text-white/30 focus-within:border-awash-gold/50 focus-within:bg-white/15"
-            : "border-border/60 bg-white/80 text-foreground backdrop-blur-sm placeholder:text-neutral-400 focus:bg-white"
+            ? "border-white/10 bg-white/10 text-white placeholder:text-white/30"
+            : "border-border/60 bg-white text-foreground placeholder:text-neutral-400"
         } ${
           invalid
             ? isDark
@@ -117,7 +117,7 @@ export function FormTextarea({ invalid, className = "", ...props }: TextareaProp
   return (
     <textarea
       {...props}
-      className={`w-full rounded-xl border bg-white/80 backdrop-blur-sm px-4 py-3 text-sm font-medium text-foreground outline-none transition-all duration-300 focus:bg-white focus:shadow-lg focus:shadow-primary/5 ${
+      className={`w-full rounded-xl border bg-white px-4 py-3 text-sm font-normal text-foreground outline-none transition-colors duration-200 ${
         invalid
           ? "border-destructive/60 focus:border-destructive focus:ring-2 focus:ring-destructive/20"
           : "border-border/60 focus:border-primary/50 focus:ring-2 focus:ring-primary/20"

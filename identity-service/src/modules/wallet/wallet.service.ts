@@ -1,157 +1,110 @@
-import { Injectable, BadRequestException, NotFoundException, UnauthorizedException, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
-import { User } from '../auth/entities/user.entity';
-import { Transaction, TransactionType } from './entities/transaction.entity';
+import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class WalletService {
   private readonly logger = new Logger(WalletService.name);
 
   constructor(
-    @InjectRepository(User)
-    private userRepository: Repository<User>,
-    @InjectRepository(Transaction)
-    private transactionRepository: Repository<Transaction>,
-    private dataSource: DataSource,
+    private prisma: PrismaService,
   ) {}
 
-  async deposit(userId: string, amount: number, referenceId: string): Promise<User> {
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
+  async deposit(userId: string, amount: number, referenceId: string): Promise<any> {
+    return this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.findUnique({ where: { id: userId } });
+      if (!user) throw new NotFoundException('User not found');
 
-    try {
-      const user = await queryRunner.manager.findOne(User, {
+      const updatedUser = await tx.user.update({
         where: { id: userId },
-        lock: { mode: 'pessimistic_write' },
+        data: { wallet_balance: Number(user.wallet_balance) + amount },
       });
 
-      if (!user) {
-        throw new NotFoundException('User not found');
-      }
-
-      user.wallet_balance = Number(user.wallet_balance) + amount;
-      await queryRunner.manager.save(user);
-
-      const transaction = queryRunner.manager.create(Transaction, {
-        user_id: userId,
-        amount,
-        type: TransactionType.DEPOSIT,
-        reference_id: referenceId,
+      await tx.transaction.create({
+        data: {
+          user_id: userId,
+          amount,
+          type: 'DEPOSIT',
+          reference_id: referenceId,
+        },
       });
-      await queryRunner.manager.save(transaction);
 
-      await queryRunner.commitTransaction();
-      return user;
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+      return updatedUser;
+    });
   }
 
   async deductBidFee(userId: string, feeAmount: number): Promise<void> {
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
-      const user = await queryRunner.manager.findOne(User, {
-        where: { id: userId },
-        lock: { mode: 'pessimistic_write' },
-      });
-
-      if (!user) {
-        throw new NotFoundException('User not found');
-      }
-
+    await this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.findUnique({ where: { id: userId } });
+      if (!user) throw new NotFoundException('User not found');
       if (Number(user.wallet_balance) < feeAmount) {
         throw new BadRequestException('Insufficient wallet balance');
       }
 
-      user.wallet_balance = Number(user.wallet_balance) - feeAmount;
-      await queryRunner.manager.save(user);
-
-      const transaction = queryRunner.manager.create(Transaction, {
-        user_id: userId,
-        amount: feeAmount,
-        type: TransactionType.BID_FEE,
-        reference_id: null as any,
+      await tx.user.update({
+        where: { id: userId },
+        data: { wallet_balance: Number(user.wallet_balance) - feeAmount },
       });
-      await queryRunner.manager.save(transaction);
 
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+      await tx.transaction.create({
+        data: {
+          user_id: userId,
+          amount: feeAmount,
+          type: 'BID_FEE',
+          reference_id: null,
+        },
+      });
+    });
   }
 
-  async refund(userId: string, amount: number, referenceId: string): Promise<User> {
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
+  async refund(userId: string, amount: number, referenceId: string): Promise<any> {
+    return this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.findUnique({ where: { id: userId } });
+      if (!user) throw new NotFoundException('User not found');
 
-    try {
-      const user = await queryRunner.manager.findOne(User, {
+      const updatedUser = await tx.user.update({
         where: { id: userId },
-        lock: { mode: 'pessimistic_write' },
+        data: { wallet_balance: Number(user.wallet_balance) + amount },
       });
 
-      if (!user) {
-        throw new NotFoundException('User not found');
-      }
-
-      user.wallet_balance = Number(user.wallet_balance) + amount;
-      await queryRunner.manager.save(user);
-
-      const transaction = queryRunner.manager.create(Transaction, {
-        user_id: userId,
-        amount,
-        type: TransactionType.REFUND,
-        reference_id: referenceId,
+      await tx.transaction.create({
+        data: {
+          user_id: userId,
+          amount,
+          type: 'REFUND',
+          reference_id: referenceId,
+        },
       });
-      await queryRunner.manager.save(transaction);
 
-      await queryRunner.commitTransaction();
-      return user;
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+      return updatedUser;
+    });
   }
 
   async getBalance(userId: string): Promise<number> {
-    const user = await this.userRepository.findOne({
+    const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: ['wallet_balance'],
+      select: { wallet_balance: true },
     });
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
+    if (!user) throw new NotFoundException('User not found');
     return Number(user.wallet_balance);
   }
 
-  async getTransactions(userId: string, page = 1, limit = 20): Promise<{ data: Transaction[]; total: number }> {
-    const [data, total] = await this.transactionRepository.findAndCount({
-      where: { user_id: userId },
-      order: { created_at: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+  async getTransactions(userId: string, page = 1, limit = 20): Promise<{ data: any[]; total: number }> {
+    const [data, total] = await Promise.all([
+      this.prisma.transaction.findMany({
+        where: { user_id: userId },
+        orderBy: { created_at: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.transaction.count({ where: { user_id: userId } }),
+    ]);
     return { data, total };
   }
 
-  async resolveUser(id: string): Promise<User | null> {
-    return this.userRepository.findOne({
+  async resolveUser(id: string): Promise<any | null> {
+    return this.prisma.user.findUnique({
       where: { id },
-      select: ['id', 'full_name', 'phone_number'],
+      select: { id: true, full_name: true, phone_number: true },
     });
   }
 
@@ -161,16 +114,12 @@ export class WalletService {
     amount: number;
     status: string;
   }): Promise<void> {
-    if (payload.status !== 'COMPLETED') {
-      return;
-    }
+    if (payload.status !== 'COMPLETED') return;
 
-    const existing = await this.transactionRepository.findOne({
+    const existing = await this.prisma.transaction.findFirst({
       where: { reference_id: payload.reference_id },
     });
-    if (existing) {
-      return;
-    }
+    if (existing) return;
 
     await this.deposit(payload.user_id, payload.amount, payload.reference_id);
   }

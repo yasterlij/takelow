@@ -13,7 +13,7 @@ export const appConfig = registerAs('app', () => {
     jwtRefreshSecret: process.env.JWT_REFRESH_SECRET,
     databaseUrl:
       process.env.DATABASE_URL ||
-      'postgresql://admin:secret@localhost:5432/takelow_db',
+      'postgresql://admin:secret@localhost:5433/takelow_db',
     redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
     smsApiKey: process.env.SMS_API_KEY || '',
     internalApiKey: process.env.INTERNAL_API_KEY || '',

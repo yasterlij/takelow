@@ -1,23 +1,57 @@
-import React, { useState, useCallback } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, RefreshControl, Image } from 'react-native'
+import React, { useState, useCallback, useMemo } from 'react'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, RefreshControl, Image, TextInput } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
-import { Trophy, ArrowLeft, Crown, Sparkles, ArrowRight, Gavel, Timer, CreditCard, Users } from 'lucide-react-native'
+import { Trophy, ArrowLeft, Crown, Sparkles, ArrowRight, Gavel, Timer, CreditCard, Users, Search, X, TrendingDown, Award } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { Badge, Card } from '../components/AuctionUI'
 import { colors } from '../theme'
 import { formatCurrency, formatETB } from '../mockDataV0'
 
 export function WinnersListScreen() {
-  const { go, auctions, refreshAuctions, selectAuction } = useApp()
+  const { go, auctions, refreshAuctions, selectAuction, user } = useApp()
   const [refreshing, setRefreshing] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [filterTab, setFilterTab] = useState<'all' | 'highest-savings' | 'my-wins'>('all')
 
-  const closedAuctions = auctions.filter((a) => a.status === 'closed')
+  const closedAuctions = useMemo(() => auctions.filter((a) => a.status === 'closed'), [auctions])
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
     await refreshAuctions()
     setRefreshing(false)
   }, [refreshAuctions])
+
+  const { filtered, totalSavings } = useMemo(() => {
+    let list = [...closedAuctions]
+    let savingsSum = 0
+
+    list.forEach((a) => {
+      if (a.winning_bid_amount != null && a.marketPrice > 0) {
+        savingsSum += Math.max(0, a.marketPrice - a.winning_bid_amount)
+      }
+    })
+
+    if (filterTab === 'my-wins') {
+      list = list.filter((a) => a.winners?.some((w) => w.user_id === user?.id))
+    } else if (filterTab === 'highest-savings') {
+      list = list.sort((a, b) => {
+        const savA = a.winning_bid_amount != null && a.marketPrice > 0 ? (1 - a.winning_bid_amount / a.marketPrice) : 0
+        const savB = b.winning_bid_amount != null && b.marketPrice > 0 ? (1 - b.winning_bid_amount / b.marketPrice) : 0
+        return savB - savA
+      })
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim()
+      list = list.filter((a) =>
+        a.name.toLowerCase().includes(q) ||
+        (a.category && a.category.toLowerCase().includes(q)) ||
+        (a.publicCode && a.publicCode.toLowerCase().includes(q))
+      )
+    }
+
+    return { filtered: list, totalSavings: savingsSum }
+  }, [closedAuctions, filterTab, searchQuery, user?.id])
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.neutralGray50 }}>
@@ -28,21 +62,69 @@ export function WinnersListScreen() {
           </TouchableOpacity>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <Crown size={20} color={colors.primary} />
-            <Text style={{ fontFamily: 'System', fontSize: 18, fontWeight: '800', color: '#FFF' }}>Winners</Text>
+            <Text style={{ fontFamily: 'System', fontSize: 18, fontWeight: '800', color: '#FFF' }}>Winners Circle</Text>
           </View>
           <View style={{ width: 36 }} />
         </View>
         <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', textAlign: 'center' }}>
-          {closedAuctions.length} closed auction{closedAuctions.length !== 1 ? 's' : ''} with winners
+          {closedAuctions.length} closed auction{closedAuctions.length !== 1 ? 's' : ''} • Lowest unique bids win
         </Text>
       </LinearGradient>
 
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 110 }}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}
       >
+        {/* ── Total Value Savings Banner ── */}
+        {totalSavings > 0 && (
+          <View style={s.savingsBanner}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <View style={s.savingsIconWrap}>
+                <TrendingDown size={20} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.savingsLabel}>Total Winner Savings</Text>
+                <Text style={s.savingsAmount}>{formatCurrency(totalSavings)} saved!</Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* ── Search Bar ── */}
+        <View style={s.searchBarContainer}>
+          <Search size={16} color={colors.mutedForeground} />
+          <TextInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search winners by product or code..."
+            placeholderTextColor={colors.mutedForeground}
+            style={s.searchInput}
+            returnKeyType="search"
+          />
+          {searchQuery.length > 0 ? (
+            <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <X size={16} color={colors.mutedForeground} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        {/* ── Filter Tabs ── */}
+        <View style={s.filterTabsRow}>
+          {(['all', 'highest-savings', 'my-wins'] as const).map((tab) => (
+            <TouchableOpacity
+              key={tab}
+              onPress={() => setFilterTab(tab)}
+              style={[s.tabBtn, filterTab === tab && s.tabBtnActive]}
+            >
+              <Text style={[s.tabBtnText, filterTab === tab && s.tabBtnTextActive]}>
+                {tab === 'all' ? `All (${closedAuctions.length})` : tab === 'highest-savings' ? 'Top Savings' : 'My Wins'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
         {closedAuctions.length === 0 ? (
           <View style={s.empty}>
             <Trophy size={48} color={colors.neutralGray300} />
@@ -55,19 +137,19 @@ export function WinnersListScreen() {
               </LinearGradient>
             </TouchableOpacity>
           </View>
+        ) : filtered.length === 0 ? (
+          <View style={[s.empty, { paddingVertical: 24 }]}>
+            <Text style={s.emptyTitle}>No matching winners found</Text>
+            <Text style={s.emptySub}>Try adjusting your search or switching filter tabs.</Text>
+          </View>
         ) : (
-          <>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-              <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: colors.primary + '18', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.primary + '20' }}>
-                <Sparkles size={16} color={colors.primary} />
-              </View>
-              <Text style={{ fontFamily: 'System', fontSize: 15, fontWeight: '700', color: colors.primary }}>Recent Winners</Text>
-            </View>
-
-            {closedAuctions.map((a) => {
+          <View style={{ gap: 14 }}>
+            {filtered.map((a) => {
               const savings = a.winning_bid_amount != null && a.marketPrice > 0 ? Math.round((1 - a.winning_bid_amount / a.marketPrice) * 100) : 0
               const winnerCount = a.winnersCount ?? a.winners?.length ?? 0
-              const paidCount = a.winners?.filter((w) => w.payment_status === 'PAID').length ?? 0
+              const primaryWinner = a.winners?.[0]
+              const winnerDisplay = primaryWinner?.name || 'Verified Winner'
+
               return (
                 <TouchableOpacity key={a.id} onPress={() => selectAuction(a.id)} activeOpacity={0.85}>
                   <Card style={s.card}>
@@ -79,81 +161,57 @@ export function WinnersListScreen() {
                           <Trophy size={32} color={colors.neutralGray400} />
                         </View>
                       )}
-                      <LinearGradient colors={['transparent', 'rgba(0,0,0,0.7)']} style={s.cardImgOverlay} />
+                      <LinearGradient colors={['transparent', 'rgba(0,0,0,0.75)']} style={StyleSheet.absoluteFill} />
                       <View style={s.cardImgTop}>
                         <Badge tone="gold"><Crown size={10} /> Winner</Badge>
-                        <Badge tone="gold"><Trophy size={9} /> -{savings}%</Badge>
+                        {savings > 0 && <Badge tone="gold"><Trophy size={9} /> -{savings}%</Badge>}
                       </View>
                       <View style={s.cardImgBottom}>
                         <Text style={s.cardName} numberOfLines={1}>{a.name}</Text>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                          <Text style={{ color: colors.primary, fontSize: 15, fontWeight: '800' }}>
-                            {formatCurrency(a.winning_bid_amount ?? a.bidFee)}
+                          <Text style={{ color: colors.primary, fontSize: 16, fontWeight: '800' }}>
+                            Won with {formatCurrency(a.winning_bid_amount ?? a.bidFee)}
                           </Text>
                           {a.marketPrice > 0 ? (
-                            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10, fontWeight: '500', textDecorationLine: 'line-through' }}>
+                            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: '500', textDecorationLine: 'line-through' }}>
                               {formatCurrency(a.marketPrice)}
                             </Text>
                           ) : null}
                         </View>
                       </View>
                     </View>
-                    <View style={{ paddingHorizontal: 12, paddingVertical: 10, gap: 6 }}>
+
+                    <View style={{ paddingHorizontal: 12, paddingVertical: 10, gap: 8 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                           <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: colors.primary + '1A', justifyContent: 'center', alignItems: 'center' }}>
-                            <Timer size={12} color={colors.primary} />
+                            <Award size={12} color={colors.primary} />
                           </View>
-                          <Text style={{ fontSize: 10, fontWeight: '600', color: colors.mutedForeground }}>
-                            {a.totalBids || a.bidders} bids
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: colors.navy }}>
+                            {winnerDisplay}
                           </Text>
                         </View>
+
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                          <Text style={{ fontSize: 10, fontWeight: '600', color: colors.primary }}>View Details</Text>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>View Breakdown</Text>
                           <ArrowRight size={12} color={colors.primary} />
                         </View>
                       </View>
-                      {winnerCount > 0 && (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                            <Users size={10} color={colors.mutedForeground} />
-                            <Text style={{ fontSize: 9, fontWeight: '600', color: colors.mutedForeground }}>
-                              {winnerCount} winner{winnerCount !== 1 ? 's' : ''}
-                            </Text>
-                          </View>
-                          {paidCount > 0 && (
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                              <CreditCard size={10} color={colors.emerald600} />
-                              <Text style={{ fontSize: 9, fontWeight: '600', color: colors.emerald600 }}>
-                                {paidCount} paid
-                              </Text>
-                            </View>
-                          )}
-                          {a.winners?.slice(0, 2).map((w) => (
-                            <Text key={w.user_id} style={{ fontSize: 8, color: colors.mutedForeground }} numberOfLines={1}>
-                              {formatCurrency(w.amount)}
-                            </Text>
-                          ))}
-                          {winnerCount > 2 && (
-                            <Text style={{ fontSize: 8, color: colors.mutedForeground }}>+{winnerCount - 2}</Text>
-                          )}
-                        </View>
-                      )}
+
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: colors.border + '60', paddingTop: 6 }}>
+                        <Text style={{ fontSize: 10, fontWeight: '600', color: colors.mutedForeground }}>
+                          {a.totalBids || a.bidders} total bids evaluated
+                        </Text>
+                        <Text style={{ fontSize: 10, fontWeight: '600', color: colors.awashBlue }}>
+                          Code {a.publicCode || a.id.slice(0, 6).toUpperCase()}
+                        </Text>
+                      </View>
                     </View>
                   </Card>
                 </TouchableOpacity>
               )
             })}
-
-            <View style={{ height: 20 }} />
-            <TouchableOpacity onPress={() => go('auctions')} activeOpacity={0.85} style={{ borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: colors.primary + '50' }}>
-              <LinearGradient colors={['#C8A642', '#D4B85E', '#C8A642']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ paddingVertical: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
-                <Gavel size={16} color={colors.primaryForeground} />
-                <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primaryForeground }}>Browse Live Auctions</Text>
-                <ArrowRight size={14} color={colors.primaryForeground} />
-              </LinearGradient>
-            </TouchableOpacity>
-          </>
+          </View>
         )}
       </ScrollView>
     </View>
@@ -161,18 +219,140 @@ export function WinnersListScreen() {
 }
 
 const s = StyleSheet.create({
-  empty: { alignItems: 'center', justifyContent: 'center', paddingTop: 60, paddingHorizontal: 40 },
-  emptyTitle: { fontFamily: 'System', fontSize: 17, fontWeight: '700', color: colors.foreground, marginTop: 16 },
-  emptySub: { fontSize: 13, color: colors.mutedForeground, textAlign: 'center', marginTop: 6, lineHeight: 18 },
-  card: {
-    marginBottom: 14,
-    overflow: 'hidden',
-    borderRadius: 16,
+  savingsBanner: {
+    backgroundColor: colors.card,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.primary + '33',
+    padding: 12,
+    marginBottom: 12,
+    shadowColor: colors.awashBlue,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  cardImgWrap: { width: '100%', aspectRatio: 4 / 3, position: 'relative' },
-  cardImgFull: { width: '100%', height: '100%' },
-  cardImgOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: '60%' },
-  cardImgTop: { position: 'absolute', top: 8, left: 8, right: 8, flexDirection: 'row', justifyContent: 'space-between' },
-  cardImgBottom: { position: 'absolute', bottom: 10, left: 12, right: 12 },
-  cardName: { fontFamily: 'System', fontSize: 16, fontWeight: '800', color: '#FFF', textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+  savingsIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: colors.primary + '18',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  savingsLabel: {
+    fontSize: 10.5,
+    fontWeight: '600',
+    color: colors.mutedForeground,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
+  savingsAmount: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: colors.navy,
+    marginTop: 2,
+  },
+  searchBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    marginBottom: 10,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 12.5,
+    color: colors.foreground,
+    padding: 0,
+  },
+  filterTabsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 14,
+  },
+  tabBtn: {
+    flex: 1,
+    paddingVertical: 7,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabBtnActive: {
+    backgroundColor: colors.navy,
+    borderColor: colors.navy,
+  },
+  tabBtnText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.mutedForeground,
+  },
+  tabBtnTextActive: {
+    color: colors.navyForeground,
+    fontWeight: '700',
+  },
+  card: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  cardImgWrap: {
+    height: 160,
+    width: '100%',
+    position: 'relative',
+  },
+  cardImgFull: {
+    width: '100%',
+    height: '100%',
+  },
+  cardImgTop: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    right: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  cardImgBottom: {
+    position: 'absolute',
+    bottom: 10,
+    left: 12,
+    right: 12,
+  },
+  cardName: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#FFF',
+    marginBottom: 2,
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  empty: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 48,
+    gap: 10,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: colors.navy,
+  },
+  emptySub: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: colors.mutedForeground,
+    textAlign: 'center',
+  },
 })

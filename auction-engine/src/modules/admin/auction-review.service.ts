@@ -1,9 +1,7 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
-import { Auction, AuctionStatus } from "../winner/entities/auction.entity";
+import { PrismaService } from "../../prisma/prisma.service";
+import { AuctionStatus } from "@prisma/client";
 import { WinnerService } from "../winner/winner.service";
-import { Bid } from "../bidding/entities/bid.entity";
 import { BidEncryptionService } from "../common/bid-encryption.service";
 
 @Injectable()
@@ -35,7 +33,7 @@ export class AuctionReviewService {
     return value != null;
   }
 
-  private mapLegacyBidRow(row: Record<string, unknown>): Bid {
+  private mapLegacyBidRow(row: Record<string, unknown>): any {
     return {
       id: String(row.bid_id ?? ""),
       user_id: String(row.bid_user_id ?? ""),
@@ -45,12 +43,12 @@ export class AuctionReviewService {
       service_fee_paid: this.normalizeBoolean(row.bid_service_fee_paid),
       ticket_number: "",
       encrypted_amount: "",
-    } as Bid;
+    } as any;
   }
 
-  private async loadAuctionBids(auctionId: string): Promise<Bid[]> {
+  private async loadAuctionBids(auctionId: string): Promise<any[]> {
     try {
-      return await this.bidRepository.find({
+      return await this.prisma.repository("bid").find({
         where: { auction_id: auctionId },
         order: { bid_time: "ASC" },
       });
@@ -63,29 +61,21 @@ export class AuctionReviewService {
         `Legacy bid schema detected for ${auctionId}, falling back to base bid columns: ${e.message}`,
       );
 
-      const rows = await this.bidRepository
-        .createQueryBuilder("bid")
-        .select([
-          "bid.id",
-          "bid.user_id",
-          "bid.auction_id",
-          "bid.amount",
-          "bid.bid_time",
-          "bid.service_fee_paid",
-        ])
-        .where("bid.auction_id = :auctionId", { auctionId })
-        .orderBy("bid.bid_time", "ASC")
-        .getRawMany<Record<string, unknown>>();
+      const rows = await this.prisma
+        .repository("bid")
+        .query(
+          `SELECT id AS bid_id, user_id AS bid_user_id, auction_id AS bid_auction_id,
+                  amount AS bid_amount, bid_time AS bid_bid_time, service_fee_paid AS bid_service_fee_paid
+           FROM bids WHERE auction_id = $1 ORDER BY bid_time ASC`,
+          [auctionId],
+        );
 
-      return rows.map((row) => this.mapLegacyBidRow(row));
+      return rows.map((row: any) => this.mapLegacyBidRow(row));
     }
   }
 
   constructor(
-    @InjectRepository(Auction)
-    private auctionRepository: Repository<Auction>,
-    @InjectRepository(Bid)
-    private bidRepository: Repository<Bid>,
+    private prisma: PrismaService,
     private winnerService: WinnerService,
     private bidEncryptionService: BidEncryptionService,
   ) {}
@@ -118,7 +108,7 @@ export class AuctionReviewService {
     }
   }
 
-  private resolveBidAmount(bid: Bid): number {
+  private resolveBidAmount(bid: any): number {
     if (bid.amount !== 0 || !bid.encrypted_amount) return bid.amount;
     try {
       return this.bidEncryptionService.decrypt(bid.encrypted_amount);
@@ -128,13 +118,13 @@ export class AuctionReviewService {
   }
 
   async drawWinner(auctionId: string) {
-    const auction = await this.auctionRepository.findOne({
+    const auction = await this.prisma.repository("auction").findOne({
       where: { id: auctionId },
-      relations: ["product"],
+      include: { product: true },
     });
     if (!auction) throw new NotFoundException("Auction not found");
 
-    let bids: Bid[] = [];
+    let bids: any[] = [];
     if (auction.status === AuctionStatus.CLOSED) {
       bids = await this.loadAuctionBids(auctionId);
     }
@@ -200,9 +190,9 @@ export class AuctionReviewService {
   }
 
   async getAuctionBids(auctionId: string) {
-    const auction = await this.auctionRepository.findOne({
+    const auction = await this.prisma.repository("auction").findOne({
       where: { id: auctionId },
-      select: ["id", "status"],
+      select: { id: true, status: true },
     });
     if (!auction) throw new NotFoundException("Auction not found");
     const bids = await this.loadAuctionBids(auctionId);

@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { View, Text, TextInput, ScrollView, StyleSheet, ActivityIndicator, TouchableOpacity, Alert } from 'react-native'
-import { Sparkles, TrendingDown, CheckCircle2, Minus, Plus, AlertTriangle, Info } from 'lucide-react-native'
+import { Sparkles, TrendingDown, CheckCircle2, Minus, Plus, AlertTriangle, Info, Dices, Copy, Check } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { AppBar, CTAButton, Card, AwashMark } from '../components/AuctionUI'
+import { useToast } from '../components/Toast'
 import { CURRENCY, formatCurrency } from '../mockDataV0'
 import { colors } from '../theme'
 import { api } from '../api'
+
+const QUICK_DELTAS = [0.05, 0.10, 0.50, 1.00, 5.00]
 
 export function PlaceBidScreen() {
   const { go, goBack, selectedId, submitBid, getAuction, authError, feePaid, pendingBidAmount, setPendingBidAmount, myBids } = useApp()
@@ -17,6 +20,8 @@ export function PlaceBidScreen() {
   const [bidFlash, setBidFlash] = useState(false)
   const [serverBidAmounts, setServerBidAmounts] = useState<number[]>([])
   const [debouncedAmount, setDebouncedAmount] = useState(0)
+  const [copiedCode, setCopiedCode] = useState(false)
+  const toast = useToast()
   const STEP = 0.01
 
   const amount = parseFloat(amountStr || '0')
@@ -69,6 +74,21 @@ export function PlaceBidScreen() {
     updateBid((amountStr ? Number(amountStr) : 1) + delta)
   }, [amountStr, updateBid])
 
+  const suggestUniqueBid = useCallback(() => {
+    // Generate an unexpected non-round decimal bid
+    const base = Math.floor(Math.random() * 8) + 1
+    const cents = Math.floor(Math.random() * 90) + 10
+    const suggested = parseFloat(`${base}.${cents}`)
+    updateBid(suggested)
+    toast.show(`Suggested bid ${formatCurrency(suggested)} applied!`, 'info')
+  }, [updateBid, toast])
+
+  const copyAuctionCode = (code: string) => {
+    setCopiedCode(true)
+    toast.show(`Auction Code ${code} copied!`, 'success')
+    setTimeout(() => setCopiedCode(false), 2000)
+  }
+
   const handleSubmit = async () => {
     if (amount < 1) {
       setSubmitError('Minimum bid is 1.00')
@@ -117,6 +137,9 @@ export function PlaceBidScreen() {
       .finally(() => setLoading(false))
   }, [auction, feePaid, pendingBidAmount, submitBid, hasPlacedBid])
 
+  const publicCode = auction.publicCode || auction.id.slice(0, 6).toUpperCase()
+  const estSavings = auction.marketPrice > 0 && amount > 0 ? Math.max(0, auction.marketPrice - amount) : 0
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={{ backgroundColor: colors.navy }}>
@@ -136,7 +159,10 @@ export function PlaceBidScreen() {
           <View style={s.snapshotHero}>
             <Text style={s.snapshotEyebrow}>Auction snapshot</Text>
             <Text style={s.snapshotTitle}>{auction.name}</Text>
-            <Text style={s.snapshotCode}>Code {auction.publicCode || auction.id.slice(0, 6).toUpperCase()}</Text>
+            <TouchableOpacity onPress={() => copyAuctionCode(publicCode)} style={s.codeChip} activeOpacity={0.7}>
+              <Text style={s.snapshotCode}>CODE {publicCode}</Text>
+              {copiedCode ? <Check size={12} color="#FFF" /> : <Copy size={12} color="rgba(255,255,255,0.7)" />}
+            </TouchableOpacity>
             {auction.specSummary ? <Text style={s.snapshotSummary}>{auction.specSummary}</Text> : null}
           </View>
         </Card>
@@ -163,7 +189,11 @@ export function PlaceBidScreen() {
               <Text style={s.statChipText}>Min {auction.minBid} bids</Text>
             </View>
           )}
-
+          {estSavings > 0 && (
+            <View style={[s.statChip, { backgroundColor: colors.emerald50 }]}>
+              <Text style={[s.statChipText, { color: colors.emerald700 }]}>Save ~{formatCurrency(estSavings)}</Text>
+            </View>
+          )}
         </View>
 
         {auction.maxBid && (
@@ -214,6 +244,26 @@ export function PlaceBidScreen() {
               <Plus size={18} color={colors.awashBlue} />
             </TouchableOpacity>
           </View>
+
+          {/* Quick Delta Chips */}
+          <View style={s.quickDeltasRow}>
+            {QUICK_DELTAS.map((delta) => (
+              <TouchableOpacity
+                key={delta}
+                onPress={() => adjustBid(delta)}
+                style={s.deltaChip}
+                activeOpacity={0.7}
+              >
+                <Text style={s.deltaChipText}>+{delta.toFixed(2)}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Suggest Unique Bid Helper */}
+          <TouchableOpacity onPress={suggestUniqueBid} style={s.suggestBtn} activeOpacity={0.8}>
+            <Dices size={15} color={colors.primary} />
+            <Text style={s.suggestBtnText}>Suggest Strategic Bid</Text>
+          </TouchableOpacity>
 
           {isDuplicate && (
             <View style={s.duplicateWarning}>
@@ -274,9 +324,10 @@ const s = StyleSheet.create({
   snapshotHero: { borderRadius: 18, padding: 16, backgroundColor: colors.awashBlue },
   snapshotEyebrow: { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', color: 'rgba(255,255,255,0.7)' },
   snapshotTitle: { fontSize: 22, fontWeight: '800', color: '#fff', marginTop: 8 },
-  snapshotCode: { fontSize: 13, fontWeight: '700', color: 'rgba(255,255,255,0.78)', marginTop: 6 },
+  codeChip: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 6, backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  snapshotCode: { fontSize: 12, fontWeight: '700', color: '#FFF' },
   snapshotSummary: { fontSize: 12, fontWeight: '600', lineHeight: 18, color: 'rgba(255,255,255,0.9)', marginTop: 10 },
-  feePaidBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, backgroundColor: colors.emerald50, padding: 12 },
+  feePaidBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, backgroundColor: colors.emerald50, padding: 12, marginTop: 12 },
   feePaidText: { fontSize: 12, fontWeight: '600', color: colors.emerald700, flex: 1 },
   statChip: { borderRadius: 6, backgroundColor: colors.accent, paddingHorizontal: 8, paddingVertical: 4 },
   statChipText: { fontSize: 10, fontWeight: '600', color: colors.primary },
@@ -289,6 +340,11 @@ const s = StyleSheet.create({
   bidAdjustBtnDisabled: { opacity: 0.45 },
   bidInput: { width: '100%', textAlign: 'center', fontSize: 36, fontWeight: '800', color: colors.navy, paddingVertical: 8 },
   bidCurrency: { textAlign: 'center', fontSize: 14, fontWeight: '700', color: colors.mutedForeground, paddingBottom: 4 },
+  quickDeltasRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 6, marginTop: 12 },
+  deltaChip: { flex: 1, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.secondary, alignItems: 'center' },
+  deltaChipText: { fontSize: 11, fontWeight: '700', color: colors.awashBlue },
+  suggestBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: colors.primary + '40', backgroundColor: colors.primary + '10' },
+  suggestBtnText: { fontSize: 12, fontWeight: '700', color: colors.primary },
   duplicateWarning: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, backgroundColor: colors.warning + '1A', borderWidth: 1, borderColor: colors.warning + '40', paddingHorizontal: 12, paddingVertical: 8, marginTop: 12 },
   duplicateText: { fontSize: 12, fontWeight: '600', color: colors.warning, flex: 1 },
   tip: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 8, backgroundColor: colors.accent, paddingHorizontal: 12, paddingVertical: 8, marginTop: 16 },

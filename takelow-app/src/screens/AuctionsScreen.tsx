@@ -1,9 +1,10 @@
 import React, { useMemo, useState, useCallback } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, Image, StyleSheet, Dimensions, RefreshControl } from 'react-native'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Dimensions, RefreshControl, TextInput } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
-import { Flame, ShieldCheck, Trophy, Sparkles, PiggyBank, ImageIcon } from 'lucide-react-native'
+import { Flame, ShieldCheck, Trophy, Sparkles, PiggyBank, Search, X, SlidersHorizontal, Heart, ArrowUpDown } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { AppBar, Badge } from '../components/AuctionUI'
+import { SmartImage } from '../components/SmartImage'
 import { useCountdown } from '../components/Countdown'
 import { SkeletonCard } from '../components/SkeletonLoader'
 import { EmptyState } from '../components/EmptyState'
@@ -12,20 +13,13 @@ import type { Auction } from '../mockDataV0'
 import { formatCurrency, formatCountdown } from '../mockDataV0'
 import { colors } from '../theme'
 
-const CARD_W = (Dimensions.get('window').width - 16 * 2 - 12) / 2
+const CARD_W = Dimensions.get('window').width - 16 * 2
+
+type SortOption = 'ending-soon' | 'bids-desc' | 'fee-asc' | 'price-desc' | 'price-asc'
 
 function AuctionImage({ src, alt }: { src?: string; alt: string }) {
-  const [err, setErr] = useState(false)
-  if (err || !src) {
-    return (
-      <View style={[s.cardImgWrap, { justifyContent: 'center', alignItems: 'center', backgroundColor: colors.secondary, gap: 4 }]}>
-        <ImageIcon size={24} color={colors.mutedForeground + '66'} />
-        <Text style={{ fontSize: 9, fontWeight: '500', color: colors.mutedForeground + '4D' }}>{alt}</Text>
-      </View>
-    )
-  }
   return (
-    <Image source={{ uri: src }} style={s.cardImgWrap} resizeMode="cover" onError={() => setErr(true)} />
+    <SmartImage uri={src} alt={alt} style={s.cardImgWrap} resizeMode="cover" />
   )
 }
 
@@ -42,17 +36,28 @@ function TimePill({ seconds, endingSoon }: { seconds: number; endingSoon: boolea
   )
 }
 
-export function AuctionCard({ auction, onOpen }: { auction: Auction; onOpen: () => void }) {
+export function AuctionCard({
+  auction,
+  onOpen,
+  onToggleFavorite,
+  isFav,
+}: {
+  auction: Auction
+  onOpen: () => void
+  onToggleFavorite?: () => void
+  isFav?: boolean
+}) {
   const endingSoon = auction.status === 'ending-soon'
   const isClosed = auction.status === 'closed'
   const bidProgress = auction.maxBid ? Math.min(auction.totalBids / auction.maxBid, 1) : 0
   const publicCode = auction.publicCode || auction.id.slice(0, 6).toUpperCase()
+
   return (
     <TouchableOpacity onPress={onOpen} activeOpacity={0.85} style={s.card}>
       <View style={s.cardImgOuter}>
         <AuctionImage src={auction.images?.[0]} alt={auction.name} />
         <LinearGradient
-          colors={['rgba(0,43,92,0.06)', 'transparent', 'rgba(200,166,66,0.05)']}
+          colors={['rgba(0,43,92,0.1)', 'transparent', 'rgba(200,166,66,0.05)']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFill}
@@ -66,19 +71,34 @@ export function AuctionCard({ auction, onOpen }: { auction: Auction; onOpen: () 
           ) : (
             <Badge tone="green">Live</Badge>
           )}
-          <View style={s.codeBadge}><Text style={s.codeBadgeText}>{publicCode}</Text></View>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <View style={s.codeBadge}><Text style={s.codeBadgeText}>{publicCode}</Text></View>
+            {onToggleFavorite && (
+              <TouchableOpacity
+                onPress={(e) => {
+                  e.stopPropagation?.()
+                  onToggleFavorite()
+                }}
+                style={s.favBtn}
+                activeOpacity={0.7}
+              >
+                <Heart size={14} color={isFav ? colors.destructive : colors.navy} fill={isFav ? colors.destructive : 'transparent'} />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       </View>
       <View style={{ padding: 10, gap: 6 }}>
-        <Text style={s.cardName} numberOfLines={1}>{auction.name}</Text>
-        {auction.specSummary ? <Text style={s.cardSpec} numberOfLines={1}>{auction.specSummary}</Text> : null}
+        <Text style={s.cardName} numberOfLines={2}>{auction.name}</Text>
+        {auction.specSummary ? <Text style={s.cardSpec} numberOfLines={2}>{auction.specSummary}</Text> : null}
         {auction.marketPrice > 0 ? (
-          <Text style={{ fontSize: 9, fontWeight: '500', color: colors.mutedForeground, textDecorationLine: 'line-through' }}>
+          <Text style={{ fontSize: 11, fontWeight: '500', color: colors.mutedForeground, textDecorationLine: 'line-through' }}>
             {formatCurrency(auction.marketPrice)}
           </Text>
         ) : null}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-          <View style={s.feeTag}><Text style={s.feeTagText}>Bid Amount: {formatCurrency(auction.bidFee)}</Text></View>
+          <View style={s.feeTag}><Text style={s.feeTagText}>Bid Fee: {formatCurrency(auction.bidFee)}</Text></View>
           <View style={s.bidderBadge}>
             <Text style={s.bidderBadgeText}>{auction.totalBids || auction.bidders} bidders</Text>
           </View>
@@ -115,19 +135,51 @@ const loveItems = [
 ]
 
 export function AuctionsScreen() {
-  const { go, goBack, selectAuction, myBids, auctions, auctionsLoading, refreshAuctions } = useApp()
+  const { goBack, selectAuction, auctions, auctionsLoading, refreshAuctions, isFavorite, toggleFavorite } = useApp()
   const [category, setCategory] = useState('All')
   const [showClosed, setShowClosed] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sortBy, setSortBy] = useState<SortOption>('ending-soon')
+  const [showSortPicker, setShowSortPicker] = useState(false)
 
   const liveAuctions = useMemo(() => auctions.filter((a) => a.status !== 'closed'), [auctions])
   const closedAuctions = useMemo(() => auctions.filter((a) => a.status === 'closed'), [auctions])
 
   const categories = useMemo(() => buildAuctionCategoryOptions(liveAuctions.map((a) => a.category)), [liveAuctions])
+
   const filtered = useMemo(() => {
     const source = showClosed ? closedAuctions : liveAuctions
     const unique = Array.from(new Map(source.map((a) => [a.id, a])).values())
-    return category === 'All' ? unique : unique.filter((a) => a.category === category)
-  }, [category, showClosed, liveAuctions, closedAuctions])
+
+    let list = category === 'All' ? unique : unique.filter((a) => a.category === category)
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim()
+      list = list.filter((a) =>
+        a.name.toLowerCase().includes(q) ||
+        (a.publicCode && a.publicCode.toLowerCase().includes(q)) ||
+        (a.description && a.description.toLowerCase().includes(q)) ||
+        (a.category && a.category.toLowerCase().includes(q))
+      )
+    }
+
+    return list.sort((a, b) => {
+      switch (sortBy) {
+        case 'ending-soon':
+          return a.timeLeft - b.timeLeft
+        case 'bids-desc':
+          return (b.totalBids || b.bidders || 0) - (a.totalBids || a.bidders || 0)
+        case 'fee-asc':
+          return a.bidFee - b.bidFee
+        case 'price-desc':
+          return b.marketPrice - a.marketPrice
+        case 'price-asc':
+          return a.marketPrice - b.marketPrice
+        default:
+          return 0
+      }
+    })
+  }, [category, showClosed, liveAuctions, closedAuctions, searchQuery, sortBy])
 
   const [refreshing, setRefreshing] = useState(false)
   const onRefresh = useCallback(async () => {
@@ -135,6 +187,14 @@ export function AuctionsScreen() {
     await refreshAuctions()
     setRefreshing(false)
   }, [refreshAuctions])
+
+  const sortLabels: Record<SortOption, string> = {
+    'ending-soon': 'Ending Soonest',
+    'bids-desc': 'Most Bids',
+    'fee-asc': 'Lowest Bid Fee',
+    'price-desc': 'Highest Value',
+    'price-asc': 'Lowest Value',
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -148,38 +208,90 @@ export function AuctionsScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}
       >
+        {/* ── Search Bar ── */}
+        <View style={s.searchBarContainer}>
+          <Search size={16} color={colors.mutedForeground} />
+          <TextInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search auctions by name, brand, code..."
+            placeholderTextColor={colors.mutedForeground}
+            style={s.searchInput}
+            returnKeyType="search"
+          />
+          {searchQuery.length > 0 ? (
+            <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <X size={16} color={colors.mutedForeground} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
         {auctionsLoading && auctions.length === 0 ? (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
             {[1, 2, 3, 4].map((i) => <SkeletonCard key={i} style={{ width: CARD_W }} imageHeight={CARD_W * 0.75} />)}
           </View>
         ) : (
           <>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <View>
                 <Text style={s.pageTitle}>{showClosed ? 'Closed Auctions' : 'Reverse Auctions'}</Text>
                 <Text style={s.pageSub}>{showClosed ? 'Recently ended auctions' : 'Lowest unique bid wins. Bid low, be unique!'}</Text>
               </View>
               <Badge tone={showClosed ? 'muted' : 'green'}>
                 <View style={[s.greenDot, { backgroundColor: showClosed ? colors.mutedForeground : colors.emerald500 }]} />
-                {' '}{showClosed ? closedAuctions.length : liveAuctions.length} {showClosed ? 'Closed' : 'Live'}
+                {' '}{filtered.length} {showClosed ? 'Closed' : 'Active'}
               </Badge>
             </View>
 
-            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+            {/* ── Live / Closed Status Switch & Sort Toggle ── */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <TouchableOpacity
+                  onPress={() => setShowClosed(false)}
+                  style={[s.chip, !showClosed ? { backgroundColor: colors.navy, borderColor: colors.navy } : { backgroundColor: colors.card, borderColor: colors.border }]}
+                >
+                  <Text style={[s.chipText, !showClosed ? { color: colors.navyForeground } : { color: colors.mutedForeground }]}>Live</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setShowClosed(true)}
+                  style={[s.chip, showClosed ? { backgroundColor: colors.navy, borderColor: colors.navy } : { backgroundColor: colors.card, borderColor: colors.border }]}
+                >
+                  <Text style={[s.chipText, showClosed ? { color: colors.navyForeground } : { color: colors.mutedForeground }]}>Closed ({closedAuctions.length})</Text>
+                </TouchableOpacity>
+              </View>
+
               <TouchableOpacity
-                onPress={() => setShowClosed(false)}
-                style={[s.chip, !showClosed ? { backgroundColor: colors.navy, borderColor: colors.navy } : { backgroundColor: colors.card, borderColor: colors.border }]}
+                onPress={() => setShowSortPicker((prev) => !prev)}
+                style={s.sortBtn}
+                activeOpacity={0.8}
               >
-                <Text style={[s.chipText, { color: !showClosed ? colors.navyForeground : colors.mutedForeground }]}>Live</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => setShowClosed(true)}
-                style={[s.chip, showClosed ? { backgroundColor: colors.navy, borderColor: colors.navy } : { backgroundColor: colors.card, borderColor: colors.border }]}
-              >
-                <Text style={[s.chipText, { color: showClosed ? colors.navyForeground : colors.mutedForeground }]}>Closed ({closedAuctions.length})</Text>
+                <ArrowUpDown size={13} color={colors.navy} />
+                <Text style={s.sortBtnText}>{sortLabels[sortBy]}</Text>
               </TouchableOpacity>
             </View>
 
+            {/* ── Sort Options Dropdown / Chips ── */}
+            {showSortPicker && (
+              <View style={s.sortOptionsBox}>
+                <Text style={s.sortOptionsTitle}>Sort By:</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                  {(['ending-soon', 'bids-desc', 'fee-asc', 'price-desc', 'price-asc'] as SortOption[]).map((opt) => (
+                    <TouchableOpacity
+                      key={opt}
+                      onPress={() => {
+                        setSortBy(opt)
+                        setShowSortPicker(false)
+                      }}
+                      style={[s.sortChip, sortBy === opt && s.sortChipActive]}
+                    >
+                      <Text style={[s.sortChipText, sortBy === opt && s.sortChipTextActive]}>{sortLabels[opt]}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* ── Category Chips ── */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16, marginHorizontal: -16, paddingHorizontal: 16 }}>
               {categories.map((c) => {
                 const active = c === category
@@ -189,7 +301,7 @@ export function AuctionsScreen() {
                     onPress={() => setCategory(c)}
                     style={[s.chip, active ? { backgroundColor: colors.navy, borderColor: colors.navy } : { backgroundColor: colors.card, borderColor: colors.border }]}
                   >
-                    <Text style={[s.chipText, { color: active ? colors.navyForeground : colors.mutedForeground }]}>{c}</Text>
+                    <Text style={[s.chipText, active ? { color: colors.navyForeground } : { color: colors.mutedForeground }]}>{c}</Text>
                   </TouchableOpacity>
                 )
               })}
@@ -199,16 +311,29 @@ export function AuctionsScreen() {
               <EmptyState
                 icon="search-x"
                 title="No Auctions Found"
-                message="There are no auctions in this category right now. Try another category or check back later."
+                message={searchQuery ? `No auctions matching "${searchQuery}". Try changing your search or category.` : "There are no auctions in this category right now."}
+                actionLabel={searchQuery || category !== 'All' ? "Clear Filters" : undefined}
+                onAction={() => {
+                  setSearchQuery('')
+                  setCategory('All')
+                }}
               />
             ) : (
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-                {filtered.map((a) => <AuctionCard key={a.id} auction={a} onOpen={() => selectAuction(a.id)} />)}
+                {filtered.map((a) => (
+                  <AuctionCard
+                    key={a.id}
+                    auction={a}
+                    onOpen={() => selectAuction(a.id)}
+                    isFav={isFavorite(a.id)}
+                    onToggleFavorite={() => toggleFavorite(a.id)}
+                  />
+                ))}
               </View>
             )}
 
             <View style={s.loveBox}>
-              <Text style={s.loveTitle}>Why customers love it</Text>
+              <Text style={s.loveTitle}>Why customers love TakeLow</Text>
               {loveItems.map((item) => (
                 <View key={item.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 10 }}>
                   <View style={s.loveIcon}><item.icon size={16} color={colors.primary} /></View>
@@ -232,6 +357,82 @@ function StatusBarCustom() {
 }
 
 const s = StyleSheet.create({
+  searchBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 14,
+    gap: 8,
+    shadowColor: colors.awashBlue,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: colors.foreground,
+    padding: 0,
+  },
+  sortBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: colors.primary + '18',
+    borderWidth: 1,
+    borderColor: colors.primary + '33',
+  },
+  sortBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.navy,
+  },
+  sortOptionsBox: {
+    backgroundColor: colors.card,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 12,
+    marginBottom: 12,
+    gap: 8,
+  },
+  sortOptionsTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.mutedForeground,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  sortChip: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.secondary,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  sortChipActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  sortChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.foreground,
+  },
+  sortChipTextActive: {
+    color: colors.primaryForeground,
+    fontWeight: '700',
+  },
   card: {
     width: CARD_W,
     borderRadius: 16,
@@ -247,17 +448,18 @@ const s = StyleSheet.create({
   },
   cardImgOuter: { width: '100%', height: CARD_W * 0.75, position: 'relative' },
   cardImgWrap: { width: '100%', height: '100%' },
-  cardImgTop: { position: 'absolute', top: 8, left: 8, right: 8, flexDirection: 'row', justifyContent: 'space-between' },
-  codeBadge: { borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.92)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)', paddingHorizontal: 8, paddingVertical: 4 },
-  codeBadgeText: { fontSize: 9, fontWeight: '800', color: colors.awashBlue, letterSpacing: 1 },
-  cardSpec: { fontSize: 10, fontWeight: '500', color: colors.mutedForeground },
+  cardImgTop: { position: 'absolute', top: 8, left: 8, right: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  codeBadge: { borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.92)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)', paddingHorizontal: 7, paddingVertical: 3 },
+  codeBadgeText: { fontSize: 10, fontWeight: '800', color: colors.awashBlue, letterSpacing: 0.8 },
+  favBtn: { width: 26, height: 26, borderRadius: 13, backgroundColor: 'rgba(255,255,255,0.92)', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)' },
+  cardSpec: { fontSize: 12, fontWeight: '500', color: colors.mutedForeground },
   feeTag: { borderRadius: 999, backgroundColor: colors.primary + '14', borderWidth: 1, borderColor: colors.primary + '33', paddingHorizontal: 8, paddingVertical: 4 },
-  feeTagText: { fontSize: 10, fontWeight: '700', color: colors.primary },
+  feeTagText: { fontSize: 12, fontWeight: '700', color: colors.primary },
   bidderBadge: { borderRadius: 16, backgroundColor: colors.emerald50, paddingHorizontal: 8, paddingVertical: 4 },
-  bidderBadgeText: { fontSize: 10, fontWeight: '700', color: colors.emerald700 },
-  cardName: { fontSize: 13, fontWeight: '700', color: colors.navy },
+  bidderBadgeText: { fontSize: 11, fontWeight: '700', color: colors.emerald700 },
+  cardName: { fontSize: 15, fontWeight: '700', color: colors.navy },
   viewSpecsBar: { marginTop: 2, borderRadius: 10, backgroundColor: colors.awashBlue + '0D', paddingVertical: 6, paddingHorizontal: 8, alignItems: 'center' },
-  viewSpecsText: { fontSize: 9, fontWeight: '700', color: colors.awashBlue, textTransform: 'uppercase', letterSpacing: 1 },
+  viewSpecsText: { fontSize: 11, fontWeight: '700', color: colors.awashBlue, textTransform: 'uppercase', letterSpacing: 1 },
   timePill: { flexDirection: 'row', alignItems: 'center', gap: 2, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
   timePillText: { fontSize: 11, fontWeight: '800', fontVariant: ['tabular-nums'] },
   pageTitle: { fontSize: 18, fontWeight: '800', color: colors.navy },

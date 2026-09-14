@@ -1,18 +1,16 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { PaymentService } from '../src/modules/payment/payment.service';
 import { SikinaService } from '../src/modules/payment/sikina.service';
 import { AwashService } from '../src/modules/payment/awash.service';
 import { REDIS_CLIENT } from '../src/modules/common/redis.decorator';
-import { PaymentTransaction, PaymentTransactionStatus, PaymentType } from '../src/modules/payment/entities/payment-transaction.entity';
-import { Auction } from '../src/modules/winner/entities/auction.entity';
-import { Bid } from '../src/modules/bidding/entities/bid.entity';
-import { Winner, WinnerPaymentStatus } from '../src/modules/winner/entities/winner.entity';
+import { PaymentTransactionStatus, PaymentType } from '@prisma/client';
+import { WinnerPaymentStatus } from '../src/modules/common/prisma-types';
 import { WinnerService } from '../src/modules/winner/winner.service';
 import { BidEncryptionService } from '../src/modules/common/bid-encryption.service';
 import { NotificationDispatchService } from '../src/modules/worker/notification-dispatch.service';
 import { PaymentLinkService } from '../src/modules/payment/payment-link.service';
+import { PrismaService } from '../src/prisma/prisma.service';
 
 function createMockRepo() {
   return {
@@ -43,23 +41,36 @@ describe('PaymentService - Bid Fee Payment', () => {
     mockAuctionRepo = createMockRepo();
     mockBidRepo = createMockRepo();
     mockWinnerRepo = createMockRepo();
-    
+
+    const mockRepos: Record<string, any> = {
+      auction: mockAuctionRepo,
+      bid: mockBidRepo,
+      winner: mockWinnerRepo,
+      paymentTransaction: mockPaymentTransactionRepo,
+    };
+
+    const mockPrisma: any = {
+      repository: jest.fn((model: string) => mockRepos[model]),
+      $queryRaw: jest.fn(),
+      $transaction: jest.fn(async (fn: any) => fn(mockPrisma)),
+    };
+
     mockSikinaService = {
       generatePaymentLink: jest.fn(),
       getPaymentStatus: jest.fn(),
     };
-    
+
     mockAwashService = {
       generatePaymentLink: jest.fn(),
       getPaymentStatus: jest.fn(),
     };
-    
+
     mockWinnerService = {
       updateWinnerPaymentStatus: jest.fn(),
       getNextUnpaidWinner: jest.fn(),
       calculateWinners: jest.fn(),
     };
-    
+
     mockConfigService = {
       get: jest.fn((key: string) => {
         const config: Record<string, string> = {
@@ -79,10 +90,7 @@ describe('PaymentService - Bid Fee Payment', () => {
       providers: [
         PaymentLinkService,
         PaymentService,
-        { provide: getRepositoryToken(Auction), useValue: mockAuctionRepo },
-        { provide: getRepositoryToken(Bid), useValue: mockBidRepo },
-        { provide: getRepositoryToken(PaymentTransaction), useValue: mockPaymentTransactionRepo },
-        { provide: getRepositoryToken(Winner), useValue: mockWinnerRepo },
+        { provide: PrismaService, useValue: mockPrisma },
         { provide: WinnerService, useValue: mockWinnerService },
         { provide: SikinaService, useValue: mockSikinaService },
         { provide: AwashService, useValue: mockAwashService },
@@ -110,7 +118,7 @@ describe('PaymentService - Bid Fee Payment', () => {
       const amount = 50;
 
       mockPaymentTransactionRepo.findOne.mockResolvedValue(null);
-      
+
       const mockSikinaResponse = {
         paymentUrl: 'https://sandbox.sikinapay.com/checkout/web/TEST123',
         responseCode: '0',
@@ -132,7 +140,6 @@ describe('PaymentService - Bid Fee Payment', () => {
         currency: 'ETB',
         payment_type: PaymentType.BID_FEE,
       };
-      mockPaymentTransactionRepo.create.mockReturnValue(mockTransaction);
       mockPaymentTransactionRepo.save.mockResolvedValue(mockTransaction);
 
       const result = await service.createBidFeePaymentLink(auctionId, userId, amount);
@@ -151,7 +158,7 @@ describe('PaymentService - Bid Fee Payment', () => {
         }),
       );
 
-      expect(mockPaymentTransactionRepo.create).toHaveBeenCalledWith(
+      expect(mockPaymentTransactionRepo.save).toHaveBeenCalledWith(
         expect.objectContaining({
           auction_id: auctionId,
           user_id: userId,
@@ -322,8 +329,8 @@ describe('PaymentService - Bid Fee Payment', () => {
       };
       mockPaymentTransactionRepo.findOne.mockResolvedValue({ ...mockTransaction, status: PaymentTransactionStatus.SUCCESSFUL });
       mockPaymentTransactionRepo.save.mockResolvedValue({ ...mockTransaction, status: PaymentTransactionStatus.SUCCESSFUL });
-      mockPaymentTransactionRepo.update.mockResolvedValue({ affected: 1 });
-      
+      mockPaymentTransactionRepo.update.mockResolvedValue({ count: 1 });
+
       const mockAuction = {
         id: auctionId,
         status: 'CLOSED',
@@ -364,7 +371,7 @@ describe('PaymentService - Bid Fee Payment', () => {
       };
       mockPaymentTransactionRepo.findOne.mockResolvedValue({ ...mockTransaction, status: PaymentTransactionStatus.SUCCESSFUL });
       mockPaymentTransactionRepo.save.mockResolvedValue({ ...mockTransaction, status: PaymentTransactionStatus.SUCCESSFUL });
-      mockPaymentTransactionRepo.update.mockResolvedValue({ affected: 1 });
+      mockPaymentTransactionRepo.update.mockResolvedValue({ count: 1 });
 
       await service.handleSuccessfulPayment(clientReferenceId, paymentReferenceId, {});
 
@@ -380,7 +387,7 @@ describe('PaymentService - Bid Fee Payment', () => {
     it('should skip processing when the payment is already marked successful', async () => {
       const clientReferenceId = 'pay-existing-success';
 
-      mockPaymentTransactionRepo.update.mockResolvedValue({ affected: 0 });
+      mockPaymentTransactionRepo.update.mockResolvedValue({ count: 0 });
 
       await service.handleSuccessfulPayment(clientReferenceId, 'payment-ref', {});
 

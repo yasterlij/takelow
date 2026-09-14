@@ -1,8 +1,9 @@
-import React, { useEffect, useRef } from 'react'
-import { View, Text, StyleSheet, Animated } from 'react-native'
-import { Check, Eye, Home, MessageSquareText } from 'lucide-react-native'
+import React, { useEffect, useRef, useState } from 'react'
+import { View, Text, StyleSheet, Animated, TouchableOpacity } from 'react-native'
+import { Check, Eye, Home, MessageSquareText, Copy, TicketCheck } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { CTAButton, Card } from '../components/AuctionUI'
+import { useToast } from '../components/Toast'
 import { formatCurrency, formatETB } from '../mockDataV0'
 import { colors } from '../theme'
 
@@ -11,6 +12,8 @@ export function BidConfirmedScreen() {
   const isAdmin = user?.role === 'admin'
   const auction = getAuction(selectedId)
   const pingAnim = useRef(new Animated.Value(1)).current
+  const [copiedTicket, setCopiedTicket] = useState(false)
+  const toast = useToast()
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -28,6 +31,13 @@ export function BidConfirmedScreen() {
   const smsMessage = bidTicketNumber
     ? `Your bid of ${formatCurrency(userBid ?? 0)} on '${auction.name}' has been placed successfully. Your BID ticket number is: ${bidTicketNumber}`
     : null
+
+  const handleCopyTicket = () => {
+    if (!bidTicketNumber) return
+    setCopiedTicket(true)
+    toast.show(`Ticket ${bidTicketNumber} copied!`, 'success')
+    setTimeout(() => setCopiedTicket(false), 2000)
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -63,33 +73,36 @@ export function BidConfirmedScreen() {
           </View>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
             <Text style={s.infoLabel}>Status</Text>
-            <Text style={[s.infoValue, { color: colors.emerald600 }]}>Recorded</Text>
+            <Text style={[s.infoValue, { color: colors.emerald600 }]}>Recorded ✓</Text>
           </View>
           {bidTicketNumber && (
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+            <TouchableOpacity onPress={handleCopyTicket} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }} activeOpacity={0.7}>
               <Text style={s.infoLabel}>Ticket</Text>
-              <Text style={[s.infoValue, { fontFamily: 'monospace', fontSize: 11 }]}>{bidTicketNumber}</Text>
-            </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Text style={[s.infoValue, { fontFamily: 'monospace', fontSize: 11 }]}>{bidTicketNumber}</Text>
+                {copiedTicket ? <Check size={11} color={colors.emerald600} /> : <Copy size={11} color={colors.mutedForeground} />}
+              </View>
+            </TouchableOpacity>
           )}
         </Card>
 
         <Text style={s.keepWatching}>Keep watching — you might be the lowest unique bidder!</Text>
       </View>
       <View style={s.bottomCta}>
-        {isAdmin ? (
-          <View style={{ gap: 8 }}>
-            <CTAButton variant="orange" onPress={() => go('auctions')}>
-              <Home size={18} /> Back to Auctions
-            </CTAButton>
-            <CTAButton variant="navy" onPress={() => go('monitor')}>
+        <View style={{ gap: 8 }}>
+          <CTAButton variant="navy" onPress={() => go('my-bids')}>
+            <TicketCheck size={18} /> View My Bids
+          </CTAButton>
+          {isAdmin ? (
+            <CTAButton variant="orange" onPress={() => go('monitor')}>
               <Eye size={18} /> Monitor Auction
             </CTAButton>
-          </View>
-        ) : (
-          <CTAButton variant="outline" onPress={() => go('auctions')}>
-            <Home size={18} /> Back to Auctions
-          </CTAButton>
-        )}
+          ) : (
+            <CTAButton variant="outline" onPress={() => go('auctions')}>
+              <Home size={18} /> Browse More Auctions
+            </CTAButton>
+          )}
+        </View>
       </View>
     </View>
   )

@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react'
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
-import { Bell, CheckCheck } from 'lucide-react-native'
+import React, { useEffect, useState, useCallback, useMemo } from 'react'
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View, RefreshControl, TextInput } from 'react-native'
+import { Bell, CheckCheck, Search, X, Trophy, AlertTriangle, Info, Gavel } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { api, type ApiNotification } from '../api'
 import { AppBar, Badge, Card, CTAButton } from '../components/AuctionUI'
@@ -17,30 +17,37 @@ export function NotificationsScreen() {
   const { go, goBack, refreshUnreadNotifications } = useApp()
   const [notifications, setNotifications] = useState<ApiNotification[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [unreadOnly, setUnreadOnly] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
   const [refreshKey, setRefreshKey] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [markingAll, setMarkingAll] = useState(false)
 
-  useEffect(() => {
-    let active = true
-    setLoading(true)
-    setError(null)
-    api.getInbox(unreadOnly)
-      .then((items) => {
-        if (active) setNotifications(items)
-      })
-      .catch((err: any) => {
-        if (active) setError(err?.message || 'Failed to load notifications')
-      })
-      .finally(() => {
-        if (active) setLoading(false)
-      })
-    return () => {
-      active = false
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const items = await api.getInbox(unreadOnly)
+      setNotifications(items)
+      setError(null)
+    } catch (err: any) {
+      setError(err?.message || 'Failed to load notifications')
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
     }
-  }, [refreshKey, unreadOnly])
+  }, [unreadOnly])
+
+  useEffect(() => {
+    setLoading(true)
+    fetchNotifications()
+  }, [fetchNotifications, refreshKey])
+
+  const onRefresh = async () => {
+    setRefreshing(true)
+    await fetchNotifications()
+    await refreshUnreadNotifications()
+  }
 
   const markRead = async (id: string) => {
     setBusyId(id)
@@ -64,6 +71,15 @@ export function NotificationsScreen() {
     }
   }
 
+  const filtered = useMemo(() => {
+    if (!searchQuery.trim()) return notifications
+    const q = searchQuery.toLowerCase().trim()
+    return notifications.filter((n) =>
+      n.title.toLowerCase().includes(q) ||
+      n.body.toLowerCase().includes(q)
+    )
+  }, [notifications, searchQuery])
+
   const unreadCount = notifications.filter((item) => !item.read).length
 
   return (
@@ -71,10 +87,32 @@ export function NotificationsScreen() {
       <View style={{ backgroundColor: colors.navy }}>
         <AppBar title="Notifications" onBack={goBack} />
       </View>
-      <ScrollView contentContainerStyle={s.container}>
+      <ScrollView
+        contentContainerStyle={s.container}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}
+      >
         <View style={s.headerRow}>
-          <Text style={s.subtitle}>Auction updates, reminders, and winner alerts</Text>
+          <Text style={s.subtitle}>Auction updates, outbid notices, and winner alerts</Text>
           <Badge tone={unreadCount > 0 ? 'orange' : 'muted'}>{unreadCount} unread</Badge>
+        </View>
+
+        {/* ── Search Bar ── */}
+        <View style={s.searchBarContainer}>
+          <Search size={16} color={colors.mutedForeground} />
+          <TextInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search alerts and notifications..."
+            placeholderTextColor={colors.mutedForeground}
+            style={s.searchInput}
+            returnKeyType="search"
+          />
+          {searchQuery.length > 0 ? (
+            <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <X size={16} color={colors.mutedForeground} />
+            </TouchableOpacity>
+          ) : null}
         </View>
 
         <View style={s.actionsRow}>
@@ -95,32 +133,53 @@ export function NotificationsScreen() {
           <View style={s.loadingWrap}><ActivityIndicator size="large" color={colors.primary} /></View>
         ) : error ? (
           <EmptyState icon="alert" title="Notifications unavailable" message={error} actionLabel="Retry" onAction={() => setRefreshKey((current) => current + 1)} />
-        ) : notifications.length === 0 ? (
-          <EmptyState icon="inbox" title="No notifications yet" message={unreadOnly ? 'You have read everything for now.' : 'We will show winner alerts, auction reminders, and account updates here.'} actionLabel={unreadOnly ? 'Show all' : 'Go to auctions'} onAction={() => unreadOnly ? setUnreadOnly(false) : go('auctions')} />
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            icon="inbox"
+            title="No notifications"
+            message={searchQuery ? 'No notifications match your search.' : unreadOnly ? 'You have read everything for now.' : 'We will show winner alerts, auction reminders, and account updates here.'}
+            actionLabel={searchQuery ? 'Clear Search' : unreadOnly ? 'Show all' : 'Go to auctions'}
+            onAction={() => searchQuery ? setSearchQuery('') : unreadOnly ? setUnreadOnly(false) : go('auctions')}
+          />
         ) : (
           <View style={{ gap: 10 }}>
-            {notifications.map((item) => (
-              <Card key={item.id} style={{ ...s.card, ...(!item.read ? s.unreadCard : {}) }}>
-                <View style={s.cardRow}>
-                  <View style={[s.iconWrap, item.read ? s.iconWrapMuted : null]}>
-                    <Bell size={18} color={item.read ? colors.mutedForeground : colors.primary} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <View style={s.titleRow}>
-                      <Text style={s.title}>{item.title}</Text>
-                      {!item.read && <Badge tone="orange">New</Badge>}
+            {filtered.map((item) => {
+              const isWinner = item.title.toLowerCase().includes('winner') || item.title.toLowerCase().includes('won')
+              const isOutbid = item.title.toLowerCase().includes('outbid')
+
+              return (
+                <Card key={item.id} style={{ ...s.card, ...(!item.read ? s.unreadCard : {}) }}>
+                  <View style={s.cardRow}>
+                    <View style={[
+                      s.iconWrap,
+                      item.read ? s.iconWrapMuted : null,
+                      isWinner ? { backgroundColor: colors.primary + '20', borderColor: colors.primary + '40' } : null,
+                    ]}>
+                      {isWinner ? (
+                        <Trophy size={18} color={colors.primary} />
+                      ) : isOutbid ? (
+                        <AlertTriangle size={18} color={colors.warning} />
+                      ) : (
+                        <Bell size={18} color={item.read ? colors.mutedForeground : colors.primary} />
+                      )}
                     </View>
-                    <Text style={s.body}>{item.body}</Text>
-                    <Text style={s.timestamp}>{formatSentAt(item.sent_at)}</Text>
+                    <View style={{ flex: 1 }}>
+                      <View style={s.titleRow}>
+                        <Text style={s.title}>{item.title}</Text>
+                        {!item.read && <Badge tone="orange">New</Badge>}
+                      </View>
+                      <Text style={s.body}>{item.body}</Text>
+                      <Text style={s.timestamp}>{formatSentAt(item.sent_at)}</Text>
+                    </View>
                   </View>
-                </View>
-                {!item.read && (
-                  <TouchableOpacity onPress={() => markRead(item.id)} style={s.readBtn} activeOpacity={0.85} disabled={busyId === item.id}>
-                    <Text style={s.readBtnText}>{busyId === item.id ? 'Saving...' : 'Mark read'}</Text>
-                  </TouchableOpacity>
-                )}
-              </Card>
-            ))}
+                  {!item.read && (
+                    <TouchableOpacity onPress={() => markRead(item.id)} style={s.readBtn} activeOpacity={0.85} disabled={busyId === item.id}>
+                      <Text style={s.readBtnText}>{busyId === item.id ? 'Saving...' : 'Mark read'}</Text>
+                    </TouchableOpacity>
+                  )}
+                </Card>
+              )
+            })}
           </View>
         )}
       </ScrollView>
@@ -129,9 +188,26 @@ export function NotificationsScreen() {
 }
 
 const s = StyleSheet.create({
-  container: { padding: 16, paddingBottom: 32, gap: 16 },
+  container: { padding: 16, paddingBottom: 110, gap: 14 },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   subtitle: { flex: 1, fontSize: 13, fontWeight: '500', color: colors.mutedForeground },
+  searchBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 12.5,
+    color: colors.foreground,
+    padding: 0,
+  },
   actionsRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   filterChip: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card },
   filterChipActive: { backgroundColor: colors.navy, borderColor: colors.navy },
@@ -140,7 +216,7 @@ const s = StyleSheet.create({
   markAllInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   markAllText: { fontSize: 12, fontWeight: '700', color: colors.foreground },
   loadingWrap: { paddingVertical: 48 },
-  card: { padding: 14, gap: 12 },
+  card: { padding: 14, gap: 12, borderRadius: 16 },
   unreadCard: { borderColor: colors.primary + '55' },
   cardRow: { flexDirection: 'row', gap: 12 },
   iconWrap: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.primary + '14', borderWidth: 1, borderColor: colors.primary + '2A', justifyContent: 'center', alignItems: 'center' },

@@ -1,10 +1,10 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, MoreThan, In } from "typeorm";
-import { Auction, AuctionStatus } from "./entities/auction.entity";
-import { Bid } from "./entities/bid.entity";
+import { PrismaService } from "../../prisma/prisma.service";
 import { BidEncryptionService } from "../common/bid-encryption.service";
+import { ListAuctionsQueryDto } from "../common/dto/list-auctions-query.dto";
 import { normalizeProductCategory } from "./product-categories";
+import { AuditService } from "../common/audit/audit.service";
+import { RedisCacheService } from "../common/redis-cache.service";
 
 interface WinnerRow {
   user_id: string;
@@ -19,11 +19,10 @@ interface WinnerRow {
 @Injectable()
 export class AuctionsService {
   constructor(
-    @InjectRepository(Auction)
-    private auctionRepository: Repository<Auction>,
-    @InjectRepository(Bid)
-    private bidRepository: Repository<Bid>,
+    private readonly prisma: PrismaService,
     private bidEncryptionService: BidEncryptionService,
+    private readonly auditService: AuditService,
+    private readonly redisCacheService: RedisCacheService,
   ) {}
 
   private isRecoverableSchemaError(error: unknown): boolean {
@@ -40,15 +39,15 @@ export class AuctionsService {
   }
 
   private async getExistingColumns(table: string): Promise<Set<string>> {
-    const rows: any[] = await this.auctionRepository.query(
+    const rows: any[] = await this.prisma.$queryRawUnsafe(
       "SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = $1",
-      [table],
+      table,
     );
     return new Set(rows.map((r) => r.column_name));
   }
 
   private async loadAuctionRows(
-    statuses: AuctionStatus[],
+    statuses: string[],
     activeOnly = false,
   ): Promise<any[]> {
     const statusPlaceholders = statuses
@@ -119,7 +118,7 @@ export class AuctionsService {
           "NULL::text AS product_brand",
         ].join(",\n        ");
 
-    return this.auctionRepository.query(
+    return this.prisma.$queryRawUnsafe(
       `WITH ranked AS (
         SELECT id, LPAD(ROW_NUMBER() OVER (ORDER BY ${rankedOrder})::text, 5, '0') AS public_code
         FROM auctions
@@ -133,7 +132,7 @@ export class AuctionsService {
       WHERE ${where}
       ORDER BY ${finalOrder}
       LIMIT 50`,
-      params,
+      ...params,
     );
   }
 
@@ -170,18 +169,44 @@ export class AuctionsService {
     };
   }
 
-  async getActiveAuctions(): Promise<any[]> {
+  async getActiveAuctions(query?: ListAuctionsQueryDto): Promise<any[]> {
+    const cacheKey = "auctions:active";
+    const cached = await this.redisCacheService.get<any[]>(cacheKey);
+    if (cached !== null) {
+      return cached;
+    }
+
     let auctions: any[] = [];
     try {
-      auctions = await this.auctionRepository.find({
-        where: { status: AuctionStatus.ACTIVE, end_time: MoreThan(new Date()) },
-        relations: ["product"],
-        order: { created_at: "DESC" },
+      auctions = await this.prisma.auction.findMany({
+        where: { status: "ACTIVE", end_time: { gt: new Date() } },
+        select: {
+          id: true,
+          public_code: true,
+          product_id: true,
+          start_time: true,
+          end_time: true,
+          status: true,
+          bid_fee: true,
+          product: {
+            select: {
+              id: true,
+              name: true,
+              description: true,
+              image_urls: true,
+              current_market_price: true,
+              category: true,
+              brand: true,
+              specs: true,
+            },
+          },
+        },
+        orderBy: { created_at: "desc" },
         take: 50,
       });
     } catch (error) {
       if (!this.isRecoverableSchemaError(error)) throw error;
-      const rows = await this.loadAuctionRows([AuctionStatus.ACTIVE], true);
+      const rows = await this.loadAuctionRows(["ACTIVE"], true);
       auctions = rows.map((row) => this.toAuctionRecord(row));
     }
 
@@ -193,33 +218,33 @@ export class AuctionsService {
     let uniqueBidderMap = new Map<string, number>();
     try {
       const [bidCounts, uniqueBidderRows] = await Promise.all([
-        this.bidRepository
-          .createQueryBuilder("bid")
-          .select("bid.auction_id", "auction_id")
-          .addSelect("COUNT(*)", "count")
-          .where("bid.auction_id IN (:...ids)", { ids: auctionIds })
-          .groupBy("bid.auction_id")
-          .getRawMany(),
-        this.bidRepository
-          .createQueryBuilder("bid")
-          .select("bid.auction_id", "auction_id")
-          .addSelect("COUNT(DISTINCT bid.user_id)", "count")
-          .where("bid.auction_id IN (:...ids)", { ids: auctionIds })
-          .groupBy("bid.auction_id")
-          .getRawMany(),
+        this.prisma.$queryRawUnsafe(
+          `SELECT auction_id, COUNT(*)::text AS count
+           FROM bids
+           WHERE auction_id = ANY($1)
+           GROUP BY auction_id`,
+          auctionIds,
+        ),
+        this.prisma.$queryRawUnsafe(
+          `SELECT auction_id, COUNT(DISTINCT user_id)::text AS count
+           FROM bids
+           WHERE auction_id = ANY($1)
+           GROUP BY auction_id`,
+          auctionIds,
+        ),
       ]);
 
       bidCountMap = new Map(
-        bidCounts.map((r: any) => [r.auction_id, parseInt(r.count, 10)]),
+        (bidCounts as any[]).map((r: any) => [r.auction_id, parseInt(r.count, 10)]),
       );
       uniqueBidderMap = new Map(
-        uniqueBidderRows.map((r: any) => [r.auction_id, parseInt(r.count, 10)]),
+        (uniqueBidderRows as any[]).map((r: any) => [r.auction_id, parseInt(r.count, 10)]),
       );
     } catch (error) {
       if (!this.isRecoverableSchemaError(error)) throw error;
     }
 
-    return auctions.map((auction) => ({
+    const result = auctions.map((auction) => ({
       id: auction.id,
       public_code: auction.public_code,
       product_id: auction.product_id,
@@ -234,14 +259,37 @@ export class AuctionsService {
       },
       status: auction.status,
     }));
+
+    await this.redisCacheService.set(cacheKey, result, 5);
+    return result;
   }
 
-  async getActiveAuction(auctionId: string): Promise<any> {
+  async getActiveAuction(auctionId: string, userId?: string): Promise<any> {
     let auction: any = null;
     try {
-      auction = await this.auctionRepository.findOne({
+      auction = await this.prisma.auction.findFirst({
         where: { id: auctionId },
-        relations: ["product"],
+        select: {
+          id: true,
+          public_code: true,
+          product_id: true,
+          start_time: true,
+          end_time: true,
+          status: true,
+          bid_fee: true,
+          product: {
+            select: {
+              id: true,
+              name: true,
+              description: true,
+              image_urls: true,
+              current_market_price: true,
+              category: true,
+              brand: true,
+              specs: true,
+            },
+          },
+        },
       });
     } catch (error) {
       if (!this.isRecoverableSchemaError(error)) throw error;
@@ -274,7 +322,7 @@ export class AuctionsService {
           : ["NULL::text AS product_category"]),
         ...(productCols.has("brand") ? ["p.brand AS product_brand"] : []),
       ].join(",\n          ");
-      const rows = await this.auctionRepository.query(
+      const rows = await this.prisma.$queryRawUnsafe(
         `WITH ranked AS (
           SELECT id, LPAD(ROW_NUMBER() OVER (ORDER BY created_at ASC)::text, 5, '0') AS public_code
           FROM auctions
@@ -287,14 +335,14 @@ export class AuctionsService {
         LEFT JOIN products p ON p.id = a.product_id
         WHERE a.id = $1
         LIMIT 1`,
-        [auctionId],
+        auctionId,
       );
-      auction = rows[0] ? this.toAuctionRecord(rows[0]) : null;
+      auction = (rows as any[])[0] ? this.toAuctionRecord((rows as any[])[0]) : null;
     }
 
     if (
       !auction ||
-      auction.status !== AuctionStatus.ACTIVE ||
+      auction.status !== "ACTIVE" ||
       auction.end_time.getTime() <= Date.now()
     ) {
       throw new NotFoundException("Auction not found or has ended");
@@ -303,17 +351,20 @@ export class AuctionsService {
     const now = Date.now();
     const timeRemaining = Math.max(0, auction.end_time.getTime() - now);
 
-    const totalBids = await this.bidRepository.count({
-      where: { auction_id: auctionId },
-    });
+    const [totalBids, uniqueBiddersRows] = await Promise.all([
+      this.prisma.bid.count({
+        where: { auction_id: auctionId },
+      }),
+      this.prisma.$queryRawUnsafe(
+        `SELECT COUNT(DISTINCT user_id)::text AS count
+         FROM bids
+         WHERE auction_id = $1`,
+        auctionId,
+      ),
+    ]);
+    const uniqueBidders = (uniqueBiddersRows as any[])[0];
 
-    const uniqueBidders = await this.bidRepository
-      .createQueryBuilder("bid")
-      .where("bid.auction_id = :auctionId", { auctionId })
-      .select("COUNT(DISTINCT bid.user_id)", "count")
-      .getRawOne();
-
-    return {
+    const result = {
       id: auction.id,
       public_code: auction.public_code,
       product: (auction as any).product || null,
@@ -330,25 +381,68 @@ export class AuctionsService {
       },
       status: auction.status,
     };
+
+    // Audit log: auction viewed
+    if (userId) {
+      this.auditService.log({
+        actor_id: userId,
+        action: 'auction_viewed',
+        entity_type: 'auction',
+        entity_id: auctionId,
+        details: { status: auction.status },
+      }).catch((e: any) =>
+        console.warn(`Failed to log auction view audit: ${e.message}`),
+      );
+    }
+
+    return result;
   }
 
-  async getClosedAuctions(): Promise<any[]> {
+  async getClosedAuctions(query?: ListAuctionsQueryDto): Promise<any[]> {
+    const cacheKey = "auctions:closed";
+    const cached = await this.redisCacheService.get<any[]>(cacheKey);
+    if (cached !== null) {
+      return cached;
+    }
+
     let auctions: any[] = [];
     try {
-      auctions = await this.auctionRepository.find({
-        where: [
-          { status: AuctionStatus.CLOSED },
-          { status: AuctionStatus.EXPIRED },
-        ],
-        relations: ["product"],
-        order: { created_at: "DESC" },
+      auctions = await this.prisma.auction.findMany({
+        where: {
+          status: { in: ["CLOSED", "EXPIRED"] },
+        },
+        select: {
+          id: true,
+          public_code: true,
+          product_id: true,
+          start_time: true,
+          end_time: true,
+          status: true,
+          bid_fee: true,
+          winner_user_id: true,
+          winning_bid_amount: true,
+          created_at: true,
+          product: {
+            select: {
+              id: true,
+              name: true,
+              description: true,
+              image_urls: true,
+              current_market_price: true,
+              category: true,
+              brand: true,
+              specs: true,
+            },
+          },
+        },
+        orderBy: { created_at: "desc" },
         take: 50,
       });
     } catch (error) {
       if (!this.isRecoverableSchemaError(error)) throw error;
       const rows = await this.loadAuctionRows([
-        AuctionStatus.CLOSED,
-        AuctionStatus.EXPIRED,
+        "CLOSED",
+        "EXPIRED",
       ]);
       auctions = rows.map((row) => this.toAuctionRecord(row));
     }
@@ -356,17 +450,29 @@ export class AuctionsService {
     const auctionIds = auctions.map((a) => a.id);
 
     let winnersByAuction: Map<string, WinnerRow[]> = new Map();
+    let bidCountMap = new Map<string, number>();
+
     if (auctionIds.length > 0) {
       try {
-        const winnerRows: any[] = await this.auctionRepository.query(
-          `SELECT w.auction_id, w.user_id, w.amount, w.rank, w.payment_status, w.payment_deadline, u.full_name AS user_name, u.phone_number AS phone
-            FROM winners w
-            LEFT JOIN users u ON u.id = w.user_id
-            WHERE w.auction_id = ANY($1)
-            ORDER BY w.rank ASC`,
-          [auctionIds],
-        );
-        for (const row of winnerRows) {
+        const [winnerRows, bidCountRows] = await Promise.all([
+          this.prisma.$queryRawUnsafe(
+            `SELECT w.auction_id, w.user_id, w.amount, w.rank, w.payment_status, w.payment_deadline, u.full_name AS user_name, u.phone_number AS phone
+              FROM winners w
+              LEFT JOIN users u ON u.id = w.user_id
+              WHERE w.auction_id = ANY($1)
+              ORDER BY w.rank ASC`,
+            auctionIds,
+          ),
+          this.prisma.$queryRawUnsafe(
+            `SELECT auction_id, COUNT(*)::text AS count
+             FROM bids
+             WHERE auction_id = ANY($1)
+             GROUP BY auction_id`,
+            auctionIds,
+          ),
+        ]);
+
+        for (const row of winnerRows as any[]) {
           if (!winnersByAuction.has(row.auction_id)) {
             winnersByAuction.set(row.auction_id, []);
           }
@@ -380,25 +486,18 @@ export class AuctionsService {
             phone: row.phone || null,
           });
         }
+
+        bidCountMap = new Map(
+          (bidCountRows as any[]).map((r: any) => [r.auction_id, parseInt(r.count, 10)]),
+        );
       } catch {
-        // winners table may not exist in query service's read replica; ignore
+        // winners/bids tables may not exist in query service's read replica; ignore
       }
     }
 
     if (auctions.length === 0) return [];
 
-    const bidCountRows = await this.bidRepository
-      .createQueryBuilder("bid")
-      .select("bid.auction_id", "auction_id")
-      .addSelect("COUNT(*)", "count")
-      .where("bid.auction_id IN (:...ids)", { ids: auctionIds })
-      .groupBy("bid.auction_id")
-      .getRawMany();
-    const bidCountMap = new Map(
-      bidCountRows.map((r: any) => [r.auction_id, parseInt(r.count, 10)]),
-    );
-
-    return auctions.map((auction) => {
+    const result = auctions.map((auction) => {
       const auctionWinners = winnersByAuction.get(auction.id) || [];
       return {
         id: auction.id,
@@ -425,22 +524,49 @@ export class AuctionsService {
         created_at: auction.created_at,
       };
     });
+
+    await this.redisCacheService.set(cacheKey, result, 30);
+    return result;
   }
 
-  async getBidHistory(auctionId: string): Promise<any[]> {
-    const auction = await this.auctionRepository.findOne({
+  async getBidHistory(auctionId: string, userId?: string): Promise<any[]> {
+    const auction = await this.prisma.auction.findFirst({
       where: { id: auctionId },
-      select: ["id", "status"],
+      select: { id: true, status: true },
     });
-    const isActive = auction?.status === AuctionStatus.ACTIVE;
-    const bids = await this.bidRepository.find({
+    const isActive = auction?.status === "ACTIVE";
+    const bids = await this.prisma.bid.findMany({
       where: { auction_id: auctionId },
-      order: { bid_time: "DESC" },
+      select: {
+        id: true,
+        user_id: true,
+        auction_id: true,
+        amount: true,
+        encrypted_amount: true,
+        bid_time: true,
+        service_fee_paid: true,
+        ticket_number: true,
+      },
+      orderBy: { bid_time: "desc" },
       take: 200,
     });
+
+    // Audit log: bid history viewed
+    if (userId) {
+      this.auditService.log({
+        actor_id: userId,
+        action: 'bid_history_viewed',
+        entity_type: 'auction',
+        entity_id: auctionId,
+        details: { is_active: isActive },
+      }).catch((e: any) =>
+        console.warn(`Failed to log bid history view audit: ${e.message}`),
+      );
+    }
+
     return Promise.all(
       bids.map(async (b) => {
-        let realAmount = b.amount;
+        let realAmount = Number(b.amount);
         if (!isActive && b.encrypted_amount) {
           try {
             realAmount = this.bidEncryptionService.decrypt(b.encrypted_amount);
@@ -463,27 +589,50 @@ export class AuctionsService {
     );
   }
 
-  async getUserBidHistory(userId: string): Promise<any[]> {
-    const bids = await this.bidRepository.find({
+  async getUserBidHistory(userId: string, actorId?: string): Promise<any[]> {
+    const bids = await this.prisma.bid.findMany({
       where: { user_id: userId },
-      order: { bid_time: "DESC" },
+      select: {
+        id: true,
+        user_id: true,
+        auction_id: true,
+        amount: true,
+        encrypted_amount: true,
+        bid_time: true,
+        service_fee_paid: true,
+        ticket_number: true,
+      },
+      orderBy: { bid_time: "desc" },
       take: 100,
     });
+
+    // Audit log: user bid history viewed
+    if (actorId && actorId !== userId) {
+      this.auditService.log({
+        actor_id: actorId,
+        action: 'user_bid_history_viewed',
+        entity_type: 'user',
+        entity_id: userId,
+        details: { bid_count: bids.length },
+      }).catch((e: any) =>
+        console.warn(`Failed to log user bid history view audit: ${e.message}`),
+      );
+    }
 
     if (bids.length === 0) return [];
 
     const auctionIds = [...new Set(bids.map((b) => b.auction_id))];
-    const auctions = await this.auctionRepository.find({
-      where: { id: In(auctionIds) },
-      select: ["id", "status"],
+    const auctions = await this.prisma.auction.findMany({
+      where: { id: { in: auctionIds } },
+      select: { id: true, status: true },
     });
     const auctionStatusMap = new Map(auctions.map((a) => [a.id, a.status]));
 
     return Promise.all(
       bids.map(async (b) => {
         const isActive =
-          auctionStatusMap.get(b.auction_id) === AuctionStatus.ACTIVE;
-        let realAmount = b.amount;
+          auctionStatusMap.get(b.auction_id) === "ACTIVE";
+        let realAmount = Number(b.amount);
         if (!isActive && b.encrypted_amount) {
           try {
             realAmount = this.bidEncryptionService.decrypt(b.encrypted_amount);
@@ -506,21 +655,56 @@ export class AuctionsService {
     );
   }
 
-  async getUserWonAuctions(userId: string): Promise<any[]> {
+  async getUserWonAuctions(userId: string, actorId?: string): Promise<any[]> {
+    // Audit log: user won auctions viewed
+    if (actorId && actorId !== userId) {
+      this.auditService.log({
+        actor_id: actorId,
+        action: 'user_won_auctions_viewed',
+        entity_type: 'user',
+        entity_id: userId,
+        details: {},
+      }).catch((e: any) =>
+        console.warn(`Failed to log user won auctions view audit: ${e.message}`),
+      );
+    }
+
     let auctions: any[];
     try {
-      auctions = await this.auctionRepository.find({
+      auctions = await this.prisma.auction.findMany({
         where: {
           winner_user_id: userId,
-          status: AuctionStatus.CLOSED,
+          status: "CLOSED",
         },
-        relations: ["product"],
-        order: { created_at: "DESC" },
+        select: {
+          id: true,
+          product_id: true,
+          start_time: true,
+          end_time: true,
+          status: true,
+          bid_fee: true,
+          winner_user_id: true,
+          winning_bid_amount: true,
+          created_at: true,
+          product: {
+            select: {
+              id: true,
+              name: true,
+              description: true,
+              image_urls: true,
+              current_market_price: true,
+              category: true,
+              brand: true,
+              specs: true,
+            },
+          },
+        },
+        orderBy: { created_at: "desc" },
         take: 50,
       });
     } catch (error) {
       if (!this.isRecoverableSchemaError(error)) throw error;
-      auctions = (await this.loadAuctionRows([AuctionStatus.CLOSED])).filter(
+      auctions = (await this.loadAuctionRows(["CLOSED"])).filter(
         (a) => a.winner_user_id === userId,
       );
     }
@@ -529,13 +713,14 @@ export class AuctionsService {
     let winnersByAuction: Map<string, WinnerRow[]> = new Map();
     if (auctionIds.length > 0) {
       try {
-        const winnerRows: any[] = await this.auctionRepository.query(
+        const winnerRows: any[] = await this.prisma.$queryRawUnsafe(
           `SELECT w.auction_id, w.user_id, w.amount, w.rank, w.payment_status, w.payment_deadline, u.full_name AS user_name, u.phone_number AS phone
            FROM winners w
            LEFT JOIN users u ON u.id = w.user_id
            WHERE w.auction_id = ANY($1) AND w.user_id = $2
            ORDER BY w.rank ASC`,
-          [auctionIds, userId],
+          auctionIds,
+          userId,
         );
         for (const row of winnerRows) {
           if (!winnersByAuction.has(row.auction_id)) {

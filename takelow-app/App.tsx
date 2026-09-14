@@ -1,7 +1,7 @@
 import React from 'react'
 import { StatusBar } from 'expo-status-bar'
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
-import { Gavel, LogOut, Wallet, Trophy, UserRound } from 'lucide-react-native'
+import { Gavel, LogOut, Wallet, Trophy, UserRound, TicketCheck } from 'lucide-react-native'
 import { AppProvider, useApp } from './src/AppContext'
 import { LoginScreen } from './src/screens/LoginScreen'
 import { RegisterScreen } from './src/screens/RegisterScreen'
@@ -34,6 +34,7 @@ import { DepositScreen } from './src/screens/DepositScreen'
 import { ErrorBoundary } from './src/components/ErrorBoundary'
 import { ToastProvider } from './src/components/Toast'
 import { ShimmerProvider } from './src/components/SkeletonLoader'
+import { NetworkBanner } from './src/components/NetworkBanner'
 import { colors } from './src/theme'
 
 export default function App() {
@@ -43,6 +44,7 @@ export default function App() {
         <ShimmerProvider>
           <AppProvider>
             <StatusBar style="light" />
+            <NetworkBanner />
             <ScreenRouter />
           </AppProvider>
         </ShimmerProvider>
@@ -52,7 +54,7 @@ export default function App() {
 }
 
 function ScreenRouter() {
-  const { view, user, go } = useApp()
+  const { view, user } = useApp()
   const isAdmin = user?.role === 'admin'
 
   const screen = (() => {
@@ -102,12 +104,13 @@ function ScreenRouter() {
 }
 
 function BottomTabBar() {
-  const { view, go, logout } = useApp()
+  const { view, go, logout, myBids, unreadNotificationCount } = useApp()
   const tabs = [
-    { key: 'home', label: 'Home', icon: Wallet },
-    { key: 'auctions', label: 'Auctions', icon: Gavel },
-    { key: 'winners-list', label: 'Winners', icon: Trophy },
-    { key: 'profile', label: 'Profile', icon: UserRound },
+    { key: 'home', label: 'Home', icon: Wallet, badge: null },
+    { key: 'auctions', label: 'Auctions', icon: Gavel, badge: null },
+    { key: 'my-bids', label: 'My Bids', icon: TicketCheck, badge: myBids.length > 0 ? myBids.length : null },
+    { key: 'winners-list', label: 'Winners', icon: Trophy, badge: null },
+    { key: 'profile', label: 'Profile', icon: UserRound, badge: unreadNotificationCount > 0 ? unreadNotificationCount : null },
   ] as const
 
   return (
@@ -120,7 +123,12 @@ function BottomTabBar() {
             <TouchableOpacity key={tab.key} style={s.tab} onPress={() => go(tab.key as any)} activeOpacity={0.7}>
               {active && <View style={s.activeIndicator} />}
               <View style={{ position: 'relative', marginTop: 4 }}>
-                <Icon size={22} color={active ? colors.primary : colors.neutralGray400} />
+                <Icon size={21} color={active ? colors.primary : colors.neutralGray400} />
+                {tab.badge != null && (
+                  <View style={s.badgeDot}>
+                    <Text style={s.badgeDotText}>{tab.badge > 99 ? '99+' : tab.badge}</Text>
+                  </View>
+                )}
               </View>
               <Text style={[s.tabLabel, active && s.tabLabelActive]}>{tab.label}</Text>
             </TouchableOpacity>
@@ -138,12 +146,12 @@ const s = StyleSheet.create({
   tabBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.88)',
+    backgroundColor: 'rgba(255,255,255,0.92)',
     borderTopWidth: 1,
     borderTopColor: 'rgba(0,0,0,0.06)',
     paddingBottom: 28,
     paddingTop: 4,
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
     shadowColor: colors.awashBlue,
     shadowOffset: { width: 0, height: -6 },
     shadowOpacity: 0.08,
@@ -162,19 +170,36 @@ const s = StyleSheet.create({
   activeIndicator: {
     position: 'absolute',
     top: 0,
-    width: 28,
+    width: 24,
     height: 3,
     borderRadius: 2,
     backgroundColor: colors.primary,
   },
+  badgeDot: {
+    position: 'absolute',
+    top: -4,
+    right: -10,
+    backgroundColor: colors.primary,
+    borderRadius: 8,
+    minWidth: 15,
+    height: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 3,
+  },
+  badgeDotText: {
+    color: colors.primaryForeground,
+    fontSize: 9,
+    fontWeight: '800',
+  },
   logoutBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
+    width: 34,
+    height: 34,
+    borderRadius: 10,
     backgroundColor: colors.destructive + '14',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 4,
+    marginRight: 2,
     marginTop: 8,
     borderWidth: 1,
     borderColor: colors.destructive + '20',

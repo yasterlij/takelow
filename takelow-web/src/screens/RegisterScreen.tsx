@@ -28,17 +28,7 @@ export function RegisterScreen() {
   const showStrength = form.values.password.length > 0
 
   return (
-    <div className="relative flex min-h-screen flex-col overflow-y-auto bg-gradient-to-br from-awash-blue via-awash-blue-dark to-[#001224] px-6">
-      <motion.div
-        animate={{ y: [0, 40, 0], rotate: [0, -8, 0] }}
-        transition={{ duration: 13, repeat: Infinity, ease: "easeInOut" }}
-        className="pointer-events-none absolute -right-20 top-20 size-80 rounded-full bg-primary/10 blur-3xl"
-      />
-      <motion.div
-        animate={{ y: [0, -30, 0] }}
-        transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
-        className="pointer-events-none absolute -left-24 bottom-10 size-72 rounded-full bg-awash-blue-light/15 blur-3xl"
-      />
+    <div className="relative flex min-h-screen flex-col overflow-y-auto bg-white px-6">
 
       <div className="relative flex flex-1 flex-col items-center justify-center py-10">
         <motion.div
@@ -47,7 +37,7 @@ export function RegisterScreen() {
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
           className="animate-float-rotate"
         >
-          <AwashLogo variant="light" size={40} />
+          <AwashLogo variant="dark" size={40} />
         </motion.div>
 
         <motion.div
@@ -56,8 +46,8 @@ export function RegisterScreen() {
           transition={{ duration: 0.5, delay: 0.15 }}
           className="mt-8 text-center"
         >
-          <h1 className="font-display text-2xl font-extrabold text-white">Create Account</h1>
-          <p className="mt-1.5 flex items-center justify-center gap-1.5 text-sm font-medium text-white/60">
+          <h1 className="font-display text-3xl font-semibold tracking-[-0.022em] text-ink">Create Account</h1>
+          <p className="mt-1.5 flex items-center justify-center gap-1.5 text-sm font-normal text-neutral-500">
             <Sparkles className="size-3.5 text-primary" />
             Join the TakeLow auction platform
           </p>
@@ -69,7 +59,7 @@ export function RegisterScreen() {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
-              className="mt-6 flex w-full max-w-xs items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/15 p-3 text-xs font-semibold text-destructive backdrop-blur-sm"
+              className="mt-6 flex w-full max-w-xs items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/15 p-3 text-xs font-semibold text-destructive"
             >
               <AlertCircle className="size-4 shrink-0" />
               <span>{displayError}</span>
@@ -99,10 +89,10 @@ export function RegisterScreen() {
               onBlur={() => form.handleBlur("full_name")}
               onKeyDown={(e) => e.key === "Enter" && phoneRef.current?.focus()}
               placeholder="Selam Tesfaye"
-              className={`w-full rounded-xl border bg-white/10 px-4 py-3 pl-11 text-sm font-medium text-white outline-none transition-all backdrop-blur-sm placeholder:text-white/30 focus:bg-white/15 ${
+              className={`w-full rounded-xl border bg-white px-4 py-3 pl-11 text-sm font-normal text-ink outline-none transition-colors placeholder:text-neutral-400 ${
                 form.errors.full_name && form.touched.full_name
-                  ? "border-destructive/60"
-                  : "border-white/10 focus:border-awash-gold/50"
+                  ? "border-destructive/60 focus:border-destructive"
+                  : "border-border/60 focus:border-primary/50"
               }`}
             />
           </FormField>
@@ -124,10 +114,10 @@ export function RegisterScreen() {
               onKeyDown={(e) => e.key === "Enter" && pwRef.current?.focus()}
               placeholder="091 XXX XXXX"
               maxLength={15}
-              className={`w-full rounded-xl border bg-white/10 px-4 py-3 pl-11 text-sm font-medium text-white outline-none transition-all backdrop-blur-sm placeholder:text-white/30 focus:bg-white/15 ${
+              className={`w-full rounded-xl border bg-white px-4 py-3 pl-11 text-sm font-normal text-ink outline-none transition-colors placeholder:text-neutral-400 ${
                 form.errors.phone_number && form.touched.phone_number
-                  ? "border-destructive/60"
-                  : "border-white/10 focus:border-awash-gold/50"
+                  ? "border-destructive/60 focus:border-destructive"
+                  : "border-border/60 focus:border-primary/50"
               }`}
             />
           </FormField>
@@ -149,10 +139,10 @@ export function RegisterScreen() {
               onBlur={() => form.handleBlur("password")}
               onKeyDown={(e) => e.key === "Enter" && form.handleSubmit(onSubmit)}
               placeholder="min 4 characters"
-              className={`w-full rounded-xl border bg-white/10 px-4 py-3 pl-11 text-sm font-medium text-white outline-none transition-all backdrop-blur-sm placeholder:text-white/30 focus:bg-white/15 ${
+              className={`w-full rounded-xl border bg-white px-4 py-3 pl-11 text-sm font-normal text-ink outline-none transition-colors placeholder:text-neutral-400 ${
                 form.errors.password && form.touched.password
-                  ? "border-destructive/60"
-                  : "border-white/10 focus:border-awash-gold/50"
+                  ? "border-destructive/60 focus:border-destructive"
+                  : "border-border/60 focus:border-primary/50"
               }`}
             />
           </FormField>
@@ -195,7 +185,7 @@ export function RegisterScreen() {
           onClick={() => form.handleSubmit(onSubmit)}
           disabled={form.isSubmitting}
           whileTap={{ scale: 0.98 }}
-          className="mt-8 flex w-full max-w-xs items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-awash-gold to-awash-gold-light py-3.5 text-sm font-bold text-awash-blue shadow-lg shadow-primary/30 transition-all hover:shadow-primary/40 disabled:opacity-60"
+          className="mt-8 flex w-full max-w-xs items-center justify-center gap-2 rounded-full bg-primary py-3.5 text-[17px] font-normal tracking-[-0.022em] text-primary-foreground transition-colors hover:bg-[#B89A38] disabled:opacity-60"
         >
           {form.isSubmitting ? <Loader2 className="size-4 animate-spin" /> : null}
           {form.isSubmitting ? "Creating account…" : "Create Account"}
@@ -205,10 +195,10 @@ export function RegisterScreen() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5 }}
-          className="mt-6 text-xs font-medium text-white/50"
+          className="mt-6 text-xs font-normal text-neutral-500"
         >
           Already have an account?{" "}
-          <button onClick={() => go("login")} className="font-bold text-awash-gold transition-colors hover:text-awash-gold-light">
+          <button onClick={() => go("login")} className="font-medium text-link-blue hover:underline">
             Sign In
           </button>
         </motion.p>

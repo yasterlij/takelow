@@ -15,3 +15,6 @@ jest.config.ts
 test
 uploads
 .eslintrc.js
+*.md
+.expo
+npm-cache*
