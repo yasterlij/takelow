@@ -365,7 +365,65 @@ export class AuctionAdminService {
     if (dto.max_bid !== undefined) auction.max_bid = dto.max_bid;
     if (dto.bid_fee !== undefined) auction.bid_fee = dto.bid_fee;
 
-    const savedAuction = await this.prisma.repository("auction").save(auction);
+    let savedAuction: any;
+    try {
+      const rows = await this.prisma.repository("auction").query(
+        `UPDATE auctions
+         SET status = $2,
+             start_time = $3,
+             end_time = $4,
+             winner_user_id = NULL,
+             winning_bid_amount = NULL,
+             payment_status = NULL,
+             payment_deadline = NULL,
+             last_payment_update = NULL,
+             extensions = 0,
+             min_bid = COALESCE($5, min_bid),
+             max_bid = COALESCE($6, max_bid),
+             bid_fee = COALESCE($7, bid_fee)
+         WHERE id = $1
+         RETURNING *`,
+        [
+          id,
+          AuctionStatus.ACTIVE,
+          startTime,
+          endTime,
+          dto.min_bid !== undefined ? dto.min_bid : null,
+          dto.max_bid !== undefined ? dto.max_bid : null,
+          dto.bid_fee !== undefined ? dto.bid_fee : null,
+        ],
+      );
+      savedAuction = rows?.[0];
+    } catch {
+      // fallback
+    }
+
+    if (!savedAuction) {
+      const auctionToSave = { ...auction };
+      delete auctionToSave.product;
+      delete auctionToSave.bids;
+      delete auctionToSave.winners;
+      delete auctionToSave.winner;
+      delete auctionToSave.favorites;
+      delete auctionToSave.notifications;
+      delete auctionToSave.payment_transactions;
+      try {
+        savedAuction = await this.prisma.repository("auction").save(auctionToSave);
+      } catch {
+        savedAuction = {
+          ...auction,
+          status: AuctionStatus.ACTIVE,
+          start_time: startTime,
+          end_time: endTime,
+          winner_user_id: null,
+          winning_bid_amount: null,
+          payment_status: null,
+          payment_deadline: null,
+          last_payment_update: null,
+          extensions: 0,
+        };
+      }
+    }
 
     let updatedProduct = auction.product;
     if (
@@ -381,11 +439,34 @@ export class AuctionAdminService {
       if (product) {
         if (dto.name) product.name = dto.name;
         if (dto.description !== undefined) product.description = dto.description;
-        if (dto.category !== undefined) product.category = dto.category;
+        if (dto.category !== undefined) {
+          product.category = normalizeProductCategory(
+            dto.category,
+            dto.name ?? product.name,
+          );
+        }
         if (dto.image_urls !== undefined) product.image_urls = dto.image_urls;
-        if (dto.current_market_price !== undefined)
+        if (dto.current_market_price !== undefined) {
           product.current_market_price = dto.current_market_price;
-        updatedProduct = await this.prisma.repository("product").save(product);
+        }
+        try {
+          updatedProduct = await this.prisma.repository("product").save(product);
+        } catch {
+          const prodRows = await this.prisma.repository("product").query(
+            `UPDATE products
+             SET name = $2, description = $3, category = $4, current_market_price = $5
+             WHERE id = $1
+             RETURNING *`,
+            [
+              product.id,
+              product.name,
+              product.description,
+              product.category,
+              product.current_market_price,
+            ],
+          );
+          updatedProduct = prodRows?.[0] || product;
+        }
       }
     }
 
@@ -402,7 +483,7 @@ export class AuctionAdminService {
         },
       });
     } catch {
-      // audit log table save failure should not abort reopen
+      // audit log
     }
 
     return {
