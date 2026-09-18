@@ -1,5 +1,8 @@
 import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+
+type WalletRow = { id: string; wallet_balance: Prisma.Decimal };
 
 @Injectable()
 export class WalletService {
@@ -10,14 +13,32 @@ export class WalletService {
   ) {}
 
   async deposit(userId: string, amount: number, referenceId: string): Promise<any> {
-    return this.prisma.$transaction(async (tx) => {
-      const user = await tx.user.findUnique({ where: { id: userId } });
-      if (!user) throw new NotFoundException('User not found');
+    if (amount <= 0) {
+      throw new BadRequestException('Deposit amount must be positive');
+    }
 
-      const updatedUser = await tx.user.update({
-        where: { id: userId },
-        data: { wallet_balance: Number(user.wallet_balance) + amount },
-      });
+    return this.prisma.$transaction(async (tx) => {
+      if (referenceId) {
+        const existing = await tx.transaction.findFirst({
+          where: { reference_id: referenceId },
+        });
+        if (existing) {
+          const user = await tx.user.findUnique({ where: { id: userId } });
+          if (!user) throw new NotFoundException('User not found');
+          return user;
+        }
+      }
+
+      const rows = await tx.$queryRaw<WalletRow[]>`
+        UPDATE users
+        SET wallet_balance = wallet_balance + ${amount}::numeric
+        WHERE id = ${userId}::uuid
+        RETURNING id, wallet_balance
+      `;
+
+      if (!rows.length) {
+        throw new NotFoundException('User not found');
+      }
 
       await tx.transaction.create({
         data: {
@@ -28,22 +49,32 @@ export class WalletService {
         },
       });
 
-      return updatedUser;
+      return rows[0];
     });
   }
 
   async deductBidFee(userId: string, feeAmount: number): Promise<void> {
+    if (feeAmount <= 0) {
+      throw new BadRequestException('Fee amount must be positive');
+    }
+
     await this.prisma.$transaction(async (tx) => {
-      const user = await tx.user.findUnique({ where: { id: userId } });
-      if (!user) throw new NotFoundException('User not found');
-      if (Number(user.wallet_balance) < feeAmount) {
+      const rows = await tx.$queryRaw<WalletRow[]>`
+        UPDATE users
+        SET wallet_balance = wallet_balance - ${feeAmount}::numeric
+        WHERE id = ${userId}::uuid
+          AND wallet_balance >= ${feeAmount}::numeric
+        RETURNING id, wallet_balance
+      `;
+
+      if (!rows.length) {
+        const user = await tx.user.findUnique({
+          where: { id: userId },
+          select: { id: true },
+        });
+        if (!user) throw new NotFoundException('User not found');
         throw new BadRequestException('Insufficient wallet balance');
       }
-
-      await tx.user.update({
-        where: { id: userId },
-        data: { wallet_balance: Number(user.wallet_balance) - feeAmount },
-      });
 
       await tx.transaction.create({
         data: {
@@ -57,14 +88,32 @@ export class WalletService {
   }
 
   async refund(userId: string, amount: number, referenceId: string): Promise<any> {
-    return this.prisma.$transaction(async (tx) => {
-      const user = await tx.user.findUnique({ where: { id: userId } });
-      if (!user) throw new NotFoundException('User not found');
+    if (amount <= 0) {
+      throw new BadRequestException('Refund amount must be positive');
+    }
 
-      const updatedUser = await tx.user.update({
-        where: { id: userId },
-        data: { wallet_balance: Number(user.wallet_balance) + amount },
-      });
+    return this.prisma.$transaction(async (tx) => {
+      if (referenceId) {
+        const existing = await tx.transaction.findFirst({
+          where: { reference_id: referenceId },
+        });
+        if (existing) {
+          const user = await tx.user.findUnique({ where: { id: userId } });
+          if (!user) throw new NotFoundException('User not found');
+          return user;
+        }
+      }
+
+      const rows = await tx.$queryRaw<WalletRow[]>`
+        UPDATE users
+        SET wallet_balance = wallet_balance + ${amount}::numeric
+        WHERE id = ${userId}::uuid
+        RETURNING id, wallet_balance
+      `;
+
+      if (!rows.length) {
+        throw new NotFoundException('User not found');
+      }
 
       await tx.transaction.create({
         data: {
@@ -75,7 +124,7 @@ export class WalletService {
         },
       });
 
-      return updatedUser;
+      return rows[0];
     });
   }
 

@@ -279,46 +279,55 @@ export class BiddingService {
     return !!transaction;
   }
 
+  private static readonly TRACK_BID_LUA = `
+local freqKey = KEYS[1]
+local uniqueKey = KEYS[2]
+local biddersKey = KEYS[3]
+local totalKey = KEYS[4]
+local amountKey = ARGV[1]
+local amountScore = tonumber(ARGV[2])
+local userId = ARGV[3]
+local ttl = tonumber(ARGV[4])
+
+redis.call('SADD', biddersKey, userId)
+local count = tonumber(redis.call('ZINCRBY', freqKey, 1, amountKey))
+if count == 1 then
+  redis.call('ZADD', uniqueKey, amountScore, amountKey)
+else
+  redis.call('ZREM', uniqueKey, amountKey)
+end
+redis.call('INCR', totalKey)
+redis.call('EXPIRE', freqKey, ttl)
+redis.call('EXPIRE', uniqueKey, ttl)
+redis.call('EXPIRE', biddersKey, ttl)
+redis.call('EXPIRE', totalKey, ttl)
+return count
+`;
+
   private async trackBidInRedis(
     auctionId: string,
     userId: string,
     amount: number,
     endTime: Date,
   ): Promise<void> {
-    const multi = this.redis.multi();
     const amountKey = this.normalizeAmount(amount);
-
-    multi.sadd(`takelow:auction:${auctionId}:bidders`, userId);
-
-    multi.zincrby(`takelow:auction:${auctionId}:frequencies`, 1, amountKey);
-
+    const ttl = this.getAuctionStateTtl(endTime);
     const freqKey = `takelow:auction:${auctionId}:frequencies`;
     const uniqueKey = `takelow:auction:${auctionId}:unique_bids`;
+    const biddersKey = `takelow:auction:${auctionId}:bidders`;
+    const totalKey = `takelow:auction:${auctionId}:total_bids`;
 
-    const results = await multi.exec();
-    if (!results) return;
-
-    const saddResult = results[0][1];
-    const zincyResult = results[1][1];
-
-    const isNewBidder = saddResult === 1;
-    const count = Number(zincyResult);
-
-    const uniqueMulti = this.redis.multi();
-    if (count === 1) {
-      uniqueMulti.zadd(uniqueKey, amount, amountKey);
-    } else if (count > 1) {
-      uniqueMulti.zrem(uniqueKey, amountKey);
-    }
-
-    uniqueMulti.incr(`takelow:auction:${auctionId}:total_bids`);
-
-    const ttl = this.getAuctionStateTtl(endTime);
-    uniqueMulti.expire(`takelow:auction:${auctionId}:frequencies`, ttl);
-    uniqueMulti.expire(`takelow:auction:${auctionId}:unique_bids`, ttl);
-    uniqueMulti.expire(`takelow:auction:${auctionId}:bidders`, ttl);
-    uniqueMulti.expire(`takelow:auction:${auctionId}:total_bids`, ttl);
-
-    await uniqueMulti.exec();
+    await this.redis.eval(
+      BiddingService.TRACK_BID_LUA,
+      4,
+      freqKey,
+      uniqueKey,
+      biddersKey,
+      totalKey,
+      amountKey,
+      String(amount),
+      userId,
+      String(ttl),
+    );
   }
 }

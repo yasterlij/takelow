@@ -16,7 +16,9 @@ describe('WalletService Integration (Section 11.2)', () => {
           },
           transaction: {
             create: jest.fn(),
+            findFirst: jest.fn(),
           },
+          $queryRaw: jest.fn(),
         };
         return fn(tx);
       }),
@@ -41,22 +43,19 @@ describe('WalletService Integration (Section 11.2)', () => {
   });
 
   describe('deductBidFee', () => {
-    it('should deduct bid fee from wallet balance', async () => {
-      const user = {
-        id: 'user-1',
-        wallet_balance: 100,
-        phone_number: '+251911111111',
-      };
-
+    it('should deduct bid fee atomically via UPDATE ... WHERE balance >= fee', async () => {
       mockPrisma.$transaction.mockImplementation(async (fn: any) => {
         const tx = {
           user: {
-            findUnique: jest.fn().mockResolvedValue(user),
-            update: jest.fn().mockResolvedValue({ ...user, wallet_balance: 50 }),
+            findUnique: jest.fn(),
           },
           transaction: {
             create: jest.fn().mockResolvedValue({}),
+            findFirst: jest.fn(),
           },
+          $queryRaw: jest.fn().mockResolvedValue([
+            { id: 'user-1', wallet_balance: 50 },
+          ]),
         };
         return fn(tx);
       });
@@ -64,23 +63,36 @@ describe('WalletService Integration (Section 11.2)', () => {
       await service.deductBidFee('user-1', 50);
 
       expect(mockPrisma.$transaction).toHaveBeenCalled();
+      const txFn = mockPrisma.$transaction.mock.calls[0][0];
+      const tx = {
+        user: { findUnique: jest.fn() },
+        transaction: { create: jest.fn().mockResolvedValue({}), findFirst: jest.fn() },
+        $queryRaw: jest.fn().mockResolvedValue([{ id: 'user-1', wallet_balance: 50 }]),
+      };
+      await txFn(tx);
+      expect(tx.$queryRaw).toHaveBeenCalled();
+      expect(tx.transaction.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            user_id: 'user-1',
+            amount: 50,
+            type: 'BID_FEE',
+          }),
+        }),
+      );
     });
 
-    it('should throw Insufficient Funds when balance < fee', async () => {
-      const user = {
-        id: 'user-1',
-        wallet_balance: 30,
-      };
-
+    it('should throw Insufficient Funds when atomic update matches no rows', async () => {
       mockPrisma.$transaction.mockImplementation(async (fn: any) => {
         const tx = {
           user: {
-            findUnique: jest.fn().mockResolvedValue(user),
-            update: jest.fn(),
+            findUnique: jest.fn().mockResolvedValue({ id: 'user-1' }),
           },
           transaction: {
             create: jest.fn(),
+            findFirst: jest.fn(),
           },
+          $queryRaw: jest.fn().mockResolvedValue([]),
         };
         return fn(tx);
       });
@@ -88,6 +100,65 @@ describe('WalletService Integration (Section 11.2)', () => {
       await expect(service.deductBidFee('user-1', 50)).rejects.toThrow(
         'Insufficient wallet balance',
       );
+    });
+
+    it('should throw NotFound when user is missing', async () => {
+      mockPrisma.$transaction.mockImplementation(async (fn: any) => {
+        const tx = {
+          user: {
+            findUnique: jest.fn().mockResolvedValue(null),
+          },
+          transaction: {
+            create: jest.fn(),
+            findFirst: jest.fn(),
+          },
+          $queryRaw: jest.fn().mockResolvedValue([]),
+        };
+        return fn(tx);
+      });
+
+      await expect(service.deductBidFee('missing', 10)).rejects.toThrow(
+        'User not found',
+      );
+    });
+  });
+
+  describe('deposit', () => {
+    it('should credit balance atomically and record the deposit', async () => {
+      mockPrisma.$transaction.mockImplementation(async (fn: any) => {
+        const tx = {
+          user: { findUnique: jest.fn() },
+          transaction: {
+            create: jest.fn().mockResolvedValue({}),
+            findFirst: jest.fn().mockResolvedValue(null),
+          },
+          $queryRaw: jest.fn().mockResolvedValue([
+            { id: 'user-1', wallet_balance: 150 },
+          ]),
+        };
+        return fn(tx);
+      });
+
+      const result = await service.deposit('user-1', 50, 'ref-1');
+      expect(result.wallet_balance).toBe(150);
+    });
+
+    it('should be idempotent when reference_id already exists', async () => {
+      const existingUser = { id: 'user-1', wallet_balance: 100 };
+      mockPrisma.$transaction.mockImplementation(async (fn: any) => {
+        const tx = {
+          user: { findUnique: jest.fn().mockResolvedValue(existingUser) },
+          transaction: {
+            create: jest.fn(),
+            findFirst: jest.fn().mockResolvedValue({ id: 'txn-1', reference_id: 'ref-1' }),
+          },
+          $queryRaw: jest.fn(),
+        };
+        return fn(tx);
+      });
+
+      const result = await service.deposit('user-1', 50, 'ref-1');
+      expect(result).toEqual(existingUser);
     });
   });
 });
