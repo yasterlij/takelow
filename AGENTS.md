@@ -27,7 +27,7 @@ Always run `npx tsc --noEmit` and `npm test` in a service after editing it.
 - 3 NestJS microservices share one Postgres + one Redis. JWT secret must be identical across services (tokens are issued by identity-service and verified by all three).
 - Migrations are raw SQL in `database/migrations/`, applied via `scripts/migrate-raw.sh` with a `schema_migrations` tracking table. They are idempotent (`IF NOT EXISTS`) and re-runnable.
 - The auction winner algorithm uses Redis ZSETs (`frequencies` + `unique_bids`). See `SRS.md` §6.1.
-- Web/mobile share ~80% logic but are not yet a monorepo. `api.ts` and `AppContext.tsx` are near-duplicates.
+- Shared HTTP client lives in `packages/takelow-api` (`@takelow/api`). Web/mobile `src/api.ts` are thin config wrappers. `AppContext.tsx` is still duplicated per platform.
 
 ## Conventions
 

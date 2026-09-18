@@ -1,7 +1,9 @@
+export type { SocketUpdatePayload } from "@takelow/api";
 import { useEffect, useRef } from "react"
 import { io, Socket } from "socket.io-client"
 import type { Auction } from "../mockDataV0"
 import { getApiToken } from "../api"
+import { AuctionSocketEvents, AUCTION_SOCKET_NAMESPACE, type SocketUpdatePayload } from "@takelow/api"
 
 function getSocketBaseUrl(): string {
   const explicit = import.meta.env.VITE_ENGINE_API_BASE_URL as string | undefined
@@ -20,12 +22,6 @@ function getSocketBaseUrl(): string {
   return "http://localhost:3002"
 }
 
-export type SocketUpdatePayload = {
-  auction_id: string
-  total_bids: number
-  timestamp: string
-}
-
 export function useAuctionSocket(
   selectedId: string | null,
   onUpdate: (payload: SocketUpdatePayload) => void,
@@ -39,11 +35,11 @@ export function useAuctionSocket(
 
   const syncSubscription = (socket: Socket, nextSelectedId: string | null) => {
     if (subscribedRef.current && subscribedRef.current !== nextSelectedId) {
-      socket.emit("unsubscribe:auction", subscribedRef.current)
+      socket.emit(AuctionSocketEvents.unsubscribe, subscribedRef.current)
     }
 
     if (nextSelectedId) {
-      socket.emit("subscribe:auction", nextSelectedId)
+      socket.emit(AuctionSocketEvents.subscribe, nextSelectedId)
       subscribedRef.current = nextSelectedId
     } else {
       subscribedRef.current = null
@@ -56,7 +52,7 @@ export function useAuctionSocket(
 
     const baseUrl = getSocketBaseUrl()
 
-    const socket = io(`${baseUrl}/auctions`, {
+    const socket = io(`${baseUrl}${AUCTION_SOCKET_NAMESPACE}`, {
       path: "/socket.io",
       transports: ["websocket"],
       auth: { token },
@@ -65,7 +61,7 @@ export function useAuctionSocket(
     })
     socketRef.current = socket
 
-    socket.on("auction:update", (payload: SocketUpdatePayload) => {
+    socket.on(AuctionSocketEvents.update, (payload: SocketUpdatePayload) => {
       onUpdateRef.current(payload)
     })
 

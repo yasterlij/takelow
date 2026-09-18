@@ -3,9 +3,26 @@
   "compilerOptions": {
     "strict": true,
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": [
+        "./src/*"
+      ],
+      "@takelow/api": [
+        "../packages/takelow-api/src/index.ts"
+      ],
+      "@takelow/api/*": [
+        "../packages/takelow-api/src/*"
+      ]
     }
   },
-  "include": ["App.tsx", "src"],
-  "exclude": [".expo", "dist", "node_modules", "android", "ios"]
+  "include": [
+    "App.tsx",
+    "src"
+  ],
+  "exclude": [
+    ".expo",
+    "dist",
+    "node_modules",
+    "android",
+    "ios"
+  ]
 }

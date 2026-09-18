@@ -475,7 +475,7 @@ export function AdminAuctionsScreen() {
     setWinnerResult(null)
     try {
       const result = await api.drawWinner(id)
-      setWinnerResult({ auctionId: id, winnerName: result.winner_name, winnerUserId: result.winner_user_id, amount: result.winning_bid_amount })
+      setWinnerResult({ auctionId: id, winnerName: result.winner_name ?? undefined, winnerUserId: result.winner_user_id, amount: result.winning_bid_amount })
     } catch {
       setWinnerResult({ auctionId: id, winnerName: undefined, winnerUserId: null, amount: undefined })
     }

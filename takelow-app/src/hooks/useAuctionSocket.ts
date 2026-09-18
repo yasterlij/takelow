@@ -1,20 +1,15 @@
+export type { SocketUpdatePayload } from '@takelow/api'
 import { useEffect, useRef } from 'react'
 import { Platform } from 'react-native'
 import { io, Socket } from 'socket.io-client'
 import type { Auction } from '../mockDataV0'
 import { getApiToken } from '../api'
+import { AuctionSocketEvents, AUCTION_SOCKET_NAMESPACE, type SocketUpdatePayload } from '@takelow/api'
 
 const PROD_HOST = '196.189.237.158'
 const DEV_HOST = Platform.OS === 'android' ? '10.0.2.2' : 'localhost'
 const HOST = true ? PROD_HOST : DEV_HOST
-const SOCKET_URL = `http://${HOST}/auctions`
-
-export type SocketUpdatePayload = {
-  auction_id: string
-  new_bid_amount: number
-  total_bids: number
-  timestamp: string
-}
+const SOCKET_URL = `http://${HOST}${AUCTION_SOCKET_NAMESPACE}`
 
 export function useAuctionSocket(
   selectedId: string | null,
@@ -29,11 +24,11 @@ export function useAuctionSocket(
 
   const syncSubscription = (socket: Socket, nextSelectedId: string | null) => {
     if (subscribedRef.current && subscribedRef.current !== nextSelectedId) {
-      socket.emit('unsubscribe:auction', subscribedRef.current)
+      socket.emit(AuctionSocketEvents.unsubscribe, subscribedRef.current)
     }
 
     if (nextSelectedId) {
-      socket.emit('subscribe:auction', nextSelectedId)
+      socket.emit(AuctionSocketEvents.subscribe, nextSelectedId)
       subscribedRef.current = nextSelectedId
     } else {
       subscribedRef.current = null
@@ -53,7 +48,7 @@ export function useAuctionSocket(
     })
     socketRef.current = socket
 
-    socket.on('auction:update', (payload: SocketUpdatePayload) => {
+    socket.on(AuctionSocketEvents.update, (payload: SocketUpdatePayload) => {
       onUpdateRef.current(payload)
     })
 

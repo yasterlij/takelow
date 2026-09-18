@@ -1,3 +1,5 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
@@ -5,8 +7,15 @@ const IDENTITY = process.env.VITE_IDENTITY_API_BASE_URL || 'http://localhost:300
 const ENGINE = process.env.VITE_ENGINE_API_BASE_URL || 'http://localhost:3002';
 const QUERY = process.env.VITE_QUERY_API_BASE_URL || 'http://localhost:3003';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      "@takelow/api": path.resolve(__dirname, "../packages/takelow-api/src/index.ts"),
+    },
+  },
   build: {
     rollupOptions: {
       output: {
