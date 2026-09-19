@@ -5,7 +5,7 @@ import {
   ArrowUpRight, Crown, Zap, Clock, Radio,
   Server, Database, Cpu, AlertCircle, CheckCircle2,
   FileText, ScrollText, BarChart3, ShieldAlert, Wallet,
-  CircleDollarSign, UserPlus, Layers, Trophy, ShieldCheck, Download, RotateCcw,
+  CircleDollarSign, UserPlus, Layers, Trophy, ShieldCheck, Download, RotateCcw, Receipt,
 } from "lucide-react"
 import { useApp } from "../AppContext"
 import { AdminLayout } from "../components/AdminLayout"
@@ -393,12 +393,12 @@ export function AdminDashboardScreen() {
           {[
             { label: "Monitor Live", icon: Radio, view: "admin-monitor" as const, color: "from-emerald-600 to-emerald-700" },
             { label: "Manage Auctions", icon: Gavel, view: "admin-auctions" as const, color: "from-awash-blue to-awash-blue-dark" },
+            { label: "Transactions Hub", icon: Receipt, view: "admin-transactions" as const, color: "from-blue-600 to-indigo-700" },
+            { label: "Revenue & Settlement", icon: FileText, view: "admin-settlement" as const, color: "from-indigo-600 to-purple-700" },
             { label: "Manage Products", icon: Package, view: "admin-products" as const, color: "from-primary to-awash-gold-dark" },
             { label: "Manage Users", icon: Users, view: "admin-users" as const, color: "from-neutral-700 to-neutral-900" },
-            { label: "Settlement Report", icon: FileText, view: "admin-settlement" as const, color: "from-indigo-600 to-purple-700" },
             { label: "Analytics", icon: BarChart3, view: "admin-analytics" as const, color: "from-cyan-600 to-blue-700" },
             { label: "Disputes", icon: ShieldAlert, view: "admin-disputes" as const, color: "from-red-600 to-orange-700" },
-            { label: "Winners", icon: Crown, view: "admin-winners" as const, color: "from-amber-600 to-yellow-700" },
           ].map((q) => (
             <motion.div
               key={q.label}

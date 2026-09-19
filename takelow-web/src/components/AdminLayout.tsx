@@ -38,7 +38,7 @@ const NAV: NavItem[] = [
   { id: "admin-winners", label: "Winners", icon: Trophy, group: "Manage" },
   { id: "admin-users", label: "Users", icon: Users, group: "Manage" },
   { id: "admin-transactions", label: "Transactions", icon: Receipt, group: "Finance" },
-  { id: "admin-settlement", label: "Settlement", icon: FileText, group: "Finance" },
+  { id: "admin-settlement", label: "Revenue & Settlement", icon: FileText, group: "Finance" },
   { id: "admin-disputes", label: "Disputes", icon: ShieldAlert, group: "Governance" },
   { id: "admin-rbac", label: "Roles & Access", icon: Shield, group: "Governance" },
   { id: "admin-audit", label: "Audit Log", icon: ScrollText, group: "Governance" },
