@@ -594,6 +594,7 @@ describe('PaymentService - Bid Fee Payment', () => {
           winner_user_id: 'winner-2',
           winning_bid_amount: 12.5,
           payment_status: 'PENDING',
+          second_winner_assigned: true,
         }),
       );
       expect(mockNotificationDispatchService.dispatch).toHaveBeenCalledWith(
@@ -602,6 +603,7 @@ describe('PaymentService - Bid Fee Payment', () => {
           user_id: 'winner-2',
           auction_id: 'auction-1',
           winning_amount: 12.5,
+          reassignment_reason: expect.stringContaining('original winner did not complete payment'),
         }),
       );
     });
@@ -626,7 +628,7 @@ describe('PaymentService - Bid Fee Payment', () => {
       (mockWinnerService.getNextUnpaidWinner as jest.Mock).mockResolvedValue(null);
       mockWinnerRepo.save.mockResolvedValue(currentWinner);
       mockWinnerRepo.update.mockResolvedValue({ affected: 1 });
-      mockAuctionRepo.save.mockResolvedValue({ ...overdueAuction, status: 'EXPIRED', payment_status: 'EXPIRED' });
+      mockAuctionRepo.save.mockResolvedValue({ ...overdueAuction, status: 'EXPIRED', payment_status: 'PAYMENT_DEFAULTED' });
 
       await service.expireOverduePayments();
 
@@ -637,7 +639,7 @@ describe('PaymentService - Bid Fee Payment', () => {
       expect(mockAuctionRepo.save).toHaveBeenCalledWith(
         expect.objectContaining({
           status: 'EXPIRED',
-          payment_status: 'EXPIRED',
+          payment_status: 'PAYMENT_DEFAULTED',
         }),
       );
       expect(mockNotificationDispatchService.dispatch).not.toHaveBeenCalledWith(

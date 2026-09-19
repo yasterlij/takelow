@@ -89,6 +89,9 @@ export class AuctionsService {
         : []),
       ...(auctionCols.has("payment_status") ? ["a.payment_status"] : []),
       ...(auctionCols.has("payment_deadline") ? ["a.payment_deadline"] : []),
+      ...(auctionCols.has("second_winner_assigned") ? ["a.second_winner_assigned"] : []),
+      ...(auctionCols.has("payment_deadline_hours") ? ["a.payment_deadline_hours"] : []),
+      ...(auctionCols.has("escalation_rule") ? ["a.escalation_rule"] : []),
       ...(auctionCols.has("created_at") ? ["a.created_at"] : []),
     ].join(",\n        ");
 
@@ -137,13 +140,14 @@ export class AuctionsService {
   }
 
   private toAuctionRecord(row: any) {
+    const productId = row.product_ref_id || row.product_id;
     return {
       id: row.id,
-      public_code: row.public_code,
-      product_id: row.product_id,
-      product: row.product_ref_id
+      public_code: row.public_code ? String(row.public_code) : undefined,
+      product_id: productId,
+      product: productId
         ? {
-            id: row.product_ref_id,
+            id: productId,
             name: row.product_name,
             description: row.product_description,
             image_urls: row.product_image_urls,
@@ -165,6 +169,9 @@ export class AuctionsService {
       winning_bid_amount: row.winning_bid_amount,
       payment_status: row.payment_status,
       payment_deadline: row.payment_deadline,
+      payment_deadline_hours: row.payment_deadline_hours != null ? Number(row.payment_deadline_hours) : null,
+      escalation_rule: row.escalation_rule || null,
+      second_winner_assigned: Boolean(row.second_winner_assigned),
       created_at: row.created_at,
     };
   }
@@ -309,6 +316,9 @@ export class AuctionsService {
           : []),
         ...(auctionCols.has("payment_status") ? ["a.payment_status"] : []),
         ...(auctionCols.has("payment_deadline") ? ["a.payment_deadline"] : []),
+        ...(auctionCols.has("second_winner_assigned") ? ["a.second_winner_assigned"] : []),
+        ...(auctionCols.has("payment_deadline_hours") ? ["a.payment_deadline_hours"] : []),
+        ...(auctionCols.has("escalation_rule") ? ["a.escalation_rule"] : []),
         ...(auctionCols.has("created_at") ? ["a.created_at"] : []),
       ].join(",\n          ");
       const productSelect = [

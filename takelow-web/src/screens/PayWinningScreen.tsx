@@ -93,9 +93,21 @@ export function PayWinningScreen() {
   if (!auction) return null
 
   const amount = auction.winning_bid_amount ?? userBid ?? 0
-  const deadlineHrs = 24
-  const deadlineMins = 1440
-  const urgent = deadlineHrs < 6
+  const deadline = (auction as any).payment_deadline ? new Date((auction as any).payment_deadline) : null
+  const deadlineHrs = deadline ? Math.max(0, Math.round((deadline.getTime() - Date.now()) / 3600000)) : 30 * 24
+  const deadlineMins = deadline ? Math.max(0, Math.round((deadline.getTime() - Date.now()) / 60000)) : 30 * 24 * 60
+  const deadlineDays = Math.floor(deadlineHrs / 24)
+  const isSecondWinnerAssigned = Boolean(auction.second_winner_assigned || (auction as any).second_winner_assigned)
+  const isPaymentExpired = (deadline !== null && deadlineHrs <= 0) || auction.payment_status === "PAYMENT_DEFAULTED" || (auction as any).payment_status === "PAYMENT_DEFAULTED" || (auction as any).status === "PAYMENT_DEFAULTED"
+  const urgent = deadlineHrs < 24 && !isPaymentExpired
+
+  const deadlineMessage = deadlineHrs <= 0
+    ? "Payment deadline has expired."
+    : deadlineDays >= 30
+      ? `Complete payment within ${Math.floor(deadlineDays / 30)} month${Math.floor(deadlineDays / 30) > 1 ? "s" : ""} (${deadlineDays} days) to claim your prize.`
+      : deadlineDays >= 1
+        ? `Complete payment within ${deadlineDays} days ${deadlineHrs % 24}h to claim your prize.`
+        : `Complete payment within ${deadlineHrs}h ${deadlineMins % 60}m to claim your prize.`
   const hasSufficientBalance = walletBalance >= amount
   const SelectedIcon = paymentMethods.find((m) => m.id === selected)?.icon || ShieldCheck
 
@@ -219,18 +231,47 @@ export function PayWinningScreen() {
         </div>
       </div>
 
-      {/* ── Urgency Banner ── */}
-      <motion.div
-        initial={{ opacity: 0, y: -8 }}
-        animate={{ opacity: 1, y: 0 }}
-        className={`flex items-center gap-2 rounded-xl p-3 ${urgent ? "bg-red-50 border border-red-200" : "bg-gradient-to-br from-awash-gold/10 to-awash-gold-light/5 border border-primary/20"
-          }`}
-      >
-        <Clock className={`size-[18px] flex-shrink-0 ${urgent ? "text-red-500 animate-pulse" : "text-primary"}`} />
-        <p className={`text-xs font-semibold ${urgent ? "text-red-700" : "text-foreground/80"}`}>
-          Complete payment within <strong>{deadlineHrs}h {deadlineMins % 60}m</strong> to claim your prize.
-        </p>
-      </motion.div>
+      {/* ── Second Winner Reassignment Banner ── */}
+      {isSecondWinnerAssigned && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-2xl border border-primary/30 bg-primary/10 p-4 text-left shadow-sm"
+        >
+          <div className="flex items-center gap-2 text-primary font-extrabold text-sm">
+            <Trophy className="size-4" />
+            <span>Second Winner Assigned</span>
+          </div>
+          <p className="mt-1 text-xs font-medium text-foreground leading-relaxed">
+            You have been awarded this auction because the original winner did not complete payment within the specified timeframe.
+          </p>
+        </motion.div>
+      )}
+
+      {/* ── Urgency or Expired Banner ── */}
+      {isPaymentExpired ? (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-center"
+        >
+          <p className="text-sm font-bold text-destructive">
+            This auction is no longer eligible for payment. The payment deadline has expired.
+          </p>
+        </motion.div>
+      ) : (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className={`flex items-center gap-2 rounded-xl p-3 ${urgent ? "bg-red-50 border border-red-200" : "bg-gradient-to-br from-awash-gold/10 to-awash-gold-light/5 border border-primary/20"
+            }`}
+        >
+          <Clock className={`size-[18px] flex-shrink-0 ${urgent ? "text-red-500 animate-pulse" : "text-primary"}`} />
+          <p className={`text-xs font-semibold ${urgent ? "text-red-700" : "text-foreground/80"}`}>
+            {deadlineMessage}
+          </p>
+        </motion.div>
+      )}
 
       {/* ── Winning Amount ── */}
       <motion.div
@@ -372,7 +413,7 @@ export function PayWinningScreen() {
       )}
 
       {/* ── CTA ── */}
-      {selected === "AWASH" && !hasSufficientBalance && (
+      {selected === "AWASH" && !hasSufficientBalance && !isPaymentExpired && (
         <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-center">
           <p className="text-xs font-semibold text-destructive">
             Insufficient wallet balance. Top up your wallet before paying with Awash Mobile Wallet.
@@ -380,24 +421,35 @@ export function PayWinningScreen() {
         </div>
       )}
 
-      <button
-        onClick={handlePayClick}
-        disabled={loading || checkingPin || (selected === "AWASH" && !hasSufficientBalance)}
-        className="btn-primary animate-shine group"
-      >
-        {loading || checkingPin ? (
-          <Loader2 className="size-[18px] animate-spin" />
-        ) : selected === "SIKINAPAY" ? (
-          <ShieldCheck className="size-[18px] group-hover:scale-110 transition-transform" />
-        ) : (
-          <Wallet className="size-[18px] group-hover:scale-110 transition-transform" />
-        )}
-        {loading
-          ? "Processing..."
-          : checkingPin
-            ? "Checking wallet PIN status..."
-            : `Proceed to Payment · ${formatCurrency(amount)}`}
-      </button>
+      {isPaymentExpired ? (
+        <div className="space-y-2">
+          <button disabled className="btn-primary opacity-50 cursor-not-allowed">
+            Payment Expired
+          </button>
+          <button onClick={() => go("home")} className="btn-outline">
+            Back to Dashboard
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={handlePayClick}
+          disabled={loading || checkingPin || (selected === "AWASH" && !hasSufficientBalance)}
+          className="btn-primary animate-shine group"
+        >
+          {loading || checkingPin ? (
+            <Loader2 className="size-[18px] animate-spin" />
+          ) : selected === "SIKINAPAY" ? (
+            <ShieldCheck className="size-[18px] group-hover:scale-110 transition-transform" />
+          ) : (
+            <Wallet className="size-[18px] group-hover:scale-110 transition-transform" />
+          )}
+          {loading
+            ? "Processing..."
+            : checkingPin
+              ? "Checking wallet PIN status..."
+              : `Proceed to Payment · ${formatCurrency(amount)}`}
+        </button>
+      )}
 
       <AnimatePresence>
         {showPinModal && (

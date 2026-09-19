@@ -232,9 +232,6 @@ export function ProductScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={{ backgroundColor: colors.navy }}>
-        <StatusBarCustom />
-      </View>
       <AppBar
         title="Product Details"
         onBack={goBack}
@@ -249,11 +246,12 @@ export function ProductScreen() {
                 } catch {}
               }}
               style={{
-                width: 32,
-                height: 32,
+                width: 40,
+                height: 40,
                 justifyContent: "center",
                 alignItems: "center",
               }}
+              hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
               activeOpacity={0.7}
             >
               <Share2 size={18} color={colors.navyForeground} />
@@ -261,11 +259,12 @@ export function ProductScreen() {
             <TouchableOpacity
               onPress={() => toggleFavorite(auction.id)}
               style={{
-                width: 32,
-                height: 32,
+                width: 40,
+                height: 40,
                 justifyContent: "center",
                 alignItems: "center",
               }}
+              hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
               activeOpacity={0.7}
             >
               <Heart
@@ -291,6 +290,7 @@ export function ProductScreen() {
           paddingBottom: 32,
           gap: 16,
         }}
+        keyboardShouldPersistTaps="handled"
       >
         <ProductHeroSection
           auction={auction}
@@ -394,82 +394,84 @@ export function ProductScreen() {
       >
         <View style={s.confirmModalBackdrop}>
           <View style={s.confirmModalCard}>
-            <View style={s.confirmModalHeader}>
-              <View style={{ flex: 1 }}>
-                <Text style={s.confirmModalTitle}>Confirm Your Bid</Text>
-                <Text style={s.confirmModalSubtitle}>
-                  Review the bid details and bid fee before proceeding to
-                  payment.
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 8 }}>
+              <View style={s.confirmModalHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.confirmModalTitle}>Confirm Your Bid</Text>
+                  <Text style={s.confirmModalSubtitle}>
+                    Review the bid details and bid fee before proceeding to
+                    payment.
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setShowBidConfirmModal(false)}
+                  style={s.confirmModalClose}
+                >
+                  <X size={18} color={colors.mutedForeground} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={s.confirmDetailsCard}>
+                <Text style={s.confirmLabel}>Your Bid Item</Text>
+                <Text style={s.confirmValuePrimary}>{auction.name}</Text>
+
+                <View style={s.confirmDivider} />
+
+                <View style={s.confirmRow}>
+                  <Text style={s.confirmLabel}>Your Bid Amount</Text>
+                  <Text style={s.confirmValue}>{formatCurrency(numericBid)}</Text>
+                </View>
+
+                <View style={s.confirmDivider} />
+
+                <View style={s.confirmRow}>
+                  <Text style={s.confirmLabel}>Bid Service Fee</Text>
+                  <Text style={s.confirmFeeValue}>
+                    {formatCurrency(auction.bidFee)} (Non-refundable)
+                  </Text>
+                </View>
+
+                <Text style={s.confirmBodyText}>
+                  The bid service fee is non-refundable and is paid to participate
+                  in the auction. Your bid amount is not charged when you place
+                  the bid. Only the winning bidder will later pay the winning bid
+                  amount, in addition to this participation fee.
                 </Text>
               </View>
+
               <TouchableOpacity
-                onPress={() => setShowBidConfirmModal(false)}
-                style={s.confirmModalClose}
+                onPress={() => setBidAgreementAccepted((value) => !value)}
+                style={s.confirmAgreementRow}
               >
-                <X size={18} color={colors.mutedForeground} />
+                <View
+                  style={[
+                    s.confirmCheckbox,
+                    bidAgreementAccepted ? s.confirmCheckboxChecked : null,
+                  ]}
+                >
+                  {bidAgreementAccepted ? (
+                    <CheckCircle2 size={16} color="#FFF" />
+                  ) : null}
+                </View>
+                <Text style={s.confirmAgreementText}>I agree to continue</Text>
               </TouchableOpacity>
-            </View>
 
-            <View style={s.confirmDetailsCard}>
-              <Text style={s.confirmLabel}>Your Bid Item</Text>
-              <Text style={s.confirmValuePrimary}>{auction.name}</Text>
-
-              <View style={s.confirmDivider} />
-
-              <View style={s.confirmRow}>
-                <Text style={s.confirmLabel}>Your Bid Amount</Text>
-                <Text style={s.confirmValue}>{formatCurrency(numericBid)}</Text>
-              </View>
-
-              <View style={s.confirmDivider} />
-
-              <View style={s.confirmRow}>
-                <Text style={s.confirmLabel}>Bid Service Fee</Text>
-                <Text style={s.confirmFeeValue}>
-                  {formatCurrency(auction.bidFee)} (Non-refundable)
-                </Text>
-              </View>
-
-              <Text style={s.confirmBodyText}>
-                The bid service fee is non-refundable and is paid to participate
-                in the auction. Your bid amount is not charged when you place
-                the bid. Only the winning bidder will later pay the winning bid
-                amount, in addition to this participation fee.
-              </Text>
-            </View>
-
-            <TouchableOpacity
-              onPress={() => setBidAgreementAccepted((value) => !value)}
-              style={s.confirmAgreementRow}
-            >
-              <View
+              <TouchableOpacity
+                onPress={handleConfirmPayment}
+                disabled={!bidAgreementAccepted}
                 style={[
-                  s.confirmCheckbox,
-                  bidAgreementAccepted ? s.confirmCheckboxChecked : null,
+                  s.confirmContinueBtn,
+                  !bidAgreementAccepted ? s.confirmContinueBtnDisabled : null,
                 ]}
               >
-                {bidAgreementAccepted ? (
-                  <CheckCircle2 size={16} color="#FFF" />
-                ) : null}
-              </View>
-              <Text style={s.confirmAgreementText}>I agree to continue</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={handleConfirmPayment}
-              disabled={!bidAgreementAccepted}
-              style={[
-                s.confirmContinueBtn,
-                !bidAgreementAccepted ? s.confirmContinueBtnDisabled : null,
-              ]}
-            >
-              <Text style={s.confirmContinueBtnText}>
-                Continue to{" "}
-                {pendingPaymentMethod === "AWASH"
-                  ? "Awash Wallet"
-                  : "SikinaPay"}
-              </Text>
-            </TouchableOpacity>
+                <Text style={s.confirmContinueBtnText}>
+                  Continue to{" "}
+                  {pendingPaymentMethod === "AWASH"
+                    ? "Awash Wallet"
+                    : "SikinaPay"}
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -711,29 +713,6 @@ export function ProductScreen() {
   );
 }
 
-function StatusBarCustom() {
-  return (
-    <View
-      style={{
-        flexDirection: "row",
-        justifyContent: "space-between",
-        paddingHorizontal: 20,
-        paddingTop: 8,
-        paddingBottom: 4,
-      }}
-    >
-      <Text
-        style={{
-          fontSize: 13,
-          fontWeight: "600",
-          color: colors.navyForeground,
-        }}
-      >
-        9:41
-      </Text>
-    </View>
-  );
-}
 
 const s = StyleSheet.create({
   imageArea: {
@@ -934,6 +913,7 @@ const s = StyleSheet.create({
     padding: 20,
     borderWidth: 1,
     borderColor: colors.border,
+    maxHeight: '90%',
   },
   confirmModalHeader: {
     flexDirection: "row",

@@ -301,9 +301,6 @@ export function PayFeeScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={{ backgroundColor: colors.navy }}>
-        <StatusBarCustom />
-      </View>
       <AppBar
         title="Place Bid & Pay"
         onBack={goBack}
@@ -311,8 +308,8 @@ export function PayFeeScreen() {
           <TouchableOpacity
             onPress={() => go("home")}
             style={{
-              width: 34,
-              height: 34,
+              width: 44,
+              height: 44,
               justifyContent: "center",
               alignItems: "center",
             }}
@@ -323,6 +320,7 @@ export function PayFeeScreen() {
       />
       <ScrollView
         style={{ flex: 1 }}
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={{
           paddingHorizontal: 20,
           paddingTop: 20,
@@ -828,77 +826,79 @@ export function PayFeeScreen() {
         onRequestClose={() => setShowAgreementModal(false)}
       >
         <View style={s.confirmBackdrop}>
-          <Card style={s.confirmSheet}>
-            <View style={s.confirmHeader}>
-              <View style={{ flex: 1 }}>
-                <Text style={s.confirmTitle}>Confirm Your Bid</Text>
-                <Text style={s.confirmSubtext}>
-                  Review your bid and the service fee before proceeding to
-                  payment.
-                </Text>
+          <Card style={[s.confirmSheet, { maxHeight: '90%' }]}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 16 }}>
+              <View style={s.confirmHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.confirmTitle}>Confirm Your Bid</Text>
+                  <Text style={s.confirmSubtext}>
+                    Review your bid and the service fee before proceeding to
+                    payment.
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setShowAgreementModal(false)}
+                  style={s.confirmCloseButton}
+                >
+                  <X size={18} color={colors.mutedForeground} />
+                </TouchableOpacity>
               </View>
+
+              <Card style={s.confirmCard}>
+                <Text style={s.confirmLabel}>Your Bid Item:</Text>
+                <Text style={s.confirmProductName}>{auction.name}</Text>
+
+                <View style={s.confirmDivider} />
+
+                <View style={s.confirmRow}>
+                  <Text style={s.confirmLabel}>Your Bid Amount:</Text>
+                  <Text style={s.confirmBidAmount}>
+                    {formatCurrency(numericBid)}
+                  </Text>
+                </View>
+
+                <View style={s.confirmDivider} />
+
+                <Text style={s.confirmLabel}>Bid Service Fee:</Text>
+                <Text style={s.confirmFeeText}>
+                  {formatCurrency(auction.bidFee)} (Non-refundable)
+                </Text>
+
+                <Text style={s.confirmBody}>
+                  The bid service fee is non-refundable and is paid to participate
+                  in the auction. The amount submitted as a bid is not charged at
+                  the time of placing the bid. In this auction, winners are
+                  determined based on the lowest unique bid submitted among all
+                  participants. Only participants who win the auction will be
+                  required to pay the amount of their winning bid, in addition to
+                  the participation fee.
+                </Text>
+              </Card>
+
               <TouchableOpacity
-                onPress={() => setShowAgreementModal(false)}
-                style={s.confirmCloseButton}
+                onPress={() => setAgreementAccepted((value) => !value)}
+                style={s.confirmAgreementRow}
               >
-                <X size={18} color={colors.mutedForeground} />
+                <View
+                  style={[
+                    s.confirmCheckbox,
+                    agreementAccepted ? s.confirmCheckboxChecked : null,
+                  ]}
+                >
+                  {agreementAccepted ? (
+                    <ShieldCheck size={14} color={colors.primaryForeground} />
+                  ) : null}
+                </View>
+                <Text style={s.confirmAgreementText}>I agree to continue</Text>
               </TouchableOpacity>
-            </View>
 
-            <Card style={s.confirmCard}>
-              <Text style={s.confirmLabel}>Your Bid Item:</Text>
-              <Text style={s.confirmProductName}>{auction.name}</Text>
-
-              <View style={s.confirmDivider} />
-
-              <View style={s.confirmRow}>
-                <Text style={s.confirmLabel}>Your Bid Amount:</Text>
-                <Text style={s.confirmBidAmount}>
-                  {formatCurrency(numericBid)}
-                </Text>
-              </View>
-
-              <View style={s.confirmDivider} />
-
-              <Text style={s.confirmLabel}>Bid Service Fee:</Text>
-              <Text style={s.confirmFeeText}>
-                {formatCurrency(auction.bidFee)} (Non-refundable)
-              </Text>
-
-              <Text style={s.confirmBody}>
-                The bid service fee is non-refundable and is paid to participate
-                in the auction. The amount submitted as a bid is not charged at
-                the time of placing the bid. In this auction, winners are
-                determined based on the lowest unique bid submitted among all
-                participants. Only participants who win the auction will be
-                required to pay the amount of their winning bid, in addition to
-                the participation fee.
-              </Text>
-            </Card>
-
-            <TouchableOpacity
-              onPress={() => setAgreementAccepted((value) => !value)}
-              style={s.confirmAgreementRow}
-            >
-              <View
-                style={[
-                  s.confirmCheckbox,
-                  agreementAccepted ? s.confirmCheckboxChecked : null,
-                ]}
+              <CTAButton
+                onPress={handleConfirmAgreement}
+                disabled={!agreementAccepted}
               >
-                {agreementAccepted ? (
-                  <ShieldCheck size={14} color={colors.primaryForeground} />
-                ) : null}
-              </View>
-              <Text style={s.confirmAgreementText}>I agree to continue</Text>
-            </TouchableOpacity>
-
-            <CTAButton
-              onPress={handleConfirmAgreement}
-              disabled={!agreementAccepted}
-            >
-              Proceed to Payment · {formatCurrency(auction.bidFee)}
-            </CTAButton>
+                Proceed to Payment · {formatCurrency(auction.bidFee)}
+              </CTAButton>
+            </ScrollView>
           </Card>
         </View>
       </Modal>
@@ -1040,29 +1040,6 @@ export function PayFeeScreen() {
   );
 }
 
-function StatusBarCustom() {
-  return (
-    <View
-      style={{
-        flexDirection: "row",
-        justifyContent: "space-between",
-        paddingHorizontal: 20,
-        paddingTop: 8,
-        paddingBottom: 4,
-      }}
-    >
-      <Text
-        style={{
-          fontSize: 13,
-          fontWeight: "600",
-          color: colors.navyForeground,
-        }}
-      >
-        9:41
-      </Text>
-    </View>
-  );
-}
 
 const s = StyleSheet.create({
   infoBox: {

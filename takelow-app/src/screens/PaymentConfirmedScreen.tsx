@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Platform, StatusBar, ScrollView } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Check, Download, Truck, ArrowRight, Home, Copy } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { CTAButton, Card, AwashMark } from '../components/AuctionUI'
@@ -8,6 +9,8 @@ import { formatCurrency, formatETB } from '../mockDataV0'
 import { colors } from '../theme'
 
 export function PaymentConfirmedScreen() {
+  const insets = useSafeAreaInsets()
+  const topInset = Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 0)
   const { go, selectedId, userBid, getAuction } = useApp()
   const auction = getAuction(selectedId)
   const pingAnim = useRef(new Animated.Value(1)).current
@@ -34,9 +37,13 @@ export function PaymentConfirmedScreen() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <StatusBarCustom />
-      <View style={s.body}>
+    <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: topInset }}>
+      <StatusBar barStyle="dark-content" />
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={[s.body, { flexGrow: 1 }]}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={{ position: 'relative', marginBottom: 8 }}>
           <Animated.View
             style={[
@@ -98,9 +105,9 @@ export function PaymentConfirmedScreen() {
         </Card>
 
         <Text style={s.confirmText}>Thank you for your payment!</Text>
-      </View>
+      </ScrollView>
 
-      <Card style={s.bottomCta}>
+      <Card style={[s.bottomCta, { paddingBottom: Math.max(insets.bottom, 16) }]}>
         <View style={{ flexDirection: 'row', gap: 12 }}>
           <View style={{ flex: 1 }}>
             <CTAButton variant="navy" onPress={() => go('delivery')}>
@@ -118,13 +125,6 @@ export function PaymentConfirmedScreen() {
   )
 }
 
-function StatusBarCustom() {
-  return (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4, backgroundColor: colors.navy }}>
-      <Text style={{ fontSize: 13, fontWeight: '600', color: colors.navyForeground }}>9:41</Text>
-    </View>
-  )
-}
 
 const s = StyleSheet.create({
   body: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 40 },

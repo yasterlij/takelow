@@ -110,6 +110,14 @@ export class CreateAuctionDto {
   @IsNumber()
   @Min(0)
   bid_fee?: number;
+
+  @IsOptional()
+  @IsNumber()
+  payment_deadline_hours?: number;
+
+  @IsOptional()
+  @IsString()
+  escalation_rule?: string;
 }
 
 export class UpdateAuctionDto {
@@ -137,6 +145,14 @@ export class UpdateAuctionDto {
   @IsNumber()
   @Min(0)
   bid_fee?: number;
+
+  @IsOptional()
+  @IsNumber()
+  payment_deadline_hours?: number;
+
+  @IsOptional()
+  @IsString()
+  escalation_rule?: string;
 
   @IsOptional()
   @IsEnum(AuctionStatus)

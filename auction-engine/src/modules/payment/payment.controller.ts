@@ -54,9 +54,12 @@ export class PaymentController {
     }
     if (
       auction.status !== "CLOSED" ||
-      auction.payment_status !== "PENDING"
+      auction.payment_status !== "PENDING" ||
+      (auction.payment_deadline && new Date() > new Date(auction.payment_deadline))
     ) {
-      throw new BadRequestException("Auction is not eligible for payment");
+      throw new BadRequestException(
+        "This auction is no longer eligible for payment. The payment deadline has expired.",
+      );
     }
 
     const method = (paymentMethod as "SIKINAPAY" | "AWASH") || "SIKINAPAY";
@@ -227,9 +230,12 @@ export class PaymentController {
     }
     if (
       auction.status !== "CLOSED" ||
-      auction.payment_status !== "PENDING"
+      auction.payment_status !== "PENDING" ||
+      (auction.payment_deadline && new Date() > new Date(auction.payment_deadline))
     ) {
-      throw new BadRequestException("Auction is not eligible for payment");
+      throw new BadRequestException(
+        "This auction is no longer eligible for payment. The payment deadline has expired.",
+      );
     }
 
     await this.paymentService.createWinningWalletPayment(

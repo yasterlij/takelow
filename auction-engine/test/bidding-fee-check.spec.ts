@@ -24,6 +24,8 @@ function createMockRedis(): Partial<Record<keyof Redis, jest.Mock>> {
     zrem: jest.fn(),
     incr: jest.fn(),
     expire: jest.fn(),
+    eval: jest.fn().mockResolvedValue(1),
+    zscore: jest.fn().mockResolvedValue(null),
     multi: jest.fn().mockReturnValue({
       exec: jest.fn().mockResolvedValue([
         [null, 1], // sadd result
@@ -277,15 +279,7 @@ describe('BiddingService - Bid Fee Payment Check', () => {
         status: PaymentTransactionStatus.SUCCESSFUL,
       });
       mockBidRepo.count.mockResolvedValue(1);
-      (mockRedis.multi as jest.Mock).mockReturnValue({
-        exec: jest.fn().mockRejectedValue(new Error('redis write failed')),
-        sadd: jest.fn().mockReturnThis(),
-        zincrby: jest.fn().mockReturnThis(),
-        zadd: jest.fn().mockReturnThis(),
-        zrem: jest.fn().mockReturnThis(),
-        incr: jest.fn().mockReturnThis(),
-        expire: jest.fn().mockReturnThis(),
-      });
+      (mockRedis.eval as jest.Mock).mockRejectedValueOnce(new Error('redis write failed'));
 
       const result = await service.placeBid(
         auctionId,

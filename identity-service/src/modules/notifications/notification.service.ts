@@ -21,6 +21,7 @@ export interface WinnerNotificationPayload {
   collection_location?: string;
   collection_method?: string;
   collection_instructions?: string;
+  reassignment_reason?: string;
 }
 
 @Injectable()
@@ -70,14 +71,22 @@ export class NotificationService {
   async sendWinnerNotification(payload: WinnerNotificationPayload): Promise<void> {
     const deadlineDate = new Date(payload.payment_deadline);
     const deadlineFormatted = deadlineDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-    const pushTitle = 'You Won!';
-    const pushBody = `Congratulations! You won the ${payload.product_name} auction with a unique bid of ETB ${payload.winning_amount.toFixed(2)}. Payment due by ${deadlineFormatted}.`;
-    await this.sendPush(payload.user_id, { title: pushTitle, body: pushBody, data: { auction_id: payload.auction_id, type: 'won', winning_amount: String(payload.winning_amount), payment_deadline: payload.payment_deadline } });
-    const inAppBody = [`Congratulations! You won the "${payload.product_name}" auction.`, `Your unique winning bid: ETB ${payload.winning_amount.toFixed(2)}`, `Payment deadline: ${deadlineFormatted}`];
+    const pushTitle = payload.reassignment_reason ? 'You Won! (Second Winner Assigned)' : 'You Won!';
+    const pushBody = payload.reassignment_reason
+      ? `Congratulations! You won the ${payload.product_name} auction with a unique bid of ETB ${payload.winning_amount.toFixed(2)}. ${payload.reassignment_reason} Payment due by ${deadlineFormatted}.`
+      : `Congratulations! You won the ${payload.product_name} auction with a unique bid of ETB ${payload.winning_amount.toFixed(2)}. Payment due by ${deadlineFormatted}.`;
+    await this.sendPush(payload.user_id, { title: pushTitle, body: pushBody, data: { auction_id: payload.auction_id, type: 'won', winning_amount: String(payload.winning_amount), payment_deadline: payload.payment_deadline, reassignment_reason: payload.reassignment_reason || '' } });
+    const inAppBody = [
+      `Congratulations! You won the "${payload.product_name}" auction.`,
+      `Your unique winning bid: ETB ${payload.winning_amount.toFixed(2)}`,
+      `Payment deadline: ${deadlineFormatted}`,
+    ];
+    if (payload.reassignment_reason) inAppBody.push(`Reason: ${payload.reassignment_reason}`);
     if (payload.product_description) inAppBody.push(`Item: ${payload.product_description}`);
     if (payload.collection_location) inAppBody.push(`Collection: ${payload.collection_location}`);
     if (payload.collection_instructions) inAppBody.push(`Instructions: ${payload.collection_instructions}`);
     const metadata: Record<string, any> = { auction_id: payload.auction_id, winning_amount: payload.winning_amount, payment_deadline: payload.payment_deadline, product_name: payload.product_name };
+    if (payload.reassignment_reason) metadata.reassignment_reason = payload.reassignment_reason;
     if (payload.collection_location) metadata.collection_location = payload.collection_location;
     if (payload.collection_method) metadata.collection_method = payload.collection_method;
     if (payload.collection_instructions) metadata.collection_instructions = payload.collection_instructions;

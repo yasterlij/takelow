@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { View, Text, StyleSheet, Animated, TouchableOpacity } from 'react-native'
+import { View, Text, StyleSheet, Animated, TouchableOpacity, Platform, StatusBar, ScrollView } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Check, Eye, Home, MessageSquareText, Copy, TicketCheck } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { CTAButton, Card } from '../components/AuctionUI'
@@ -8,6 +9,8 @@ import { formatCurrency, formatETB } from '../mockDataV0'
 import { colors } from '../theme'
 
 export function BidConfirmedScreen() {
+  const insets = useSafeAreaInsets()
+  const topInset = Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 0)
   const { go, selectedId, userBid, bidTicketNumber, getAuction, user } = useApp()
   const isAdmin = user?.role === 'admin'
   const auction = getAuction(selectedId)
@@ -40,9 +43,13 @@ export function BidConfirmedScreen() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <StatusBarCustom />
-      <View style={s.body}>
+    <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: topInset }}>
+      <StatusBar barStyle="dark-content" />
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={[s.body, { flexGrow: 1 }]}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={{ position: 'relative', marginBottom: 8 }}>
           <Animated.View
             style={[
@@ -87,8 +94,8 @@ export function BidConfirmedScreen() {
         </Card>
 
         <Text style={s.keepWatching}>Keep watching — you might be the lowest unique bidder!</Text>
-      </View>
-      <View style={s.bottomCta}>
+      </ScrollView>
+      <View style={[s.bottomCta, { paddingBottom: Math.max(insets.bottom, 16) }]}>
         <View style={{ gap: 8 }}>
           <CTAButton variant="navy" onPress={() => go('my-bids')}>
             <TicketCheck size={18} /> View My Bids
@@ -108,13 +115,6 @@ export function BidConfirmedScreen() {
   )
 }
 
-function StatusBarCustom() {
-  return (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4, backgroundColor: colors.navy }}>
-      <Text style={{ fontSize: 13, fontWeight: '600', color: colors.navyForeground }}>9:41</Text>
-    </View>
-  )
-}
 
 const s = StyleSheet.create({
   body: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 40 },

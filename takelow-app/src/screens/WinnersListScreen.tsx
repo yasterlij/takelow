@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, RefreshControl, Image, TextInput } from 'react-native'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, RefreshControl, Image, TextInput, Platform, StatusBar } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Trophy, ArrowLeft, Crown, Sparkles, ArrowRight, Gavel, Timer, CreditCard, Users, Search, X, TrendingDown, Award } from 'lucide-react-native'
 import { useApp } from '../AppContext'
@@ -8,6 +9,8 @@ import { colors } from '../theme'
 import { formatCurrency, formatETB } from '../mockDataV0'
 
 export function WinnersListScreen() {
+  const insets = useSafeAreaInsets()
+  const topInset = Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 0)
   const { go, auctions, refreshAuctions, selectAuction, user } = useApp()
   const [refreshing, setRefreshing] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -55,16 +58,17 @@ export function WinnersListScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.neutralGray50 }}>
-      <LinearGradient colors={['#002B5C', '#001F3F']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ paddingTop: 12, paddingBottom: 20, paddingHorizontal: 16 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <TouchableOpacity onPress={() => go('home')} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' }}>
-            <ArrowLeft size={18} color="#FFF" />
+      <StatusBar barStyle="light-content" />
+      <LinearGradient colors={['#002B5C', '#001F3F']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ paddingTop: topInset + 6, paddingBottom: 16, paddingHorizontal: 16 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 56, marginBottom: 4 }}>
+          <TouchableOpacity onPress={() => go('home')} style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' }}>
+            <ArrowLeft size={20} color="#FFF" />
           </TouchableOpacity>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <Crown size={20} color={colors.primary} />
-            <Text style={{ fontFamily: 'System', fontSize: 18, fontWeight: '800', color: '#FFF' }}>Winners Circle</Text>
+            <Text style={{ fontFamily: 'System', fontSize: 17, fontWeight: '800', color: '#FFF' }}>Winners Circle</Text>
           </View>
-          <View style={{ width: 36 }} />
+          <View style={{ width: 44 }} />
         </View>
         <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', textAlign: 'center' }}>
           {closedAuctions.length} closed auction{closedAuctions.length !== 1 ? 's' : ''} • Lowest unique bids win

@@ -71,6 +71,12 @@ export class WinnerManagementController {
     return this.winnerManagementService.confirmPayment(winnerId, req.user.id);
   }
 
+  @Post(':id/remind')
+  @ApiOperation({ summary: 'Send payment reminder to winner' })
+  async sendPaymentReminder(@Param('id') winnerId: string, @Req() req: any) {
+    return this.winnerManagementService.sendPaymentReminder(winnerId, req.user.id);
+  }
+
   @Post('auction/:auctionId/rotate')
   @ApiOperation({ summary: 'Trigger winner rotation' })
   async triggerRotation(@Param('auctionId') auctionId: string, @Req() req: any) {
@@ -78,6 +84,12 @@ export class WinnerManagementController {
       auctionId,
       req.user.id,
     );
+  }
+
+  @Get('bidder/:userId/history')
+  @ApiOperation({ summary: 'Get bidder history and compliance statistics' })
+  async getBidderHistory(@Param('userId') userId: string) {
+    return this.winnerManagementService.getBidderHistory(userId);
   }
 
   @Get(':auctionId')

@@ -20,6 +20,8 @@ import type {
   ApiDispute,
   ApiRbacOverride,
   ApiAccessDecision,
+  ApiBidderHistory,
+  ApiNotificationTemplate,
 } from "./types";
 
 export type TakelowApiConfig = {
@@ -520,6 +522,8 @@ const api = {
     min_bid?: number;
     max_bid?: number;
     bid_fee?: number;
+    payment_deadline_hours?: number;
+    escalation_rule?: string;
   }) {
     return request<ApiAuction>("POST", "/admin/auctions", data, ENGINE_API);
   },
@@ -533,6 +537,8 @@ const api = {
       min_bid: number;
       max_bid: number;
       bid_fee: number;
+      payment_deadline_hours: number;
+      escalation_rule: string;
     }>,
   ) {
     return request<ApiAuction>(
@@ -889,10 +895,28 @@ const api = {
       IDENTITY_API,
     );
   },
-  adminListAuditLogs(page = 1, limit = 50) {
+  adminListAuditLogs(
+    pageOrParams: number | { page?: number; limit?: number; entity_type?: string; entity_id?: string; actor_id?: string; action?: string } = 1,
+    limit = 50,
+  ) {
+    let query = "";
+    if (typeof pageOrParams === "number") {
+      query = `page=${pageOrParams}&limit=${limit}`;
+    } else if (pageOrParams) {
+      const q = new URLSearchParams();
+      if (pageOrParams.page != null) q.set("page", String(pageOrParams.page));
+      if (pageOrParams.limit != null) q.set("limit", String(pageOrParams.limit));
+      if (pageOrParams.entity_type) q.set("entity_type", pageOrParams.entity_type);
+      if (pageOrParams.entity_id) q.set("entity_id", pageOrParams.entity_id);
+      if (pageOrParams.actor_id) q.set("actor_id", pageOrParams.actor_id);
+      if (pageOrParams.action) q.set("action", pageOrParams.action);
+      query = q.toString();
+    } else {
+      query = "page=1&limit=50";
+    }
     return request<{ data: any[]; meta: any }>(
       "GET",
-      `/admin/users/audit/list?page=${page}&limit=${limit}`,
+      `/admin/users/audit/list?${query}`,
       undefined,
       IDENTITY_API,
     );
@@ -1059,6 +1083,22 @@ const api = {
       QUERY_API,
     );
   },
+  adminSendPaymentReminder(winnerId: string) {
+    return request<{ success: boolean; message: string }>(
+      "POST",
+      `/admin/winners/${winnerId}/remind`,
+      undefined,
+      QUERY_API,
+    );
+  },
+  adminGetBidderHistory(userId: string) {
+    return request<ApiBidderHistory>(
+      "GET",
+      `/admin/bidders/${userId}/history`,
+      undefined,
+      QUERY_API,
+    );
+  },
 
   // Disputes
   getUserDisputes() {
@@ -1087,11 +1127,11 @@ const api = {
       IDENTITY_API,
     );
   },
-  adminUpdateDisputeStatus(id: string, status: string, resolution?: string) {
+  adminUpdateDisputeStatus(id: string, status: string, resolution?: string, document_urls?: string) {
     return request<ApiDispute>(
       "PATCH",
       `/disputes/${id}/status`,
-      { status, resolution },
+      { status, resolution, document_urls },
       IDENTITY_API,
     );
   },

@@ -13,6 +13,8 @@ import {
   CheckCircle2,
   Receipt,
   Percent,
+  ShieldCheck,
+  CreditCard,
 } from "lucide-react"
 import { AdminLayout } from "../components/AdminLayout"
 import { StatCard } from "../components/StatCard"
@@ -278,6 +280,96 @@ export function SettlementReportScreen() {
                 <span className="font-bold text-foreground">Platform Net Retained</span>
                 <span className="font-bold text-primary tabular-nums">
                   {formatCurrency(report?.net_revenue || 0)}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Escrow Handling & Multi-Gateway Breakdown */}
+        <div className="grid gap-4 lg:grid-cols-2">
+          {/* Escrow Handling (Procurement Compliance) */}
+          <div className="rounded-2xl border border-emerald-200/80 bg-gradient-to-br from-white to-emerald-50/30 p-5 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="size-4 text-emerald-600" />
+                <h2 className="font-display text-sm font-bold text-foreground">
+                  Escrow Handling & Procurement Compliance
+                </h2>
+              </div>
+              <span className="rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 border border-emerald-200">
+                UNCITRAL / ICC Compliant
+              </span>
+            </div>
+
+            <p className="text-[11px] text-neutral-500 mb-4 leading-relaxed">
+              Winning bids are held securely in escrow pending final customer product inspection and delivery verification before platform revenue disbursement.
+            </p>
+
+            <div className="grid grid-cols-2 gap-3 text-xs mb-3">
+              <div className="rounded-xl border border-emerald-100 bg-white p-3 shadow-2xs">
+                <span className="text-neutral-500 block text-[10px] font-bold uppercase">Funds Held in Escrow</span>
+                <span className="mt-1 font-bold text-base text-amber-600 block">
+                  {formatCurrency(report?.escrow_summary?.total_held_in_escrow || 0)}
+                </span>
+                <span className="text-[10px] text-neutral-400">
+                  {report?.escrow_summary?.pending_delivery_count || 0} auctions awaiting delivery
+                </span>
+              </div>
+              <div className="rounded-xl border border-emerald-100 bg-white p-3 shadow-2xs">
+                <span className="text-neutral-500 block text-[10px] font-bold uppercase">Released Platform Revenue</span>
+                <span className="mt-1 font-bold text-base text-emerald-700 block">
+                  {formatCurrency(report?.escrow_summary?.total_released_to_platform || 0)}
+                </span>
+                <span className="text-[10px] text-neutral-400">Fulfillment confirmed</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Multi-Payment Gateway Integration */}
+          <div className="rounded-2xl border border-border/60 bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <CreditCard className="size-4 text-primary" />
+                <h2 className="font-display text-sm font-bold text-foreground">
+                  Payment Gateway Breakdown
+                </h2>
+              </div>
+              <span className="text-[11px] font-mono text-neutral-400">Multi-Gateway Reconciliation</span>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="rounded-xl border border-blue-100 bg-blue-50/40 p-3 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="size-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-xs">
+                    AW
+                  </div>
+                  <div>
+                    <span className="font-bold text-awash-blue block">Awash Wallet & Telebirr Direct</span>
+                    <span className="text-[10px] text-neutral-500">
+                      {report?.gateway_breakdown?.awash_count || 0} successful settlements
+                    </span>
+                  </div>
+                </div>
+                <span className="font-bold text-awash-blue text-sm">
+                  {formatCurrency(report?.gateway_breakdown?.awash_volume || 0)}
+                </span>
+              </div>
+
+              <div className="rounded-xl border border-amber-100 bg-amber-50/40 p-3 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="size-8 rounded-lg bg-awash-gold text-awash-blue flex items-center justify-center font-bold text-xs">
+                    SK
+                  </div>
+                  <div>
+                    <span className="font-bold text-amber-900 block">SikinaPay Aggregator Gateway</span>
+                    <span className="text-[10px] text-neutral-500">
+                      {report?.gateway_breakdown?.sikinapay_count || 0} successful settlements
+                    </span>
+                  </div>
+                </div>
+                <span className="font-bold text-amber-900 text-sm">
+                  {formatCurrency(report?.gateway_breakdown?.sikinapay_volume || 0)}
                 </span>
               </div>
             </div>

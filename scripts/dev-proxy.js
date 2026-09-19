@@ -30,6 +30,7 @@ app.use((req, res, next) => {
     url.startsWith('/api/v1/auth') ||
     url.startsWith('/api/v1/wallet') ||
     url.startsWith('/api/v1/notify') ||
+    url.startsWith('/api/v1/otp') ||
     url.startsWith('/api/v1/admin/users') ||
     url.startsWith('/api/v1/admin/rbac') ||
     url.startsWith('/api/v1/rbac') ||

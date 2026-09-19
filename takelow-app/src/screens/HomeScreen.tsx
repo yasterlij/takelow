@@ -1,12 +1,13 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Modal, Pressable, Dimensions, RefreshControl, TextInput } from 'react-native'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Modal, Pressable, Dimensions, RefreshControl, TextInput, Platform, StatusBar } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient'
-import { Gavel, Wallet, ArrowRight, Eye, EyeOff, Shield, LogOut, Sparkles, Trophy, Bell, Heart, Search, TicketCheck } from 'lucide-react-native'
+import { Gavel, Wallet, ArrowRight, Eye, EyeOff, Shield, LogOut, Sparkles, Trophy, Bell, Heart, Search, TicketCheck, Crown, PartyPopper, CheckCircle2, TrendingDown, Clock, Calendar } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { AwashMark } from '../components/AuctionUI'
 import { SmartImage } from '../components/SmartImage'
 import { colors } from '../theme'
-import { formatCurrency, formatETB, formatCountdown } from '../mockDataV0'
+import { formatCurrency, formatETB, formatCountdown, COMING_SOON_ITEMS } from '../mockDataV0'
 import { useCountdown } from '../components/Countdown'
 import { AuctionCard } from './AuctionsScreen'
 
@@ -93,43 +94,341 @@ function HeroSlide({ item, onJoin, counter }: { item: any; onJoin: () => void; c
   )
 }
 
-function WinnerSlide({ auction, index }: { auction: any; index: number }) {
+const WINNER_CARD_W = 270
+const WINNER_IMG_H = 140
+
+function WinnerSlide({
+  auction,
+  index,
+  onPress,
+}: {
+  auction: any
+  index: number
+  onPress: () => void
+}) {
   const winnerInfo = auction.winners?.[0]
-  const maskPhone = (p: string | null) => p ? p.slice(0, 4) + 'XXXX' + p.slice(-2) : null
+  const maskPhone = (p: string | null) => (p ? p.slice(0, 4) + 'XXXX' + p.slice(-2) : null)
   const maskedPhone = winnerInfo?.phone ? maskPhone(winnerInfo.phone) : null
-  const firstName = winnerInfo?.name ? winnerInfo.name.split(" ")[0] : null
-  const winnerName = firstName && maskedPhone ? `${firstName} ${maskedPhone}` : (firstName || maskedPhone || `Winner #${index + 1}`)
+  const firstName = winnerInfo?.name ? winnerInfo.name.split(' ')[0] : null
+  const winnerName =
+    firstName && maskedPhone
+      ? `${firstName} (${maskedPhone})`
+      : firstName || maskedPhone || `Winner #${index + 1}`
   const bidAmount = auction.winning_bid_amount ?? winnerInfo?.amount ?? 0
+  const marketPrice = auction.marketPrice ?? 0
+  const savings =
+    marketPrice > 0 && bidAmount > 0
+      ? Math.round((1 - bidAmount / marketPrice) * 100)
+      : 0
+  const savedAmount = marketPrice > bidAmount ? marketPrice - bidAmount : 0
+  const hasImage = Boolean(auction.images?.[0])
+
   return (
-    <View style={{
-      width: 260, marginRight: 12, borderRadius: 16,
-      borderWidth: 1, borderColor: colors.primary + '33',
-      backgroundColor: colors.accent,
-      padding: 16, alignItems: 'center',
-      shadowColor: colors.primary, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4,
-    }}>
-      <View style={{ position: 'relative', marginBottom: 8 }}>
-        <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: colors.awashBlue, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 }}>
-          <Trophy size={26} color={colors.primary} />
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.92}
+      style={{
+        width: WINNER_CARD_W,
+        marginRight: 14,
+        borderRadius: 20,
+        backgroundColor: colors.card,
+        borderWidth: 1.5,
+        borderColor: colors.primary + '38',
+        overflow: 'hidden',
+        shadowColor: colors.awashBlue,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.12,
+        shadowRadius: 16,
+        elevation: 5,
+      }}
+    >
+      {/* ── Top Hero Image with celebratory overlays ── */}
+      <View style={{ width: '100%', height: WINNER_IMG_H, position: 'relative', backgroundColor: colors.awashBlue, overflow: 'hidden' }}>
+        {hasImage ? (
+          <SmartImage
+            uri={auction.images[0]}
+            alt={auction.name}
+            style={StyleSheet.absoluteFill}
+            resizeMode="cover"
+          />
+        ) : (
+          <LinearGradient
+            colors={['#002B5C', '#001A3A']}
+            style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center' }]}
+          >
+            <Trophy size={48} color={colors.primary + '66'} />
+          </LinearGradient>
+        )}
+
+        {/* Dual Gradient Overlay for legibility & prestige */}
+        <LinearGradient
+          colors={['rgba(0,0,0,0.45)', 'transparent', 'rgba(0, 31, 63, 0.92)']}
+          locations={[0, 0.45, 1]}
+          style={StyleSheet.absoluteFill}
+        />
+
+        {/* Top Badges */}
+        <View style={{ position: 'absolute', top: 10, left: 10, right: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', zIndex: 10 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0, 43, 92, 0.88)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: colors.primary + '66' }}>
+            <Crown size={12} color="#D4B85E" />
+            <Text style={{ fontSize: 10, fontWeight: '800', color: '#FFF', letterSpacing: 0.5 }}>WINNER #{index + 1}</Text>
+          </View>
+          {savings > 0 ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: colors.emerald600, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 3, elevation: 2 }}>
+              <TrendingDown size={11} color="#FFF" />
+              <Text style={{ fontSize: 10, fontWeight: '800', color: '#FFF' }}>-{savings}% OFF</Text>
+            </View>
+          ) : (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: colors.primary, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 4 }}>
+              <Sparkles size={11} color={colors.primaryForeground} />
+              <Text style={{ fontSize: 10, fontWeight: '800', color: colors.primaryForeground }}>CLAIMED</Text>
+            </View>
+          )}
         </View>
-        <View style={{ position: 'absolute', right: -4, top: -4, width: 24, height: 24, borderRadius: 12, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' }}>
-          <Text style={{ fontSize: 9, fontWeight: '700', color: colors.primaryForeground }}>#{index + 1}</Text>
+
+        {/* Product Title Overlaid On Bottom of Image */}
+        <View style={{ position: 'absolute', bottom: 8, left: 10, right: 10, zIndex: 10 }}>
+          <Text
+            style={{
+              color: '#FFF',
+              fontFamily: 'System',
+              fontSize: 15,
+              fontWeight: '800',
+              textShadowColor: 'rgba(0,0,0,0.85)',
+              textShadowOffset: { width: 0, height: 1.5 },
+              textShadowRadius: 4,
+            }}
+            numberOfLines={1}
+          >
+            {auction.name}
+          </Text>
+          {auction.specSummary ? (
+            <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: '600', marginTop: 1 }} numberOfLines={1}>
+              {auction.specSummary}
+            </Text>
+          ) : null}
         </View>
       </View>
-      <Text style={{ fontFamily: 'System', fontSize: 16, fontWeight: '800', color: colors.awashBlue }} numberOfLines={1}>{winnerName}</Text>
-      {winnerInfo?.phone && <Text style={{ fontSize: 10, fontWeight: '500', color: colors.mutedForeground, marginTop: 2 }}>{maskPhone(winnerInfo.phone)}</Text>}
-      <Text style={{ fontSize: 12, fontWeight: '500', color: colors.mutedForeground, marginTop: 2 }} numberOfLines={1}>{auction.name}</Text>
-      {auction.specSummary ? <Text style={{ fontSize: 10, fontWeight: '500', color: colors.mutedForeground, marginTop: 2 }} numberOfLines={1}>{auction.specSummary}</Text> : null}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8, backgroundColor: colors.primary + '1A', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6, borderWidth: 1, borderColor: colors.primary + '33' }}>
-        <Trophy size={14} color={colors.primary} />
-        <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>Won with {formatCurrency(bidAmount)}</Text>
+
+      {/* ── Bottom Details ── */}
+      <View style={{ padding: 12, gap: 10 }}>
+        {/* Winner Name & Verified Badge */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: colors.primary + '18', borderWidth: 1.5, borderColor: colors.primary + '55', justifyContent: 'center', alignItems: 'center' }}>
+            <PartyPopper size={16} color={colors.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Text style={{ fontFamily: 'System', fontSize: 13, fontWeight: '800', color: colors.navy }} numberOfLines={1}>
+                {winnerName}
+              </Text>
+              <CheckCircle2 size={13} color={colors.emerald600} />
+            </View>
+            <Text style={{ fontSize: 10, fontWeight: '600', color: colors.mutedForeground }}>
+              Lowest Unique Bid Winner
+            </Text>
+          </View>
+        </View>
+
+        {/* Price Box with Winning Bid vs Retail Value */}
+        <View style={{ backgroundColor: colors.accent, borderRadius: 14, borderWidth: 1, borderColor: colors.primary + '22', padding: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <View>
+            <Text style={{ fontSize: 9, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.8, color: colors.primary }}>Winning Bid</Text>
+            <Text style={{ fontFamily: 'System', fontSize: 17, fontWeight: '800', color: colors.navy, marginTop: 1, fontVariant: ['tabular-nums'] }}>
+              {formatCurrency(bidAmount)}
+            </Text>
+          </View>
+          {marketPrice > 0 && (
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={{ fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, color: colors.mutedForeground }}>Retail Value</Text>
+              <Text style={{ fontSize: 12, fontWeight: '600', color: colors.mutedForeground, textDecorationLine: 'line-through', marginTop: 1, fontVariant: ['tabular-nums'] }}>
+                {formatCurrency(marketPrice)}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Footer: Savings highlight + Tap Action */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 2 }}>
+          {savedAmount > 0 ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Sparkles size={12} color={colors.primary} />
+              <Text style={{ fontSize: 11, fontWeight: '800', color: colors.emerald700 }}>
+                Saved {formatCurrency(savedAmount)}!
+              </Text>
+            </View>
+          ) : (
+            <View />
+          )}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>View Result</Text>
+            <ArrowRight size={12} color={colors.primary} />
+          </View>
+        </View>
+      </View>
+    </TouchableOpacity>
+  )
+}
+
+function ComingSoonSlide({
+  item,
+  isWatched,
+  onToggleWatch,
+}: {
+  item: any
+  isWatched: boolean
+  onToggleWatch: () => void
+}) {
+  const hasImage = Boolean(item.images?.[0])
+  return (
+    <View
+      style={{
+        width: WINNER_CARD_W,
+        marginRight: 14,
+        borderRadius: 20,
+        backgroundColor: colors.card,
+        borderWidth: 1.5,
+        borderColor: isWatched ? colors.primary + '90' : 'rgba(0, 43, 92, 0.12)',
+        overflow: 'hidden',
+        shadowColor: colors.awashBlue,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.1,
+        shadowRadius: 16,
+        elevation: 4,
+      }}
+    >
+      <View style={{ width: '100%', height: WINNER_IMG_H, position: 'relative', backgroundColor: colors.awashBlue, overflow: 'hidden' }}>
+        {hasImage ? (
+          <SmartImage
+            uri={item.images[0]}
+            alt={item.name}
+            style={StyleSheet.absoluteFill}
+            resizeMode="cover"
+          />
+        ) : (
+          <LinearGradient colors={['#002B5C', '#001A3A']} style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center' }]}>
+            <Sparkles size={40} color={colors.primary + '66'} />
+          </LinearGradient>
+        )}
+        <LinearGradient
+          colors={['rgba(0,0,0,0.5)', 'transparent', 'rgba(0,0,0,0.75)']}
+          style={StyleSheet.absoluteFill}
+        />
+
+        <View style={{ position: 'absolute', top: 10, left: 10, right: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,43,92,0.88)', paddingHorizontal: 9, paddingVertical: 4.5, borderRadius: 12, borderWidth: 1, borderColor: colors.primary + '60' }}>
+            <Clock size={11} color={colors.primary} />
+            <Text style={{ fontSize: 10, fontWeight: '800', color: '#FFF', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              Coming Soon
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            onPress={onToggleWatch}
+            activeOpacity={0.8}
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 16,
+              backgroundColor: isWatched ? colors.primary : 'rgba(0,0,0,0.5)',
+              borderWidth: 1,
+              borderColor: isWatched ? colors.primary : 'rgba(255,255,255,0.4)',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            <Heart
+              size={15}
+              color={isWatched ? colors.primaryForeground : '#FFF'}
+              fill={isWatched ? colors.primaryForeground : 'transparent'}
+            />
+          </TouchableOpacity>
+        </View>
+
+        <View style={{ position: 'absolute', bottom: 10, left: 10, right: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <View style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3.5, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Calendar size={11} color={colors.navy} />
+            <Text style={{ fontSize: 10, fontWeight: '800', color: colors.navy }}>{item.dropTime}</Text>
+          </View>
+          <View style={{ backgroundColor: colors.primary + 'E6', borderRadius: 10, paddingHorizontal: 7, paddingVertical: 3.5 }}>
+            <Text style={{ fontSize: 9, fontWeight: '800', color: colors.primaryForeground, textTransform: 'uppercase' }}>
+              {item.category}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      <View style={{ padding: 14, gap: 8 }}>
+        <Text style={{ fontFamily: 'System', fontWeight: '800', fontSize: 14, color: colors.foreground, lineHeight: 18 }} numberOfLines={1}>
+          {item.name}
+        </Text>
+        <Text style={{ fontSize: 11, fontWeight: '500', color: colors.mutedForeground, lineHeight: 15 }} numberOfLines={2}>
+          {item.specSummary}
+        </Text>
+
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 4, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.06)' }}>
+          <View>
+            <Text style={{ fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, color: colors.mutedForeground }}>Est. Bid Fee</Text>
+            <Text style={{ fontSize: 13, fontWeight: '800', color: colors.primary, marginTop: 1, fontVariant: ['tabular-nums'] }}>
+              {formatCurrency(item.bidFee)}
+            </Text>
+          </View>
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text style={{ fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, color: colors.mutedForeground }}>Retail Value</Text>
+            <Text style={{ fontSize: 12, fontWeight: '600', color: colors.mutedForeground, marginTop: 1, fontVariant: ['tabular-nums'] }}>
+              {formatCurrency(item.marketPrice)}
+            </Text>
+          </View>
+        </View>
+
+        <TouchableOpacity
+          onPress={onToggleWatch}
+          activeOpacity={0.85}
+          style={{
+            marginTop: 4,
+            borderRadius: 12,
+            overflow: 'hidden',
+            borderWidth: 1,
+            borderColor: isWatched ? colors.primary : 'rgba(0,43,92,0.15)',
+          }}
+        >
+          <LinearGradient
+            colors={isWatched ? ['#002B5C', '#001A3A'] : ['#C8A642', '#D4B85E', '#C8A642']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={{
+              paddingVertical: 9,
+              flexDirection: 'row',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: 6,
+            }}
+          >
+            <Heart
+              size={13}
+              color={isWatched ? '#E6AF2E' : colors.primaryForeground}
+              fill={isWatched ? '#E6AF2E' : 'transparent'}
+            />
+            <Text
+              style={{
+                fontSize: 12,
+                fontWeight: '800',
+                color: isWatched ? '#FFF' : colors.primaryForeground,
+              }}
+            >
+              {isWatched ? 'Added to Watchlist' : 'Notify Me (Watch)'}
+            </Text>
+          </LinearGradient>
+        </TouchableOpacity>
       </View>
     </View>
   )
 }
 
 export function HomeScreen() {
-  const { go, walletBalance, user, logout, auctions, auctionsLoading, selectAuction, refreshAuctions, myBids, getAuction, unreadNotificationCount, isFavorite, toggleFavorite } = useApp()
+  const insets = useSafeAreaInsets()
+  const topInset = Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 0)
+  const { go, walletBalance, user, logout, auctions, auctionsLoading, selectAuction, refreshAuctions, myBids, getAuction, unreadNotificationCount, isFavorite, toggleFavorite, favoriteAuctionIds } = useApp()
   const isAdmin = user?.role === 'admin'
   const [showBalance, setShowBalance] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -137,6 +436,7 @@ export function HomeScreen() {
   const [heroIndex, setHeroIndex] = useState(0)
   const [heroPaused, setHeroPaused] = useState(false)
   const winnerScrollRef = useRef<ScrollView>(null)
+  const comingSoonScrollRef = useRef<ScrollView>(null)
   const heroScrollRef = useRef<ScrollView>(null)
   const isDraggingRef = useRef(false)
 
@@ -198,65 +498,66 @@ export function HomeScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.neutralGray50 }}>
+      <StatusBar barStyle="light-content" />
       {/* ── Header ── */}
-      <View style={{ backgroundColor: colors.awashBlue, paddingBottom: 20 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8 }}>
-          <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFF', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 4, elevation: 3 }}>
-            <AwashMark size={26} />
-          </View>
+      <View style={{ backgroundColor: colors.awashBlue, paddingBottom: 6 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: topInset + 6, paddingBottom: 8, height: topInset + 56 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <TouchableOpacity onPress={() => go('notifications')} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center', position: 'relative' }}>
+            <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFF', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 4, elevation: 3 }}>
+              <AwashMark size={28} />
+            </View>
+            <View>
+              <Text style={{ fontSize: 10, fontWeight: '700', color: 'rgba(255,255,255,0.65)', textTransform: 'uppercase', letterSpacing: 0.8 }}>Awash TakeLow</Text>
+              <Text style={{ fontSize: 15, fontWeight: '800', color: '#FFF' }}>Hello, {user?.name ? user.name.split(' ')[0] : 'Bidder'}</Text>
+            </View>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            {/* Header Watchlist Pill */}
+            <TouchableOpacity
+              onPress={() => go('favorites')}
+              activeOpacity={0.8}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                backgroundColor: favoriteAuctionIds.length > 0 ? 'rgba(200, 166, 66, 0.25)' : 'rgba(255, 255, 255, 0.15)',
+                borderWidth: 1,
+                borderColor: favoriteAuctionIds.length > 0 ? colors.primary + '80' : 'rgba(255, 255, 255, 0.25)',
+                borderRadius: 20,
+                paddingHorizontal: 11,
+                paddingVertical: 6,
+              }}
+            >
+              <Heart
+                size={14}
+                color={favoriteAuctionIds.length > 0 ? '#E6AF2E' : '#FFF'}
+                fill={favoriteAuctionIds.length > 0 ? '#E6AF2E' : 'transparent'}
+              />
+              <Text style={{ fontSize: 12, fontWeight: '800', color: '#FFF' }}>
+                Watchlist
+              </Text>
+              {favoriteAuctionIds.length > 0 && (
+                <View style={{ backgroundColor: colors.primary, borderRadius: 10, paddingHorizontal: 5, paddingVertical: 1, marginLeft: 1 }}>
+                  <Text style={{ fontSize: 10, fontWeight: '800', color: colors.primaryForeground }}>
+                    {favoriteAuctionIds.length}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={() => go('notifications')} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center', position: 'relative' }}>
               <Bell size={18} color="#FFF" />
               {unreadNotificationCount > 0 && (
-                <View style={{ position: 'absolute', top: -2, right: -2, backgroundColor: colors.primary, borderRadius: 8, minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 3 }}>
+                <View style={{ position: 'absolute', top: 2, right: 2, backgroundColor: colors.primary, borderRadius: 8, minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 3 }}>
                   <Text style={{ color: colors.primaryForeground, fontSize: 9, fontWeight: '800' }}>{unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}</Text>
                 </View>
               )}
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => setMenuOpen(true)} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' }}>
-              <Text style={{ fontSize: 12, fontWeight: '700', color: '#FFF' }}>{getInitials(user?.name || '?')}</Text>
+            <TouchableOpacity onPress={() => setMenuOpen(true)} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFF' }}>{getInitials(user?.name || '?')}</Text>
             </TouchableOpacity>
           </View>
         </View>
-
-        <LinearGradient colors={['#003366', '#001F3F']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ marginHorizontal: 16, marginTop: 8, borderRadius: 16, borderWidth: 1, borderColor: colors.primary + '33', padding: 16, overflow: 'hidden' }}>
-          <View style={{ position: 'absolute', top: -40, right: -30, width: 140, height: 140, borderRadius: 70, backgroundColor: colors.primary + '14' }} />
-          <View style={{ position: 'absolute', bottom: -50, left: -40, width: 120, height: 120, borderRadius: 60, backgroundColor: colors.primary + '0D' }} />
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Wallet size={14} color="#FFF" />
-              <Text style={{ fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.8)' }}>Wallet Balance</Text>
-            </View>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              <TouchableOpacity onPress={() => go('deposit')} style={{ backgroundColor: colors.primary, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
-                <Text style={{ fontSize: 10, fontWeight: '700', color: colors.primaryForeground }}>+ Top Up</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => setShowBalance((s) => !s)}>
-                {showBalance ? <Eye size={14} color="rgba(255,255,255,0.6)" /> : <EyeOff size={14} color="rgba(255,255,255,0.6)" />}
-              </TouchableOpacity>
-            </View>
-          </View>
-          <Text style={{ fontFamily: 'System', fontSize: 28, fontWeight: '800', color: '#FFF', marginTop: 8, fontVariant: ['tabular-nums'] }}>
-            {showBalance ? formatCurrency(walletBalance) : '••••••'}
-          </Text>
-          <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>Account ****091332</Text>
-
-          {/* Quick Nav Chips */}
-          <View style={{ flexDirection: 'row', gap: 8, marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.1)' }}>
-            <TouchableOpacity onPress={() => go('auctions')} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.1)', paddingVertical: 6, borderRadius: 8 }}>
-              <Gavel size={12} color="#FFF" />
-              <Text style={{ fontSize: 11, fontWeight: '600', color: '#FFF' }}>Auctions</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => go('my-bids')} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.1)', paddingVertical: 6, borderRadius: 8 }}>
-              <TicketCheck size={12} color="#FFF" />
-              <Text style={{ fontSize: 11, fontWeight: '600', color: '#FFF' }}>My Bids</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => go('favorites')} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.1)', paddingVertical: 6, borderRadius: 8 }}>
-              <Heart size={12} color="#FFF" />
-              <Text style={{ fontSize: 11, fontWeight: '600', color: '#FFF' }}>Watchlist</Text>
-            </TouchableOpacity>
-          </View>
-        </LinearGradient>
       </View>
 
       <ScrollView
@@ -399,34 +700,88 @@ export function HomeScreen() {
         )}
 
         {/* ── Section B: Winners ── */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 24 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: colors.primary + '18', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.primary + '20' }}>
-                <Trophy size={18} color={colors.primary} />
-              </View>
-              <View>
-                <Text style={{ fontFamily: 'System', fontWeight: '700', fontSize: 17, color: colors.primary }}>Winners!</Text>
-                <Text style={{ fontSize: 11, fontWeight: '500', color: colors.mutedForeground }}>Celebrate our recent winners</Text>
+        <View style={{ paddingHorizontal: 16, paddingTop: 26 }}>
+          {/* Section Header */}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, marginRight: 8 }}>
+              <LinearGradient
+                colors={['#C8A642', '#D4B85E', '#C8A642']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{
+                  width: 42,
+                  height: 42,
+                  borderRadius: 14,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  shadowColor: colors.primary,
+                  shadowOffset: { width: 0, height: 3 },
+                  shadowOpacity: 0.3,
+                  shadowRadius: 6,
+                  elevation: 4,
+                }}
+              >
+                <Crown size={22} color={colors.primaryForeground} />
+              </LinearGradient>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={{ fontFamily: 'System', fontWeight: '800', fontSize: 18, color: colors.navy }}>
+                    Celebrate Our Winners!
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: colors.mutedForeground, marginTop: 2 }}>
+                  Real bidders winning big with lowest unique bids
+                </Text>
               </View>
             </View>
-            <TouchableOpacity onPress={() => go('winners-list')} activeOpacity={0.85} style={{ borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: colors.primary + '40' }}>
-              <LinearGradient colors={['#C8A642', '#D4B85E', '#C8A642']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ paddingHorizontal: 12, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <TouchableOpacity onPress={() => go('winners-list')} activeOpacity={0.85} style={{ borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: colors.primary + '50' }}>
+              <LinearGradient colors={['#C8A642', '#D4B85E', '#C8A642']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ paddingHorizontal: 12, paddingVertical: 7, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                 <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primaryForeground }}>View All</Text>
                 <ArrowRight size={12} color={colors.primaryForeground} />
               </LinearGradient>
             </TouchableOpacity>
           </View>
 
+          {/* Celebratory Banner */}
           {closedAuctions.length > 0 && (
-            <View style={{ marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, borderWidth: 1, borderColor: colors.primary + '33', backgroundColor: colors.primary + '14', paddingHorizontal: 14, paddingVertical: 12 }}>
-              <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' }}>
-                <Trophy size={16} color={colors.primaryForeground} />
+            <LinearGradient
+              colors={['#002B5C', '#001833']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={{
+                marginBottom: 14,
+                borderRadius: 16,
+                borderWidth: 1,
+                borderColor: 'rgba(200, 166, 66, 0.4)',
+                paddingHorizontal: 14,
+                paddingVertical: 12,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                shadowColor: colors.awashBlue,
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.18,
+                shadowRadius: 10,
+                elevation: 4,
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(200, 166, 66, 0.2)', borderWidth: 1, borderColor: 'rgba(200, 166, 66, 0.5)', justifyContent: 'center', alignItems: 'center' }}>
+                  <PartyPopper size={18} color="#D4B85E" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontFamily: 'System', fontSize: 13, fontWeight: '800', color: '#FFF' }}>
+                    🎉 Verified Awash Bank Auction Winners
+                  </Text>
+                  <Text style={{ fontSize: 11, fontWeight: '500', color: 'rgba(255,255,255,0.72)', marginTop: 2 }}>
+                    {closedAuctions.length} completed auction{closedAuctions.length !== 1 ? 's' : ''} • Prizes delivered across Ethiopia
+                  </Text>
+                </View>
               </View>
-              <Text style={{ fontFamily: 'System', fontSize: 13, fontWeight: '700', color: colors.primary, flex: 1 }}>Congratulations to our latest winners!</Text>
-            </View>
+            </LinearGradient>
           )}
 
+          {/* Horizontal Winner Slides */}
           <ScrollView
             ref={winnerScrollRef}
             horizontal
@@ -434,27 +789,144 @@ export function HomeScreen() {
             style={{ marginHorizontal: -16, paddingHorizontal: 16 }}
           >
             {closedAuctions.length > 0 ? (
-              closedAuctions.slice(0, 5).map((a, i) => (
-                <WinnerSlide key={a.id} auction={a} index={i} />
+              closedAuctions.slice(0, 6).map((a, i) => (
+                <WinnerSlide
+                  key={a.id}
+                  auction={a}
+                  index={i}
+                  onPress={() => {
+                    selectAuction(a.id)
+                    go('winner')
+                  }}
+                />
               ))
             ) : (
-              <View style={{ width: SCREEN_W - 32, borderRadius: 16, borderWidth: 2, borderColor: colors.primary + '26', borderStyle: 'dashed', backgroundColor: colors.accent, justifyContent: 'center', alignItems: 'center', paddingVertical: 32, gap: 8 }}>
-                <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: colors.primary + '18', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.primary + '33' }}>
-                  <Trophy size={22} color={colors.primary} />
+              <View style={{ width: SCREEN_W - 32, borderRadius: 20, borderWidth: 1.5, borderColor: colors.primary + '33', borderStyle: 'dashed', backgroundColor: colors.accent, justifyContent: 'center', alignItems: 'center', paddingVertical: 36, paddingHorizontal: 20, gap: 10 }}>
+                <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: colors.primary + '20', justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: colors.primary + '44' }}>
+                  <Trophy size={28} color={colors.primary} />
                 </View>
-                <Text style={{ fontSize: 14, fontWeight: '700', color: colors.primary }}>Winners announced soon</Text>
-                <Text style={{ fontSize: 11, fontWeight: '500', color: colors.mutedForeground }}>The lowest unique bid wins.</Text>
+                <Text style={{ fontSize: 16, fontWeight: '800', color: colors.navy, textAlign: 'center' }}>Winners Spotlight Coming Soon</Text>
+                <Text style={{ fontSize: 12, fontWeight: '500', color: colors.mutedForeground, textAlign: 'center', maxWidth: 280, lineHeight: 18 }}>
+                  Auctions close when time expires or max bids are reached. The lowest unique bid always wins!
+                </Text>
+                <TouchableOpacity onPress={() => go('auctions')} activeOpacity={0.85} style={{ marginTop: 6, borderRadius: 12, overflow: 'hidden' }}>
+                  <LinearGradient colors={['#C8A642', '#D4B85E', '#C8A642']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ paddingHorizontal: 18, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Gavel size={14} color={colors.primaryForeground} />
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primaryForeground }}>Join Live Auctions</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
               </View>
             )}
           </ScrollView>
 
-          <TouchableOpacity onPress={() => go('winners-list')} activeOpacity={0.85} style={{ marginTop: 8, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: colors.primary + '50' }}>
-            <LinearGradient colors={['#C8A642', '#D4B85E', '#C8A642']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ paddingVertical: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
-              <Trophy size={14} color={colors.primaryForeground} />
-              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primaryForeground }}>View All Winners</Text>
-              <ArrowRight size={14} color={colors.primaryForeground} />
-            </LinearGradient>
-          </TouchableOpacity>
+          {/* Bottom All Winners CTA Button */}
+          {closedAuctions.length > 0 && (
+            <TouchableOpacity onPress={() => go('winners-list')} activeOpacity={0.85} style={{ marginTop: 14, borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: colors.primary + '44' }}>
+              <LinearGradient colors={['#C8A642', '#D4B85E', '#C8A642']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ paddingVertical: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
+                <Trophy size={16} color={colors.primaryForeground} />
+                <Text style={{ fontSize: 13, fontWeight: '800', color: colors.primaryForeground }}>Explore All Recent Winners ({closedAuctions.length})</Text>
+                <ArrowRight size={14} color={colors.primaryForeground} />
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* ── Section C: Coming Soon ── */}
+        <View style={{ paddingHorizontal: 16, paddingTop: 26 }}>
+          {/* Section Header */}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, marginRight: 8 }}>
+              <LinearGradient
+                colors={['#002B5C', '#004B99', '#002B5C']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{
+                  width: 42,
+                  height: 42,
+                  borderRadius: 14,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  shadowColor: colors.awashBlue,
+                  shadowOffset: { width: 0, height: 3 },
+                  shadowOpacity: 0.3,
+                  shadowRadius: 6,
+                  elevation: 4,
+                }}
+              >
+                <Sparkles size={22} color="#D4B85E" />
+              </LinearGradient>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={{ fontFamily: 'System', fontWeight: '800', fontSize: 18, color: colors.navy }}>
+                    Coming Soon to TakeLow!
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: colors.mutedForeground, marginTop: 2 }}>
+                  Preview upcoming reverse auction drops & set alerts
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity onPress={() => go('favorites')} activeOpacity={0.85} style={{ borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: colors.primary + '50' }}>
+              <LinearGradient colors={['#C8A642', '#D4B85E', '#C8A642']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ paddingHorizontal: 12, paddingVertical: 7, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primaryForeground }}>Watchlist</Text>
+                <ArrowRight size={12} color={colors.primaryForeground} />
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+
+          {/* Coming Soon Teaser Banner */}
+          <LinearGradient
+            colors={['#002B5C', '#001833']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={{
+              marginBottom: 14,
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: 'rgba(200, 166, 66, 0.4)',
+              paddingHorizontal: 14,
+              paddingVertical: 12,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              shadowColor: colors.awashBlue,
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.18,
+              shadowRadius: 10,
+              elevation: 4,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+              <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(200, 166, 66, 0.2)', borderWidth: 1, borderColor: 'rgba(200, 166, 66, 0.5)', justifyContent: 'center', alignItems: 'center' }}>
+                <Bell size={18} color="#D4B85E" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontFamily: 'System', fontSize: 13, fontWeight: '800', color: '#FFF' }}>
+                  🚀 Get Early Drop Alerts
+                </Text>
+                <Text style={{ fontSize: 11, fontWeight: '500', color: 'rgba(255,255,255,0.72)', marginTop: 2 }}>
+                  Tap the heart to add items to your Watchlist and receive instant launch alerts
+                </Text>
+              </View>
+            </View>
+          </LinearGradient>
+
+          {/* Horizontal Coming Soon Slides */}
+          <ScrollView
+            ref={comingSoonScrollRef}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ marginHorizontal: -16, paddingHorizontal: 16 }}
+          >
+            {COMING_SOON_ITEMS.map((item) => (
+              <ComingSoonSlide
+                key={item.id}
+                item={item}
+                isWatched={isFavorite(item.id)}
+                onToggleWatch={() => toggleFavorite(item.id)}
+              />
+            ))}
+          </ScrollView>
         </View>
 
         {/* ── Promo ── */}
@@ -505,7 +977,10 @@ export function HomeScreen() {
               <Text style={{ fontSize: 11, color: colors.mutedForeground, marginTop: 2 }}>{user?.phone}</Text>
             </View>
           </View>
-          <View style={{ height: 1, backgroundColor: colors.border }} />
+          <TouchableOpacity style={s.menuItem} onPress={() => { setMenuOpen(false); go('wallet') }}>
+            <Wallet size={16} color={colors.primary} />
+            <Text style={s.menuItemText}>My Wallet</Text>
+          </TouchableOpacity>
           {isAdmin && (
             <TouchableOpacity style={s.menuItem} onPress={() => { setMenuOpen(false); go('admin-dashboard') }}>
               <Shield size={16} color={colors.primary} />

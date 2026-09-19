@@ -179,9 +179,6 @@ export function AdminAuctionMonitorScreen() {
   if (!selectedId || !liveAuction) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <View style={{ backgroundColor: colors.navy }}>
-          <StatusBarCustom />
-        </View>
         <AppBar title="Monitor Auction" onBack={goBack} />
         <View style={{ alignItems: "center", paddingVertical: 80 }}>
           <Gavel size={40} color={colors.neutralGray300} />
@@ -250,9 +247,6 @@ export function AdminAuctionMonitorScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={{ backgroundColor: colors.navy }}>
-        <StatusBarCustom />
-      </View>
       <AppBar
         title="Auction Monitor"
         onBack={goBack}
@@ -263,8 +257,8 @@ export function AdminAuctionMonitorScreen() {
               fetchBids();
             }}
             style={{
-              width: 32,
-              height: 32,
+              width: 44,
+              height: 44,
               justifyContent: "center",
               alignItems: "center",
             }}
@@ -1292,29 +1286,6 @@ function StatBox({
   );
 }
 
-function StatusBarCustom() {
-  return (
-    <View
-      style={{
-        flexDirection: "row",
-        justifyContent: "space-between",
-        paddingHorizontal: 20,
-        paddingTop: 8,
-        paddingBottom: 4,
-      }}
-    >
-      <Text
-        style={{
-          fontSize: 13,
-          fontWeight: "600",
-          color: colors.navyForeground,
-        }}
-      >
-        9:41
-      </Text>
-    </View>
-  );
-}
 
 const s = StyleSheet.create({
   banner: {

@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 
 export class PrismaRepository<T extends keyof PrismaClient> {
   constructor(protected prisma: PrismaClient, protected model: T) {}
@@ -88,39 +88,58 @@ export class PrismaRepository<T extends keyof PrismaClient> {
     return this.delegate.count({ where: opts.where });
   }
 
-  private cleanData(data: any): any {
+  private validFields: Set<string> | null = null;
+
+  private getValidFields(): Set<string> | null {
+    if (this.validFields) return this.validFields;
+    const modelMeta = (Prisma as any).dmmf?.datamodel?.models?.find(
+      (m: any) => m.name.toLowerCase() === String(this.model).toLowerCase(),
+    );
+    if (!modelMeta) return null;
+    this.validFields = new Set(
+      modelMeta.fields
+        .filter((f: any) => f.kind === 'scalar' || f.kind === 'enum')
+        .map((f: any) => f.name),
+    );
+    return this.validFields;
+  }
+
+  private cleanData(data: any, isUpdate = false): any {
     if (!data || typeof data !== 'object' || Array.isArray(data)) return data;
+    const validFields = this.getValidFields();
     const cleaned: any = {};
     for (const [key, value] of Object.entries(data)) {
-      if (value !== undefined) {
-        cleaned[key] = value;
-      }
+      if (value === undefined) continue;
+      if (isUpdate && key === 'id') continue;
+      if (validFields && !validFields.has(key)) continue;
+      cleaned[key] = value;
     }
     return cleaned;
   }
 
   async save(entity: any): Promise<any> {
     if (Array.isArray(entity)) {
-      return this.delegate.createMany({ data: entity.map((e: any) => this.cleanData(e)) });
+      return this.delegate.createMany({ data: entity.map((e: any) => this.cleanData(e, false)) });
     }
     if (entity.id) {
-      return this.delegate.update({ where: { id: entity.id }, data: this.cleanData(entity) });
+      return this.delegate.update({ where: { id: entity.id }, data: this.cleanData(entity, true) });
     }
-    return this.delegate.create({ data: this.cleanData(entity) });
+    return this.delegate.create({ data: this.cleanData(entity, false) });
   }
 
   create(data: any): any {
     if (Array.isArray(data)) {
-      return data.map((e: any) => this.cleanData(e));
+      return data.map((e: any) => this.cleanData(e, false));
     }
-    return this.cleanData(data);
+    return this.cleanData(data, false);
   }
 
   async update(where: any, data: any): Promise<any> {
+    const cleaned = this.cleanData(data, true);
     if (typeof where === 'string') {
-      return this.delegate.update({ where: { id: where }, data });
+      return this.delegate.update({ where: { id: where }, data: cleaned });
     }
-    return this.delegate.updateMany({ where: this.cleanWhere(where), data });
+    return this.delegate.updateMany({ where: this.cleanWhere(where), data: cleaned });
   }
 
   async remove(entity: any): Promise<any> {

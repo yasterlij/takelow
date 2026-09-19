@@ -144,6 +144,9 @@ model Auction {
   extensions           Int                 @default(0)
   public_code          Int                 @default(autoincrement()) @unique
   bid_fee              Decimal?            @db.Decimal(12, 2)
+  second_winner_assigned Boolean?          @default(false)
+  payment_deadline_hours Int?              @default(720)
+  escalation_rule        String?           @default("LOWEST_UNIQUE_BID") @db.VarChar(50)
 
   // Relations
   product              Product             @relation(fields: [product_id], references: [id], onDelete: Cascade)

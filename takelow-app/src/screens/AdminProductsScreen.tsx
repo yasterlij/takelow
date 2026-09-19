@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert,
 import { Package, Plus, Search, Edit3, Trash2, ImageIcon, X, ArrowLeft } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { api } from '../api'
-import { CTAButton, Card } from '../components/AuctionUI'
+import { CTAButton, Card, AppBar } from '../components/AuctionUI'
 import { usePagination, PaginationBar } from '../components/Pagination'
 import { STANDARD_AUCTION_CATEGORIES, normalizeAuctionCategory } from '../lib/auctionCategories'
 import { formatCurrency, formatSpecSummary } from '../mockDataV0'
@@ -96,14 +96,26 @@ export function AdminProductsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={s.header}>
-        <TouchableOpacity onPress={goBack} style={s.backBtn}><ArrowLeft size={20} color={colors.navyForeground} /></TouchableOpacity>
-        <Text style={s.headerTitle}>Products</Text>
-        <TouchableOpacity onPress={() => { resetForm(); setShowForm(true) }} style={s.addBtn}><Plus size={18} color={colors.primaryForeground} /></TouchableOpacity>
-      </View>
+      <AppBar
+        title="Products"
+        onBack={goBack}
+        right={
+          <TouchableOpacity
+            onPress={() => { resetForm(); setShowForm(true) }}
+            style={{ width: 44, height: 44, justifyContent: 'center', alignItems: 'center' }}
+            activeOpacity={0.7}
+          >
+            <Plus size={20} color={colors.navyForeground} />
+          </TouchableOpacity>
+        }
+      />
 
       {showForm ? (
-        <ScrollView style={{ flex: 1, padding: 16 }}>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+          keyboardShouldPersistTaps="handled"
+        >
           <Text style={s.formTitle}>{editing ? 'Edit Product' : 'New Product'}</Text>
           <TextInput value={name} onChangeText={setName} placeholder="Product name" style={s.input} placeholderTextColor={colors.mutedForeground} />
           <Text style={s.fieldLabel}>Category</Text>
@@ -155,7 +167,11 @@ export function AdminProductsScreen() {
           {loading ? (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}><ActivityIndicator size="large" color={colors.primary} /></View>
           ) : (
-            <ScrollView style={{ flex: 1, padding: 16 }}>
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+              keyboardShouldPersistTaps="handled"
+            >
               {filtered.length === 0 ? (
                 <Text style={{ textAlign: 'center', color: colors.mutedForeground, marginTop: 40 }}>No products found</Text>
               ) : paginated.map((p: any) => (

@@ -13,4 +13,8 @@ export class CreateDisputeDto {
   @IsString()
   @IsNotEmpty()
   description: string;
+
+  @IsString()
+  @IsOptional()
+  document_urls?: string;
 }

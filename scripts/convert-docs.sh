@@ -101,32 +101,80 @@ convert_file() {
 
     log_info "Converting: $base_name"
 
-    # PDF
+    # HTML (standalone with embedded CSS)
     if pandoc "$input_file" \
         --from markdown+yaml_metadata_block \
-        --to pdf \
+        --to html5 \
+        --standalone \
         --toc \
         --toc-depth=3 \
         --number-sections \
         --syntax-highlighting=tango \
-        --pdf-engine=xelatex \
-        --variable=fontsize:11pt \
-        --variable=geometry:margin=1in \
+        --css="${TEMPLATE_DIR}/github-pandoc.css" \
         --metadata=title:"TakeLow - ${base_name}" \
-        --metadata=author:"TakeLow Team" \
-        --metadata=date:"$(date '+%B %d, %Y')" \
-        --output="$output_pdf" 2>&1; then
-        log_info "  ✓ PDF: $output_pdf"
+        --output="$output_html" 2>/dev/null; then
+        log_info "  ✓ HTML: $output_html"
     else
-        log_warn "  PDF conversion failed, trying with weasyprint..."
-        pandoc "$input_file" \
+        log_warn "  HTML conversion failed"
+    fi
+
+    # PDF
+    local pdf_done=false
+    if command -v xelatex &> /dev/null; then
+        if pandoc "$input_file" \
+            --from markdown+yaml_metadata_block \
+            --to pdf \
+            --toc \
+            --toc-depth=3 \
+            --number-sections \
+            --syntax-highlighting=tango \
+            --pdf-engine=xelatex \
+            --variable=fontsize:11pt \
+            --variable=geometry:margin=1in \
+            --metadata=title:"TakeLow - ${base_name}" \
+            --metadata=author:"TakeLow Team" \
+            --metadata=date:"$(date '+%B %d, %Y')" \
+            --output="$output_pdf" 2>&1; then
+            log_info "  ✓ PDF (xelatex): $output_pdf"
+            pdf_done=true
+        fi
+    fi
+
+    if [ "$pdf_done" = false ] && command -v weasyprint &> /dev/null; then
+        if pandoc "$input_file" \
             --from markdown+yaml_metadata_block \
             --to pdf \
             --toc \
             --toc-depth=3 \
             --number-sections \
             --pdf-engine=weasyprint \
-            --output="$output_pdf" 2>/dev/null && log_info "  ✓ PDF (weasyprint): $output_pdf" || log_error "  PDF failed: $base_name"
+            --output="$output_pdf" 2>/dev/null; then
+            log_info "  ✓ PDF (weasyprint): $output_pdf"
+            pdf_done=true
+        fi
+    fi
+
+    if [ "$pdf_done" = false ]; then
+        local chrome_bin=""
+        if [ -x "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" ]; then
+            chrome_bin="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+        elif command -v google-chrome &> /dev/null; then
+            chrome_bin="google-chrome"
+        elif command -v chromium &> /dev/null; then
+            chrome_bin="chromium"
+        fi
+
+        if [ -n "$chrome_bin" ] && [ -f "$output_html" ]; then
+            "$chrome_bin" --headless --disable-gpu --run-all-compositor-stages-before-draw --print-to-pdf="$output_pdf" "$output_html" 2>/dev/null
+            if [ -f "$output_pdf" ]; then
+                log_info "  ✓ PDF (Chrome): $output_pdf"
+                pdf_done=true
+            fi
+        fi
+    fi
+
+    if [ "$pdf_done" = false ]; then
+        log_error "  PDF failed: $base_name (no suitable engine found: xelatex, weasyprint, or Chrome)"
     fi
 
     # Word Document (DOCX)
@@ -144,23 +192,6 @@ convert_file() {
         log_info "  ✓ DOCX: $output_docx"
     else
         log_error "  DOCX failed: $base_name"
-    fi
-
-    # HTML (standalone with embedded CSS)
-    if pandoc "$input_file" \
-        --from markdown+yaml_metadata_block \
-        --to html5 \
-        --standalone \
-        --toc \
-        --toc-depth=3 \
-        --number-sections \
-        --syntax-highlighting=tango \
-        --css="${TEMPLATE_DIR}/github-pandoc.css" \
-        --metadata=title:"TakeLow - ${base_name}" \
-        --output="$output_html" 2>/dev/null; then
-        log_info "  ✓ HTML: $output_html"
-    else
-        log_warn "  HTML conversion failed"
     fi
 }
 
@@ -302,4 +333,3 @@ main() {
 }
 
 main "$@"
-EOF

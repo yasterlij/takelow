@@ -28,10 +28,18 @@ export class FavoritesService {
     });
   }
 
-  async getUserFavorites(userId: string, page = 1, limit = 20): Promise<{ data: any[]; total: number }> {
+  async getUserFavorites(userId: string, page = 1, limit = 100): Promise<{ data: any[]; total: number }> {
     const [data, total] = await Promise.all([
       this.prisma.favorite.findMany({
         where: { user_id: userId },
+        include: {
+          auction: {
+            include: {
+              product: true,
+              winners: true,
+            },
+          },
+        },
         orderBy: { created_at: 'desc' },
         skip: (page - 1) * limit,
         take: limit,

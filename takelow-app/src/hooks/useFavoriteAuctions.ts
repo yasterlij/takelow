@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react"
+import AsyncStorage from "@react-native-async-storage/async-storage"
 import { api, getUserFriendlyMessage } from "../api"
+
+const LOCAL_WATCHED_DROPS_KEY = "takelow_watched_drops"
 
 export function useFavoriteAuctions({
   hydrated,
@@ -14,46 +17,98 @@ export function useFavoriteAuctions({
   onErrorRef.current = onError
   const [favoriteAuctionIds, setFavoriteAuctionIds] = useState<string[]>([])
   const [favoritesLoading, setFavoritesLoading] = useState(false)
+  const localDropsRef = useRef<string[]>([])
+
+  const loadLocalDrops = useCallback(async () => {
+    try {
+      const raw = await AsyncStorage.getItem(LOCAL_WATCHED_DROPS_KEY)
+      const ids = raw ? JSON.parse(raw) : []
+      localDropsRef.current = ids
+      return ids
+    } catch {
+      return []
+    }
+  }, [])
+
+  const saveLocalDrops = useCallback(async (ids: string[]) => {
+    localDropsRef.current = ids
+    try {
+      await AsyncStorage.setItem(LOCAL_WATCHED_DROPS_KEY, JSON.stringify(ids))
+    } catch {}
+  }, [])
 
   const refreshFavorites = useCallback(async () => {
+    const localDrops = await loadLocalDrops()
     if (!userId) {
-      setFavoriteAuctionIds([])
+      setFavoriteAuctionIds(localDrops)
       return
     }
     setFavoritesLoading(true)
     try {
       const res = await api.getFavorites()
-      setFavoriteAuctionIds(res.data.map((item) => item.auction_id))
+      const serverIds = (res.data || []).map((item) => item.auction_id)
+      const merged = Array.from(new Set([...serverIds, ...localDrops]))
+      setFavoriteAuctionIds(merged)
     } catch {
       onErrorRef.current?.("Failed to refresh favorites")
+      setFavoriteAuctionIds(localDrops)
     } finally {
       setFavoritesLoading(false)
     }
-  }, [userId])
+  }, [userId, loadLocalDrops])
 
   useEffect(() => {
     if (!hydrated) return
-    if (!userId) {
-      setFavoriteAuctionIds([])
-      return
-    }
     refreshFavorites()
   }, [hydrated, userId, refreshFavorites])
 
-  const isFavorite = useCallback((auctionId: string) => favoriteAuctionIds.includes(auctionId), [favoriteAuctionIds])
+  const isFavorite = useCallback(
+    (auctionId: string) => favoriteAuctionIds.includes(auctionId),
+    [favoriteAuctionIds]
+  )
 
-  const toggleFavorite = useCallback(async (auctionId: string) => {
-    if (!userId) return
-    const currentlyFavorite = favoriteAuctionIds.includes(auctionId)
-    setFavoriteAuctionIds((prev) => currentlyFavorite ? prev.filter((id) => id !== auctionId) : [...prev, auctionId])
-    try {
-      if (currentlyFavorite) await api.removeFavorite(auctionId)
-      else await api.addFavorite(auctionId)
-    } catch (e: any) {
-      setFavoriteAuctionIds((prev) => currentlyFavorite ? [...prev, auctionId] : prev.filter((id) => id !== auctionId))
-      onErrorRef.current?.(getUserFriendlyMessage(e))
-    }
-  }, [favoriteAuctionIds, userId])
+  const toggleFavorite = useCallback(
+    async (auctionId: string) => {
+      const isComingSoon = auctionId.startsWith("cs-")
+
+      if (isComingSoon) {
+        const localDrops = localDropsRef.current
+        const currentlyWatched = localDrops.includes(auctionId)
+        const updated = currentlyWatched
+          ? localDrops.filter((id) => id !== auctionId)
+          : [...localDrops, auctionId]
+        await saveLocalDrops(updated)
+        setFavoriteAuctionIds((prev) =>
+          currentlyWatched ? prev.filter((id) => id !== auctionId) : [...prev, auctionId]
+        )
+        return
+      }
+
+      if (!userId) {
+        onErrorRef.current?.("Please sign in to save auctions to your watchlist")
+        return
+      }
+
+      const currentlyFavorite = favoriteAuctionIds.includes(auctionId)
+      setFavoriteAuctionIds((prev) =>
+        currentlyFavorite ? prev.filter((id) => id !== auctionId) : [...prev, auctionId]
+      )
+
+      try {
+        if (currentlyFavorite) {
+          await api.removeFavorite(auctionId)
+        } else {
+          await api.addFavorite(auctionId)
+        }
+      } catch (e: any) {
+        setFavoriteAuctionIds((prev) =>
+          currentlyFavorite ? [...prev, auctionId] : prev.filter((id) => id !== auctionId)
+        )
+        onErrorRef.current?.(getUserFriendlyMessage(e))
+      }
+    },
+    [favoriteAuctionIds, userId, saveLocalDrops]
+  )
 
   return {
     favoriteAuctionIds,

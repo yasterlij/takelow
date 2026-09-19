@@ -60,6 +60,14 @@ async function getAuctionBids(token, auctionId) {
   return res.json();
 }
 
+async function payBidFee(token, auctionId) {
+  const res = await fetch(`${ENGINE}/api/v1/payments/bid-fee/${auctionId}/wallet-pay`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return { ok: res.ok, status: res.status, body: await res.text() };
+}
+
 async function placeBid(token, auctionId, amount) {
   const nonce = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   const timestamp = Date.now().toString();
@@ -160,7 +168,7 @@ async function main() {
     55.00,   // user 23 → UNIQUE
     60.00,   // user 24 → UNIQUE
     99.99,   // user 25 → UNIQUE
-    0.50,    // user 26 → UNIQUE (lowest amount, but check if 0.50 is valid: Min(0.01) yes)
+    1.25,    // user 26 → UNIQUE (lowest amount)
     100.00,  // user 27 → UNIQUE
     2.75,    // user 28 → UNIQUE
   ];
@@ -178,6 +186,7 @@ async function main() {
   let failed = 0;
   for (let i = 0; i < tokens.length; i++) {
     const amount = amounts[i];
+    await payBidFee(tokens[i].token, auction.id);
     const result = await placeBid(tokens[i].token, auction.id, amount);
     if (result.ok) {
       process.stdout.write('.');

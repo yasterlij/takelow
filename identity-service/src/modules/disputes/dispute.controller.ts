@@ -32,6 +32,7 @@ export class DisputeController {
       dto.auction_id ?? null,
       dto.type,
       dto.description,
+      dto.document_urls,
     );
   }
 
@@ -77,6 +78,7 @@ export class DisputeController {
       dto.status,
       dto.resolution,
       req.user.id,
+      dto.document_urls,
     );
   }
 }

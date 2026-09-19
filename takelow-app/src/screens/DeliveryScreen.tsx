@@ -41,9 +41,6 @@ export function DeliveryScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={{ backgroundColor: colors.navy }}>
-        <StatusBarCustom />
-      </View>
       <AppBar title="Track Delivery" onBack={goBack} />
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 40 }}>
         <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 16, borderColor: colors.primary + '4D', backgroundColor: colors.accent, padding: 16 }}>
@@ -175,13 +172,6 @@ export function DeliveryScreen() {
   )
 }
 
-function StatusBarCustom() {
-  return (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 }}>
-      <Text style={{ fontSize: 13, fontWeight: '600', color: colors.navyForeground }}>9:41</Text>
-    </View>
-  )
-}
 
 const s = StyleSheet.create({
   courierIcon: { width: 56, height: 56, borderRadius: 16, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' },

@@ -41,7 +41,12 @@ export type ApiAuction = {
   product: ApiProduct | null;
   start_time: string;
   end_time: string;
-  status: "ACTIVE" | "CLOSED" | "EXPIRED";
+  status: "ACTIVE" | "CLOSED" | "EXPIRED" | "PAYMENT_DEFAULTED";
+  payment_status?: string | null;
+  payment_deadline?: string | null;
+  payment_deadline_hours?: number | null;
+  escalation_rule?: string | null;
+  second_winner_assigned?: boolean;
   winner_user_id: string | null;
   winning_bid_amount: number | null;
   winners?: ApiWinnerInfo[];
@@ -146,6 +151,17 @@ export type ApiSettlementReport = {
   net_revenue: number;
   auction_count: number;
   transaction_count: number;
+  escrow_summary?: {
+    total_held_in_escrow: number;
+    total_released_to_platform: number;
+    pending_delivery_count: number;
+  };
+  gateway_breakdown?: {
+    sikinapay_volume: number;
+    sikinapay_count: number;
+    awash_volume: number;
+    awash_count: number;
+  };
   details: ApiSettlementRow[];
 };
 
@@ -192,6 +208,8 @@ export type ApiPendingWinner = {
     id: string;
     public_code: string;
     payment_deadline: string | null;
+    payment_status?: string | null;
+    second_winner_assigned?: boolean;
     product?: { id: string; name: string };
   };
 };
@@ -212,6 +230,7 @@ export type ApiDispute = {
   description: string;
   status: "OPEN" | "IN_REVIEW" | "RESOLVED" | "REJECTED";
   resolution: string | null;
+  document_urls?: string | null;
   created_at: string;
   updated_at: string;
   user?: {
@@ -224,6 +243,57 @@ export type ApiDispute = {
     title?: string;
     public_code?: string;
   };
+};
+
+export type ApiBidderHistory = {
+  user: {
+    id: string;
+    phone_number: string;
+    full_name: string | null;
+    email?: string | null;
+    wallet_balance: number;
+    created_at: string;
+  };
+  stats: {
+    total_bids: number;
+    auctions_participated: number;
+    auctions_won: number;
+    payments_completed: number;
+    payments_defaulted: number;
+    compliance_rate: number;
+  };
+  recent_bids: Array<{
+    id: string;
+    auction_id: string;
+    auction_name: string;
+    public_code?: string;
+    amount: number;
+    bid_time: string;
+    ticket_number?: string;
+    service_fee_paid: boolean;
+  }>;
+  won_auctions: Array<{
+    id: string;
+    auction_id: string;
+    auction_name: string;
+    public_code?: string;
+    amount: number;
+    rank: number;
+    payment_status: string;
+    payment_deadline: string | null;
+    second_winner_assigned: boolean;
+    created_at: string;
+  }>;
+};
+
+export type ApiNotificationTemplate = {
+  id: string;
+  name: string;
+  category: "PAYMENT_REMINDER" | "DEFAULT_NOTICE" | "SECOND_WINNER" | "AUCTION_ALERT";
+  channels: Array<"PUSH" | "SMS" | "INAPP">;
+  title_template: string;
+  body_template: string;
+  sample_data: Record<string, string>;
 };
 
 export type ApiRbacOverride = {

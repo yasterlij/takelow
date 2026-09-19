@@ -23,6 +23,7 @@ export class WinnerManagementService {
             public_code: true,
             payment_deadline: true,
             payment_status: true,
+            second_winner_assigned: true,
             product: { select: { id: true, name: true } },
           },
         },
@@ -73,6 +74,8 @@ export class WinnerManagementService {
             id: true,
             public_code: true,
             payment_deadline: true,
+            payment_status: true,
+            second_winner_assigned: true,
             product: { select: { id: true, name: true } },
           },
         },
@@ -107,6 +110,8 @@ export class WinnerManagementService {
             id: true,
             public_code: true,
             payment_deadline: true,
+            payment_status: true,
+            second_winner_assigned: true,
             product: { select: { id: true, name: true } },
           },
         },
@@ -251,6 +256,39 @@ export class WinnerManagementService {
       ),
     );
 
+    const nextEligibleWinner = await this.prisma.winner.findFirst({
+      where: {
+        auction_id: auctionId,
+        payment_status: 'PENDING',
+      },
+      orderBy: { rank: 'asc' },
+    });
+
+    if (nextEligibleWinner) {
+      await this.prisma.auction.update({
+        where: { id: auctionId },
+        data: {
+          second_winner_assigned: true,
+          winner_user_id: nextEligibleWinner.user_id,
+          winning_bid_amount: nextEligibleWinner.amount,
+        },
+      });
+      await this.prisma.auditLog.create({
+        data: {
+          actor_id: adminId,
+          action: 'SECOND_WINNER_ASSIGNED',
+          entity_type: 'Auction',
+          entity_id: auctionId,
+          details: {
+            second_winner_id: nextEligibleWinner.user_id,
+            amount: Number(nextEligibleWinner.amount),
+            assigned_at: new Date().toISOString(),
+            reason: 'You have been awarded this auction because the original winner did not complete payment within the specified timeframe.',
+          },
+        },
+      });
+    }
+
     await this.prisma.auditLog.create({
       data: {
         actor_id: adminId,
@@ -260,6 +298,7 @@ export class WinnerManagementService {
         details: {
           expired_winner_count: rotated.length,
           rotated_winner_ids: rotated.map((w) => w.id),
+          second_winner_assigned: Boolean(nextEligibleWinner),
         },
       },
     });
@@ -271,6 +310,179 @@ export class WinnerManagementService {
         ...w,
         amount: Number(w.amount),
       })),
+    };
+  }
+
+  async getBidderHistory(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        phone_number: true,
+        full_name: true,
+        email: true,
+        wallet_balance: true,
+        created_at: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException(`User with id ${userId} not found`);
+    }
+
+    const [
+      totalBids,
+      distinctAuctionsParticipated,
+      wonWinners,
+      recentBids,
+    ] = await Promise.all([
+      this.prisma.bid.count({ where: { user_id: userId } }),
+      this.prisma.$queryRawUnsafe<{ count: number }[]>(
+        `SELECT COUNT(DISTINCT auction_id)::int as count FROM bids WHERE user_id = $1::uuid`,
+        userId,
+      ),
+      this.prisma.winner.findMany({
+        where: { user_id: userId },
+        include: {
+          auction: {
+            select: {
+              id: true,
+              public_code: true,
+              second_winner_assigned: true,
+              product: { select: { name: true } },
+            },
+          },
+        },
+        orderBy: { created_at: 'desc' },
+      }),
+      this.prisma.bid.findMany({
+        where: { user_id: userId },
+        include: {
+          auction: {
+            select: {
+              id: true,
+              public_code: true,
+              product: { select: { name: true } },
+            },
+          },
+        },
+        orderBy: { bid_time: 'desc' },
+        take: 20,
+      }),
+    ]);
+
+    const auctionsParticipated = Number(distinctAuctionsParticipated[0]?.count || 0);
+    const auctionsWon = wonWinners.length;
+    const paymentsCompleted = wonWinners.filter((w) => w.payment_status === 'PAID').length;
+    const paymentsDefaulted = wonWinners.filter(
+      (w) => w.payment_status === 'EXPIRED' || w.payment_status === 'DEFAULTED',
+    ).length;
+
+    const complianceRate =
+      paymentsCompleted + paymentsDefaulted === 0
+        ? 100
+        : Math.round((paymentsCompleted / (paymentsCompleted + paymentsDefaulted)) * 100);
+
+    return {
+      user: {
+        id: user.id,
+        phone_number: user.phone_number || '',
+        full_name: user.full_name,
+        email: user.email,
+        wallet_balance: Number(user.wallet_balance),
+        created_at: user.created_at.toISOString(),
+      },
+      stats: {
+        total_bids: totalBids,
+        auctions_participated: auctionsParticipated,
+        auctions_won: auctionsWon,
+        payments_completed: paymentsCompleted,
+        payments_defaulted: paymentsDefaulted,
+        compliance_rate: complianceRate,
+      },
+      recent_bids: recentBids.map((b) => ({
+        id: b.id,
+        auction_id: b.auction_id,
+        auction_name: b.auction?.product?.name || 'Auction',
+        public_code: b.auction?.public_code || undefined,
+        amount: Number(b.amount),
+        bid_time: b.bid_time.toISOString(),
+        ticket_number: b.ticket_number,
+        service_fee_paid: b.service_fee_paid,
+      })),
+      won_auctions: wonWinners.map((w) => ({
+        id: w.id,
+        auction_id: w.auction_id,
+        auction_name: w.auction?.product?.name || 'Auction',
+        public_code: w.auction?.public_code || undefined,
+        amount: Number(w.amount),
+        rank: w.rank,
+        payment_status: w.payment_status || 'PENDING',
+        payment_deadline: w.payment_deadline ? w.payment_deadline.toISOString() : null,
+        second_winner_assigned: Boolean(w.auction?.second_winner_assigned),
+        created_at: w.created_at ? w.created_at.toISOString() : new Date().toISOString(),
+      })),
+    };
+  }
+
+  async sendPaymentReminder(winnerId: string, adminId: string) {
+    const winner = await this.prisma.winner.findUnique({
+      where: { id: winnerId },
+      include: {
+        user: true,
+        auction: {
+          include: { product: true },
+        },
+      },
+    });
+
+    if (!winner) {
+      throw new NotFoundException(`Winner with id ${winnerId} not found`);
+    }
+
+    const recipient = winner.user?.phone_number || winner.user?.full_name || 'winner';
+    const deadlineStr = winner.payment_deadline
+      ? winner.payment_deadline.toLocaleDateString()
+      : 'your payment window';
+
+    await this.prisma.auditLog.create({
+      data: {
+        actor_id: adminId,
+        action: 'SEND_PAYMENT_REMINDER',
+        entity_type: 'Winner',
+        entity_id: winnerId,
+        details: {
+          user_id: winner.user_id,
+          auction_id: winner.auction_id,
+          amount: Number(winner.amount),
+          payment_deadline: winner.payment_deadline,
+          channels: ['SMS', 'PUSH', 'IN_APP'],
+        },
+      },
+    });
+
+    if (winner.user_id) {
+      await this.prisma.notificationLog.create({
+        data: {
+          user_id: winner.user_id,
+          auction_id: winner.auction_id,
+          type: 'PAYMENT_REMINDER',
+          channel: 'PUSH',
+          title: 'Payment Reminder for Won Auction',
+          body: `Please complete payment of ETB ${Number(winner.amount).toFixed(2)} for ${winner.auction?.product?.name || 'your won auction'} before ${deadlineStr}.`,
+          metadata: {
+            winner_id: winner.id,
+            auction_id: winner.auction_id,
+            amount: Number(winner.amount),
+            deadline: winner.payment_deadline,
+          },
+        },
+      });
+    }
+
+    return {
+      success: true,
+      message: `Payment reminder sent to ${recipient} via SMS, Push, and In-App notification.`,
     };
   }
 }

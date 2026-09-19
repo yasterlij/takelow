@@ -1,7 +1,7 @@
 import React from 'react'
 import { StatusBar } from 'expo-status-bar'
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
-import { Gavel, LogOut, Wallet, Trophy, UserRound, TicketCheck } from 'lucide-react-native'
+import { Home as HomeIcon, Gavel, Wallet, Trophy, UserRound, TicketCheck } from 'lucide-react-native'
 import { AppProvider, useApp } from './src/AppContext'
 import { LoginScreen } from './src/screens/LoginScreen'
 import { RegisterScreen } from './src/screens/RegisterScreen'
@@ -31,7 +31,9 @@ import { AdminAuctionsScreen } from './src/screens/AdminAuctionsScreen'
 import { AdminUsersScreen } from './src/screens/AdminUsersScreen'
 import { AdminProductsScreen } from './src/screens/AdminProductsScreen'
 import { DepositScreen } from './src/screens/DepositScreen'
+import { WalletScreen } from './src/screens/WalletScreen'
 import { ErrorBoundary } from './src/components/ErrorBoundary'
+import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { ToastProvider } from './src/components/Toast'
 import { ShimmerProvider } from './src/components/SkeletonLoader'
 import { NetworkBanner } from './src/components/NetworkBanner'
@@ -39,17 +41,19 @@ import { colors } from './src/theme'
 
 export default function App() {
   return (
-    <ErrorBoundary>
-      <ToastProvider>
-        <ShimmerProvider>
-          <AppProvider>
-            <StatusBar style="light" />
-            <NetworkBanner />
-            <ScreenRouter />
-          </AppProvider>
-        </ShimmerProvider>
-      </ToastProvider>
-    </ErrorBoundary>
+    <SafeAreaProvider>
+      <ErrorBoundary>
+        <ToastProvider>
+          <ShimmerProvider>
+            <AppProvider>
+              <StatusBar style="light" />
+              <NetworkBanner />
+              <ScreenRouter />
+            </AppProvider>
+          </ShimmerProvider>
+        </ToastProvider>
+      </ErrorBoundary>
+    </SafeAreaProvider>
   )
 }
 
@@ -88,11 +92,12 @@ function ScreenRouter() {
       case 'admin-products': return isAdmin ? <AdminProductsScreen /> : <HomeScreen />
       case 'winners-list': return <WinnersListScreen />
       case 'deposit': return <DepositScreen />
+      case 'wallet': return <WalletScreen />
       default: return user ? <HomeScreen /> : <LoginScreen />
     }
   })()
 
-  const showTabBar = user && ['home', 'auctions', 'my-bids', 'winners-list', 'profile'].includes(view)
+  const showTabBar = user && ['home', 'auctions', 'wallet', 'my-bids', 'winners-list', 'profile'].includes(view)
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.neutralGray50 }}>
@@ -104,12 +109,12 @@ function ScreenRouter() {
 }
 
 function BottomTabBar() {
-  const { view, go, logout, myBids, unreadNotificationCount } = useApp()
+  const { view, go, myBids, unreadNotificationCount } = useApp()
   const tabs = [
-    { key: 'home', label: 'Home', icon: Wallet, badge: null },
+    { key: 'home', label: 'Home', icon: HomeIcon, badge: null },
     { key: 'auctions', label: 'Auctions', icon: Gavel, badge: null },
+    { key: 'wallet', label: 'Wallet', icon: Wallet, badge: null },
     { key: 'my-bids', label: 'My Bids', icon: TicketCheck, badge: myBids.length > 0 ? myBids.length : null },
-    { key: 'winners-list', label: 'Winners', icon: Trophy, badge: null },
     { key: 'profile', label: 'Profile', icon: UserRound, badge: unreadNotificationCount > 0 ? unreadNotificationCount : null },
   ] as const
 
@@ -135,9 +140,6 @@ function BottomTabBar() {
           )
         })}
       </View>
-      <TouchableOpacity style={s.logoutBtn} onPress={() => logout()} activeOpacity={0.7}>
-        <LogOut size={16} color={colors.destructive} />
-      </TouchableOpacity>
     </View>
   )
 }
@@ -191,18 +193,6 @@ const s = StyleSheet.create({
     color: colors.primaryForeground,
     fontSize: 9,
     fontWeight: '800',
-  },
-  logoutBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    backgroundColor: colors.destructive + '14',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 2,
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: colors.destructive + '20',
   },
   tabLabel: { fontSize: 10, fontWeight: '500', color: colors.neutralGray400, marginTop: 2 },
   tabLabelActive: { color: colors.primary, fontWeight: '700' },

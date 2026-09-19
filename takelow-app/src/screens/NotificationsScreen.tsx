@@ -84,9 +84,7 @@ export function NotificationsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={{ backgroundColor: colors.navy }}>
-        <AppBar title="Notifications" onBack={goBack} />
-      </View>
+      <AppBar title="Notifications" onBack={goBack} />
       <ScrollView
         contentContainerStyle={s.container}
         showsVerticalScrollIndicator={false}

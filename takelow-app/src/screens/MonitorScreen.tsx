@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { View, Text, Image, StyleSheet, Animated } from 'react-native'
+import { View, Text, Image, StyleSheet, Animated, ScrollView } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Bell, Users, Radio, Eye, ImageIcon, Trophy, TrendingDown } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { AppBar, CTAButton, Card, Badge } from '../components/AuctionUI'
@@ -8,6 +9,7 @@ import { CURRENCY, formatETB } from '../mockDataV0'
 import { colors } from '../theme'
 
 export function MonitorScreen() {
+  const insets = useSafeAreaInsets()
   const { go, goBack, selectedId, userBid, getAuction } = useApp()
   const auction = getAuction(selectedId)
   const pulseAnim = useRef(new Animated.Value(1)).current
@@ -64,11 +66,12 @@ export function MonitorScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={{ backgroundColor: colors.navy }}>
-        <StatusBarCustom />
-      </View>
       <AppBar title="Auction in Progress" onBack={goBack} />
-      <View style={{ flex: 1, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 120 }}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 120 }}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={{ alignItems: 'center', justifyContent: 'center', gap: 8 }}>
           <Animated.View style={[s.liveBadge, { opacity: pulseAnim }]}>
             <Radio size={14} color={colors.emerald700} />
@@ -142,9 +145,9 @@ export function MonitorScreen() {
         <Text style={{ textAlign: 'center', fontSize: 12, fontWeight: '500', color: colors.navy + '99', marginTop: 16 }}>
           Keep watching — you might be the lowest unique bidder!
         </Text>
-      </View>
+      </ScrollView>
 
-      <Card style={s.bottomCta}>
+      <Card style={[s.bottomCta, { paddingBottom: Math.max(insets.bottom, 16) }]}>
         <CTAButton variant="navy" onPress={() => go('closed')}>
           <Eye size={18} /> View Result Now
         </CTAButton>
@@ -153,13 +156,6 @@ export function MonitorScreen() {
   )
 }
 
-function StatusBarCustom() {
-  return (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 }}>
-      <Text style={{ fontSize: 13, fontWeight: '600', color: colors.navyForeground }}>9:41</Text>
-    </View>
-  )
-}
 
 const s = StyleSheet.create({
   liveBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 20, backgroundColor: colors.emerald100, paddingHorizontal: 12, paddingVertical: 4 },

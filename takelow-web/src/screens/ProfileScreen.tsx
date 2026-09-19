@@ -15,6 +15,7 @@ export function ProfileScreen() {
   const isAdmin = user?.role === "admin"
 
   const menuItems = [
+    { id: "wallet", label: "My Wallet", icon: Wallet, onClick: () => go("wallet") },
     { id: "my-bids", label: "My Bids", icon: TicketCheck, onClick: () => go("my-bids") },
     { id: "winners", label: "Winners", icon: Trophy, onClick: () => go("closed-auctions") },
     { id: "favorites", label: "Favorites", icon: Heart, onClick: () => go("favorites") },
@@ -78,7 +79,7 @@ export function ProfileScreen() {
             <button onClick={() => setShowBalance((s) => !s)} className="rounded-lg bg-neutral-100 px-2.5 py-2 text-xs font-medium text-neutral-500 transition-all hover:bg-neutral-200 border border-border/60">
               {showBalance ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
             </button>
-            <button onClick={() => go("deposit")} className="rounded-lg bg-gradient-to-r from-awash-gold to-awash-gold-light px-3.5 py-2 text-xs font-bold text-awash-blue shadow-lg shadow-primary/20 transition-all hover:shadow-primary/30 hover:scale-105 active:scale-[0.97]">
+            <button onClick={() => go("wallet")} className="rounded-lg bg-gradient-to-r from-awash-gold to-awash-gold-light px-3.5 py-2 text-xs font-bold text-awash-blue shadow-lg shadow-primary/20 transition-all hover:shadow-primary/30 hover:scale-105 active:scale-[0.97]">
               + Top Up
             </button>
           </div>

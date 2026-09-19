@@ -44,6 +44,20 @@ function toDatetimeLocal(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+function formatDeadlineRemaining(hrs: number | null): string {
+  if (hrs == null) return "";
+  if (hrs <= 0) return "Expired";
+  const days = Math.floor(hrs / 24);
+  const remHrs = hrs % 24;
+  if (days >= 30) {
+    const months = Math.floor(days / 30);
+    const remDays = days % 30;
+    return remDays > 0 ? `${months}mo ${remDays}d left` : `${months} months left`;
+  }
+  if (days > 0) return `${days}d ${remHrs}h left`;
+  return `${hrs}h left`;
+}
+
 export function WinnerScreen() {
   const { go, goBack, selectedId, user, getAuction, reopenAuction, selectAuction } = useApp();
   const isAdmin = user?.role === "admin";
@@ -186,6 +200,17 @@ export function WinnerScreen() {
   const isUserWinner = allWinners?.some((w) => w.user_id === user?.id);
   const userWinnerInfo = allWinners?.find((w) => w.user_id === user?.id);
   const isPrimaryWinner = winner?.winner_user_id === user?.id;
+  const isSecondWinnerAssigned = Boolean(
+    auction?.second_winner_assigned ||
+    (winner as any)?.second_winner_assigned
+  );
+  const isPaymentExpired =
+    (deadlineHrs !== null && deadlineHrs <= 0) ||
+    auction?.payment_status === "PAYMENT_DEFAULTED" ||
+    (auction as any)?.status === "PAYMENT_DEFAULTED" ||
+    userWinnerInfo?.payment_status === "DEFAULTED" ||
+    userWinnerInfo?.payment_status === "EXPIRED" ||
+    (winner as any)?.payment_status === "PAYMENT_DEFAULTED";
   const allBids = ((winner as any)?.bids as ApiBid[] | undefined)?.map(
     (bid) => ({
       ...bid,
@@ -419,6 +444,23 @@ export function WinnerScreen() {
             </motion.div>
           ) : null}
 
+          {/* ── Second Winner Reassignment Banner ── */}
+          {isSecondWinnerAssigned && (
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="w-full max-w-md rounded-2xl border border-primary/30 bg-primary/10 p-4 text-left shadow-sm"
+            >
+              <div className="flex items-center gap-2 text-primary font-extrabold text-sm">
+                <Trophy className="size-4" />
+                <span>Second Winner Assigned</span>
+              </div>
+              <p className="mt-1 text-xs font-medium text-foreground leading-relaxed">
+                You have been awarded this auction because the original winner did not complete payment within the specified timeframe.
+              </p>
+            </motion.div>
+          )}
+
           {/* ── Winner Card ── */}
           {(winner?.winner_user_id || winner?.winning_bid_amount != null) && (
             <motion.div
@@ -495,11 +537,9 @@ export function WinnerScreen() {
                         <Clock className="size-3" /> Payment Deadline
                       </span>
                       <p
-                        className={`font-bold ${deadlineHrs < 6 ? "text-red-500" : "text-foreground"}`}
+                        className={`font-bold ${deadlineHrs < 24 ? "text-red-500" : "text-foreground"}`}
                       >
-                        {deadlineHrs > 0
-                          ? `${deadlineHrs}h remaining`
-                          : "Expired"}
+                        {formatDeadlineRemaining(deadlineHrs)}
                       </p>
                     </div>
                   )}
@@ -685,17 +725,15 @@ export function WinnerScreen() {
                             {!isPaid && !isExpired && wDeadlineHrs != null && (
                               <span
                                 className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                                  wDeadlineHrs < 6
+                                  wDeadlineHrs < 24
                                     ? "bg-destructive/10 text-destructive border border-destructive/20 animate-pulse"
-                                    : wDeadlineHrs < 24
+                                    : wDeadlineHrs < 72
                                     ? "bg-amber-50 text-amber-700 border border-amber-200"
                                     : "bg-neutral-100 text-neutral-600"
                                 }`}
                               >
                                 <Clock className="size-2.5" />
-                                {wDeadlineHrs > 0
-                                  ? `${wDeadlineHrs}h left`
-                                  : "Overdue"}
+                                {formatDeadlineRemaining(wDeadlineHrs)}
                               </span>
                             )}
                           </div>
@@ -928,6 +966,15 @@ export function WinnerScreen() {
                   <CheckCircle2 className="size-[18px]" /> Payment Complete —
                   Back Home
                 </button>
+              ) : isPaymentExpired ? (
+                <div className="w-full space-y-2">
+                  <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-3 text-center text-xs font-semibold text-destructive">
+                    This auction is no longer eligible for payment. The payment deadline has expired.
+                  </div>
+                  <button onClick={() => go("home")} className="btn-outline">
+                    Back to Dashboard
+                  </button>
+                </div>
               ) : !isPrimaryWinner ? (
                 <button type="button" className="btn-outline cursor-default">
                   <Clock className="size-[18px]" /> Waiting for higher-ranked

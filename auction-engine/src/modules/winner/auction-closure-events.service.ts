@@ -2,7 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { NotificationDispatchService } from "../worker/notification-dispatch.service";
 
-const PAYMENT_DEADLINE_HOURS = 24;
+const PAYMENT_DEADLINE_HOURS = Number(process.env.PAYMENT_DEADLINE_HOURS) || 30 * 24;
 
 @Injectable()
 export class AuctionClosureEventsService {

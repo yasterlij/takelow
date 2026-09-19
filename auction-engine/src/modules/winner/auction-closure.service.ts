@@ -11,7 +11,7 @@ import { AuctionClosureEventsService } from "./auction-closure-events.service";
 
 const MAX_RETRIES = 5;
 const RETRY_DELAY_MS = 300;
-const PAYMENT_DEADLINE_HOURS = 24;
+const PAYMENT_DEADLINE_HOURS = Number(process.env.PAYMENT_DEADLINE_HOURS) || 30 * 24;
 const AUCTION_STATE_TTL_BUFFER_SECONDS = 3600;
 
 @Injectable()
@@ -146,8 +146,10 @@ export class AuctionClosureService {
             );
             await auctionRepo.save(auction);
           } else {
+            const deadlineHours =
+              Number(auction.payment_deadline_hours) || PAYMENT_DEADLINE_HOURS;
             const paymentDeadline = new Date(
-              Date.now() + PAYMENT_DEADLINE_HOURS * 60 * 60 * 1000,
+              Date.now() + deadlineHours * 60 * 60 * 1000,
             );
 
             auction.winner_user_id = winningBids[0].user_id;

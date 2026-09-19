@@ -43,7 +43,10 @@ function getUserId(req: Request): string | null {
 
 function isBiddingEndpoint(req: Request): boolean {
   const url = req.originalUrl || req.url;
-  return url.includes("/bids") && req.method === "POST";
+  return (
+    req.method === "POST" &&
+    (/\/auctions\/[^/]+\/bid\b/.test(url) || url.includes("/bids"))
+  );
 }
 
 function isExemptEndpoint(req: Request): boolean {

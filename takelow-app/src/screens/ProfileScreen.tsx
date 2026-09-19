@@ -33,10 +33,7 @@ export function ProfileScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={{ backgroundColor: colors.navy }}>
-        <StatusBarCustom />
-        <AppBar title="Profile" onBack={goBack} />
-      </View>
+      <AppBar title="Profile" onBack={goBack} />
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 110, gap: 16 }}
@@ -141,13 +138,6 @@ export function ProfileScreen() {
   )
 }
 
-function StatusBarCustom() {
-  return (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 }}>
-      <Text style={{ fontSize: 13, fontWeight: '600', color: colors.navyForeground }}>9:41</Text>
-    </View>
-  )
-}
 
 const s = StyleSheet.create({
   profileCard: { borderRadius: 16, borderWidth: 1, borderColor: colors.primary + '33', padding: 18, overflow: 'hidden' },

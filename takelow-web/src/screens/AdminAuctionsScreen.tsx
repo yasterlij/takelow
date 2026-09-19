@@ -28,6 +28,10 @@ import {
   CheckSquare,
   Square,
   Layers,
+  History,
+  Users,
+  ShieldAlert,
+  Clock,
 } from "lucide-react"
 import { useApp } from "../AppContext"
 import { api } from "../api"
@@ -209,6 +213,8 @@ const emptyForm: {
   endTime: string
   minBid: string
   maxBid: string
+  paymentDeadlineHours: string
+  escalationRule: string
 } = {
   name: "",
   category: STANDARD_AUCTION_CATEGORIES[0],
@@ -222,6 +228,8 @@ const emptyForm: {
   endTime: "",
   minBid: "",
   maxBid: "",
+  paymentDeadlineHours: "720",
+  escalationRule: "LOWEST_UNIQUE_BID",
 }
 
 type TabType = "all" | "live" | "closed-won" | "unsold" | "no-winner"
@@ -306,6 +314,24 @@ export function AdminAuctionsScreen() {
     setImgPreviewErr(false)
   }
 
+  const [auditModalAuction, setAuditModalAuction] = useState<Auction | null>(null)
+  const [auditLogs, setAuditLogs] = useState<any[]>([])
+  const [auditLogsLoading, setAuditLogsLoading] = useState(false)
+
+  const openAuditTrail = async (a: Auction) => {
+    setAuditModalAuction(a)
+    setAuditLogsLoading(true)
+    try {
+      const res = await api.adminListAuditLogs({ entity_id: a.id, limit: 50 })
+      const list = Array.isArray(res) ? res : (res as any)?.data || []
+      setAuditLogs(list)
+    } catch {
+      setAuditLogs([])
+    } finally {
+      setAuditLogsLoading(false)
+    }
+  }
+
   const openCreate = () => {
     setEditingId(null)
     resetForm()
@@ -323,6 +349,8 @@ export function AdminAuctionsScreen() {
       imageUrl: a.images?.[0] || "", startTime: toDatetimeLocal(startDate), endTime: toDatetimeLocal(endDate),
       minBid: a.minBid != null ? String(a.minBid) : "",
       maxBid: a.maxBid != null ? String(a.maxBid) : "",
+      paymentDeadlineHours: a.payment_deadline_hours != null ? String(a.payment_deadline_hours) : "720",
+      escalationRule: a.escalation_rule || "LOWEST_UNIQUE_BID",
     })
     setImgPreviewErr(false)
     setShowForm(true)
@@ -445,6 +473,8 @@ export function AdminAuctionsScreen() {
       ...(minBid != null ? { minBid } : {}),
       ...(maxBid != null ? { maxBid } : {}),
       ...(form.bidFee ? { bidFee: Number(form.bidFee) } : {}),
+      paymentDeadlineHours: form.paymentDeadlineHours ? parseInt(form.paymentDeadlineHours, 10) : undefined,
+      escalationRule: form.escalationRule,
     }
     if (editingId) {
       await updateAuction(editingId, base)
@@ -669,6 +699,70 @@ export function AdminAuctionsScreen() {
                     <input type="datetime-local" value={form.endTime} onChange={(e) => setForm((f) => ({ ...f, endTime: e.target.value }))} className="input-full" />
                   </label>
                 </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 rounded-2xl border border-awash-gold/30 bg-awash-gold/5 p-3.5">
+                  <div>
+                    <label className="mb-1.5 flex items-center justify-between text-[11px] font-bold text-awash-blue">
+                      <span>Winner Payment Deadline Window</span>
+                      <span className="text-[10px] text-neutral-500 font-normal">
+                        {form.paymentDeadlineHours}h ({Math.round(Number(form.paymentDeadlineHours || 720) / 24)} days)
+                      </span>
+                    </label>
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {[
+                        { label: "48h", hours: "48" },
+                        { label: "72h", hours: "72" },
+                        { label: "7d", hours: "168" },
+                        { label: "30d", hours: "720" },
+                        { label: "90d (3mo)", hours: "2160" },
+                      ].map((preset) => (
+                        <button
+                          key={preset.hours}
+                          type="button"
+                          onClick={() => setForm((f) => ({ ...f, paymentDeadlineHours: preset.hours }))}
+                          className={`rounded-lg px-2 py-0.5 text-[10px] font-bold transition-all ${
+                            form.paymentDeadlineHours === preset.hours
+                              ? "bg-awash-blue text-white shadow-xs"
+                              : "bg-white/80 text-neutral-600 border border-border/70 hover:bg-white"
+                          }`}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+                    <input
+                      type="number"
+                      value={form.paymentDeadlineHours}
+                      onChange={(e) => setForm((f) => ({ ...f, paymentDeadlineHours: e.target.value }))}
+                      placeholder="Custom hours (e.g. 720)"
+                      className="input-full bg-white text-xs"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-[11px] font-bold text-awash-blue">
+                      Automatic Escalation Rule
+                    </label>
+                    <select
+                      value={form.escalationRule}
+                      onChange={(e) => setForm((f) => ({ ...f, escalationRule: e.target.value }))}
+                      className="input-full bg-white text-xs mb-1"
+                    >
+                      <option value="LOWEST_UNIQUE_BID">
+                        Auto Escalation: Lowest Unique Bid → 2nd Winner (Recommended)
+                      </option>
+                      <option value="MANUAL_REVIEW">
+                        Manual Review: Hold for Admin Determination
+                      </option>
+                      <option value="AUTO_FORFEIT_CLOSE">
+                        Auto Forfeit: Close Without Winner on Default
+                      </option>
+                    </select>
+                    <p className="text-[10px] text-neutral-500 leading-tight">
+                      Automated protocol triggered when primary winner payment window expires without settlement.
+                    </p>
+                  </div>
+                </div>
+
                 <CTAButton onClick={handleSubmit} disabled={submitting || !form.name}>
                   {submitting ? "Saving..." : editingId ? "Update Auction" : "Create Auction"}
                 </CTAButton>
@@ -1351,10 +1445,19 @@ export function AdminAuctionsScreen() {
                     )}
                     <AuctionThumb src={a.images?.[0]} onClick={() => a.images?.[0] && setLightboxImg(a.images[0])} />
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-1.5">
                         <p className="truncate text-sm font-bold text-awash-blue">{a.name}</p>
                         {a.publicCode && <Badge tone="green">Code {a.publicCode}</Badge>}
                         <StatusBadge status={a.status} isUnsold={isUnsold} isWon={isWon} />
+                        {a.second_winner_assigned && (
+                          <Badge tone="orange"><Users className="size-2.5 mr-1" /> 2nd Winner Assigned</Badge>
+                        )}
+                        {(a.payment_status === "PAYMENT_DEFAULTED" || a.payment_status === "DEFAULTED") && (
+                          <Badge tone="hot"><AlertTriangle className="size-2.5 mr-1" /> Payment Default</Badge>
+                        )}
+                        {(a.payment_status === "CLOSED_NO_PAYMENT" || (isUnsold && isClosed)) && (
+                          <Badge tone="muted"><Clock className="size-2.5 mr-1" /> Closed – No Payment</Badge>
+                        )}
                       </div>
                       <p className="mt-0.5 text-xs font-medium text-neutral-400">
                         {a.bidders} bidders · {formatCurrency(a.marketPrice)}
@@ -1365,6 +1468,9 @@ export function AdminAuctionsScreen() {
                         {a.minBid && <span className="ml-2">· Reserve {a.minBid}</span>}
                         {a.maxBid && <span className="ml-2">· Max {a.maxBid}</span>}
                         {a.bidFee != null && <span className="ml-2">· Fee {a.bidFee} ETB</span>}
+                        {a.payment_deadline_hours && (
+                          <span className="ml-2">· Window {a.payment_deadline_hours}h</span>
+                        )}
                       </p>
                     </div>
 
@@ -1402,6 +1508,15 @@ export function AdminAuctionsScreen() {
                           <Pencil className="size-3" />
                         </button>
                       )}
+
+                      {/* Audit Trail Button */}
+                      <button
+                        onClick={() => openAuditTrail(a)}
+                        className="flex items-center gap-1 rounded-lg border border-border/60 px-2.5 py-1.5 text-[10px] font-semibold text-awash-blue hover:bg-neutral-50 transition-colors"
+                        title="View Auction Lifecycle Audit Trail"
+                      >
+                        <History className="size-3" /> Audit
+                      </button>
 
                       {/* View Bids Button */}
                       <button
@@ -1549,6 +1664,107 @@ export function AdminAuctionsScreen() {
                 </button>
               </div>
             </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── Audit Trail Modal ── */}
+        <AnimatePresence>
+          {auditModalAuction && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-scale-in"
+              onClick={() => setAuditModalAuction(null)}
+            >
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 16 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 16 }}
+                className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl border border-awash-gold/30 bg-white p-6 shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  onClick={() => setAuditModalAuction(null)}
+                  className="absolute right-4 top-4 rounded-xl p-1.5 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
+                >
+                  <X className="size-5" />
+                </button>
+
+                <div className="flex items-center gap-3">
+                  <div className="flex size-11 items-center justify-center rounded-2xl bg-blue-50 border border-blue-200/60 text-awash-blue">
+                    <History className="size-5.5" />
+                  </div>
+                  <div>
+                    <h2 className="font-display text-lg font-bold text-awash-blue">
+                      Auction Lifecycle Audit Trail
+                    </h2>
+                    <p className="text-xs font-medium text-neutral-500">
+                      {auditModalAuction.name} (Code: {auditModalAuction.publicCode || auditModalAuction.id.slice(0, 8)})
+                    </p>
+                  </div>
+                </div>
+
+                {/* Auction Governance Configuration */}
+                <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2.5 rounded-2xl border border-border/70 bg-neutral-50/70 p-3.5 text-xs">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-neutral-400 block">Payment Window</span>
+                    <span className="font-bold text-awash-blue">
+                      {auditModalAuction.payment_deadline_hours || 720}h ({Math.round((auditModalAuction.payment_deadline_hours || 720) / 24)}d)
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-neutral-400 block">Escalation Rule</span>
+                    <span className="font-bold text-neutral-700">
+                      {auditModalAuction.escalation_rule || "LOWEST_UNIQUE_BID"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-neutral-400 block">Payment Status</span>
+                    <span className="font-bold text-emerald-700">
+                      {auditModalAuction.payment_status || "UNSET"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-neutral-400 block">2nd Winner Reassigned</span>
+                    <span className="font-bold text-neutral-700">
+                      {auditModalAuction.second_winner_assigned ? "Yes" : "No"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Audit Logs Ledger */}
+                <div className="mt-5 space-y-2">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-500">
+                    Audit Event History ({auditLogs.length} events)
+                  </h3>
+                  {auditLogsLoading ? (
+                    <div className="py-8 text-center text-xs text-neutral-400">Loading audit history...</div>
+                  ) : auditLogs.length === 0 ? (
+                    <div className="py-8 text-center text-xs text-neutral-400">No recorded audit log events yet.</div>
+                  ) : (
+                    <div className="divide-y divide-border/60 border border-border/70 rounded-2xl bg-white overflow-hidden max-h-72 overflow-y-auto">
+                      {auditLogs.map((log: any) => (
+                        <div key={log.id} className="p-3 text-xs hover:bg-neutral-50/80">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-awash-blue">{log.action}</span>
+                            <span className="text-[10px] font-mono text-neutral-400">
+                              {new Date(log.created_at).toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="mt-1 text-[11px] text-neutral-500 flex items-center gap-3">
+                            <span>Actor: <strong className="font-mono">{log.actor_phone || log.actor_id?.slice(0, 8)}</strong></span>
+                            <span>Entity: {log.entity_type}</span>
+                          </div>
+                          {log.details && (
+                            <pre className="mt-1.5 p-2 bg-neutral-100 rounded-lg text-[10px] font-mono text-neutral-600 overflow-x-auto whitespace-pre-wrap">
+                              {typeof log.details === "object" ? JSON.stringify(log.details, null, 2) : log.details}
+                            </pre>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            </div>
           )}
         </AnimatePresence>
       </motion.div>

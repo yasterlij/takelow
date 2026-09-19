@@ -183,6 +183,21 @@ const [category, setCategory] = useState<string>(STANDARD_AUCTION_CATEGORIES[0])
   const [minBid, setMinBid] = useState('')
   const [maxBid, setMaxBid] = useState('')
 
+  const DEADLINE_PRESETS = [
+    { label: '48h', hours: 48 },
+    { label: '72h', hours: 72 },
+    { label: '7 Days', hours: 168 },
+    { label: '30 Days', hours: 720 },
+    { label: '90 Days', hours: 2160 },
+  ]
+  const ESCALATION_OPTIONS: Array<{ value: 'LOWEST_UNIQUE_BID' | 'MANUAL_REVIEW' | 'AUTO_FORFEIT_CLOSE'; label: string; desc: string }> = [
+    { value: 'LOWEST_UNIQUE_BID', label: 'Lowest Unique Bid', desc: 'Reassign automatically to next lowest unique bidder' },
+    { value: 'MANUAL_REVIEW', label: 'Manual Review', desc: 'Hold for administrator manual reassignment' },
+    { value: 'AUTO_FORFEIT_CLOSE', label: 'Auto Forfeit & Close', desc: 'Default primary winner and close auction immediately' },
+  ]
+
+  const [paymentDeadlineHours, setPaymentDeadlineHours] = useState('720')
+  const [escalationRule, setEscalationRule] = useState<'LOWEST_UNIQUE_BID' | 'MANUAL_REVIEW' | 'AUTO_FORFEIT_CLOSE'>('LOWEST_UNIQUE_BID')
   const [description, setDescription] = useState('')
   const [highlights, setHighlights] = useState('')
   const [imageUrl, setImageUrl] = useState('')
@@ -201,6 +216,8 @@ const [category, setCategory] = useState<string>(STANDARD_AUCTION_CATEGORIES[0])
     setMinBid(''); setMaxBid('')
     setDescription(''); setHighlights(''); setImageUrl(''); setSpecText('')
     setStartDate(new Date()); setEndDate(new Date(Date.now() + 7 * 86400000))
+    setPaymentDeadlineHours('720')
+    setEscalationRule('LOWEST_UNIQUE_BID')
   }
 
   const openCreate = () => {
@@ -215,6 +232,8 @@ const [category, setCategory] = useState<string>(STANDARD_AUCTION_CATEGORIES[0])
     setSpecText(Object.keys(emptySpecs).map((key) => (a.specs || {})[key]).filter(Boolean).join(', '))
     setMinBid(a.minBid != null ? String(a.minBid) : '')
     setMaxBid(a.maxBid != null ? String(a.maxBid) : '')
+    setPaymentDeadlineHours(String(a.paymentDeadlineHours || a.payment_deadline_hours || 720))
+    setEscalationRule(a.escalationRule || a.escalation_rule || 'LOWEST_UNIQUE_BID')
     const end = a.endTime ? new Date(a.endTime) : new Date(Date.now() + 7 * 86400000)
     const start = new Date(end.getTime() - 7 * 86400000)
     setStartDate(start)
@@ -270,13 +289,17 @@ const [category, setCategory] = useState<string>(STANDARD_AUCTION_CATEGORIES[0])
         minBid: minBid ? Number(minBid) : undefined,
         maxBid: maxBid ? Number(maxBid) : undefined,
         bidFee: bidFee ? Number(bidFee) : undefined,
-      })
+        paymentDeadlineHours: Number(paymentDeadlineHours) || 720,
+        escalationRule,
+      } as any)
     } else {
       await addAuction({
         ...payload, bidFee: Number(bidFee),
         startTime: startDate.toISOString(), endTime: endDate.toISOString(),
         minBid: minBid ? Number(minBid) : undefined,
         maxBid: maxBid ? Number(maxBid) : undefined,
+        paymentDeadlineHours: Number(paymentDeadlineHours) || 720,
+        escalationRule,
       })
     }
     setSubmitting(false)
@@ -373,11 +396,8 @@ const [category, setCategory] = useState<string>(STANDARD_AUCTION_CATEGORIES[0])
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={{ backgroundColor: colors.navy }}>
-        <StatusBarCustom />
-      </View>
       <AppBar title="Auction Management" onBack={goBack} right={
-        <TouchableOpacity style={{ width: 32, height: 32, justifyContent: 'center', alignItems: 'center' }} onPress={openCreate}>
+        <TouchableOpacity style={{ width: 44, height: 44, justifyContent: 'center', alignItems: 'center' }} onPress={openCreate}>
           <Plus size={20} color={colors.navyForeground} />
         </TouchableOpacity>
       } />
@@ -466,6 +486,64 @@ const [category, setCategory] = useState<string>(STANDARD_AUCTION_CATEGORIES[0])
             <TextInput value={description} onChangeText={setDescription} placeholder="Description" placeholderTextColor={colors.mutedForeground} style={s.input} multiline numberOfLines={2} />
             <TextInput value={highlights} onChangeText={setHighlights} placeholder="Highlights (comma separated)" placeholderTextColor={colors.mutedForeground} style={s.input} />
             <TextInput value={specText} onChangeText={setSpecText} placeholder="Product specs (comma separated)" placeholderTextColor={colors.mutedForeground} style={s.input} />
+            <Text style={{ fontSize: 10, fontWeight: '600', color: colors.mutedForeground, marginBottom: 4 }}>Payment Deadline Window</Text>
+            <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+              {DEADLINE_PRESETS.map((p) => {
+                const isSelected = String(p.hours) === paymentDeadlineHours
+                return (
+                  <TouchableOpacity
+                    key={p.hours}
+                    onPress={() => setPaymentDeadlineHours(String(p.hours))}
+                    style={{
+                      paddingHorizontal: 10,
+                      paddingVertical: 5,
+                      borderRadius: 14,
+                      backgroundColor: isSelected ? colors.navy : colors.card,
+                      borderWidth: 1,
+                      borderColor: isSelected ? colors.navy : colors.border,
+                    }}
+                  >
+                    <Text style={{ fontSize: 10, fontWeight: '600', color: isSelected ? colors.navyForeground : colors.foreground }}>
+                      {p.label}
+                    </Text>
+                  </TouchableOpacity>
+                )
+              })}
+            </View>
+            <TextInput
+              value={paymentDeadlineHours}
+              onChangeText={(t) => setPaymentDeadlineHours(t.replace(/\D/g, ''))}
+              placeholder="Custom deadline (hours, e.g. 720)"
+              placeholderTextColor={colors.mutedForeground}
+              keyboardType="number-pad"
+              style={s.input}
+            />
+            <Text style={{ fontSize: 10, fontWeight: '600', color: colors.mutedForeground, marginBottom: 4 }}>Escalation Rule</Text>
+            <View style={{ gap: 6, marginBottom: 12 }}>
+              {ESCALATION_OPTIONS.map((opt) => {
+                const isSelected = escalationRule === opt.value
+                return (
+                  <TouchableOpacity
+                    key={opt.value}
+                    onPress={() => setEscalationRule(opt.value)}
+                    style={{
+                      padding: 8,
+                      borderRadius: 10,
+                      backgroundColor: isSelected ? colors.primary + '14' : colors.card,
+                      borderWidth: 1,
+                      borderColor: isSelected ? colors.primary : colors.border,
+                    }}
+                  >
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: isSelected ? colors.primary : colors.foreground }}>
+                      {opt.label}
+                    </Text>
+                    <Text style={{ fontSize: 9, color: colors.mutedForeground, marginTop: 2 }}>
+                      {opt.desc}
+                    </Text>
+                  </TouchableOpacity>
+                )
+              })}
+            </View>
             <Text style={{ fontSize: 10, fontWeight: '600', color: colors.mutedForeground, marginBottom: 4 }}>Start</Text>
             <TouchableOpacity style={s.dateBtn} onPress={() => { setStartPickerMode('date'); setShowStartPicker(true) }}>
               <Calendar size={14} color={colors.mutedForeground} />
@@ -505,18 +583,30 @@ const [category, setCategory] = useState<string>(STANDARD_AUCTION_CATEGORIES[0])
             const bids = allBids.filter((b) => b.auctionId === a.id)
             const bidAmounts = bids.map((b) => b.amount)
             const avgBid = bidAmounts.length > 0 ? Math.round(bidAmounts.reduce((s, v) => s + v, 0) / bidAmounts.length) : 0
+            const hasSecondWinner = (a as any).second_winner_assigned || (a as any).payment_status === 'second_assigned' || (a as any).winners?.some((w: any) => w.status === 'assigned_second' || w.rank === 2)
+            const isDefaulted = (a as any).payment_status === 'defaulted' || (a.status as string) === 'payment-defaulted'
+            const deadlineHrs = (a as any).paymentDeadlineHours || (a as any).payment_deadline_hours
+            const escRule = (a as any).escalationRule || (a as any).escalation_rule
             return (
               <View key={a.id}>
                 <Card style={s.row}>
                   <AuctionThumb src={a.images?.[0]} />
                   <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                       <Text style={s.name} numberOfLines={1}>{a.name}</Text>
                       <StatusBadge status={a.status} isUnsold={isNoWinnerAuction(a)} />
+                      {hasSecondWinner ? <Badge tone="orange">2nd Winner</Badge> : null}
+                      {isDefaulted ? (
+                        <View style={{ backgroundColor: '#ef44441a', borderWidth: 1, borderColor: '#ef44444d', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 }}>
+                          <Text style={{ fontSize: 9, fontWeight: '700', color: '#ef4444' }}>Defaulted</Text>
+                        </View>
+                      ) : null}
                     </View>
                     <Text style={s.meta}>
                       {a.uniqueBidders} bidders · {formatCurrency(a.marketPrice)}
                       {bidAmounts.length > 0 ? ` · Avg ${formatCurrency(avgBid)}` : ''}
+                      {deadlineHrs ? ` · ${deadlineHrs}h deadline` : ''}
+                      {escRule ? ` · ${escRule}` : ''}
                       {a.specSummary ? ` · ${a.specSummary}` : ''}
                     </Text>
                   </View>
@@ -641,13 +731,6 @@ const [category, setCategory] = useState<string>(STANDARD_AUCTION_CATEGORIES[0])
   )
 }
 
-function StatusBarCustom() {
-  return (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 }}>
-      <Text style={{ fontSize: 13, fontWeight: '600', color: colors.navyForeground }}>9:41</Text>
-    </View>
-  )
-}
 
 const s = StyleSheet.create({
   searchWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.secondary, paddingHorizontal: 10 },

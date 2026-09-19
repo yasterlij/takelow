@@ -27,6 +27,7 @@
 | 4.0 | 2026-06-20 | Engineering Team | Compliance Review Board | CTO | Added backup/DR, Redis HA, WebSocket scaling |
 | 5.0 | 2026-08-18 | Engineering Team | Architecture Review Board | CTO | Added comprehensive audit, fine-grained permissions |
 | 6.0 | 2026-08-18 | Platform Architecture Team | Architecture Review Board | CTO | Enterprise-grade: Prisma migration, T&C, product approval, settlement reports, analytics, audit viewer, winner management, Redis caching, legal/compliance, risk assessment, acceptance criteria, glossary |
+| 6.1 | 2026-09-19 | Platform Architecture Team | Architecture Review Board | CTO | Enhanced Reverse Auction Payment & Winner Escalation Rule: UNCITRAL Model Law & ICC Auction Guidelines alignment, configurable 1-month payment deadline, payment defaulting, professional error messaging, second winner assignment notifications, audit trail & transparency flags |
 
 ---
 
@@ -81,7 +82,7 @@ This document is prepared in conformance with **IEEE Standard 830-1998** (*IEEE 
 
 ### 1.2 Scope
 
-TakeLow enables users to participate in timed auctions by placing monetary bids. The winner is the participant who submits the **lowest unique bid amount** (up to 2 decimal places) before the auction timer expires. Winners shall pay the winning amount within a configurable deadline (default 24 hours).
+TakeLow enables users to participate in timed auctions by placing monetary bids. The winner is the participant who submits the **lowest unique bid amount** (up to 2 decimal places) before the auction timer expires. The Primary Winner is notified and given a configurable payment deadline (default 1 month / 30 days / 720 hours, configurable by admin). If the Primary Winner fails to pay within the deadline, the auction payment status changes to **"Payment Defaulted"** and the system automatically escalates to the Second Winner (next lowest unique bid) in compliance with UNCITRAL and ICC auction standards.
 
 The system encompasses:
 - **Three microservices**: Identity Service, Auction Engine, Query Service
@@ -238,12 +239,16 @@ Refer to [Section 14 — Glossary](#14-glossary) for the complete and expanded d
 | **FR-WIN-02** | Must | The system shall support multiple winners per auction (configurable `num_winners`). |
 | **FR-WIN-03** | Must | The system shall assign a rank to each winner based on bid amount (lowest first). |
 | **FR-WIN-04** | Must | The system shall send winner notifications via push, SMS, and in-app inbox. |
-| **FR-WIN-05** | Must | The system shall require winners to pay within 24 hours (configurable deadline). |
-| **FR-WIN-06** | Must | The system shall rotate to the next unpaid winner if the deadline expires. |
+| **FR-WIN-05** | Must | The system shall require the Primary Winner to complete payment within a configurable payment deadline (default 1 month / 30 days / 720 hours, configurable by admin via `PAYMENT_DEADLINE_HOURS`). |
+| **FR-WIN-06** | Must | If the Primary Winner fails to pay within the deadline: (a) auction status shall update to "Payment Defaulted" (`PAYMENT_DEFAULTED`), (b) system shall automatically escalate to the Second Winner (next lowest unique bid), in accordance with UNCITRAL Model Law on Public Procurement and ICC Auction Guidelines. |
 | **FR-WIN-07** | Must | The system shall support payment via SikinaPay, Awash Bank, or internal wallet. |
 | **FR-WIN-08** | Must | The system shall reconcile pending payments every 30 minutes via cron job. |
 | **FR-WIN-09** | Must | The system shall expire payments after 30 seconds of inactivity. |
 | **FR-WIN-10** | Must | The system shall send payment reminder notifications to winners with pending payments via both SMS and push notification channels. Reminders shall be sent at configurable intervals (default: 6 hours and 1 hour before deadline expiry). The system shall log each reminder dispatch to the audit trail. |
+| **FR-WIN-11** | Must | The system shall enforce professional, compliant error messaging for expired/defaulted auctions: *"This auction is no longer eligible for payment. The payment deadline has expired."* |
+| **FR-WIN-12** | Must | Upon escalation, the system shall notify the Second Winner with product details, their winning bid amount, new payment deadline, and explicit reason for reassignment: *"You have been awarded this auction because the original winner did not complete payment within the specified timeframe."* |
+| **FR-WIN-13** | Must | The system shall set the `second_winner_assigned` flag on the auction record, log immutable audit events for `PRIMARY_WINNER_DEFAULTED` and `SECOND_WINNER_ASSIGNED` with timestamps, and clearly display "Second Winner Assigned" and "Payment Defaulted" in admin and user views. |
+| **FR-WIN-14** | Must | The escalation mechanism shall comply with the UNCITRAL Model Law on Public Procurement, ICC Auction Guidelines, and Ethiopian E-Commerce Proclamation regarding transparent bidder reassignment. |
 
 ### 3.5 Wallet Management
 
@@ -679,8 +684,8 @@ The system shall incorporate consumer protection measures:
 | BR-02 | A bid is unique if no other participant submitted the same bid amount in the same auction. | FR-BID-04, FR-WIN-01 |
 | BR-03 | Users must pay a non-refundable bid service fee before placing any bid. | FR-BID-01 |
 | BR-04 | A user may place a maximum of 150 bids per auction. | FR-BID-02 |
-| BR-05 | Winners must pay the winning bid amount within 24 hours (configurable) of auction closure. | FR-WIN-05 |
-| BR-06 | If a winner fails to pay within the deadline, the next ranked winner is offered the opportunity. | FR-WIN-06 |
+| BR-05 | Winners must pay the winning bid amount within a configurable deadline (default 1 month / 30 days / 720 hours) of auction closure. | FR-WIN-05 |
+| BR-06 | If the Primary Winner fails to pay within the deadline, auction status transitions to PAYMENT_DEFAULTED and the system escalates to the Second Winner with transparent notification and audit logging (UNCITRAL & ICC aligned). | FR-WIN-06, FR-WIN-11, FR-WIN-12, FR-WIN-13, FR-WIN-14 |
 | BR-07 | An auction is extended by 24 hours if the minimum bid threshold is not met (fair-play). | FR-AUCT-04 |
 | BR-08 | An auction is extended by 24 hours if no unique bids exist at closure time. | FR-AUCT-05 |
 | BR-09 | An auction closes immediately when the maximum bid count is reached. | FR-AUCT-06 |
@@ -729,8 +734,12 @@ The system shall incorporate consumer protection measures:
 | Req ID | Acceptance Criteria |
 |--------|-------------------|
 | FR-WIN-01 | Given an auction with bids, when the auction closes, then the winner is correctly identified as the lowest unique bidder. |
-| FR-WIN-06 | Given a winner who has not paid within 24 hours, when the deadline expires, then the winner is marked expired and the next ranked winner is notified. |
+| FR-WIN-05 | Given a declared Primary Winner, when the winner record is generated, then a configurable payment deadline of 1 month (720 hours) is assigned. |
+| FR-WIN-06 | Given a Primary Winner who has not paid within the payment deadline, when the deadline expires, then: (1) primary winner payment_status becomes EXPIRED, (2) PRIMARY_WINNER_DEFAULTED audit log is recorded, (3) auction second_winner_assigned is set to true, (4) the Second Winner (next lowest unique bid) is assigned with rank 1 status and notified with explicit reason, and (5) SECOND_WINNER_ASSIGNED audit log is recorded. If no next winner exists, auction status becomes PAYMENT_DEFAULTED. |
 | FR-WIN-10 | Given a winner with a pending payment, when 6 hours and 1 hour remain before the deadline, then SMS and push notifications are sent and logged. |
+| FR-WIN-11 | Given an auction whose payment deadline has passed or defaulted, when payment is initiated via API or UI, then the system returns the standard message: "This auction is no longer eligible for payment. The payment deadline has expired." |
+| FR-WIN-12 | Given reassignment to the Second Winner, when the notification is delivered, then it explicitly includes the statement: "You have been awarded this auction because the original winner did not complete payment within the specified timeframe." |
+| FR-WIN-13 | Given admin and user auction inspection views, when second_winner_assigned is true, then the "Second Winner Assigned" badge is displayed. When payment has lapsed without payment, the "Payment Defaulted" badge is displayed. |
 
 ### 12.5 Admin Operations
 
@@ -796,7 +805,7 @@ The system shall incorporate consumer protection measures:
 | FR-WIN-02 | Multiple winners | Must | §3.4 | winner.e2e-spec | auction-engine/src/winner/winner.service.ts |
 | FR-WIN-03 | Winner ranking | Must | §3.4 | winner.e2e-spec | auction-engine/src/winner/winner.service.ts |
 | FR-WIN-04 | Multi-channel notifications | Must | §3.4 | notifications.e2e-spec | identity-service/src/notifications/ |
-| FR-WIN-05 | 24h payment deadline | Must | §3.4, §11 (BR-05) | payment.e2e-spec | auction-engine/src/payment/payment.service.ts |
+| FR-WIN-05 | 3-month (90 days) payment deadline | Must | §3.4, §11 (BR-05) | payment.e2e-spec | auction-engine/src/payment/payment.service.ts |
 | FR-WIN-06 | Winner rotation | Must | §3.4, §11 (BR-06) | payment.e2e-spec | auction-engine/src/payment/payment.service.ts |
 | FR-WIN-07 | Multiple payment methods | Must | §3.4 | payment.e2e-spec | auction-engine/src/payment/ |
 | FR-WIN-08 | Payment reconciliation cron | Must | §3.4, §8.2 | payment.e2e-spec | auction-engine/src/payment/payment.service.ts |

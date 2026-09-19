@@ -53,17 +53,19 @@ export function AuctionCard({
   const publicCode = auction.publicCode || auction.id.slice(0, 6).toUpperCase()
 
   return (
-    <TouchableOpacity onPress={onOpen} activeOpacity={0.85} style={s.card}>
+    <View style={s.card}>
       <View style={s.cardImgOuter}>
-        <AuctionImage src={auction.images?.[0]} alt={auction.name} />
-        <LinearGradient
-          colors={['rgba(0,43,92,0.1)', 'transparent', 'rgba(200,166,66,0.05)']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFill}
-          pointerEvents="none"
-        />
-        <View style={s.cardImgTop}>
+        <TouchableOpacity onPress={onOpen} activeOpacity={0.85} style={StyleSheet.absoluteFill}>
+          <AuctionImage src={auction.images?.[0]} alt={auction.name} />
+          <LinearGradient
+            colors={['rgba(0,43,92,0.1)', 'transparent', 'rgba(200,166,66,0.05)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+            pointerEvents="none"
+          />
+        </TouchableOpacity>
+        <View style={s.cardImgTop} pointerEvents="box-none">
           {isClosed ? (
             <Badge tone="muted">Closed</Badge>
           ) : endingSoon ? (
@@ -72,14 +74,11 @@ export function AuctionCard({
             <Badge tone="green">Live</Badge>
           )}
 
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} pointerEvents="box-none">
             <View style={s.codeBadge}><Text style={s.codeBadgeText}>{publicCode}</Text></View>
             {onToggleFavorite && (
               <TouchableOpacity
-                onPress={(e) => {
-                  e.stopPropagation?.()
-                  onToggleFavorite()
-                }}
+                onPress={onToggleFavorite}
                 style={s.favBtn}
                 activeOpacity={0.7}
               >
@@ -89,7 +88,7 @@ export function AuctionCard({
           </View>
         </View>
       </View>
-      <View style={{ padding: 10, gap: 6 }}>
+      <TouchableOpacity onPress={onOpen} activeOpacity={0.85} style={{ padding: 10, gap: 6 }}>
         <Text style={s.cardName} numberOfLines={2}>{auction.name}</Text>
         {auction.specSummary ? <Text style={s.cardSpec} numberOfLines={2}>{auction.specSummary}</Text> : null}
         {auction.marketPrice > 0 ? (
@@ -115,15 +114,15 @@ export function AuctionCard({
             <TimePill seconds={auction.timeLeft} endingSoon={endingSoon} />
           )}
         </View>
-      </View>
-      {!isClosed && auction.maxBid && (
-        <View style={{ paddingHorizontal: 10, paddingTop: 6 }}>
-          <View style={{ height: 3, borderRadius: 2, backgroundColor: colors.border, overflow: 'hidden' }}>
-            <View style={{ width: `${bidProgress * 100}%`, height: '100%', borderRadius: 2, backgroundColor: bidProgress > 0.8 ? colors.primary : colors.emerald500 }} />
+        {!isClosed && auction.maxBid && (
+          <View style={{ paddingTop: 4 }}>
+            <View style={{ height: 3, borderRadius: 2, backgroundColor: colors.border, overflow: 'hidden' }}>
+              <View style={{ width: `${bidProgress * 100}%`, height: '100%', borderRadius: 2, backgroundColor: bidProgress > 0.8 ? colors.primary : colors.emerald500 }} />
+            </View>
           </View>
-        </View>
-      )}
-    </TouchableOpacity>
+        )}
+      </TouchableOpacity>
+    </View>
   )
 }
 
@@ -198,10 +197,7 @@ export function AuctionsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={{ backgroundColor: colors.navy }}>
-        <StatusBarCustom />
-        <AppBar title="Live Auctions" onBack={goBack} />
-      </View>
+      <AppBar title="Live Auctions" onBack={goBack} />
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 32 }}
@@ -348,13 +344,6 @@ export function AuctionsScreen() {
   )
 }
 
-function StatusBarCustom() {
-  return (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 }}>
-      <Text style={{ fontSize: 13, fontWeight: '600', color: colors.navyForeground }}>9:41</Text>
-    </View>
-  )
-}
 
 const s = StyleSheet.create({
   searchBarContainer: {

@@ -87,7 +87,7 @@ This document is classified as **Public — User-Facing**. It may be freely dist
 2. **Pay the Bid Fee**: Each bid requires a small, non-refundable service fee (starting from 1.00 ETB).
 3. **Place Your Bid**: Enter your bid amount. Lower bids have a better chance of being unique.
 4. **Wait for the Timer**: When the auction ends, the system finds the lowest unique bid.
-5. **Win and Pay**: If you win, you have 24 hours to complete your payment and claim your item.
+5. **Win and Pay**: If you win, you have three months (90 days) to complete your payment and claim your item.
 
 ### Key Features
 - **Lowest Unique Bid (LUB)**: Be strategic — your bid must be both low and unique.
@@ -380,27 +380,37 @@ TakeLow uses fair-play rules to ensure all users have a fair chance:
 
 > **Info**: The full bid breakdown is available to all users after auction closure. This transparency allows any participant to independently verify the winning result.
 
-### Understanding Winner Rotation
+### Understanding Winner Escalation & Default Rules
 
-If you win an auction but do not pay within 24 hours:
-1. Your payment status changes to **EXPIRED**.
-2. The system automatically offers the auction to the **next winner** (the second lowest unique bid).
-3. The next winner receives a notification and has 24 hours to pay.
-4. This rotation continues down the list of winners until someone pays or all winners are exhausted.
-5. If no winner pays, the auction is marked as **EXPIRED** with no winner.
+TakeLow operates in strict compliance with the **UNCITRAL Model Law on Public Procurement** and **ICC Auction Guidelines** for transparent bidder default and escalation:
+
+1. **Primary Winner Selection**: At auction close, the system identifies the participant who submitted the lowest unique bid as the **Primary Winner** (rank 1).
+2. **Payment Deadline**: The Primary Winner receives a push/SMS notification and has a configurable payment window (default **1 month / 30 days = 720 hours**, configurable by administrators).
+3. **Payment Default & Escalation**:
+   - If the Primary Winner fails to complete payment before the deadline, the auction payment status changes to **"Payment Defaulted"**.
+   - The primary winner's payment status transitions to **EXPIRED** and is logged to the audit trail as `PRIMARY_WINNER_DEFAULTED`.
+   - The system automatically escalates to the **Second Winner** (next lowest unique bid), marking `second_winner_assigned = true` and logging `SECOND_WINNER_ASSIGNED`.
+4. **Second Winner Notification**:
+   - The Second Winner is immediately notified via push notification and SMS with:
+     - Item details
+     - Their winning bid amount
+     - New 1-month payment deadline
+     - Explicit reason for reassignment: *"You have been awarded this auction because the original winner did not complete payment within the specified timeframe."*
+5. **Compliant Error Messaging**: If an expired or defaulted winner attempts to process payment, the platform returns a clear, compliant notice:
+   > *"This auction is no longer eligible for payment. The payment deadline has expired."*
 
 ### 4.7 Paying for a Won Auction
 
-1. From the Winner Screen or notification, tap **"Pay Now"**.
+1. From the Winner Screen or notification, tap **"Pay Now"** or **"Process Payment"**.
    - `[screenshot: pay-won-step-1.png]`
 2. Choose payment method:
-   - **Wallet**: Enter your PIN to pay directly.
-   - **SikinaPay / Awash Bank**: Redirected to payment page.
-3. You have **24 hours** to complete payment.
+   - **Awash Mobile Wallet**: Enter your wallet PIN to pay directly.
+   - **SikinaPay**: Checkout via Mobile Money.
+3. You have **1 month (30 days)** to complete payment.
 4. After payment, you will see a confirmation screen with delivery tracking.
    - `[screenshot: pay-won-confirmation.png]`
 
-> **Warning**: If you do not pay within 24 hours, the auction will be offered to the next winner. This rotation is automatic and cannot be reversed.
+> **Warning**: If you do not pay within your assigned payment deadline (default 1 month / 30 days), the auction will default and escalate to the next qualified bidder. This escalation is irreversible once the deadline expires.
 
 ### 4.8 Favorites
 
@@ -672,7 +682,7 @@ The Analytics module provides administrators with deeper operational insight:
 1. After winning, you will receive a notification.
 2. Tap **"Pay Now"** from the notification or Winner Screen.
 3. Select your payment method.
-4. Complete payment within **24 hours**.
+4. Complete payment within **three months (90 days)**.
 5. You will receive a **Payment Confirmed** screen with delivery tracking.
    - `[screenshot: pay-won-confirmed.png]`
 
@@ -740,7 +750,7 @@ As a TakeLow user, you are responsible for:
 2. **Account Security**: Keeping your password and wallet PIN confidential. You are responsible for all activity on your account.
 3. **Single Account**: Maintaining only one account per phone number. Creating multiple accounts to manipulate auctions is prohibited.
 4. **Accepted Terms**: Reading and accepting the Terms & Conditions before participating. You must not place bids if you do not agree to the terms.
-5. **Payment Obligations**: Completing payment within 24 hours if you win an auction. Failure to do so results in forfeiture to the next winner.
+5. **Payment Obligations**: Completing payment within three months (90 days) if you win an auction. Failure to do so results in forfeiture to the next winner.
 6. **Fair Play**: Not attempting to manipulate auctions through automated bidding scripts, collusion with other users, or exploitation of system vulnerabilities.
 7. **Lawful Use**: Using the platform only for lawful purposes and in compliance with applicable laws.
 8. **Timely Reporting**: Reporting suspected security issues, unauthorized account access, or platform errors to support promptly.
@@ -902,7 +912,7 @@ The complete refund policy is defined in [Section 6.6](#66-refund-policy). Key p
 
 ### 10.4 Winner Payment Protection
 
-1. **24-Hour Window**: Winners have 24 hours to complete payment, clearly communicated via notification and on-screen countdown.
+1. **Three-Month Window**: Winners have three months (90 days) to complete payment, clearly communicated via notification and on-screen countdown.
 2. **Winner Rotation**: If the primary winner does not pay, the auction is offered to subsequent winners — no user is forced to pay for an auction they did not actively win.
 3. **Payment Confirmation**: Winner payments are confirmed via the same gateway webhook process as bid fees, ensuring the same level of verification.
 4. **Delivery Tracking**: After winner payment, a delivery tracking reference is provided so the winner can monitor shipment.
@@ -1009,7 +1019,7 @@ This section summarizes the key terms that users must accept before participatin
 | **Account Responsibility** | You are responsible for all activity on your account; keep credentials confidential |
 | **Bid Fee** | Each bid requires a non-refundable service fee; the fee is disclosed before each bid |
 | **Bid Validity** | Bids are final once submitted; they cannot be modified or withdrawn |
-| **Winner Obligation** | Winners must complete payment within 24 hours or forfeit to the next winner |
+| **Winner Obligation** | Winners must complete payment within three months (90 days) or forfeit to the next winner |
 | **Fair Play** | Automated bidding, collusion, and system exploitation are prohibited |
 | **Data Usage** | Your data is used for platform operation, transparency, and compliance as described in [Section 11](#11-data-subject-rights) |
 | **Platform Liability** | TakeLow is not liable for bid fees paid; platform liability for winner payments is limited to the product value |
@@ -1117,17 +1127,16 @@ Users can control which notifications they receive via SMS, avoiding unwanted me
 
 ### 13.4 Payment Reminder System
 
-TakeLow sends automated payment reminders to winners to ensure they do not miss the 24-hour payment window.
+TakeLow sends automated payment reminders to winners to ensure they do not miss the three-month (90 days) payment window.
 
 **Reminder Schedule:**
 
 | Reminder | Timing | Channel | Content |
 |----------|--------|---------|---------|
-| **Initial Winner Notification** | At auction closure | Push, SMS (if enabled), In-app | "You won! Complete payment within 24 hours." |
-| **First Reminder** | 6 hours after closure | Push, In-app | "18 hours remaining to complete your payment." |
-| **Second Reminder** | 18 hours after closure | Push, SMS (if enabled), In-app | "6 hours remaining to complete your payment." |
-| **Final Reminder** | 23 hours after closure | Push, SMS, In-app (always sent) | "1 hour remaining! Payment expires soon." |
-| **Expiration Notice** | 24 hours after closure | Push, In-app | "Payment window expired. Auction offered to next winner." |
+| **Initial Winner Notification** | At auction closure | Push, SMS (if enabled), In-app | "You won! Complete payment within three months (90 days)." |
+| **Periodic Reminders** | Configurable intervals | Push, SMS (if enabled), In-app | "Reminder to complete your winning auction payment." |
+| **Final Reminder** | Before deadline | Push, SMS, In-app (always sent) | "Urgent: Payment deadline is approaching soon." |
+| **Expiration Notice** | 90 days after closure | Push, In-app | "Payment window expired. Auction offered to next winner." |
 
 **How it works:**
 1. When an auction closes and you are the winner, the reminder schedule is automatically activated.
@@ -1329,13 +1338,13 @@ A: No, the bid service fee is non-refundable. However, if you win and pay, but t
 A: Maximum 150 bids per auction per user.
 
 **Q: How long do I have to pay if I win?**
-A: 24 hours from the auction closure time. If you don't pay, the auction will be offered to the next winner (second lowest unique bid, etc.).
+A: A configurable deadline (default 1 month / 30 days) from the auction closure time or reassignment date. If you don't pay within this timeframe, the auction status transitions to "Payment Defaulted" and escalates to the Second Winner.
 
 **Q: Why do auctions get extended?**
 A: Auctions are extended by 24 hours if: (1) the minimum bid threshold is not met, or (2) no unique bids exist. This ensures fair play for all participants.
 
 **Q: What happens if I win but don't pay?**
-A: Your payment will expire after 24 hours. The auction will be offered to the next winner (second lowest unique bid). Your payment status will be marked as EXPIRED.
+A: If payment is not completed before the 1-month deadline, the auction payment status changes to "Payment Defaulted" and your winner status is marked as EXPIRED. The system automatically escalates to the Second Winner (the next lowest unique bid), logging both events to the immutable audit trail.
 
 ### Terms & Conditions
 
@@ -1371,7 +1380,7 @@ A: Go to Profile → Notifications → SMS Preferences and toggle off specific e
 A: Verify your phone number is correct in your profile. Check that SMS preferences are enabled for the event type. Ensure your mobile carrier is not blocking short-code messages. Contact support if issues persist.
 
 **Q: Will I get a reminder before my winner payment expires?**
-A: Yes. You receive reminders at 6 hours, 18 hours, and 23 hours after auction closure, plus a final expiration notice at 24 hours. The final reminder is always sent regardless of your notification preferences.
+A: Yes. You receive periodic reminders leading up to the 90-day deadline, plus a final reminder and expiration notice. The final reminder is always sent regardless of your notification preferences.
 
 ### Settlement
 
@@ -1592,7 +1601,7 @@ A: English, Amharic, Oromo (Afaan Oromoo), and Tigrinya. See [Section 15](#15-mu
 | **Unique Bid** | A bid amount placed by exactly one user in an auction. |
 | **Wallet** | The internal, pre-funded account on the TakeLow platform used for bid fees and winner payments. |
 | **WCAG 2.1 AA** | Web Content Accessibility Guidelines, version 2.1, conformance level AA. An international standard for web accessibility. |
-| **Winner Rotation** | The process of offering an auction to the next winner when the primary winner does not pay within 24 hours. |
+| **Winner Rotation** | The process of offering an auction to the next winner when the primary winner does not pay within three months (90 days). |
 | **WebSocket** | See Socket.io / WebSocket. |
 
 ---

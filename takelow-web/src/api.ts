@@ -20,6 +20,8 @@ import {
   type ApiPendingWinner,
   type ApiWinnerStats,
   type ApiDispute,
+  type ApiBidderHistory,
+  type ApiNotificationTemplate,
   type ApiRbacOverride,
   type ApiAccessDecision,
 } from "@takelow/api";
@@ -44,6 +46,8 @@ export type {
   ApiPendingWinner,
   ApiWinnerStats,
   ApiDispute,
+  ApiBidderHistory,
+  ApiNotificationTemplate,
   ApiRbacOverride,
   ApiAccessDecision,
 };

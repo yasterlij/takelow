@@ -9,4 +9,8 @@ export class UpdateDisputeStatusDto {
   @IsString()
   @IsOptional()
   resolution?: string;
+
+  @IsString()
+  @IsOptional()
+  document_urls?: string;
 }

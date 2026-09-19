@@ -1,6 +1,6 @@
 import { useMemo, useState, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Flame, TicketCheck, ShieldCheck, Trophy, Sparkles, PiggyBank, RefreshCw, Gavel, ChevronLeft, ChevronRight, Filter, ArrowLeft, TrendingDown, Users } from "lucide-react"
+import { Flame, TicketCheck, ShieldCheck, Trophy, Sparkles, PiggyBank, RefreshCw, Gavel, ChevronLeft, ChevronRight, Filter, ArrowLeft, TrendingDown, Users, Heart } from "lucide-react"
 import { useApp } from "../AppContext"
 import { Badge } from "../components/AuctionUI"
 import { SmartImage } from "../components/SmartImage"
@@ -33,6 +33,8 @@ function TimePill({ seconds, endingSoon }: { seconds: number; endingSoon: boolea
 }
 
 export function AuctionCard({ auction, onOpen, index }: { auction: Auction; onOpen: () => void; index: number }) {
+  const { isFavorite, toggleFavorite } = useApp()
+  const isFav = isFavorite(auction.id)
   const endingSoon = auction.status === "ending-soon"
   const bidProgress = auction.maxBid ? Math.min((auction.totalBids || auction.bidders) / auction.maxBid, 1) : 0
   const isClosed = auction.status === "closed"
@@ -61,9 +63,26 @@ export function AuctionCard({ auction, onOpen, index }: { auction: Auction; onOp
             ) : (
               <Badge tone="green">Live</Badge>
             )}
-            <span className="inline-flex items-center rounded-full bg-white/90 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-ink">
-              {publicCode}
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="inline-flex items-center rounded-full bg-white/90 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-ink">
+                {publicCode}
+              </span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  toggleFavorite(auction.id)
+                }}
+                title={isFav ? "Remove from Watchlist" : "Add to Watchlist"}
+                className={`flex size-6 items-center justify-center rounded-full transition-all shadow-sm ${
+                  isFav
+                    ? "bg-red-500 text-white"
+                    : "bg-white/90 text-neutral-600 hover:bg-white hover:text-red-500"
+                }`}
+              >
+                <Heart className={`size-3 ${isFav ? "fill-current" : ""}`} />
+              </button>
+            </div>
           </div>
         </div>
         <div className="flex flex-col gap-2 p-3">

@@ -38,6 +38,7 @@ export class NotificationController {
     @Body('collection_location') collectionLocation?: string,
     @Body('collection_method') collectionMethod?: string,
     @Body('collection_instructions') collectionInstructions?: string,
+    @Body('reassignment_reason') reassignmentReason?: string,
   ) {
     if (!userId || !auctionId || !productName) {
       throw new BadRequestException('Missing required fields: user_id, auction_id, product_name');
@@ -49,10 +50,11 @@ export class NotificationController {
       product_name: productName,
       product_description: productDescription,
       winning_amount: winningAmount ?? 0,
-      payment_deadline: paymentDeadline || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      payment_deadline: paymentDeadline || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       collection_location: collectionLocation,
       collection_method: collectionMethod,
       collection_instructions: collectionInstructions,
+      reassignment_reason: reassignmentReason,
     };
 
     await this.notificationService.sendWinnerNotification(payload);

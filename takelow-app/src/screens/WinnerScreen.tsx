@@ -9,7 +9,10 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   Share,
+  Platform,
+  StatusBar,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Trophy,
   CreditCard,
@@ -29,8 +32,26 @@ import { CTAButton, Card } from "../components/AuctionUI";
 import { api, type ApiWinnerResult, type ApiAuctionResult } from "../api";
 import { formatCurrency } from "../mockDataV0";
 import { colors } from "../theme";
+function formatDeadlineRemaining(hrs: number | null): string {
+  if (hrs == null) return ''
+  if (hrs <= 0) return 'Expired'
+  const days = Math.floor(hrs / 24)
+  const remHrs = hrs % 24
+  if (days >= 30) {
+    const months = Math.floor(days / 30)
+    const remDays = days % 30
+    return remDays > 0 ? `${months}mo ${remDays}d left` : `${months} months left`
+  }
+  if (days > 0) return `${days}d ${remHrs}h left`
+  return `${hrs}h left`
+}
 
 export function WinnerScreen() {
+  const insets = useSafeAreaInsets();
+  const topInset = Math.max(
+    insets.top,
+    Platform.OS === "android" ? StatusBar.currentHeight ?? 0 : 0
+  );
   const { go, selectedId, getAuction, user } = useApp();
   const isAdmin = user?.role === "admin";
   const auction = getAuction(selectedId);
@@ -99,6 +120,11 @@ export function WinnerScreen() {
       : undefined;
   const userWinnerInfo = allWinners?.find((w: any) => w.user_id === user?.id);
   const isPrimaryWinner = winner?.winner_user_id === user?.id;
+  const isSecondWinnerAssigned = Boolean(auction.second_winner_assigned || (winner as any)?.second_winner_assigned);
+  const isPaymentExpired = (deadlineHrs !== null && deadlineHrs <= 0) ||
+    auction.payment_status === "PAYMENT_DEFAULTED" ||
+    userWinnerInfo?.payment_status === "DEFAULTED" ||
+    userWinnerInfo?.payment_status === "EXPIRED";
 
   const allBids =
     "bids" in (winner || {})
@@ -166,21 +192,72 @@ export function WinnerScreen() {
 
   return (
     <View style={{ flex: 1 }}>
+      <StatusBar barStyle="light-content" />
       <View style={s.gradient}>
-        <StatusBarCustom />
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8 }}>
-          <TouchableOpacity onPress={() => go('home')} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' }}>
-            <ArrowLeft size={18} color="#FFF" />
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingHorizontal: 16,
+            paddingTop: topInset,
+            height: topInset + 56,
+          }}
+        >
+          <TouchableOpacity
+            onPress={() => go("home")}
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 22,
+              backgroundColor: "rgba(255,255,255,0.15)",
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            <ArrowLeft size={20} color="#FFF" />
           </TouchableOpacity>
           <View style={s.winnerBadge}>
             <PartyPopper size={14} color={colors.primary} />
             <Text style={s.winnerBadgeText}>Winner Results</Text>
           </View>
-          <TouchableOpacity onPress={handleShareWinner} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' }}>
-            <Share2 size={18} color="#FFF" />
+          <TouchableOpacity
+            onPress={handleShareWinner}
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 22,
+              backgroundColor: "rgba(255,255,255,0.15)",
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            <Share2 size={20} color="#FFF" />
           </TouchableOpacity>
         </View>
-        <View style={s.body}>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={s.body}
+          showsVerticalScrollIndicator={true}
+          bounces={true}
+          alwaysBounceVertical={true}
+        >
+          {isSecondWinnerAssigned && (
+            <View style={{ width: "100%", marginBottom: 16 }}>
+              <Card style={{ padding: 14, backgroundColor: colors.primary + "22", borderWidth: 1, borderColor: colors.primary + "55", borderRadius: 14, gap: 6 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <Trophy size={16} color={colors.primary} />
+                  <Text style={{ fontSize: 13, fontWeight: "800", color: colors.primary }}>
+                    Second Winner Assigned
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 12, fontWeight: "500", color: "#FFF", lineHeight: 18 }}>
+                  You have been awarded this auction because the original winner did not complete payment within the specified timeframe.
+                </Text>
+              </Card>
+            </View>
+          )}
+
           <View style={{ position: "relative", marginTop: 16 }}>
             <Animated.View
               style={[
@@ -442,12 +519,10 @@ export function WinnerScreen() {
                           fontSize: 12,
                           fontWeight: "700",
                           color:
-                            deadlineHrs < 6 ? colors.destructive : colors.navy,
+                            deadlineHrs < 24 ? colors.destructive : colors.navy,
                         }}
                       >
-                        {deadlineHrs > 0
-                          ? `${deadlineHrs}h remaining`
-                          : "Expired"}
+                        {formatDeadlineRemaining(deadlineHrs)}
                       </Text>
                     </View>
                   )}
@@ -626,14 +701,12 @@ export function WinnerScreen() {
                                 style={{
                                   fontSize: 8,
                                   color:
-                                    wDeadlineHrs < 6
+                                    wDeadlineHrs < 24
                                       ? colors.destructive
                                       : colors.mutedForeground,
                                 }}
                               >
-                                {wDeadlineHrs > 0
-                                  ? `${wDeadlineHrs}h left`
-                                  : "Expired"}
+                                {formatDeadlineRemaining(wDeadlineHrs)}
                               </Text>
                             )}
                         </View>
@@ -1360,15 +1433,24 @@ export function WinnerScreen() {
               )}
             </>
           ) : null}
-        </View>
+        </ScrollView>
       </View>
-      <Card style={s.bottomCta}>
+      <Card style={[s.bottomCta, { paddingBottom: Math.max(insets.bottom, 16) }]}>
         {winner?.winner_user_id &&
         allWinners?.some((w: any) => w.user_id === user?.id) ? (
           userWinnerInfo?.payment_status === "PAID" ? (
             <CTAButton onPress={() => go("home")}>
               <CheckCircle2 size={18} /> Payment Complete — Back Home
             </CTAButton>
+          ) : isPaymentExpired ? (
+            <View style={{ gap: 8 }}>
+              <Text style={{ fontSize: 13, fontWeight: "600", color: colors.destructive, textAlign: "center" }}>
+                This auction is no longer eligible for payment. The payment deadline has expired.
+              </Text>
+              <CTAButton variant="outline" onPress={() => go("home")}>
+                Back to Dashboard
+              </CTAButton>
+            </View>
           ) : !isPrimaryWinner ? (
             <CTAButton variant="outline" onPress={() => {}}>
               <Clock size={18} /> Waiting for higher-ranked winners
@@ -1388,37 +1470,14 @@ export function WinnerScreen() {
   );
 }
 
-function StatusBarCustom() {
-  return (
-    <View
-      style={{
-        flexDirection: "row",
-        justifyContent: "space-between",
-        paddingHorizontal: 20,
-        paddingTop: 8,
-        paddingBottom: 4,
-      }}
-    >
-      <Text
-        style={{
-          fontSize: 13,
-          fontWeight: "600",
-          color: colors.navyForeground,
-        }}
-      >
-        9:41
-      </Text>
-    </View>
-  );
-}
 
 const s = StyleSheet.create({
   gradient: { flex: 1, backgroundColor: colors.navy },
   body: {
-    flex: 1,
     alignItems: "center",
     paddingHorizontal: 24,
-    paddingVertical: 32,
+    paddingVertical: 24,
+    paddingBottom: 48,
   },
   winnerBadge: {
     flexDirection: "row",

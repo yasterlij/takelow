@@ -4,9 +4,12 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
+  Platform,
+  StatusBar,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import {
   ChevronLeft,
@@ -433,17 +436,7 @@ export function GoldCard({
 // ─── Phone Status Bar ───────────────────────────────────────────────
 
 export function PhoneStatusBar({ dark = false }: { dark?: boolean }) {
-  const tone = dark ? "#FFFFFF" : colors.awashBlue;
-  return (
-    <View style={s.statusBar}>
-      <Text style={[s.statusTime, { color: tone }]}>9:41</Text>
-      <View style={s.statusIcons}>
-        <Signal size={14} color={tone} />
-        <Wifi size={14} color={tone} style={{ marginLeft: 4 }} />
-        <BatteryFull size={16} color={tone} style={{ marginLeft: 4 }} />
-      </View>
-    </View>
-  );
+  return <StatusBar barStyle={dark ? "light-content" : "dark-content"} />;
 }
 
 // ─── App Bar ─────────────────────────────────────────────────────────
@@ -459,14 +452,42 @@ export function AppBar({
   right?: React.ReactNode;
   variant?: "navy" | "light" | "gold";
 }) {
+  const insets = useSafeAreaInsets();
   const txtStyles = {
     navy: "#FFFFFF",
     gold: colors.primaryForeground,
     light: colors.foreground,
   };
   const txt = txtStyles[variant];
+  const topInset =
+    insets.top > 0
+      ? insets.top
+      : Platform.OS === "android"
+        ? (StatusBar.currentHeight || 24)
+        : Platform.OS === "ios"
+          ? 44
+          : 0;
+
   return (
-    <View style={s.appBarOuter}>
+    <View
+      style={[
+        s.appBarOuter,
+        {
+          paddingTop: topInset,
+          backgroundColor:
+            variant === "navy"
+              ? "#002B5C"
+              : variant === "gold"
+                ? colors.primary
+                : "#FFFFFF",
+        },
+      ]}
+    >
+      <StatusBar
+        barStyle={variant === "navy" ? "light-content" : "dark-content"}
+        backgroundColor="transparent"
+        translucent
+      />
       {variant === "navy" && (
         <LinearGradient
           colors={["#002B5C", "#003D7A", "#002B5C"]}
@@ -480,25 +501,34 @@ export function AppBar({
           s.appBarInner,
           {
             backgroundColor:
-              variant === "light" ? "rgba(255,255,255,0.8)" : "transparent",
+              variant === "light" ? "rgba(255,255,255,0.95)" : "transparent",
+            borderBottomWidth: variant === "light" ? 1 : 0,
+            borderBottomColor: colors.border,
           },
         ]}
       >
-        {onBack ? (
-          <TouchableOpacity
-            onPress={onBack}
-            style={s.appBarBtn}
-            activeOpacity={0.7}
+        <View style={s.appBarSideSlot}>
+          {onBack ? (
+            <TouchableOpacity
+              onPress={onBack}
+              style={s.appBarBtn}
+              activeOpacity={0.7}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <ChevronLeft size={22} color={txt} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+        <View style={s.appBarTitleContainer}>
+          <Text
+            style={[s.appBarTitle, { color: txt }]}
+            numberOfLines={1}
+            ellipsizeMode="tail"
           >
-            <ChevronLeft size={20} color={txt} />
-          </TouchableOpacity>
-        ) : (
-          <View style={s.appBarBtn} />
-        )}
-        <Text style={[s.appBarTitle, { color: txt }]} numberOfLines={1}>
-          {title}
-        </Text>
-        <View style={s.appBarBtn}>{right}</View>
+            {title}
+          </Text>
+        </View>
+        <View style={s.appBarSideSlotRight}>{right}</View>
       </View>
     </View>
   );
@@ -885,26 +915,48 @@ const s = StyleSheet.create({
     alignItems: "center",
   },
   appBarOuter: {
+    zIndex: 100,
+    elevation: 4,
     overflow: "hidden",
   },
   appBarInner: {
+    height: 56,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: spacing.lg,
-    paddingVertical: 14,
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.sm,
+  },
+  appBarSideSlot: {
+    width: 48,
+    height: 48,
+    justifyContent: "center",
+    alignItems: "flex-start",
   },
   appBarBtn: {
-    width: 32,
-    height: 32,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: "center",
     alignItems: "center",
   },
-  appBarTitle: {
+  appBarTitleContainer: {
     flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.xs,
+  },
+  appBarTitle: {
     textAlign: "center",
     fontFamily: "System",
-    fontSize: fontSize.base,
+    fontSize: 17,
     fontWeight: "700",
+    letterSpacing: -0.2,
+  },
+  appBarSideSlotRight: {
+    minWidth: 48,
+    height: 48,
+    justifyContent: "center",
+    alignItems: "flex-end",
   },
   badge: {
     flexDirection: "row",

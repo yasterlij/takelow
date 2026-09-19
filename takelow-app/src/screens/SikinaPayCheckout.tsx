@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native'
+import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, ScrollView } from 'react-native'
 import { WebView } from 'react-native-webview'
 import { X, Check, ArrowLeft } from 'lucide-react-native'
 import { useApp } from '../AppContext'
+import { AppBar } from '../components/AuctionUI'
 import { api } from '../api'
 import { colors } from '../theme'
 import { formatCurrency } from '../mockDataV0'
@@ -95,7 +96,11 @@ export function SikinaPayCheckout() {
 
   if (status === 'paid') {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 }}>
+      <ScrollView
+        style={{ flex: 1, backgroundColor: colors.background }}
+        contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 40 }}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: colors.emerald500, justifyContent: 'center', alignItems: 'center' }}>
           <Check size={40} color={colors.primaryForeground} strokeWidth={3} />
         </View>
@@ -114,13 +119,17 @@ export function SikinaPayCheckout() {
             {sikinaPayContext === 'bid-fee' ? 'Submit Saved Bid' : 'Track Delivery'}
           </Text>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
     )
   }
 
   if (status === 'failed') {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 }}>
+      <ScrollView
+        style={{ flex: 1, backgroundColor: colors.background }}
+        contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 40 }}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: colors.destructive, justifyContent: 'center', alignItems: 'center' }}>
           <X size={40} color={colors.primaryForeground} strokeWidth={3} />
         </View>
@@ -142,20 +151,17 @@ export function SikinaPayCheckout() {
         >
           <Text style={{ fontSize: 15, fontWeight: '700', color: colors.awashBlue }}>Try Again</Text>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
     )
   }
 
   return (
     <View style={s.container}>
-      <View style={s.header}>
-        <TouchableOpacity onPress={handleClose} style={s.backBtn} activeOpacity={0.7}>
-          <ArrowLeft size={20} color={colors.neutralGray600} />
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>
-          {sikinaPayContext === 'bid-fee' ? 'Pay Bid Fee' : 'Pay Winning Amount'}
-        </Text>
-      </View>
+      <AppBar
+        variant="light"
+        title={sikinaPayContext === 'bid-fee' ? 'Pay Bid Fee' : 'Pay Winning Amount'}
+        onBack={handleClose}
+      />
 
       <View style={s.webviewContainer}>
         {webviewLoading && (

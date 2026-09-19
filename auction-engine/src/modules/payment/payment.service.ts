@@ -15,7 +15,7 @@ import { NotificationDispatchService } from "../worker/notification-dispatch.ser
 import { PaymentLinkService } from "./payment-link.service";
 import { PrismaService } from "../../prisma/prisma.service";
 
-const PAYMENT_DEADLINE_HOURS = 24;
+const PAYMENT_DEADLINE_HOURS = Number(process.env.PAYMENT_DEADLINE_HOURS) || 30 * 24;
 const WINNING_PAYMENT_TYPES = ["WINNING_BID", "WALLET"];
 
 @Injectable()
@@ -621,7 +621,7 @@ export class PaymentService {
 
   private async handleExpiredPayment(auction: any): Promise<void> {
     this.logger.log(
-      `Auction ${auction.id}: Payment deadline passed for winner ${auction.winner_user_id}`,
+      `Auction ${auction.id}: Payment deadline passed for primary winner ${auction.winner_user_id}`,
     );
 
     const currentWinner = await this.prisma.repository("winner").findOne({
@@ -635,35 +635,77 @@ export class PaymentService {
       currentWinner.payment_status = "EXPIRED";
       await this.prisma.repository("winner").save(currentWinner);
       this.logger.log(
-        `Auction ${auction.id}: Winner ${auction.winner_user_id} payment expired`,
+        `Auction ${auction.id}: Winner ${auction.winner_user_id} payment marked EXPIRED`,
       );
     }
+
+    // Always log Primary Winner Defaulted audit record
+    await this.logAuditEvent({
+      actor_id: "system",
+      action: "PRIMARY_WINNER_DEFAULTED",
+      entity_type: "auction",
+      entity_id: auction.id,
+      details: {
+        primary_winner_id: currentWinner?.user_id || auction.winner_user_id,
+        defaulted_at: new Date().toISOString(),
+        auction_id: auction.id,
+      },
+    });
 
     const nextWinner = await this.winnerService.getNextUnpaidWinner(auction.id);
 
     if (nextWinner) {
+      const nextDeadline = new Date(
+        Date.now() + PAYMENT_DEADLINE_HOURS * 60 * 60 * 1000,
+      );
+      auction.second_winner_assigned = true;
       auction.winner_user_id = nextWinner.user_id;
       auction.winning_bid_amount = nextWinner.amount;
       auction.payment_status = "PENDING";
-      auction.payment_deadline = new Date(
-        Date.now() + PAYMENT_DEADLINE_HOURS * 60 * 60 * 1000,
-      );
-      nextWinner.payment_deadline = auction.payment_deadline;
+      auction.payment_deadline = nextDeadline;
+      auction.last_payment_update = new Date();
+
+      nextWinner.payment_deadline = nextDeadline;
+      nextWinner.payment_status = "PENDING";
+
       await this.prisma.repository("winner").save(nextWinner);
       await this.prisma.repository("auction").save(auction);
+
       this.logger.log(
-        `Auction ${auction.id}: Payment expired, new winner ${nextWinner.user_id} with bid ${nextWinner.amount}`,
+        `Auction ${auction.id}: Second Winner assigned -> ${nextWinner.user_id} with bid ${nextWinner.amount}`,
       );
+
+      // Log Second Winner Assigned audit record
+      const reassignmentReason =
+        "You have been awarded this auction because the original winner did not complete payment within the specified timeframe.";
+
+      await this.logAuditEvent({
+        actor_id: "system",
+        action: "SECOND_WINNER_ASSIGNED",
+        entity_type: "auction",
+        entity_id: auction.id,
+        details: {
+          second_winner_id: nextWinner.user_id,
+          bid_amount: nextWinner.amount,
+          assigned_at: new Date().toISOString(),
+          payment_deadline: nextDeadline.toISOString(),
+          auction_id: auction.id,
+          reason: reassignmentReason,
+        },
+      });
+
       this.notifyNewWinner(
         auction.id,
         nextWinner.user_id,
         nextWinner.amount,
+        reassignmentReason,
       ).catch((e) =>
-        this.logger.warn(`Failed to notify new winner: ${e.message}`),
+        this.logger.warn(`Failed to notify second winner: ${e.message}`),
       );
     } else {
-      auction.payment_status = "EXPIRED";
+      auction.payment_status = "PAYMENT_DEFAULTED";
       auction.status = "EXPIRED";
+      auction.last_payment_update = new Date();
 
       await this.prisma.repository("winner").update(
         { auction_id: auction.id, payment_status: "PENDING" },
@@ -672,17 +714,9 @@ export class PaymentService {
 
       await this.prisma.repository("auction").save(auction);
       this.logger.log(
-        `Auction ${auction.id}: Payment expired, no more winners, auction expired`,
+        `Auction ${auction.id}: Payment defaulted, no more eligible winners, auction marked EXPIRED`,
       );
     }
-
-    this.logPaymentExpiryEvent(
-      auction.id,
-      currentWinner?.user_id,
-      nextWinner?.user_id,
-    ).catch((e) =>
-      this.logger.warn(`Failed to log payment expiry: ${e.message}`),
-    );
   }
 
   private getInternalHeaders(): Record<string, string> {
@@ -694,31 +728,29 @@ export class PaymentService {
     return headers;
   }
 
-  private async logPaymentExpiryEvent(
-    auctionId: string,
-    expiredUserId: string | undefined,
-    nextUserId: string | undefined,
-  ): Promise<void> {
+  private async logAuditEvent(event: {
+    actor_id: string;
+    action: string;
+    entity_type: string;
+    entity_id: string;
+    details: Record<string, any>;
+  }): Promise<void> {
     try {
       await fetch("http://identity-service:3000/api/v1/admin/audit/log", {
         method: "POST",
         headers: this.getInternalHeaders(),
         body: JSON.stringify({
-          actor_id: "system",
+          actor_id: event.actor_id,
           actor_phone: "system",
-          action: "PAYMENT_EXPIRED",
-          entity_type: "auction",
-          entity_id: auctionId,
-          details: {
-            expired_winner: expiredUserId,
-            next_winner: nextUserId || null,
-            timestamp: new Date().toISOString(),
-          },
+          action: event.action,
+          entity_type: event.entity_type,
+          entity_id: event.entity_id,
+          details: event.details,
         }),
       });
     } catch (e) {
       this.logger.warn(
-        `Failed to log payment expiry for auction ${auctionId}: ${e.message}`,
+        `Failed to log audit event ${event.action} for ${event.entity_id}: ${e.message}`,
       );
     }
   }
@@ -727,6 +759,7 @@ export class PaymentService {
     auctionId: string,
     userId: string,
     amount: number,
+    reassignmentReason?: string,
   ): Promise<void> {
     try {
       const auction = await this.prisma.repository("auction").findOne({
@@ -734,14 +767,17 @@ export class PaymentService {
         include: { product: true },
       });
       const productName = auction?.product?.name || auctionId;
+      const productDescription = auction?.product?.description || "";
       const deadline = auction?.payment_deadline?.toISOString();
 
       await this.notificationDispatchService.dispatch("/api/v1/notify/winner", {
         user_id: userId,
         auction_id: auctionId,
         product_name: productName,
+        product_description: productDescription,
         winning_amount: amount,
         payment_deadline: deadline,
+        reassignment_reason: reassignmentReason,
       });
     } catch (e) {
       this.logger.warn(`Failed to notify new winner: ${e.message}`);

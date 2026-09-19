@@ -56,6 +56,7 @@ export type View =
   | "admin-winners"
   | "admin-rbac"
   | "deposit"
+  | "wallet"
   | "payment-success"
   | "payment-failed"
   | "closed-auctions"
@@ -141,6 +142,8 @@ type AppState = {
     images?: string[];
     minBid?: number;
     maxBid?: number;
+    paymentDeadlineHours?: number;
+    escalationRule?: string;
   }) => Promise<void>;
   updateAuction: (
     id: string,
@@ -248,6 +251,10 @@ function mapAuction(apiAuction: any): Auction {
     winning_bid_amount: apiAuction.winning_bid_amount ?? null,
     winner_user_id: apiAuction.winner_user_id ?? null,
     payment_status: apiAuction.payment_status,
+    payment_deadline: apiAuction.payment_deadline ?? null,
+    payment_deadline_hours: apiAuction.payment_deadline_hours ?? null,
+    escalation_rule: apiAuction.escalation_rule ?? null,
+    second_winner_assigned: Boolean(apiAuction.second_winner_assigned),
     total_revenue: apiAuction.total_revenue,
     raw_status: apiAuction.status,
   };
@@ -260,6 +267,7 @@ const LIVE_VIEWS: View[] = [
   "product",
   "monitor",
   "my-bids",
+  "wallet",
 ];
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -590,6 +598,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setAuthError(null);
         if (paymentMethod === "AWASH") {
           await api.payBidFeeWithWallet(selectedId);
+          setWalletBalance((b) => b - fee);
           setFeePaid(true);
           navigate("place-bid");
           return;
@@ -901,6 +910,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       images?: string[];
       minBid?: number;
       maxBid?: number;
+      paymentDeadlineHours?: number;
+      escalationRule?: string;
     }) => {
       if (user?.role !== "admin") return;
       try {
@@ -919,6 +930,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           min_bid: a.minBid,
           max_bid: a.maxBid,
           bid_fee: a.bidFee,
+          payment_deadline_hours: a.paymentDeadlineHours,
+          escalation_rule: a.escalationRule,
         });
         await refreshAuctions();
         toast("Auction created successfully", "success");
@@ -1056,7 +1069,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
             data.endTime ||
             data.minBid != null ||
             data.maxBid != null ||
-            data.bidFee != null
+            data.bidFee != null ||
+            data.paymentDeadlineHours != null ||
+            data.escalationRule != null
           ) {
             await api.updateAuction(id, {
               ...(data.startTime ? { start_time: data.startTime } : {}),
@@ -1064,6 +1079,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
               ...(data.minBid != null ? { min_bid: data.minBid } : {}),
               ...(data.maxBid != null ? { max_bid: data.maxBid } : {}),
               ...(data.bidFee != null ? { bid_fee: data.bidFee } : {}),
+              ...(data.paymentDeadlineHours != null
+                ? { payment_deadline_hours: data.paymentDeadlineHours }
+                : {}),
+              ...(data.escalationRule != null
+                ? { escalation_rule: data.escalationRule }
+                : {}),
             });
           }
         }

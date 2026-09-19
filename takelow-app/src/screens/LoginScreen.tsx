@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react'
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView } from 'react-native'
 import { Eye, EyeOff, Smartphone, Lock, AlertCircle, LogOut } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { AwashLogo } from '../components/AuctionUI'
@@ -42,7 +42,12 @@ export function LoginScreen() {
   const displayError = localError || authError
 
   return (
-    <View style={s.container}>
+    <ScrollView
+      style={{ flex: 1, backgroundColor: colors.navy }}
+      contentContainerStyle={[s.container, { flexGrow: 1 }]}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+    >
       <View style={s.body}>
         <AwashLogo variant="light" size={48} />
         <Text style={s.title}>Welcome Back</Text>
@@ -113,19 +118,19 @@ export function LoginScreen() {
           )}
         </TouchableOpacity>
 
-        <Text style={s.footer}>
-          Don't have an account?{' '}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 24, gap: 4 }}>
+          <Text style={s.footer}>Don't have an account?</Text>
           <TouchableOpacity onPress={() => go('register')}>
             <Text style={s.footerLink}>Register</Text>
           </TouchableOpacity>
-        </Text>
+        </View>
       </View>
-    </View>
+    </ScrollView>
   )
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.navy, justifyContent: 'center', paddingHorizontal: 24 },
+  container: { justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 40 },
   body: { alignItems: 'center' },
   title: { fontSize: 24, fontWeight: '800', color: colors.navyForeground, marginTop: 32 },
   subtitle: { fontSize: 14, fontWeight: '500', color: colors.navyForeground + '99', marginTop: 4 },
@@ -139,6 +144,6 @@ const s = StyleSheet.create({
   input: { flex: 1, fontSize: 14, fontWeight: '500', color: colors.navyForeground },
   loginBtn: { marginTop: 32, width: '100%', maxWidth: 320, borderRadius: 12, backgroundColor: colors.primary, paddingVertical: 14, alignItems: 'center', shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
   loginBtnText: { fontSize: 14, fontWeight: '700', color: colors.primaryForeground },
-  footer: { marginTop: 24, fontSize: 12, fontWeight: '500', color: colors.navyForeground + '80' },
-  footerLink: { fontWeight: '700', color: colors.primary },
+  footer: { fontSize: 12, fontWeight: '500', color: colors.navyForeground + '80' },
+  footerLink: { fontSize: 12, fontWeight: '700', color: colors.primary },
 })

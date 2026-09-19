@@ -140,18 +140,18 @@ Awash Bank Upload Product
 
 | ID | Requirement | Status |
 |----|-------------|--------|
-| BR-030 | The system should notify winners via: SMS, Push Notification, Mobile App. | ✅ Push + App; ❌ SMS |
-| BR-031 | Notification shall contain: Winning Product, Winning Price, Payment Deadline, Collection Information. | ✅ Product name + payment deadline in push notification |
+| BR-030 | The system should notify winners via: SMS, Push Notification, Mobile App. | ✅ Push + App + SMS notification dispatch |
+| BR-031 | Notification shall contain: Winning Product, Winning Price, Payment Deadline (default 1 month, configurable), Collection Information. Second Winner notifications explicitly include the reassignment reason ("You have been awarded this auction because the original winner did not complete payment within the specified timeframe."). | ✅ Implemented with dynamic reassignment reason |
 
-### Module 7 – Winning Payment
+### Module 7 – Winning Payment & Escalation
 
 | ID | Requirement | Status |
 |----|-------------|--------|
-| BR-032 | The winner will pay using Mobile Money Wallet. | ✅ |
-| BR-033 | The system shall validate wallet balance. | ✅ |
+| BR-032 | The winner will pay using Mobile Money Wallet or Awash Bank Mobile Wallet. | ✅ |
+| BR-033 | The system shall validate wallet balance and require PIN confirmation. | ✅ |
 | BR-034 | Successful payment shall generate a **receipt**. | ✅ Digital receipt with reference, product, amount, date |
-| BR-035 | Failed payment shall trigger **reminders**. | ❌ Not implemented |
-| BR-036 | If payment expires: Cancel winner, Select next lowest unique bidder. | ✅ Payment deadline enforcement + next unique bidder fallback via cron |
+| BR-035 | Failed payment shall trigger **reminders** and professional error messaging ("This auction is no longer eligible for payment. The payment deadline has expired."). | ✅ Standard compliant error messages enforced across API and UI |
+| BR-036 | If payment expires: status transitions to "Payment Defaulted", system logs `PRIMARY_WINNER_DEFAULTED`, automatically escalates to Second Winner (next lowest unique bidder) with `second_winner_assigned` flag, and logs `SECOND_WINNER_ASSIGNED` (UNCITRAL Model Law on Procurement & ICC Auction Guidelines compliant). | ✅ Auto-escalation via cron & admin rotation with audit trail |
 
 ### Module 8 – Bank Management
 
@@ -229,5 +229,5 @@ Awash Bank Upload Product
 
 ### Payment Rules
 - The participation fee is non-refundable. ✅
-- The winner must pay the winning bid amount within the configured time (e.g., 24 hours). ✅ 24h payment deadline enforced by cron
+- The winner must pay the winning bid amount within the configured time (e.g., three months / 90 days). ✅ 90-day payment deadline enforced by cron
 - If the winner fails to pay, the system shall automatically offer the item to the next eligible lowest unique bidder. ✅ Next unique bidder selected automatically on expiry

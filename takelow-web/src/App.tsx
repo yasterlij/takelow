@@ -24,6 +24,7 @@ import { PaymentResultScreen } from "./screens/PaymentResultScreen"
 import { SikinaPayCheckoutScreen } from "./screens/SikinaPayCheckoutScreen"
 import { DeliveryScreen } from "./screens/DeliveryScreen"
 import { DepositScreen } from "./screens/DepositScreen"
+import { WalletScreen } from "./screens/WalletScreen"
 import { AdminDashboardScreen } from "./screens/AdminDashboardScreen"
 import { AdminAuctionsScreen } from "./screens/AdminAuctionsScreen"
 import { AdminProductsScreen } from "./screens/AdminProductsScreen"
@@ -42,7 +43,7 @@ import { NotificationBell } from "./components/NotificationBell"
 import { ErrorBoundary } from "./components/ErrorBoundary"
 import { ToastContainer } from "./components/Toast"
 import { ShimmerProvider } from "./components/SkeletonLoader"
-import { Gavel, Wallet, Shield, LogOut, Trophy, Menu, X, User, TicketCheck } from "lucide-react"
+import { Home as HomeIcon, Gavel, Wallet, Shield, LogOut, Trophy, Menu, X, User, TicketCheck } from "lucide-react"
 
 function ScreenRouter() {
   const { view, user } = useApp()
@@ -88,6 +89,7 @@ function ScreenRouter() {
     case "payment-success": screen = <PaymentResultScreen />; break
     case "sikina-pay-checkout": screen = <SikinaPayCheckoutScreen />; break
     case "deposit": screen = <DepositScreen />; break
+    case "wallet": screen = <WalletScreen />; break
     case "payment-failed": screen = <PaymentResultScreen />; break
     case "admin-dashboard": screen = isAdmin ? <AdminDashboardScreen /> : <HomeScreen />; break
     case "admin-auctions": screen = isAdmin ? <AdminAuctionsScreen /> : <HomeScreen />; break
@@ -119,8 +121,9 @@ function Navbar() {
   if (!isAuthed) return null
 
   const navItems = [
-    { id: "home", label: "Home", icon: Wallet },
+    { id: "home", label: "Home", icon: HomeIcon },
     { id: "auctions", label: "Live Auctions", icon: Gavel },
+    { id: "wallet", label: "Wallet", icon: Wallet },
     { id: "my-bids", label: "My Bids", icon: TicketCheck },
     { id: "closed-auctions", label: "Winners", icon: Trophy },
     { id: "profile", label: "Profile", icon: User },
@@ -235,15 +238,16 @@ function BottomNav() {
   if (!user) return null
 
   const showBottomBar = [
-    "home", "auctions", "closed-auctions", "my-bids", "profile",
+    "home", "auctions", "wallet", "closed-auctions", "my-bids", "profile",
     "admin-dashboard", "admin-auctions", "admin-products", "admin-users",
   ].includes(view)
 
   if (!showBottomBar) return null
 
   const items = [
-    { id: "home", label: "Home", icon: Wallet },
+    { id: "home", label: "Home", icon: HomeIcon },
     { id: "auctions", label: "Auctions", icon: Gavel },
+    { id: "wallet", label: "Wallet", icon: Wallet },
     { id: "closed-auctions", label: "Winners", icon: Trophy },
     { id: "profile", label: "Profile", icon: User },
     ...(user?.role === "admin" ? [{ id: "admin-dashboard", label: "Admin", icon: Shield }] : []),

@@ -13,6 +13,17 @@ export interface SettlementReport {
   net_revenue: number;
   auction_count: number;
   transaction_count: number;
+  escrow_summary?: {
+    total_held_in_escrow: number;
+    total_released_to_platform: number;
+    pending_delivery_count: number;
+  };
+  gateway_breakdown?: {
+    sikinapay_volume: number;
+    sikinapay_count: number;
+    awash_volume: number;
+    awash_count: number;
+  };
   details: SettlementRow[];
 }
 
@@ -112,7 +123,34 @@ export class SettlementService {
       };
     });
 
-    const transactionCount = await this.getTransactionCount(start, end);
+    const [transactionCount, gatewayRows, escrowRow] = await Promise.all([
+      this.getTransactionCount(start, end),
+      this.prisma.$queryRawUnsafe<any[]>(
+        `SELECT gateway::text, COUNT(*)::int as count, COALESCE(SUM(amount), 0)::float as volume
+         FROM payment_transactions
+         WHERE status = 'SUCCESSFUL'
+           AND created_at >= $1 AND created_at <= $2
+         GROUP BY gateway`,
+        start,
+        end,
+      ),
+      this.prisma.$queryRawUnsafe<any[]>(
+        `SELECT
+           COALESCE(SUM(CASE WHEN a.payment_status = 'PENDING' THEN pt.amount ELSE 0 END), 0)::float as held_in_escrow,
+           COALESCE(SUM(CASE WHEN a.payment_status = 'PAID' THEN pt.amount ELSE 0 END), 0)::float as released_platform,
+           COUNT(CASE WHEN a.payment_status = 'PENDING' THEN 1 ELSE NULL END)::int as pending_delivery
+         FROM payment_transactions pt
+         JOIN auctions a ON a.id = pt.auction_id
+         WHERE pt.payment_type = 'WINNING_BID'
+           AND pt.status = 'SUCCESSFUL'
+           AND pt.created_at >= $1 AND pt.created_at <= $2`,
+        start,
+        end,
+      ),
+    ]);
+
+    const sikinaData = gatewayRows.find((r) => r.gateway === 'SIKINAPAY');
+    const awashData = gatewayRows.find((r) => r.gateway === 'AWASH');
 
     return {
       start_date: startDate,
@@ -125,6 +163,17 @@ export class SettlementService {
       net_revenue: netRevenue,
       auction_count: winningData.length,
       transaction_count: transactionCount,
+      escrow_summary: {
+        total_held_in_escrow: Number(escrowRow[0]?.held_in_escrow || 0),
+        total_released_to_platform: Number(escrowRow[0]?.released_platform || 0),
+        pending_delivery_count: Number(escrowRow[0]?.pending_delivery || 0),
+      },
+      gateway_breakdown: {
+        sikinapay_volume: Number(sikinaData?.volume || 0),
+        sikinapay_count: Number(sikinaData?.count || 0),
+        awash_volume: Number(awashData?.volume || 0),
+        awash_count: Number(awashData?.count || 0),
+      },
       details,
     };
   }

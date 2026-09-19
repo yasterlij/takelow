@@ -417,6 +417,18 @@ settlement reports, analytics, audit viewer, winner management, Redis
 caching, legal/compliance, risk assessment, acceptance criteria,
 glossary</td>
 </tr>
+<tr>
+<td>6.1</td>
+<td>2026-09-19</td>
+<td>Platform Architecture Team</td>
+<td>Architecture Review Board</td>
+<td>CTO</td>
+<td>Enhanced Reverse Auction Payment &amp; Winner Escalation Rule:
+UNCITRAL Model Law &amp; ICC Auction Guidelines alignment, configurable
+1-month payment deadline, payment defaulting, professional error
+messaging, second winner assignment notifications, audit trail &amp;
+transparency flags</td>
+</tr>
 </tbody>
 </table>
 <hr />
@@ -540,8 +552,13 @@ class="header-section-number">1.4.2</span> 1.2 Scope</h3>
 <p>TakeLow enables users to participate in timed auctions by placing
 monetary bids. The winner is the participant who submits the
 <strong>lowest unique bid amount</strong> (up to 2 decimal places)
-before the auction timer expires. Winners shall pay the winning amount
-within a configurable deadline (default 24 hours).</p>
+before the auction timer expires. The Primary Winner is notified and
+given a configurable payment deadline (default 1 month / 30 days / 720
+hours, configurable by admin). If the Primary Winner fails to pay within
+the deadline, the auction payment status changes to <strong>“Payment
+Defaulted”</strong> and the system automatically escalates to the Second
+Winner (next lowest unique bid) in compliance with UNCITRAL and ICC
+auction standards.</p>
 <p>The system encompasses: - <strong>Three microservices</strong>:
 Identity Service, Auction Engine, Query Service - <strong>Two frontend
 applications</strong>: Web (React + Vite) and Mobile (React Native /
@@ -1078,14 +1095,20 @@ inbox.</td>
 <tr>
 <td><strong>FR-WIN-05</strong></td>
 <td>Must</td>
-<td>The system shall require winners to pay within 24 hours
-(configurable deadline).</td>
+<td>The system shall require the Primary Winner to complete payment
+within a configurable payment deadline (default 1 month / 30 days / 720
+hours, configurable by admin via
+<code>PAYMENT_DEADLINE_HOURS</code>).</td>
 </tr>
 <tr>
 <td><strong>FR-WIN-06</strong></td>
 <td>Must</td>
-<td>The system shall rotate to the next unpaid winner if the deadline
-expires.</td>
+<td>If the Primary Winner fails to pay within the deadline: (a) auction
+status shall update to “Payment Defaulted”
+(<code>PAYMENT_DEFAULTED</code>), (b) system shall automatically
+escalate to the Second Winner (next lowest unique bid), in accordance
+with UNCITRAL Model Law on Public Procurement and ICC Auction
+Guidelines.</td>
 </tr>
 <tr>
 <td><strong>FR-WIN-07</strong></td>
@@ -1113,6 +1136,39 @@ pending payments via both SMS and push notification channels. Reminders
 shall be sent at configurable intervals (default: 6 hours and 1 hour
 before deadline expiry). The system shall log each reminder dispatch to
 the audit trail.</td>
+</tr>
+<tr>
+<td><strong>FR-WIN-11</strong></td>
+<td>Must</td>
+<td>The system shall enforce professional, compliant error messaging for
+expired/defaulted auctions: <em>“This auction is no longer eligible for
+payment. The payment deadline has expired.”</em></td>
+</tr>
+<tr>
+<td><strong>FR-WIN-12</strong></td>
+<td>Must</td>
+<td>Upon escalation, the system shall notify the Second Winner with
+product details, their winning bid amount, new payment deadline, and
+explicit reason for reassignment: <em>“You have been awarded this
+auction because the original winner did not complete payment within the
+specified timeframe.”</em></td>
+</tr>
+<tr>
+<td><strong>FR-WIN-13</strong></td>
+<td>Must</td>
+<td>The system shall set the <code>second_winner_assigned</code> flag on
+the auction record, log immutable audit events for
+<code>PRIMARY_WINNER_DEFAULTED</code> and
+<code>SECOND_WINNER_ASSIGNED</code> with timestamps, and clearly display
+“Second Winner Assigned” and “Payment Defaulted” in admin and user
+views.</td>
+</tr>
+<tr>
+<td><strong>FR-WIN-14</strong></td>
+<td>Must</td>
+<td>The escalation mechanism shall comply with the UNCITRAL Model Law on
+Public Procurement, ICC Auction Guidelines, and Ethiopian E-Commerce
+Proclamation regarding transparent bidder reassignment.</td>
 </tr>
 </tbody>
 </table>
@@ -2756,15 +2812,18 @@ bid.</td>
 </tr>
 <tr>
 <td>BR-05</td>
-<td>Winners must pay the winning bid amount within 24 hours
-(configurable) of auction closure.</td>
+<td>Winners must pay the winning bid amount within a configurable
+deadline (default 1 month / 30 days / 720 hours) of auction
+closure.</td>
 <td>FR-WIN-05</td>
 </tr>
 <tr>
 <td>BR-06</td>
-<td>If a winner fails to pay within the deadline, the next ranked winner
-is offered the opportunity.</td>
-<td>FR-WIN-06</td>
+<td>If the Primary Winner fails to pay within the deadline, auction
+status transitions to PAYMENT_DEFAULTED and the system escalates to the
+Second Winner with transparent notification and audit logging (UNCITRAL
+&amp; ICC aligned).</td>
+<td>FR-WIN-06, FR-WIN-11, FR-WIN-12, FR-WIN-13, FR-WIN-14</td>
 </tr>
 <tr>
 <td>BR-07</td>
@@ -2972,16 +3031,48 @@ class="header-section-number">1.15.4</span> 12.4 Winner Determination
 is correctly identified as the lowest unique bidder.</td>
 </tr>
 <tr>
+<td>FR-WIN-05</td>
+<td>Given a declared Primary Winner, when the winner record is
+generated, then a configurable payment deadline of 1 month (720 hours)
+is assigned.</td>
+</tr>
+<tr>
 <td>FR-WIN-06</td>
-<td>Given a winner who has not paid within 24 hours, when the deadline
-expires, then the winner is marked expired and the next ranked winner is
-notified.</td>
+<td>Given a Primary Winner who has not paid within the payment deadline,
+when the deadline expires, then: (1) primary winner payment_status
+becomes EXPIRED, (2) PRIMARY_WINNER_DEFAULTED audit log is recorded, (3)
+auction second_winner_assigned is set to true, (4) the Second Winner
+(next lowest unique bid) is assigned with rank 1 status and notified
+with explicit reason, and (5) SECOND_WINNER_ASSIGNED audit log is
+recorded. If no next winner exists, auction status becomes
+PAYMENT_DEFAULTED.</td>
 </tr>
 <tr>
 <td>FR-WIN-10</td>
 <td>Given a winner with a pending payment, when 6 hours and 1 hour
 remain before the deadline, then SMS and push notifications are sent and
 logged.</td>
+</tr>
+<tr>
+<td>FR-WIN-11</td>
+<td>Given an auction whose payment deadline has passed or defaulted,
+when payment is initiated via API or UI, then the system returns the
+standard message: “This auction is no longer eligible for payment. The
+payment deadline has expired.”</td>
+</tr>
+<tr>
+<td>FR-WIN-12</td>
+<td>Given reassignment to the Second Winner, when the notification is
+delivered, then it explicitly includes the statement: “You have been
+awarded this auction because the original winner did not complete
+payment within the specified timeframe.”</td>
+</tr>
+<tr>
+<td>FR-WIN-13</td>
+<td>Given admin and user auction inspection views, when
+second_winner_assigned is true, then the “Second Winner Assigned” badge
+is displayed. When payment has lapsed without payment, the “Payment
+Defaulted” badge is displayed.</td>
 </tr>
 </tbody>
 </table>
@@ -3375,7 +3466,7 @@ implementation location. NFR entries are included for completeness.</p>
 </tr>
 <tr>
 <td>FR-WIN-05</td>
-<td>24h payment deadline</td>
+<td>3-month (90 days) payment deadline</td>
 <td>Must</td>
 <td>§3.4, §11 (BR-05)</td>
 <td>payment.e2e-spec</td>

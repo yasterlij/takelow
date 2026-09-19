@@ -78,9 +78,20 @@ export function PayWinningScreen() {
 
   const amount = auction.winning_bid_amount ?? userBid ?? 0
   const deadline = (auction as any).payment_deadline ? new Date((auction as any).payment_deadline) : null
-  const deadlineHrs = deadline ? Math.max(0, Math.round((deadline.getTime() - Date.now()) / 3600000)) : 24
-  const deadlineMins = deadline ? Math.max(0, Math.round((deadline.getTime() - Date.now()) / 60000)) : 1440
-  const urgent = deadlineHrs < 6
+  const deadlineHrs = deadline ? Math.max(0, Math.round((deadline.getTime() - Date.now()) / 3600000)) : 30 * 24
+  const deadlineMins = deadline ? Math.max(0, Math.round((deadline.getTime() - Date.now()) / 60000)) : 30 * 24 * 60
+  const deadlineDays = Math.floor(deadlineHrs / 24)
+  const isSecondWinnerAssigned = Boolean((auction as any).second_winner_assigned)
+  const isExpired = (deadlineHrs <= 0) || auction.payment_status === 'PAYMENT_DEFAULTED' || auction.payment_status === 'EXPIRED'
+  const urgent = deadlineHrs < 24 && !isExpired
+
+  const deadlineMessage = isExpired
+    ? 'This auction is no longer eligible for payment. The payment deadline has expired.'
+    : deadlineDays >= 30
+      ? `Complete payment within ${Math.floor(deadlineDays / 30)} months (${deadlineDays} days) to claim your prize.`
+      : deadlineDays >= 1
+        ? `Complete payment within ${deadlineDays} days ${deadlineHrs % 24}h to claim your prize.`
+        : `Complete payment within ${deadlineHrs}h ${deadlineMins % 60}m to claim your prize.`
 
   const handlePayPress = useCallback(async () => {
     if (selected === 'SIKINAPAY') {
@@ -183,36 +194,51 @@ export function PayWinningScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={{ backgroundColor: colors.navy }}>
-        <StatusBarCustom />
-      </View>
       <AppBar
         title="Pay Winning Amount"
         onBack={goBack}
         right={
-          <TouchableOpacity onPress={() => go('home')} style={{ width: 34, height: 34, justifyContent: 'center', alignItems: 'center' }}>
+          <TouchableOpacity onPress={() => go('home')} style={{ width: 44, height: 44, justifyContent: 'center', alignItems: 'center' }}>
             <AwashMark size={22} />
           </TouchableOpacity>
         }
       />
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 120 }}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 120 }}
+        keyboardShouldPersistTaps="handled"
+      >
         <Text style={{ fontSize: 14, fontWeight: '500', color: colors.mutedForeground }}>
-          Pay the primary winning bid to claim your prize.
+          {isSecondWinnerAssigned ? 'Pay your winning bid to claim your prize as the assigned winner.' : 'Pay the winning bid to claim your prize.'}
         </Text>
 
-        <View style={[s.deadline, urgent && { backgroundColor: colors.destructive + '22' }]}>
-          <Info size={16} color={urgent ? colors.destructive : colors.primary} />
-          <Text style={s.deadlineText}>
-            {deadlineHrs > 0
-              ? `Complete payment within ${deadlineHrs}h ${deadlineMins % 60}m to claim your prize.`
-              : `Less than an hour remaining! Pay now to claim your prize.`}
+        {isSecondWinnerAssigned && (
+          <Card style={{ padding: 14, backgroundColor: colors.primary + '18', borderWidth: 1, borderColor: colors.primary + '40', borderRadius: 14, gap: 6, marginTop: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Trophy size={16} color={colors.primary} />
+              <Text style={{ fontSize: 13, fontWeight: '800', color: colors.primary }}>
+                Second Winner Assigned
+              </Text>
+            </View>
+            <Text style={{ fontSize: 12, fontWeight: '500', color: colors.navy, lineHeight: 18 }}>
+              You have been awarded this auction because the original winner did not complete payment within the specified timeframe.
+            </Text>
+          </Card>
+        )}
+
+        <View style={[s.deadline, (isExpired || urgent) && { backgroundColor: colors.destructive + '22' }]}>
+          <Info size={16} color={isExpired || urgent ? colors.destructive : colors.primary} />
+          <Text style={[s.deadlineText, isExpired && { color: colors.destructive, fontWeight: '600' }]}>
+            {deadlineMessage}
           </Text>
         </View>
 
         <Card style={{ alignItems: 'center', padding: 24, marginTop: 16, borderWidth: 1, borderColor: colors.primary + '1A', backgroundColor: colors.primary + '0D' }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Trophy size={14} color={colors.primary} />
-            <Text style={{ fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', color: colors.primary }}>Primary Winning Bid</Text>
+            <Text style={{ fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', color: colors.primary }}>
+              {isSecondWinnerAssigned ? 'Second Winning Bid' : 'Primary Winning Bid'}
+            </Text>
           </View>
           <Text style={s.amount}>{formatCurrency(amount)}</Text>
           <Text style={{ fontSize: 12, fontWeight: '500', color: colors.mutedForeground, marginTop: 8 }}>for {auction.name}</Text>
@@ -348,8 +374,8 @@ export function PayWinningScreen() {
             </TouchableOpacity>
           </View>
         )}
-        <CTAButton onPress={handlePayPress} disabled={selected === 'AWASH' && (walletBalance < amount || checkingPin)}>
-          {loading || checkingPin ? 'Processing...' : selected === 'SIKINAPAY' ? (
+        <CTAButton onPress={handlePayPress} disabled={isExpired || (selected === 'AWASH' && (walletBalance < amount || checkingPin))}>
+          {isExpired ? 'Payment Deadline Expired' : loading || checkingPin ? 'Processing...' : selected === 'SIKINAPAY' ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <ShieldCheck size={18} color={colors.primaryForeground} />
               <Text style={{ color: colors.primaryForeground, fontWeight: '700', fontSize: 14 }}>Proceed to Payment · {formatCurrency(amount)}</Text>
@@ -447,14 +473,6 @@ export function PayWinningScreen() {
           </Card>
         </KeyboardAvoidingView>
       </Modal>
-    </View>
-  )
-}
-
-function StatusBarCustom() {
-  return (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 }}>
-      <Text style={{ fontSize: 13, fontWeight: '600', color: colors.navyForeground }}>9:41</Text>
     </View>
   )
 }

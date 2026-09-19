@@ -142,19 +142,16 @@ export function PlaceBidScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={{ backgroundColor: colors.navy }}>
-        <StatusBarCustom />
-      </View>
       <AppBar
         title="Place Your Bid"
         onBack={goBack}
         right={
-          <TouchableOpacity onPress={() => go('home')} style={{ width: 34, height: 34, justifyContent: 'center', alignItems: 'center' }}>
+          <TouchableOpacity onPress={() => go('home')} style={{ width: 44, height: 44, justifyContent: 'center', alignItems: 'center' }}>
             <AwashMark size={22} />
           </TouchableOpacity>
         }
       />
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 120 }}>
+      <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 120 }}>
         <Card style={s.snapshotCard}>
           <View style={s.snapshotHero}>
             <Text style={s.snapshotEyebrow}>Auction snapshot</Text>
@@ -311,13 +308,6 @@ export function PlaceBidScreen() {
   )
 }
 
-function StatusBarCustom() {
-  return (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 }}>
-      <Text style={{ fontSize: 13, fontWeight: '600', color: colors.navyForeground }}>9:41</Text>
-    </View>
-  )
-}
 
 const s = StyleSheet.create({
   snapshotCard: { padding: 12, borderRadius: 24, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, shadowColor: colors.awashBlue, shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.08, shadowRadius: 24, elevation: 8 },

@@ -41,6 +41,7 @@ export type View =
   | "home"
   | "auctions"
   | "my-bids"
+  | "wallet"
   | "product"
   | "pay-fee"
   | "place-bid"
@@ -145,6 +146,8 @@ type AppState = {
     images?: string[];
     minBid?: number;
     maxBid?: number;
+    paymentDeadlineHours?: number;
+    escalationRule?: string;
   }) => Promise<void>;
   updateAuction: (
     id: string,
@@ -240,6 +243,9 @@ function mapAuction(apiAuction: any): Auction {
     winning_bid_amount: apiAuction.winning_bid_amount ?? null,
     payment_status: apiAuction.payment_status ?? null,
     payment_deadline: apiAuction.payment_deadline ?? null,
+    payment_deadline_hours: apiAuction.payment_deadline_hours ?? null,
+    escalation_rule: apiAuction.escalation_rule ?? null,
+    second_winner_assigned: Boolean(apiAuction.second_winner_assigned),
   };
 }
 
@@ -251,6 +257,7 @@ const LIVE_VIEWS: View[] = [
   "product",
   "monitor",
   "my-bids",
+  "wallet",
 ];
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -519,8 +526,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setWalletBalance((b) => b - fee);
         setFeePaid(true);
         navigate("place-bid");
-      } catch {
-        setAuthError("Failed to process wallet payment. Please try again.");
+      } catch (e: any) {
+        const msg = getUserFriendlyMessage(e);
+        setAuthError(msg);
+        toast.show(msg, "error");
       }
     },
     [selectedId, walletBalance, toast],
@@ -621,8 +630,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         await api.payWinningWithWallet(selectedId);
         if (amount != null) setWalletBalance((b) => b - amount);
         navigate("payment-confirmed");
-      } catch {
-        setAuthError("Failed to process wallet payment. Please try again.");
+      } catch (e: any) {
+        const msg = getUserFriendlyMessage(e);
+        setAuthError(msg);
+        toast.show(msg, "error");
       }
     },
     [selectedId, paymentMethod, walletBalance, toast],
@@ -830,6 +841,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       images?: string[];
       minBid?: number;
       maxBid?: number;
+      paymentDeadlineHours?: number;
+      escalationRule?: string;
     }) => {
       if (user?.role !== "admin") return;
       try {
@@ -848,6 +861,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           min_bid: a.minBid,
           max_bid: a.maxBid,
           bid_fee: a.bidFee,
+          payment_deadline_hours: a.paymentDeadlineHours,
+          escalation_rule: a.escalationRule,
         });
         await refreshAuctions();
         toast.show("Auction created successfully", "success");
@@ -985,7 +1000,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
             data.endTime ||
             data.minBid != null ||
             data.maxBid != null ||
-            data.bidFee != null
+            data.bidFee != null ||
+            (data as any).paymentDeadlineHours != null ||
+            (data as any).escalationRule != null
           ) {
             await api.updateAuction(id, {
               ...(data.startTime ? { start_time: data.startTime } : {}),
@@ -993,6 +1010,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
               ...(data.minBid != null ? { min_bid: data.minBid } : {}),
               ...(data.maxBid != null ? { max_bid: data.maxBid } : {}),
               ...(data.bidFee != null ? { bid_fee: data.bidFee } : {}),
+              ...((data as any).paymentDeadlineHours != null
+                ? { payment_deadline_hours: (data as any).paymentDeadlineHours }
+                : {}),
+              ...((data as any).escalationRule != null
+                ? { escalation_rule: (data as any).escalationRule }
+                : {}),
             });
           }
         }

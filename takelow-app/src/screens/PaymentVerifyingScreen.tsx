@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native'
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, ScrollView } from 'react-native'
 import { Check, X, ArrowRight, ExternalLink } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { api } from '../api'
@@ -69,7 +69,11 @@ export function PaymentVerifyingScreen() {
 
   if (paid) {
     return (
-      <View style={s.container}>
+      <ScrollView
+        style={{ flex: 1, backgroundColor: colors.background }}
+        contentContainerStyle={[s.container, { flexGrow: 1, paddingVertical: 40 }]}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={s.iconCircle}>
           <Check size={40} color={colors.primaryForeground} strokeWidth={3} />
         </View>
@@ -97,13 +101,17 @@ export function PaymentVerifyingScreen() {
           <ArrowRight size={18} color={colors.primaryForeground} />
           <Text style={s.btnText}>{isBidFee ? 'Submit Saved Bid' : 'Track Delivery'}</Text>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
     )
   }
 
   if (failed) {
     return (
-      <View style={s.container}>
+      <ScrollView
+        style={{ flex: 1, backgroundColor: colors.background }}
+        contentContainerStyle={[s.container, { flexGrow: 1, paddingVertical: 40 }]}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={[s.iconCircle, { backgroundColor: colors.destructive }]}>
           <X size={40} color={colors.primaryForeground} strokeWidth={3} />
         </View>
@@ -126,7 +134,7 @@ export function PaymentVerifyingScreen() {
         >
           <Text style={s.btnOutlineText}>Try Again</Text>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
     )
   }
 
@@ -141,7 +149,6 @@ export function PaymentVerifyingScreen() {
 
 const s = StyleSheet.create({
   container: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 24,

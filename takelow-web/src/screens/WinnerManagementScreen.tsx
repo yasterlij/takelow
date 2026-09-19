@@ -14,12 +14,16 @@ import {
   Ban,
   X,
   Loader2,
+  Bell,
+  Send,
+  ShieldCheck,
 } from "lucide-react"
 import { AdminLayout } from "../components/AdminLayout"
 import {
   api,
   type ApiPendingWinner,
   type ApiWinnerStats,
+  type ApiBidderHistory,
 } from "../api"
 import { formatCurrency } from "../mockDataV0"
 import { toast } from "../store/toast.store"
@@ -29,8 +33,12 @@ export function WinnerManagementScreen() {
   const [pendingWinners, setPendingWinners] = useState<ApiPendingWinner[]>([])
   const [expiredWinners, setExpiredWinners] = useState<ApiPendingWinner[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<"ALL" | "PENDING" | "EXPIRED">("ALL")
+  const [activeTab, setActiveTab] = useState<"ALL" | "PENDING" | "EXPIRED" | "SECOND_WINNER">("ALL")
   const [search, setSearch] = useState("")
+
+  const [selectedBidderHistory, setSelectedBidderHistory] = useState<ApiBidderHistory | null>(null)
+  const [bidderHistoryLoading, setBidderHistoryLoading] = useState(false)
+  const [remindingId, setRemindingId] = useState<string | null>(null)
 
   const [extendModalWinner, setExtendModalWinner] = useState<ApiPendingWinner | null>(null)
   const [extendHours, setExtendHours] = useState(24)
@@ -104,11 +112,40 @@ export function WinnerManagementScreen() {
     }
   }
 
+  const handleViewBidderHistory = async (userId: string) => {
+    setBidderHistoryLoading(true)
+    try {
+      const res = await api.adminGetBidderHistory(userId)
+      setSelectedBidderHistory(res)
+    } catch (e: any) {
+      toast(e.message || "Failed to load bidder history", "error")
+    } finally {
+      setBidderHistoryLoading(false)
+    }
+  }
+
+  const handleSendReminder = async (winner: ApiPendingWinner) => {
+    setRemindingId(winner.id)
+    try {
+      const res = await api.adminSendPaymentReminder(winner.id)
+      toast(res.message || "Payment reminder dispatched via SMS, Push, and In-App notification", "success")
+    } catch (e: any) {
+      toast(e.message || "Failed to send payment reminder", "error")
+    } finally {
+      setRemindingId(null)
+    }
+  }
+
+  const rawList = Array.from(new Map([...pendingWinners, ...expiredWinners].map((w) => [w.id, w])).values())
+  const secondWinnerCount = rawList.filter((w) => w.auction?.second_winner_assigned).length
+
   const allList = activeTab === "EXPIRED"
     ? expiredWinners
     : activeTab === "PENDING"
     ? pendingWinners
-    : Array.from(new Map([...pendingWinners, ...expiredWinners].map((w) => [w.id, w])).values())
+    : activeTab === "SECOND_WINNER"
+    ? rawList.filter((w) => w.auction?.second_winner_assigned)
+    : rawList
 
   const filtered = allList.filter((w) => {
     if (!search) return true
@@ -226,18 +263,23 @@ export function WinnerManagementScreen() {
             />
           </div>
 
-          <div className="flex items-center gap-1.5 rounded-xl border border-border/60 bg-white p-1 shadow-sm">
-            {(["ALL", "PENDING", "EXPIRED"] as const).map((tab) => (
+          <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-border/60 bg-white p-1 shadow-sm">
+            {[
+              { id: "ALL", label: "All Queue" },
+              { id: "PENDING", label: `Pending (${pendingWinners.length})` },
+              { id: "EXPIRED", label: `Defaulted / Expired (${expiredWinners.length})` },
+              { id: "SECOND_WINNER", label: `2nd Winner Assigned (${secondWinnerCount})` },
+            ].map((tab) => (
               <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
                 className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                  activeTab === tab
+                  activeTab === tab.id
                     ? "bg-primary text-primary-foreground shadow-sm"
                     : "text-neutral-600 hover:text-foreground"
                 }`}
               >
-                {tab === "ALL" ? "All Queue" : tab === "PENDING" ? `Pending (${pendingWinners.length})` : `Expired (${expiredWinners.length})`}
+                {tab.label}
               </button>
             ))}
           </div>
@@ -287,19 +329,34 @@ export function WinnerManagementScreen() {
                         className="hover:bg-neutral-50/80 transition-colors"
                       >
                         <td className="px-4 py-3">
-                          <div className="font-semibold text-foreground">
-                            {w.user?.full_name || "Anonymous Winner"}
-                          </div>
-                          <div className="text-[11px] text-neutral-400">
-                            {w.user?.phone_number || "No phone"}
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleViewBidderHistory(w.user_id)}
+                            className="text-left group cursor-pointer"
+                            title="View Bidder History & Compliance Profile"
+                          >
+                            <div className="font-semibold text-foreground group-hover:text-primary transition-colors flex items-center gap-1">
+                              {w.user?.full_name || "Anonymous Winner"}
+                              <UserCheck className="size-3 text-neutral-400 group-hover:text-primary transition-colors" />
+                            </div>
+                            <div className="text-[11px] text-neutral-400">
+                              {w.user?.phone_number || "No phone"}
+                            </div>
+                          </button>
                         </td>
                         <td className="px-4 py-3">
                           <div className="font-semibold text-foreground">
                             {w.auction?.product?.name || "Auction Item"}
                           </div>
-                          <div className="font-mono text-[10px] text-primary">
-                            {w.auction?.public_code || w.auction_id.slice(0, 8)}
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="font-mono text-[10px] text-primary">
+                              {w.auction?.public_code || w.auction_id.slice(0, 8)}
+                            </span>
+                            {w.auction?.second_winner_assigned && (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold text-primary border border-primary/20">
+                                <Trophy className="size-2.5" /> 2nd Winner Assigned
+                              </span>
+                            )}
                           </div>
                         </td>
                         <td className="px-4 py-3">
@@ -331,19 +388,55 @@ export function WinnerManagementScreen() {
                           )}
                         </td>
                         <td className="px-4 py-3">
-                          <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
-                            w.payment_status === "PAID"
-                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                              : isExpired
-                              ? "bg-destructive/10 text-destructive border border-destructive/20"
-                              : "bg-amber-50 text-amber-700 border border-amber-200"
-                          }`}>
-                            {w.payment_status === "PAID" ? <CheckCircle2 className="size-3" /> : isExpired ? <XCircle className="size-3" /> : <Clock className="size-3" />}
-                            {isExpired ? "EXPIRED" : w.payment_status}
-                          </span>
+                          {(() => {
+                            const isDefaulted = w.auction?.payment_status === "PAYMENT_DEFAULTED" || w.payment_status === "DEFAULTED" || w.payment_status === "PAYMENT_DEFAULTED";
+                            return (
+                              <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
+                                w.payment_status === "PAID"
+                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                  : isDefaulted
+                                  ? "bg-rose-50 text-rose-700 border border-rose-200"
+                                  : isExpired
+                                  ? "bg-destructive/10 text-destructive border border-destructive/20"
+                                  : "bg-amber-50 text-amber-700 border border-amber-200"
+                              }`}>
+                                {w.payment_status === "PAID" ? (
+                                  <CheckCircle2 className="size-3" />
+                                ) : isDefaulted ? (
+                                  <Ban className="size-3" />
+                                ) : isExpired ? (
+                                  <XCircle className="size-3" />
+                                ) : (
+                                  <Clock className="size-3" />
+                                )}
+                                {w.payment_status === "PAID"
+                                  ? "PAID"
+                                  : isDefaulted
+                                  ? "PAYMENT DEFAULTED"
+                                  : isExpired
+                                  ? "EXPIRED"
+                                  : w.payment_status}
+                              </span>
+                            );
+                          })()}
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-1.5">
+                            {w.payment_status === "PENDING" && (
+                              <button
+                                onClick={() => handleSendReminder(w)}
+                                disabled={remindingId === w.id}
+                                title="Dispatch Automated Multi-channel Payment Reminder"
+                                className="flex items-center gap-1 rounded-lg border border-primary/30 bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary hover:bg-primary/20 shadow-sm transition-all disabled:opacity-50"
+                              >
+                                {remindingId === w.id ? (
+                                  <Loader2 className="size-3 animate-spin" />
+                                ) : (
+                                  <Bell className="size-3" />
+                                )}
+                                Remind
+                              </button>
+                            )}
                             <button
                               onClick={() => setExtendModalWinner(w)}
                               disabled={actionLoading}
@@ -444,6 +537,139 @@ export function WinnerManagementScreen() {
                   {actionLoading && <Loader2 className="size-3 animate-spin" />}
                   Confirm Extension
                 </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Bidder History Profile Modal */}
+      <AnimatePresence>
+        {selectedBidderHistory && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+            onClick={() => setSelectedBidderHistory(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl border border-border/60 bg-white p-6 shadow-2xl"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex size-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                    <UserCheck className="size-5.5" />
+                  </div>
+                  <div>
+                    <h3 className="font-display text-base font-bold text-foreground">
+                      {selectedBidderHistory.user.full_name || "Bidder Profile"}
+                    </h3>
+                    <p className="text-xs text-neutral-500">
+                      {selectedBidderHistory.user.phone_number} {selectedBidderHistory.user.email ? `· ${selectedBidderHistory.user.email}` : ""}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedBidderHistory(null)}
+                  className="rounded-full p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-foreground"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+
+              {/* Compliance Score & Metrics */}
+              <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-2.5 rounded-2xl border border-border/70 bg-neutral-50/70 p-3.5 text-xs">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-neutral-400 block">Compliance Score</span>
+                  <span className={`text-base font-bold ${
+                    selectedBidderHistory.stats.compliance_rate >= 80
+                      ? "text-emerald-600"
+                      : selectedBidderHistory.stats.compliance_rate >= 50
+                      ? "text-amber-600"
+                      : "text-rose-600"
+                  }`}>
+                    {selectedBidderHistory.stats.compliance_rate}%
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-neutral-400 block">Total Bids Placed</span>
+                  <span className="text-base font-bold text-foreground">
+                    {selectedBidderHistory.stats.total_bids}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-neutral-400 block">Auctions Won</span>
+                  <span className="text-base font-bold text-primary">
+                    {selectedBidderHistory.stats.auctions_won}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-neutral-400 block">Paid vs Defaults</span>
+                  <span className="text-base font-bold text-foreground">
+                    <span className="text-emerald-600">{selectedBidderHistory.stats.payments_completed}</span> / <span className="text-rose-600">{selectedBidderHistory.stats.payments_defaulted}</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* Won Auctions History */}
+              <div className="mt-5 space-y-2">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-500">
+                  Won Auctions History ({selectedBidderHistory.won_auctions.length})
+                </h4>
+                {selectedBidderHistory.won_auctions.length === 0 ? (
+                  <p className="text-xs text-neutral-400 py-3 text-center">No won auctions on record.</p>
+                ) : (
+                  <div className="divide-y divide-border/60 border border-border/70 rounded-2xl bg-white overflow-hidden max-h-48 overflow-y-auto">
+                    {selectedBidderHistory.won_auctions.map((w) => (
+                      <div key={w.id} className="p-3 text-xs flex items-center justify-between hover:bg-neutral-50/80">
+                        <div>
+                          <p className="font-bold text-foreground">{w.auction_name}</p>
+                          <p className="text-[10px] text-neutral-400">
+                            Rank #{w.rank} · Won amount: {formatCurrency(w.amount)}
+                            {w.second_winner_assigned ? " · 2nd Winner Assigned" : ""}
+                          </p>
+                        </div>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                          w.payment_status === "PAID"
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                            : w.payment_status === "EXPIRED" || w.payment_status === "DEFAULTED"
+                            ? "bg-rose-50 text-rose-700 border border-rose-200"
+                            : "bg-amber-50 text-amber-700 border border-amber-200"
+                        }`}>
+                          {w.payment_status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Recent Bids Ledger */}
+              <div className="mt-5 space-y-2">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-500">
+                  Recent Bidding Activity (Last 20)
+                </h4>
+                {selectedBidderHistory.recent_bids.length === 0 ? (
+                  <p className="text-xs text-neutral-400 py-3 text-center">No recent bids found.</p>
+                ) : (
+                  <div className="divide-y divide-border/60 border border-border/70 rounded-2xl bg-white overflow-hidden max-h-48 overflow-y-auto">
+                    {selectedBidderHistory.recent_bids.map((b) => (
+                      <div key={b.id} className="p-3 text-xs flex items-center justify-between hover:bg-neutral-50/80">
+                        <div>
+                          <p className="font-bold text-foreground">{b.auction_name}</p>
+                          <p className="text-[10px] text-neutral-400">
+                            Ticket #{b.ticket_number || "—"} · {new Date(b.bid_time).toLocaleString()}
+                          </p>
+                        </div>
+                        <span className="font-bold text-foreground">
+                          {formatCurrency(b.amount)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </motion.div>
           </div>

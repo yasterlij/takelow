@@ -166,13 +166,15 @@ export class AuctionAdminService {
     if (dto.min_bid != null) entity.min_bid = dto.min_bid;
     if (dto.max_bid != null) entity.max_bid = dto.max_bid;
     if (dto.bid_fee != null) entity.bid_fee = dto.bid_fee;
+    if (dto.payment_deadline_hours != null) entity.payment_deadline_hours = dto.payment_deadline_hours;
+    if (dto.escalation_rule != null) entity.escalation_rule = dto.escalation_rule;
     try {
       return await this.prisma.repository("auction").save(entity);
     } catch (error) {
       if (!this.isMissingColumnError(error)) throw error;
       const rows = await this.prisma.repository("auction").query(
-        `INSERT INTO auctions (product_id, start_time, end_time, status, min_bid, max_bid, bid_fee)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `INSERT INTO auctions (product_id, start_time, end_time, status, min_bid, max_bid, bid_fee, payment_deadline_hours, escalation_rule)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          RETURNING *`,
         [
           entity.product_id,
@@ -182,6 +184,8 @@ export class AuctionAdminService {
           entity.min_bid ?? null,
           entity.max_bid ?? null,
           entity.bid_fee ?? null,
+          entity.payment_deadline_hours ?? 720,
+          entity.escalation_rule ?? "LOWEST_UNIQUE_BID",
         ],
       );
       return rows[0];
@@ -214,13 +218,15 @@ export class AuctionAdminService {
     if (dto.min_bid != null) auction.min_bid = dto.min_bid;
     if (dto.max_bid != null) auction.max_bid = dto.max_bid;
     if (dto.bid_fee != null) auction.bid_fee = dto.bid_fee;
+    if (dto.payment_deadline_hours != null) auction.payment_deadline_hours = dto.payment_deadline_hours;
+    if (dto.escalation_rule != null) auction.escalation_rule = dto.escalation_rule;
     try {
       return await this.prisma.repository("auction").save(auction);
     } catch (error) {
       if (!this.isMissingColumnError(error)) throw error;
       const rows = await this.prisma.repository("auction").query(
         `UPDATE auctions
-         SET product_id = $2, start_time = $3, end_time = $4, status = $5, min_bid = $6, max_bid = $7, bid_fee = $8
+         SET product_id = $2, start_time = $3, end_time = $4, status = $5, min_bid = $6, max_bid = $7, bid_fee = $8, payment_deadline_hours = $9, escalation_rule = $10
          WHERE id = $1
          RETURNING *`,
         [
@@ -232,6 +238,8 @@ export class AuctionAdminService {
           auction.min_bid ?? null,
           auction.max_bid ?? null,
           auction.bid_fee ?? null,
+          auction.payment_deadline_hours ?? 720,
+          auction.escalation_rule ?? "LOWEST_UNIQUE_BID",
         ],
       );
       return rows[0];

@@ -33,6 +33,7 @@ export function DisputesScreen() {
 
   const [activeModalDispute, setActiveModalDispute] = useState<ApiDispute | null>(null)
   const [resolutionNote, setResolutionNote] = useState("")
+  const [documentUrls, setDocumentUrls] = useState("")
   const [targetStatus, setTargetStatus] = useState<"RESOLVED" | "REJECTED">("RESOLVED")
   const [actionLoading, setActionLoading] = useState(false)
 
@@ -63,14 +64,27 @@ export function DisputesScreen() {
     }
   }
 
+  const handleOpenDeterminationModal = (d: ApiDispute) => {
+    setActiveModalDispute(d)
+    setResolutionNote(d.resolution || "")
+    setDocumentUrls(d.document_urls || "")
+    setTargetStatus("RESOLVED")
+  }
+
   const handleResolveSubmit = async () => {
     if (!activeModalDispute) return
     setActionLoading(true)
     try {
-      await api.adminUpdateDisputeStatus(activeModalDispute.id, targetStatus, resolutionNote || undefined)
+      await api.adminUpdateDisputeStatus(
+        activeModalDispute.id,
+        targetStatus,
+        resolutionNote || undefined,
+        documentUrls || undefined,
+      )
       toast(`Dispute marked as ${targetStatus.toLowerCase()}`, "success")
       setActiveModalDispute(null)
       setResolutionNote("")
+      setDocumentUrls("")
       loadData()
     } catch (e: any) {
       toast(e.message || "Failed to update dispute", "error")
@@ -248,6 +262,34 @@ export function DisputesScreen() {
                           <strong className="font-semibold text-emerald-900">Admin Resolution:</strong> {d.resolution}
                         </div>
                       )}
+
+                      {d.document_urls && (
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                          <span className="text-[10px] font-bold text-neutral-400">Evidence / Documents:</span>
+                          {d.document_urls.split(",").map((url, idx) => {
+                            const trimmed = url.trim()
+                            const isHttp = trimmed.startsWith("http")
+                            return isHttp ? (
+                              <a
+                                key={idx}
+                                href={trimmed}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 rounded-md bg-neutral-100 px-2 py-0.5 text-[10px] font-semibold text-primary hover:underline"
+                              >
+                                <FileCheck className="size-2.5" /> Document {idx + 1}
+                              </a>
+                            ) : (
+                              <span
+                                key={idx}
+                                className="inline-flex items-center gap-1 rounded-md bg-neutral-100 px-2 py-0.5 text-[10px] font-mono text-neutral-600"
+                              >
+                                {trimmed}
+                              </span>
+                            )
+                          })}
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
@@ -261,10 +303,7 @@ export function DisputesScreen() {
                       )}
                       {(d.status === "OPEN" || d.status === "IN_REVIEW") && (
                         <button
-                          onClick={() => {
-                            setActiveModalDispute(d)
-                            setTargetStatus("RESOLVED")
-                          }}
+                          onClick={() => handleOpenDeterminationModal(d)}
                           className="rounded-xl bg-primary px-3.5 py-2 text-xs font-bold text-primary-foreground hover:opacity-90 transition-opacity shadow-sm"
                         >
                           Resolve / Close
@@ -344,6 +383,20 @@ export function DisputesScreen() {
                     placeholder="Describe findings, verified audit log timestamp, or actions taken..."
                     className="mt-1.5 w-full rounded-xl border border-border/60 bg-white p-3 text-xs text-foreground placeholder:text-neutral-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-sm"
                   />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-foreground">Supporting Documents & Evidence (URLs / References)</label>
+                  <input
+                    type="text"
+                    value={documentUrls}
+                    onChange={(e) => setDocumentUrls(e.target.value)}
+                    placeholder="e.g. https://storage.takelow.com/disputes/doc-123.pdf, Awash receipt #99182"
+                    className="mt-1.5 w-full rounded-xl border border-border/60 bg-white p-2.5 text-xs text-foreground placeholder:text-neutral-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-sm"
+                  />
+                  <p className="mt-1 text-[10px] text-neutral-400">
+                    Attach links to payment slips, bank confirmation statements, or procurement compliance transcripts.
+                  </p>
                 </div>
               </div>
 

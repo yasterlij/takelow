@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { Gavel, Wallet, ArrowRight, Eye, EyeOff, Trophy, Sparkles, ChevronLeft, ChevronRight, TrendingDown, Users, Flame, Smartphone, Headphones, Gamepad2, Laptop, Tv, Tablet, ShieldCheck, Lock, Eye as EyeIcon, Headset, Search, CreditCard, Award, Clock, Zap, Package, CheckCircle2 } from "lucide-react"
+import { Gavel, Wallet, ArrowRight, Eye, EyeOff, Trophy, Sparkles, ChevronLeft, ChevronRight, TrendingDown, Users, Flame, Smartphone, Headphones, Gamepad2, Laptop, Tv, Tablet, ShieldCheck, Lock, Eye as EyeIcon, Headset, Search, CreditCard, Award, Clock, Zap, Package, CheckCircle2, Heart, Calendar, Bell } from "lucide-react"
 import { useApp } from "../AppContext"
-import { formatCurrency, formatCountdown } from "../mockDataV0"
+import { formatCurrency, formatCountdown, COMING_SOON_ITEMS } from "../mockDataV0"
 import { useCountdown } from "../components/Countdown"
 import { SmartImage } from "../components/SmartImage"
 import { AuctionCard, SkeletonCard } from "./AuctionsScreen"
@@ -184,10 +184,95 @@ function WinnerShowcaseSlide({ auction, index }: { auction: any; index: number }
   )
 }
 
+function ComingSoonShowcaseSlide({
+  item,
+  isWatched,
+  onToggleWatch,
+}: {
+  item: any
+  isWatched: boolean
+  onToggleWatch: () => void
+}) {
+  return (
+    <div className="group relative flex w-[280px] flex-shrink-0 snap-start flex-col overflow-hidden rounded-2xl bg-white border border-border/60 shadow-sm transition-all duration-300 hover:shadow-md hover:border-primary/40">
+      <div className="relative aspect-[4/3] w-full overflow-hidden bg-canvas">
+        <SmartImage
+          src={item.images?.[0]}
+          alt={item.name}
+          className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/15 to-transparent" />
+
+        <div className="absolute top-3 left-3 flex items-center gap-1.5 rounded-full bg-awash-blue/90 backdrop-blur-md px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white border border-primary/40">
+          <Clock className="size-3 text-primary" /> Coming Soon
+        </div>
+
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            onToggleWatch()
+          }}
+          className={`absolute top-3 right-3 flex size-8 items-center justify-center rounded-full backdrop-blur-md transition-all ${
+            isWatched
+              ? "bg-primary text-primary-foreground shadow-md"
+              : "bg-black/40 text-white hover:bg-black/60"
+          }`}
+        >
+          <Heart className="size-4" fill={isWatched ? "currentColor" : "none"} />
+        </button>
+
+        <div className="absolute bottom-2.5 left-3 right-3 flex items-center justify-between">
+          <span className="inline-flex items-center gap-1 rounded-full bg-white/90 backdrop-blur-md px-2.5 py-0.5 text-[10px] font-bold text-ink">
+            <Calendar className="size-3 text-awash-blue" /> {item.dropTime}
+          </span>
+          <span className="rounded-full bg-primary/90 backdrop-blur-md px-2 py-0.5 text-[9px] font-bold text-primary-foreground uppercase">
+            {item.category}
+          </span>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2.5 p-4">
+        <div>
+          <h3 className="truncate font-display text-base font-bold text-ink">{item.name}</h3>
+          <p className="line-clamp-2 text-xs text-neutral-500 mt-0.5 leading-relaxed">{item.specSummary}</p>
+        </div>
+
+        <div className="flex items-center justify-between pt-2 border-t border-border/40">
+          <div>
+            <span className="block text-[9px] font-bold uppercase tracking-wider text-neutral-400">Est. Bid Fee</span>
+            <span className="font-display text-sm font-bold text-primary tabular-nums">
+              {formatCurrency(item.bidFee)}
+            </span>
+          </div>
+          <div className="text-right">
+            <span className="block text-[9px] font-bold uppercase tracking-wider text-neutral-400">Retail Value</span>
+            <span className="text-xs font-semibold text-neutral-500 line-through tabular-nums">
+              {formatCurrency(item.marketPrice)}
+            </span>
+          </div>
+        </div>
+
+        <button
+          onClick={onToggleWatch}
+          className={`w-full mt-1 flex items-center justify-center gap-2 rounded-xl py-2 text-xs font-bold transition-all ${
+            isWatched
+              ? "bg-awash-blue text-white shadow-sm"
+              : "bg-primary text-primary-foreground hover:bg-[#B89A38] shadow-sm"
+          }`}
+        >
+          <Heart className="size-3.5" fill={isWatched ? "currentColor" : "none"} />
+          {isWatched ? "Added to Watchlist" : "Notify Me (Watch)"}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export function HomeScreen() {
-  const { go, walletBalance, auctions, auctionsLoading, selectAuction, myBids, getAuction } = useApp()
+  const { go, walletBalance, auctions, auctionsLoading, selectAuction, myBids, getAuction, favoriteAuctionIds, toggleFavorite } = useApp()
   const [showBalance, setShowBalance] = useState(true)
   const winnerScrollRef = useRef<HTMLDivElement>(null)
+  const comingSoonScrollRef = useRef<HTMLDivElement>(null)
 
   const activeAuctions = auctions.filter((a) => a.status !== "closed")
   const closedAuctions = auctions.filter((a) => a.status === "closed")
@@ -216,29 +301,35 @@ export function HomeScreen() {
       transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
       className="flex flex-1 flex-col gap-8 pb-8 stagger-enter"
     >
-      {/* ── Wallet Banner ── */}
-      <div className="relative overflow-hidden rounded-2xl bg-ink p-6">
-        <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex size-12 items-center justify-center rounded-2xl bg-white/10">
-              <Wallet className="size-6 text-white" />
-            </div>
-            <div>
-              <p className="text-xs font-normal text-white/60">Wallet Balance</p>
-              <p className="font-display text-2xl font-semibold text-white tabular-nums tracking-[-0.022em]">
-                {showBalance ? formatCurrency(walletBalance) : "••••••"}
-              </p>
-            </div>
+      {/* ── Quick Header / Status Strip ── */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-gradient-to-r from-awash-blue/5 via-primary/5 to-transparent p-3 sm:p-4 rounded-2xl border border-border/50">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex size-9 items-center justify-center rounded-xl bg-awash-blue text-white shadow-sm">
+            <Sparkles className="size-4 text-primary" />
           </div>
-          <div className="flex items-center gap-2">
-            <button onClick={() => setShowBalance((s) => !s)} className="rounded-full bg-white/10 px-3 py-2 text-xs font-normal text-white/80 transition-colors hover:bg-white/20">
-              {showBalance ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
-            </button>
-            <button onClick={() => go("deposit")} className="rounded-full bg-primary px-4 py-2 text-xs font-medium text-primary-foreground transition-colors hover:bg-[#B89A38] active:opacity-80">
-              + Top Up
-            </button>
+          <div>
+            <p className="text-xs font-semibold text-foreground">Welcome to Awash Reverse Auction</p>
+            <p className="text-[11px] text-neutral-500">Lowest unique bid wins authentic brand new items</p>
           </div>
         </div>
+
+        <button
+          onClick={() => go("favorites")}
+          className="flex items-center gap-2.5 bg-white hover:bg-neutral-50 border border-border/60 px-3.5 py-1.5 rounded-full shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98] group"
+        >
+          <div className="flex size-6 items-center justify-center rounded-full bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+            <Heart className="size-3.5" fill={favoriteAuctionIds.length > 0 ? "currentColor" : "none"} />
+          </div>
+          <div className="text-left">
+            <p className="text-[10px] font-medium text-neutral-500 uppercase tracking-wider leading-none">Watchlist</p>
+            <p className="text-xs font-bold text-foreground tabular-nums leading-tight">
+              {favoriteAuctionIds.length} {favoriteAuctionIds.length === 1 ? "Item" : "Items"}
+            </p>
+          </div>
+          <span className="text-[11px] font-bold text-primary bg-primary/10 group-hover:bg-primary/20 px-2 py-0.5 rounded-full">
+            View &rarr;
+          </span>
+        </button>
       </div>
 
       {/* ── Live Auctions Carousel ── */}
@@ -380,6 +471,68 @@ export function HomeScreen() {
           )}
         </div>
 
+      </section>
+
+      {/* ── Coming Soon Section ── */}
+      <section>
+        <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="flex size-11 items-center justify-center rounded-2xl bg-awash-blue text-primary shadow-sm">
+              <Sparkles className="size-5" />
+            </span>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="font-display text-2xl font-bold tracking-tight text-foreground">
+                  Coming Soon to TakeLow!
+                </h2>
+                <span className="rounded-full bg-primary/15 px-2.5 py-0.5 text-xs font-bold text-primary">
+                  Preview Drops
+                </span>
+              </div>
+              <p className="text-sm font-medium text-neutral-500">
+                Preview upcoming reverse auction drops & set early launch alerts
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => go("favorites")}
+            className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2 text-xs font-bold text-primary-foreground transition-all hover:bg-[#B89A38] active:opacity-80 shadow-sm"
+          >
+            <Heart className="size-3.5" /> View Watchlist ({favoriteAuctionIds.length})
+          </button>
+        </div>
+
+        {/* Teaser Banner */}
+        <div className="mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl bg-gradient-to-r from-awash-blue via-[#001D40] to-ink p-4 text-white shadow-md border border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="flex size-9 items-center justify-center rounded-xl bg-primary/20 text-primary">
+              <Bell className="size-4" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-white">🚀 Get Early Drop Alerts</p>
+              <p className="text-xs text-white/70">
+                Tap the heart on any upcoming drop to receive instant notifications the moment bidding opens.
+              </p>
+            </div>
+          </div>
+          <span className="text-xs font-bold text-primary bg-white/10 px-3 py-1 rounded-full shrink-0">
+            Lowest Unique Bid Wins
+          </span>
+        </div>
+
+        {/* Horizontal Carousel of Coming Soon Slides */}
+        <div className="relative">
+          <div className="flex gap-5 overflow-x-auto pb-2 snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden scroll-smooth">
+            {COMING_SOON_ITEMS.map((item) => (
+              <ComingSoonShowcaseSlide
+                key={item.id}
+                item={item}
+                isWatched={favoriteAuctionIds.includes(item.id)}
+                onToggleWatch={() => toggleFavorite(item.id)}
+              />
+            ))}
+          </div>
+        </div>
       </section>
 
       {/* ── Promo ── */}

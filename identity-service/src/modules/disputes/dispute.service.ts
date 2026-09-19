@@ -10,6 +10,7 @@ export class DisputeService {
     auctionId: string | null,
     type: string,
     description: string,
+    documentUrls?: string,
   ) {
     return this.prisma.dispute.create({
       data: {
@@ -17,6 +18,7 @@ export class DisputeService {
         auction_id: auctionId,
         type,
         description,
+        document_urls: documentUrls,
         status: 'OPEN',
       },
     });
@@ -66,20 +68,27 @@ export class DisputeService {
     status: string,
     resolution: string | undefined,
     adminId: string,
+    documentUrls?: string,
   ) {
     const dispute = await this.prisma.dispute.findUnique({ where: { id } });
     if (!dispute) {
       throw new NotFoundException('Dispute not found');
     }
 
+    const updateData: any = {
+      status,
+      resolution,
+      resolved_by: adminId,
+      updated_at: new Date(),
+    };
+
+    if (documentUrls !== undefined) {
+      updateData.document_urls = documentUrls;
+    }
+
     return this.prisma.dispute.update({
       where: { id },
-      data: {
-        status,
-        resolution,
-        resolved_by: adminId,
-        updated_at: new Date(),
-      },
+      data: updateData,
     });
   }
 }

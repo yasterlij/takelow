@@ -1,5 +1,6 @@
 import React from 'react'
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native'
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Platform, StatusBar } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Gavel, Users, TrendingUp, DollarSign, Clock, CheckCircle2, XCircle, AlertTriangle, Radio, Eye, ArrowUpRight } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { CTAButton, Badge, Card } from '../components/AuctionUI'
@@ -7,6 +8,8 @@ import { formatCurrency } from '../mockDataV0'
 import { colors } from '../theme'
 
 export function AdminDashboardScreen() {
+  const insets = useSafeAreaInsets()
+  const topInset = Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 0)
   const { go, allBids, user, users, auctions } = useApp()
   const active = auctions.filter((a) => a.status !== 'closed')
   const closed = auctions.filter((a) => a.status === 'closed')
@@ -28,7 +31,8 @@ export function AdminDashboardScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={{ backgroundColor: colors.navy, paddingTop: 48, paddingHorizontal: 20, paddingBottom: 12 }}>
+      <StatusBar barStyle="light-content" />
+      <View style={{ backgroundColor: colors.navy, paddingTop: topInset + 12, paddingHorizontal: 20, paddingBottom: 16 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <View>
             <Text style={{ fontSize: 20, fontWeight: '800', color: colors.navyForeground }}>Admin Panel</Text>
