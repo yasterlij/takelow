@@ -24,6 +24,10 @@ import {
   type ApiNotificationTemplate,
   type ApiRbacOverride,
   type ApiAccessDecision,
+  type ApiAuctionTransactions,
+  type ApiUnifiedTransaction,
+  type ApiTransactionsListResponse,
+  type ApiComplianceReport,
 } from "@takelow/api";
 
 export type {
@@ -50,6 +54,10 @@ export type {
   ApiNotificationTemplate,
   ApiRbacOverride,
   ApiAccessDecision,
+  ApiAuctionTransactions,
+  ApiUnifiedTransaction,
+  ApiTransactionsListResponse,
+  ApiComplianceReport,
 };
 export { ApiError };
 

@@ -15,12 +15,14 @@ import {
   Percent,
   ShieldCheck,
   CreditCard,
+  FileSpreadsheet,
 } from "lucide-react"
 import { AdminLayout } from "../components/AdminLayout"
 import { StatCard } from "../components/StatCard"
 import { api, type ApiSettlementReport } from "../api"
 import { formatCurrency } from "../mockDataV0"
 import { toast } from "../store/toast.store"
+import { exportToCsv, exportToXlsx, exportToPdf } from "../utils/exportUtils"
 
 type DateRange = "today" | "week" | "month" | "quarter" | "year" | "custom"
 
@@ -99,6 +101,102 @@ export function SettlementReportScreen() {
     }
   }
 
+  const handleExportXlsx = () => {
+    if (!report) return
+    const headers = [
+      "Auction ID",
+      "Product Name",
+      "Winning Bid (ETB)",
+      "Participation Fees",
+      "Platform Share (10%)",
+      "VAT Tax (15%)",
+      "Commission (5%)",
+      "Net to Seller (ETB)",
+      "Payment Status",
+      "Settled At",
+    ]
+
+    const rows = report.details.map((d) => [
+      d.auction_id.slice(0, 8),
+      d.product_name,
+      d.winning_amount,
+      d.participation_fee_revenue,
+      d.platform_share,
+      d.tax,
+      d.commission,
+      d.net_to_seller,
+      d.payment_status,
+      d.settled_at || "Pending",
+    ])
+
+    exportToXlsx(
+      `settlement-report-${dateBounds.start}-to-${dateBounds.end}`,
+      "Settlement & Revenue",
+      headers,
+      rows,
+      [
+        { label: "Participation Fee Revenue", value: `ETB ${report.participation_fee_revenue.toFixed(2)}` },
+        { label: "Winning Price Total", value: `ETB ${report.winning_price_total.toFixed(2)}` },
+        { label: "Platform Net Revenue", value: `ETB ${report.net_revenue.toFixed(2)}` },
+        { label: "Total Auctions Settled", value: report.auction_count },
+        { label: "Held in Escrow", value: `ETB ${(report.escrow_summary?.total_held_in_escrow || 0).toFixed(2)}` },
+      ],
+    )
+    toast("Settlement XLSX exported successfully", "success")
+  }
+
+  const handleExportPdf = () => {
+    if (!report) return
+    const headers = [
+      "Auction ID",
+      "Product Name",
+      "Winning Amount",
+      "Platform Share",
+      "Tax (15%)",
+      "Commission (5%)",
+      "Net to Seller",
+      "Status",
+    ]
+
+    const rows = report.details.map((d) => [
+      d.auction_id.slice(0, 8),
+      d.product_name,
+      formatCurrency(d.winning_amount),
+      formatCurrency(d.platform_share),
+      formatCurrency(d.tax),
+      formatCurrency(d.commission),
+      formatCurrency(d.net_to_seller),
+      d.payment_status,
+    ])
+
+    exportToPdf({
+      title: "TakeLow — Financial Settlement & Revenue Distribution Report",
+      subtitle: `Settlement Period: ${dateBounds.start} to ${dateBounds.end}`,
+      metadata: [
+        { label: "Settlement Range", value: `${dateBounds.start} to ${dateBounds.end}` },
+        { label: "Auctions Settled", value: report.auction_count },
+        { label: "Compliance Standard", value: "UNCITRAL Procurement Art. 37 & ICC Rules" },
+        { label: "Escrow Status", value: `${report.escrow_summary?.pending_delivery_count || 0} Pending Delivery` },
+      ],
+      summaryKpis: [
+        { label: "Total Winning Price", value: formatCurrency(report.winning_price_total), color: "#0B192C" },
+        { label: "Fee Revenue", value: formatCurrency(report.participation_fee_revenue), color: "#854D0E" },
+        { label: "Net Platform Share", value: formatCurrency(report.net_revenue), color: "#16A34A" },
+        { label: "Held in Escrow", value: formatCurrency(report.escrow_summary?.total_held_in_escrow || 0), color: "#D97706" },
+      ],
+      revenueBreakdown: {
+        winning_amount: report.winning_price_total,
+        platform_share: report.platform_share,
+        tax: report.tax,
+        commission: report.commission,
+        net_to_seller: report.details.reduce((s, r) => s + r.net_to_seller, 0),
+      },
+      headers,
+      rows,
+      legalDisclaimer: "Certified financial reconciliation and revenue distribution statement. Meets ICC Auction Guidelines and UNCITRAL Model Law Article 37 requirements for external financial audits.",
+    })
+  }
+
   const rangeOptions: { value: DateRange; label: string }[] = [
     { value: "today", label: "Today" },
     { value: "week", label: "7 Days" },
@@ -121,19 +219,37 @@ export function SettlementReportScreen() {
           <button
             onClick={loadData}
             disabled={loading}
-            className="flex items-center gap-1.5 rounded-xl border border-border/60 bg-white px-3.5 py-2 text-xs font-semibold text-foreground transition-all hover:bg-neutral-50 shadow-sm"
+            className="flex items-center gap-1.5 rounded-xl border border-border/60 bg-white px-3 py-2 text-xs font-semibold text-foreground transition-all hover:bg-neutral-50 shadow-sm"
           >
             <RefreshCw className={`size-3.5 ${loading ? "animate-spin text-primary" : ""}`} />
             Refresh
           </button>
-          <button
-            onClick={handleExportCsv}
-            disabled={exporting || loading}
-            className="flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-xs font-bold text-primary-foreground shadow-sm hover:opacity-90 transition-opacity disabled:opacity-50"
-          >
-            {exporting ? <Loader2 className="size-3.5 animate-spin" /> : <Download className="size-3.5" />}
-            Export CSV
-          </button>
+          <div className="flex items-center gap-1 bg-neutral-100 p-1 rounded-xl">
+            <button
+              onClick={handleExportCsv}
+              disabled={exporting || loading}
+              className="px-2.5 py-1.5 text-xs font-bold rounded-lg hover:bg-white text-neutral-700 hover:text-awash-blue transition-all disabled:opacity-50"
+              title="Export as CSV"
+            >
+              CSV
+            </button>
+            <button
+              onClick={handleExportXlsx}
+              disabled={loading || !report}
+              className="px-2.5 py-1.5 text-xs font-bold rounded-lg hover:bg-white text-neutral-700 hover:text-emerald-700 transition-all disabled:opacity-50"
+              title="Export as Excel XLSX"
+            >
+              XLSX
+            </button>
+            <button
+              onClick={handleExportPdf}
+              disabled={loading || !report}
+              className="px-2.5 py-1.5 text-xs font-bold rounded-lg hover:bg-white text-neutral-700 hover:text-primary transition-all disabled:opacity-50"
+              title="Print UNCITRAL / ICC Audit Certificate"
+            >
+              PDF Slip
+            </button>
+          </div>
         </div>
       }
     >

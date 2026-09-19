@@ -22,6 +22,10 @@ import type {
   ApiAccessDecision,
   ApiBidderHistory,
   ApiNotificationTemplate,
+  ApiAuctionTransactions,
+  ApiUnifiedTransaction,
+  ApiTransactionsListResponse,
+  ApiComplianceReport,
 } from "./types";
 
 export type TakelowApiConfig = {
@@ -1180,6 +1184,74 @@ const api = {
       `/admin/products/${id}/reject`,
       { reason },
       ENGINE_API,
+    );
+  },
+  adminGetAuctionTransactions(auctionId: string) {
+    return request<ApiAuctionTransactions>(
+      "GET",
+      `/admin/auctions/${auctionId}/transactions`,
+      undefined,
+      QUERY_API,
+    );
+  },
+  adminListEnhancedTransactions(filters: {
+    auction_id?: string;
+    user_id?: string;
+    type?: string;
+    status?: string;
+    start?: string;
+    end?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  } = {}) {
+    const q = new URLSearchParams();
+    if (filters.auction_id) q.set("auction_id", filters.auction_id);
+    if (filters.user_id) q.set("user_id", filters.user_id);
+    if (filters.type) q.set("type", filters.type);
+    if (filters.status) q.set("status", filters.status);
+    if (filters.start) q.set("start", filters.start);
+    if (filters.end) q.set("end", filters.end);
+    if (filters.search) q.set("search", filters.search);
+    if (filters.page != null) q.set("page", String(filters.page));
+    if (filters.limit != null) q.set("limit", String(filters.limit));
+    return request<ApiTransactionsListResponse>(
+      "GET",
+      `/admin/transactions/all?${q.toString()}`,
+      undefined,
+      QUERY_API,
+    );
+  },
+  adminExportTransactions(filters: {
+    auction_id?: string;
+    user_id?: string;
+    type?: string;
+    status?: string;
+    start?: string;
+    end?: string;
+    search?: string;
+  } = {}) {
+    const q = new URLSearchParams();
+    if (filters.auction_id) q.set("auction_id", filters.auction_id);
+    if (filters.user_id) q.set("user_id", filters.user_id);
+    if (filters.type) q.set("type", filters.type);
+    if (filters.status) q.set("status", filters.status);
+    if (filters.start) q.set("start", filters.start);
+    if (filters.end) q.set("end", filters.end);
+    if (filters.search) q.set("search", filters.search);
+    return request<string>(
+      "GET",
+      `/admin/transactions/export?${q.toString()}`,
+      undefined,
+      QUERY_API,
+    );
+  },
+  adminGetComplianceReport(start: string, end: string) {
+    return request<ApiComplianceReport>(
+      "GET",
+      `/admin/compliance/report?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`,
+      undefined,
+      QUERY_API,
     );
   },
 };

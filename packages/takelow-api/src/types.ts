@@ -314,3 +314,140 @@ export type ApiAccessDecision = {
   granted: boolean;
   timestamp: string;
 };
+
+export type ApiAuctionTransactions = {
+  auction_id: string;
+  product_name: string;
+  public_code: number;
+  status: string;
+  winner_user_id: string | null;
+  winner_name: string | null;
+  winner_phone: string | null;
+  winning_bid_amount: number;
+  payment_status: string;
+  payment_deadline: string | null;
+  second_winner_assigned: boolean;
+  escalation_rule: string;
+  bid_fee: number;
+  total_bids_count: number;
+  total_bid_fees_collected: number;
+  revenue_sharing: {
+    winning_amount: number;
+    platform_share: number;
+    platform_share_percent: number;
+    tax: number;
+    tax_percent: number;
+    commission: number;
+    commission_percent: number;
+    net_to_seller: number;
+    platform_total_net: number;
+  };
+  bids: Array<{
+    id: string;
+    ticket_number: string;
+    user_id: string;
+    user_phone: string | null;
+    user_name: string | null;
+    amount: number;
+    bid_time: string;
+    service_fee_paid: boolean;
+  }>;
+  winner_payments: Array<{
+    id: string;
+    amount: number;
+    gateway: string;
+    status: string;
+    customer_phone: string | null;
+    client_reference_id: string;
+    created_at: string;
+  }>;
+  fee_payments: Array<{
+    id: string;
+    amount: number;
+    user_id: string;
+    type: string;
+    reference_id: string | null;
+    created_at: string;
+  }>;
+  refunds: Array<{
+    id: string;
+    amount: number;
+    user_id: string;
+    reference_id: string | null;
+    created_at: string;
+  }>;
+  escalations: Array<{
+    id: string;
+    action: string;
+    actor_id: string;
+    actor_phone: string | null;
+    details: any;
+    created_at: string;
+  }>;
+};
+
+export type ApiUnifiedTransaction = {
+  id: string;
+  type: string;
+  payment_type: string;
+  amount: number;
+  status: string;
+  gateway: string | null;
+  auction_id: string | null;
+  product_name: string | null;
+  user_id: string;
+  user_phone: string | null;
+  user_name: string | null;
+  reference_id: string | null;
+  created_at: string;
+  escalation_flag: string | null;
+};
+
+export type ApiTransactionsListResponse = {
+  data: ApiUnifiedTransaction[];
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    total_pages: number;
+  };
+  summary: {
+    total_volume: number;
+    winning_bid_volume: number;
+    bid_fee_volume: number;
+    deposit_volume: number;
+    refund_volume: number;
+    successful_count: number;
+    pending_count: number;
+    defaulted_count: number;
+  };
+};
+
+export type ApiComplianceReport = {
+  generated_at: string;
+  period: {
+    start: string;
+    end: string;
+  };
+  standards: {
+    icc_auction_guidelines: string;
+    uncitral_procurement_standards: string;
+    tamper_proof_status: string;
+  };
+  metrics: {
+    total_auctions: number;
+    closed_auctions: number;
+    total_bids: number;
+    total_bid_fee_volume: number;
+    winning_bids_total_volume: number;
+    winner_payments_collected: number;
+    winner_payments_held_in_escrow: number;
+    payment_compliance_rate_percent: number;
+    payment_default_rate_percent: number;
+    second_winners_assigned_count: number;
+    total_disputes_filed: number;
+    unresolved_disputes: number;
+  };
+  legal_attestation: string;
+};
+
