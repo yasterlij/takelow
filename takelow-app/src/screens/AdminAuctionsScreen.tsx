@@ -2,9 +2,9 @@ import React, { useState, useMemo } from 'react'
 import { View, Text, ScrollView, TouchableOpacity, Image, TextInput, StyleSheet, Alert, Platform, Modal, Dimensions, ActivityIndicator } from 'react-native'
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker'
 import * as ImagePicker from 'expo-image-picker'
-import { Plus, X, Pencil, XCircle, Trash2, Eye, Calendar, ImageIcon, Search, Filter, Upload, BarChart3, TrendingDown, ArrowUpRight, Camera, Trophy, RotateCcw } from 'lucide-react-native'
+import { Plus, X, Pencil, XCircle, Trash2, Eye, Calendar, ImageIcon, Search, Filter, Upload, BarChart3, TrendingDown, ArrowUpRight, Camera, Trophy, RotateCcw, Receipt, ShieldCheck, TicketCheck, ArrowDownLeft } from 'lucide-react-native'
 import { useApp } from '../AppContext'
-import { api } from '../api'
+import { api, type ApiAuctionTransactions } from '../api'
 import { AppBar, CTAButton, Badge, Card } from '../components/AuctionUI'
 import { usePagination, PaginationBar } from '../components/Pagination'
 import { STANDARD_AUCTION_CATEGORIES } from '../lib/auctionCategories'
@@ -172,6 +172,10 @@ export function AdminAuctionsScreen() {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [viewBidsId, setViewBidsId] = useState<string | null>(null)
+  const [txnAuction, setTxnAuction] = useState<any | null>(null)
+  const [txnData, setTxnData] = useState<ApiAuctionTransactions | null>(null)
+  const [loadingTxn, setLoadingTxn] = useState(false)
+  const [txnTab, setTxnTab] = useState<'bids' | 'winner' | 'fees' | 'refunds' | 'escalations'>('bids')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [name, setName] = useState('')
@@ -208,6 +212,21 @@ const [category, setCategory] = useState<string>(STANDARD_AUCTION_CATEGORIES[0])
   const [showEndPicker, setShowEndPicker] = useState(false)
   const [startPickerMode, setStartPickerMode] = useState<'date' | 'time'>('date')
   const [endPickerMode, setEndPickerMode] = useState<'date' | 'time'>('date')
+
+  const openTransactions = async (a: any) => {
+    setTxnAuction(a)
+    setLoadingTxn(true)
+    setTxnTab('bids')
+    try {
+      const data = await api.adminGetAuctionTransactions(a.id)
+      setTxnData(data)
+    } catch {
+      Alert.alert('Error', 'Failed to load auction transactions')
+      setTxnAuction(null)
+    } finally {
+      setLoadingTxn(false)
+    }
+  }
   const [submitting, setSubmitting] = useState(false)
   const [showLightbox, setShowLightbox] = useState(false)
 
@@ -635,6 +654,9 @@ const [category, setCategory] = useState<string>(STANDARD_AUCTION_CATEGORIES[0])
                   ) : (
                     <TouchableOpacity onPress={() => openEdit(a)} style={s.iconBtn}><Pencil size={12} color={colors.mutedForeground} /></TouchableOpacity>
                   )}
+                  <TouchableOpacity onPress={() => openTransactions(a)} style={[s.iconBtn, { borderColor: colors.primary + '66', backgroundColor: colors.primary + '10' }]}>
+                    <Receipt size={12} color={colors.primary} />
+                  </TouchableOpacity>
                   <TouchableOpacity onPress={() => setViewBidsId(viewBidsId === a.id ? null : a.id)} style={s.iconBtn}><Eye size={12} color={colors.mutedForeground} /></TouchableOpacity>
                   {a.status !== 'closed' && (
                     <TouchableOpacity onPress={() => handleClose(a.id)} style={s.closeBtn}><XCircle size={12} color={colors.destructive} /></TouchableOpacity>
@@ -726,6 +748,199 @@ const [category, setCategory] = useState<string>(STANDARD_AUCTION_CATEGORIES[0])
             <X size={24} color="#fff" />
           </TouchableOpacity>
         </TouchableOpacity>
+      </Modal>
+
+      {/* Per-Auction Transactions & Revenue Sharing Modal */}
+      <Modal visible={!!txnAuction} transparent animationType="fade" onRequestClose={() => setTxnAuction(null)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 18 }}>
+          <View style={{ backgroundColor: colors.card, borderRadius: 20, padding: 18, borderWidth: 1, borderColor: colors.border, maxHeight: '90%' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 15, fontWeight: '800', color: colors.navy }} numberOfLines={1}>
+                  {txnAuction?.name}
+                </Text>
+                <Text style={{ fontSize: 10, color: colors.mutedForeground, marginTop: 1 }}>
+                  ID: {txnAuction?.id?.slice(0, 8)} · Public #{txnAuction?.public_code || txnData?.public_code}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setTxnAuction(null)} style={{ padding: 4 }}>
+                <X size={18} color={colors.mutedForeground} />
+              </TouchableOpacity>
+            </View>
+
+            {loadingTxn ? (
+              <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <Text style={{ fontSize: 12, color: colors.mutedForeground, marginTop: 8 }}>Loading transactions & split...</Text>
+              </View>
+            ) : txnData ? (
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingBottom: 10 }}>
+                {/* Revenue Sharing Split Box */}
+                <Card style={{ padding: 12, backgroundColor: '#F8FAFC', borderColor: '#E2E8F0', borderWidth: 1 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '800', color: colors.navy, marginBottom: 6 }}>
+                    Automated Revenue Distribution
+                  </Text>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}>
+                    <Text style={{ fontSize: 10.5, color: colors.mutedForeground }}>Winning Price</Text>
+                    <Text style={{ fontSize: 11.5, fontWeight: '700', color: colors.navy }}>
+                      {formatCurrency(txnData.revenue_sharing.winning_amount)}
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}>
+                    <Text style={{ fontSize: 10.5, color: colors.mutedForeground }}>Platform Share (10%)</Text>
+                    <Text style={{ fontSize: 11.5, fontWeight: '700', color: colors.primary }}>
+                      {formatCurrency(txnData.revenue_sharing.platform_share)}
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}>
+                    <Text style={{ fontSize: 10.5, color: colors.mutedForeground }}>VAT Withholding (15%)</Text>
+                    <Text style={{ fontSize: 11.5, fontWeight: '700', color: colors.navy }}>
+                      {formatCurrency(txnData.revenue_sharing.tax)}
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, borderTopWidth: 1, borderTopColor: '#CBD5E1', marginTop: 4 }}>
+                    <Text style={{ fontSize: 11, fontWeight: '800', color: colors.emerald700 }}>Net to Seller</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '800', color: colors.emerald700 }}>
+                      {formatCurrency(txnData.revenue_sharing.net_to_seller)}
+                    </Text>
+                  </View>
+                </Card>
+
+                {/* Tab Navigation */}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                  {[
+                    { key: 'bids', label: `Bids (${txnData.bids.length})` },
+                    { key: 'winner', label: `Winner (${txnData.winner_payments.length})` },
+                    { key: 'fees', label: `Fees (${txnData.fee_payments.length})` },
+                    { key: 'refunds', label: `Refunds (${txnData.refunds.length})` },
+                    { key: 'escalations', label: `Escalations (${txnData.escalations.length})` },
+                  ].map((tb) => (
+                    <TouchableOpacity
+                      key={tb.key}
+                      onPress={() => setTxnTab(tb.key as any)}
+                      style={{
+                        paddingHorizontal: 10,
+                        paddingVertical: 5,
+                        borderRadius: 14,
+                        backgroundColor: txnTab === tb.key ? colors.navy : colors.secondary,
+                      }}
+                    >
+                      <Text style={{ fontSize: 10.5, fontWeight: '700', color: txnTab === tb.key ? '#FFF' : colors.mutedForeground }}>
+                        {tb.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+
+                {/* Tab Content */}
+                {txnTab === 'bids' && (
+                  txnData.bids.length === 0 ? (
+                    <Text style={{ textAlign: 'center', paddingVertical: 20, fontSize: 11, color: colors.mutedForeground }}>No bids recorded</Text>
+                  ) : (
+                    <View style={{ gap: 6 }}>
+                      {txnData.bids.map((b) => (
+                        <View key={b.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 8, backgroundColor: colors.secondary, borderRadius: 10 }}>
+                          <View>
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.navy }}>#{b.ticket_number || '—'}</Text>
+                            <Text style={{ fontSize: 9.5, color: colors.mutedForeground }}>{b.user_phone || b.user_id.slice(0, 8)}</Text>
+                          </View>
+                          <View style={{ alignItems: 'flex-end' }}>
+                            <Text style={{ fontSize: 11, fontWeight: '800', color: colors.navy }}>{formatCurrency(b.amount)}</Text>
+                            <Text style={{ fontSize: 9, color: b.service_fee_paid ? colors.emerald700 : colors.destructive, fontWeight: '700' }}>
+                              {b.service_fee_paid ? 'Fee Paid' : 'Fee Unpaid'}
+                            </Text>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  )
+                )}
+
+                {txnTab === 'winner' && (
+                  txnData.winner_payments.length === 0 ? (
+                    <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+                      <Trophy size={24} color={colors.mutedForeground} />
+                      <Text style={{ fontSize: 11, fontWeight: '600', color: colors.mutedForeground, marginTop: 4 }}>
+                        No winner payment recorded
+                      </Text>
+                      <Text style={{ fontSize: 10, color: colors.mutedForeground }}>Status: {txnData.payment_status}</Text>
+                    </View>
+                  ) : (
+                    <View style={{ gap: 6 }}>
+                      {txnData.winner_payments.map((wp) => (
+                        <View key={wp.id} style={{ padding: 10, backgroundColor: colors.secondary, borderRadius: 10 }}>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.navy }}>{wp.gateway} Gateway</Text>
+                            <Badge tone={wp.status === 'SUCCESSFUL' || wp.status === 'PAID' ? 'green' : 'orange'}>{wp.status}</Badge>
+                          </View>
+                          <Text style={{ fontSize: 10, color: colors.mutedForeground, marginTop: 2 }}>Phone: {wp.customer_phone || '—'}</Text>
+                          <Text style={{ fontSize: 9, fontFamily: 'Courier', color: colors.mutedForeground, marginTop: 1 }}>Ref: {wp.client_reference_id}</Text>
+                          <Text style={{ fontSize: 12, fontWeight: '800', color: colors.primary, marginTop: 4 }}>{formatCurrency(wp.amount)}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )
+                )}
+
+                {txnTab === 'fees' && (
+                  txnData.fee_payments.length === 0 ? (
+                    <Text style={{ textAlign: 'center', paddingVertical: 20, fontSize: 11, color: colors.mutedForeground }}>No participation fee logs</Text>
+                  ) : (
+                    <View style={{ gap: 6 }}>
+                      {txnData.fee_payments.map((f) => (
+                        <View key={f.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 8, backgroundColor: colors.secondary, borderRadius: 10 }}>
+                          <View>
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.navy }}>{f.type}</Text>
+                            <Text style={{ fontSize: 9.5, color: colors.mutedForeground }}>User: {f.user_id.slice(0, 8)}</Text>
+                          </View>
+                          <Text style={{ fontSize: 11, fontWeight: '800', color: '#854D0E' }}>{formatCurrency(f.amount)}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )
+                )}
+
+                {txnTab === 'refunds' && (
+                  txnData.refunds.length === 0 ? (
+                    <Text style={{ textAlign: 'center', paddingVertical: 20, fontSize: 11, color: colors.mutedForeground }}>No refunds processed</Text>
+                  ) : (
+                    <View style={{ gap: 6 }}>
+                      {txnData.refunds.map((rf) => (
+                        <View key={rf.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 8, backgroundColor: colors.secondary, borderRadius: 10 }}>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: colors.destructive }}>REFUND</Text>
+                          <Text style={{ fontSize: 11, fontWeight: '800', color: colors.destructive }}>+{formatCurrency(rf.amount)}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )
+                )}
+
+                {txnTab === 'escalations' && (
+                  txnData.escalations.length === 0 ? (
+                    <Text style={{ textAlign: 'center', paddingVertical: 20, fontSize: 11, color: colors.mutedForeground }}>No escalation events</Text>
+                  ) : (
+                    <View style={{ gap: 6 }}>
+                      {txnData.escalations.map((esc) => (
+                        <View key={esc.id} style={{ padding: 8, backgroundColor: colors.secondary, borderRadius: 10 }}>
+                          <Text style={{ fontSize: 11, fontWeight: '800', color: colors.navy }}>{esc.action}</Text>
+                          <Text style={{ fontSize: 9.5, color: colors.mutedForeground, marginTop: 2 }}>
+                            Actor: {esc.actor_phone || esc.actor_id.slice(0, 8)} · {new Date(esc.created_at).toLocaleString()}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  )
+                )}
+
+                {/* UNCITRAL certification */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, padding: 8, backgroundColor: '#FEFCE8', borderRadius: 8 }}>
+                  <ShieldCheck size={12} color="#854D0E" />
+                  <Text style={{ fontSize: 9.5, color: '#854D0E' }}>UNCITRAL Model Law Art. 37 certified audit trail</Text>
+                </View>
+              </ScrollView>
+            ) : null}
+          </View>
+        </View>
       </Modal>
     </View>
   )

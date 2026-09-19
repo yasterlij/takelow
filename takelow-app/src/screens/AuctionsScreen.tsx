@@ -138,6 +138,7 @@ export function AuctionsScreen() {
   const [category, setCategory] = useState('All')
   const [showClosed, setShowClosed] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [watchlistOnly, setWatchlistOnly] = useState(false)
   const [sortBy, setSortBy] = useState<SortOption>('ending-soon')
   const [showSortPicker, setShowSortPicker] = useState(false)
 
@@ -151,6 +152,10 @@ export function AuctionsScreen() {
     const unique = Array.from(new Map(source.map((a) => [a.id, a])).values())
 
     let list = category === 'All' ? unique : unique.filter((a) => a.category === category)
+
+    if (watchlistOnly) {
+      list = list.filter((a) => isFavorite(a.id))
+    }
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim()
@@ -178,7 +183,7 @@ export function AuctionsScreen() {
           return 0
       }
     })
-  }, [category, showClosed, liveAuctions, closedAuctions, searchQuery, sortBy])
+  }, [category, showClosed, liveAuctions, closedAuctions, searchQuery, sortBy, watchlistOnly, isFavorite])
 
   const [refreshing, setRefreshing] = useState(false)
   const onRefresh = useCallback(async () => {
@@ -253,6 +258,21 @@ export function AuctionsScreen() {
                   style={[s.chip, showClosed ? { backgroundColor: colors.navy, borderColor: colors.navy } : { backgroundColor: colors.card, borderColor: colors.border }]}
                 >
                   <Text style={[s.chipText, showClosed ? { color: colors.navyForeground } : { color: colors.mutedForeground }]}>Closed ({closedAuctions.length})</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setWatchlistOnly((w) => !w)}
+                  style={[
+                    s.chip,
+                    watchlistOnly
+                      ? { backgroundColor: '#FEFCE8', borderColor: '#FDE047', flexDirection: 'row', alignItems: 'center', gap: 4 }
+                      : { backgroundColor: colors.card, borderColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: 4 }
+                  ]}
+                  activeOpacity={0.8}
+                >
+                  <Heart size={11} color={watchlistOnly ? '#DC2626' : colors.mutedForeground} fill={watchlistOnly ? '#DC2626' : 'transparent'} />
+                  <Text style={[s.chipText, watchlistOnly ? { color: '#854D0E', fontWeight: '800' } : { color: colors.mutedForeground }]}>
+                    Saved
+                  </Text>
                 </TouchableOpacity>
               </View>
 

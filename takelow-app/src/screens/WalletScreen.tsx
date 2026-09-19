@@ -27,6 +27,8 @@ import {
   PhoneCall,
   Gavel,
   Check,
+  TicketCheck,
+  Trophy,
 } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { api } from '../api'
@@ -348,10 +350,15 @@ export function WalletScreen() {
               <View style={{ marginTop: 10, gap: 10 }}>
                 {myBids.map((b, idx) => {
                   const auction = getAuction(b.auctionId)
+                  const isWinner = auction?.winning_bid_amount != null && Math.abs(b.amount - auction.winning_bid_amount) < 0.001
                   return (
                     <View key={b.ticketNumber || `${b.auctionId}-${b.placedAt}-${idx}`} style={s.txnRow}>
-                      <View style={s.txnIconWrap}>
-                        <Gavel size={16} color={colors.navy} />
+                      <View style={[s.txnIconWrap, isWinner && { backgroundColor: '#FEFCE8' }]}>
+                        {isWinner ? (
+                          <Trophy size={16} color={colors.primary} />
+                        ) : (
+                          <TicketCheck size={16} color={colors.navy} />
+                        )}
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={s.txnTitle} numberOfLines={1}>
@@ -363,7 +370,9 @@ export function WalletScreen() {
                       </View>
                       <View style={{ alignItems: 'flex-end' }}>
                         <Text style={s.txnAmount}>-{formatCurrency(auction?.bidFee ?? 50)}</Text>
-                        <Text style={s.txnStatus}>Fee Paid</Text>
+                        <Text style={[s.txnStatus, isWinner && { color: colors.primary, fontWeight: '800' }]}>
+                          {isWinner ? 'Winner Claimed' : 'Fee Paid · Awash Pay'}
+                        </Text>
                       </View>
                     </View>
                   )

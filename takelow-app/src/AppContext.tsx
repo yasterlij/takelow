@@ -56,6 +56,8 @@ export type View =
   | "admin-auctions"
   | "admin-products"
   | "admin-users"
+  | "admin-transactions"
+  | "admin-settlement"
   | "admin-monitor"
   | "admin-auction-monitor"
   | "deposit"

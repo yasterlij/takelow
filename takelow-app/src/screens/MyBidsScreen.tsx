@@ -24,7 +24,7 @@ function TimeLeft({ seconds }: { seconds: number }) {
 }
 
 export function MyBidsScreen() {
-  const { go, goBack, myBids, selectAuction, getAuction, auctionsLoading, refreshAuctions } = useApp()
+  const { go, goBack, myBids, selectAuction, getAuction, auctionsLoading, refreshAuctions, refreshWallet } = useApp()
   const [refreshing, setRefreshing] = useState(false)
   const [filterTab, setFilterTab] = useState<'all' | 'active' | 'ended'>('all')
   const [searchQuery, setSearchQuery] = useState('')
@@ -34,11 +34,11 @@ export function MyBidsScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
     try {
-      await refreshAuctions()
+      await Promise.all([refreshAuctions(), refreshWallet()])
     } finally {
       setRefreshing(false)
     }
-  }, [refreshAuctions])
+  }, [refreshAuctions, refreshWallet])
 
   const copyTicket = (ticket: string) => {
     setCopiedTicket(ticket)
@@ -212,6 +212,9 @@ export function MyBidsScreen() {
                       <View style={s.bidAmountRow}>
                         <Text style={s.bidLabel}>Your Bid:</Text>
                         <Text style={s.bidValue}>{formatCurrency(bid.amount)}</Text>
+                        {isClosed && auction.winning_bid_amount != null && Math.abs(bid.amount - auction.winning_bid_amount) < 0.001 && (
+                          <Badge tone="gold">🏆 Winner</Badge>
+                        )}
                       </View>
 
                       {bid.ticketNumber && (

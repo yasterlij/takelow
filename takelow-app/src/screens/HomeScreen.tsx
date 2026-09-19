@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Modal, Pressable, Dimensions, RefreshControl, TextInput, Platform, StatusBar } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient'
-import { Gavel, Wallet, ArrowRight, Eye, EyeOff, Shield, LogOut, Sparkles, Trophy, Bell, Heart, Search, TicketCheck, Crown, PartyPopper, CheckCircle2, TrendingDown, Clock, Calendar } from 'lucide-react-native'
+import { Gavel, Wallet, ArrowRight, Eye, EyeOff, Shield, LogOut, Sparkles, Trophy, Bell, Heart, Search, TicketCheck, Crown, PartyPopper, CheckCircle2, TrendingDown, Clock, Calendar, ShieldCheck } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { AwashMark } from '../components/AuctionUI'
 import { SmartImage } from '../components/SmartImage'
@@ -78,7 +78,7 @@ function HeroSlide({ item, onJoin, counter }: { item: any; onJoin: () => void; c
         {item.specSummary ? <Text style={{ color: 'rgba(255,255,255,0.84)', fontSize: 12, fontWeight: '600', marginTop: 4 }}>{item.specSummary}</Text> : null}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
           <View style={{ borderRadius: 999, backgroundColor: colors.primary + '33', paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: colors.primary + '40' }}>
-            <Text style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>Bid Amount: {formatCurrency(item.bidFee)}</Text>
+            <Text style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>Entry Fee: {formatCurrency(item.bidFee)}</Text>
           </View>
           <View style={{ backgroundColor: 'rgba(236,253,245,0.92)', borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: 'rgba(167,243,208,0.45)' }}>
             <Text style={{ color: colors.emerald700, fontSize: 10, fontWeight: '700' }}>{item.totalBids || item.bidders} bidders</Text>
@@ -566,6 +566,19 @@ export function HomeScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}
       >
+        {/* Trust & Guarantee Strip */}
+        <View style={{ marginHorizontal: 16, marginTop: 12, marginBottom: -6, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#FEFCE8', borderRadius: 12, borderWidth: 1, borderColor: '#FEF08A', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <ShieldCheck size={14} color="#854D0E" />
+            <Text style={{ fontSize: 11, fontWeight: '700', color: '#854D0E' }}>
+              Awash Escrow Protected
+            </Text>
+          </View>
+          <Text style={{ fontSize: 10, fontWeight: '600', color: '#A16207' }}>
+            UNCITRAL & ICC Verified
+          </Text>
+        </View>
+
         {/* ── Live Auctions Carousel ── */}
         <View style={{ paddingHorizontal: 16, paddingTop: 20 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>

@@ -30,6 +30,8 @@ import { AdminAuctionMonitorScreen } from './src/screens/AdminAuctionMonitorScre
 import { AdminAuctionsScreen } from './src/screens/AdminAuctionsScreen'
 import { AdminUsersScreen } from './src/screens/AdminUsersScreen'
 import { AdminProductsScreen } from './src/screens/AdminProductsScreen'
+import { AdminTransactionsScreen } from './src/screens/AdminTransactionsScreen'
+import { AdminSettlementScreen } from './src/screens/AdminSettlementScreen'
 import { DepositScreen } from './src/screens/DepositScreen'
 import { WalletScreen } from './src/screens/WalletScreen'
 import { ErrorBoundary } from './src/components/ErrorBoundary'
@@ -90,6 +92,8 @@ function ScreenRouter() {
       case 'admin-auction-monitor': return isAdmin ? <AdminAuctionMonitorScreen /> : <HomeScreen />
       case 'admin-users': return isAdmin ? <AdminUsersScreen /> : <HomeScreen />
       case 'admin-products': return isAdmin ? <AdminProductsScreen /> : <HomeScreen />
+      case 'admin-transactions': return isAdmin ? <AdminTransactionsScreen /> : <HomeScreen />
+      case 'admin-settlement': return isAdmin ? <AdminSettlementScreen /> : <HomeScreen />
       case 'winners-list': return <WinnersListScreen />
       case 'deposit': return <DepositScreen />
       case 'wallet': return <WalletScreen />

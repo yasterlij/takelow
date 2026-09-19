@@ -26,6 +26,10 @@ import {
   type ApiAccessDecision,
   type ApiBidderHistory,
   type ApiNotificationTemplate,
+  type ApiAuctionTransactions,
+  type ApiUnifiedTransaction,
+  type ApiTransactionsListResponse,
+  type ApiComplianceReport,
 } from "@takelow/api";
 
 export type {
@@ -52,6 +56,10 @@ export type {
   ApiAccessDecision,
   ApiBidderHistory,
   ApiNotificationTemplate,
+  ApiAuctionTransactions,
+  ApiUnifiedTransaction,
+  ApiTransactionsListResponse,
+  ApiComplianceReport,
 };
 export { ApiError };
 

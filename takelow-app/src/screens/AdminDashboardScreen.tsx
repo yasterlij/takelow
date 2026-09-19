@@ -1,7 +1,7 @@
 import React from 'react'
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Platform, StatusBar } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Gavel, Users, TrendingUp, DollarSign, Clock, CheckCircle2, XCircle, AlertTriangle, Radio, Eye, ArrowUpRight, Trophy, RotateCcw, ShieldCheck, Receipt } from 'lucide-react-native'
+import { Gavel, Users, TrendingUp, DollarSign, Clock, CheckCircle2, XCircle, AlertTriangle, Radio, Eye, ArrowUpRight, Trophy, RotateCcw, ShieldCheck, Receipt, FileText, Package, ChevronRight } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { CTAButton, Badge, Card } from '../components/AuctionUI'
 import { formatCurrency } from '../mockDataV0'
@@ -91,6 +91,51 @@ export function AdminDashboardScreen() {
             </Text>
           </View>
         </Card>
+
+        {/* Quick Action Navigation Hub */}
+        <View style={{ marginTop: 14, gap: 8 }}>
+          <Text style={{ fontSize: 13, fontWeight: '800', color: colors.navy }}>Finance & Management Hub</Text>
+          
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <TouchableOpacity
+              onPress={() => go('admin-transactions')}
+              style={{ flex: 1 }}
+              activeOpacity={0.8}
+            >
+              <Card style={{ padding: 14, backgroundColor: '#EFF6FF', borderColor: '#BFDBFE', borderWidth: 1 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Receipt size={18} color="#1D4ED8" />
+                  <ChevronRight size={14} color="#1D4ED8" />
+                </View>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: '#1E40AF', marginTop: 8 }}>
+                  Transactions Hub
+                </Text>
+                <Text style={{ fontSize: 10, color: '#3B82F6', marginTop: 2 }}>
+                  Winner payments & fee logs
+                </Text>
+              </Card>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => go('admin-settlement')}
+              style={{ flex: 1 }}
+              activeOpacity={0.8}
+            >
+              <Card style={{ padding: 14, backgroundColor: '#F0FDF4', borderColor: '#BBF7D0', borderWidth: 1 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <FileText size={18} color="#15803D" />
+                  <ChevronRight size={14} color="#15803D" />
+                </View>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: '#166534', marginTop: 8 }}>
+                  Revenue & Settlement
+                </Text>
+                <Text style={{ fontSize: 10, color: '#22C55E', marginTop: 2 }}>
+                  Proceeds split & escrow
+                </Text>
+              </Card>
+            </TouchableOpacity>
+          </View>
+        </View>
 
         {extended.length > 0 && (
           <Card style={{ borderColor: colors.orange + '44', backgroundColor: colors.secondary, marginTop: 16, padding: 16 }}>
