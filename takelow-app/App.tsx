@@ -1,7 +1,7 @@
 import React from 'react'
 import { StatusBar } from 'expo-status-bar'
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
-import { Home as HomeIcon, Gavel, Wallet, Trophy, UserRound, TicketCheck } from 'lucide-react-native'
+import { Home as HomeIcon, Gavel, Wallet, Trophy, UserRound, TicketCheck, Receipt, ShieldCheck, Settings } from 'lucide-react-native'
 import { AppProvider, useApp } from './src/AppContext'
 import { LoginScreen } from './src/screens/LoginScreen'
 import { RegisterScreen } from './src/screens/RegisterScreen'
@@ -101,7 +101,24 @@ function ScreenRouter() {
     }
   })()
 
-  const showTabBar = user && ['home', 'auctions', 'wallet', 'my-bids', 'winners-list', 'profile'].includes(view)
+  const showTabBar =
+    user &&
+    [
+      'home',
+      'auctions',
+      'wallet',
+      'my-bids',
+      'winners-list',
+      'profile',
+      'admin-dashboard',
+      'admin-transactions',
+      'admin-settlement',
+      'admin-auctions',
+      'admin-users',
+      'admin-products',
+      'admin-monitor',
+      'admin-auction-monitor',
+    ].includes(view)
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.neutralGray50 }}>
@@ -113,23 +130,67 @@ function ScreenRouter() {
 }
 
 function BottomTabBar() {
-  const { view, go, myBids, unreadNotificationCount } = useApp()
+  const { view, go, user, unreadNotificationCount } = useApp()
+  const isAdmin = user?.role === 'admin'
+
   const tabs = [
-    { key: 'home', label: 'Home', icon: HomeIcon, badge: null },
-    { key: 'auctions', label: 'Auctions', icon: Gavel, badge: null },
-    { key: 'wallet', label: 'Wallet', icon: Wallet, badge: null },
-    { key: 'my-bids', label: 'My Bids', icon: TicketCheck, badge: myBids.length > 0 ? myBids.length : null },
-    { key: 'profile', label: 'Profile', icon: UserRound, badge: unreadNotificationCount > 0 ? unreadNotificationCount : null },
-  ] as const
+    {
+      key: 'home',
+      label: 'Home',
+      icon: HomeIcon,
+      badge: null,
+      isActive: view === 'home',
+      onPress: () => go('home'),
+    },
+    {
+      key: 'auctions',
+      label: 'Auctions',
+      icon: Gavel,
+      badge: null,
+      isActive: view === 'auctions',
+      onPress: () => go('auctions'),
+    },
+    {
+      key: 'transactions',
+      label: 'Transactions',
+      icon: Receipt,
+      badge: null,
+      isActive: ['admin-transactions', 'admin-settlement', 'wallet'].includes(view),
+      onPress: () => go(isAdmin ? 'admin-transactions' : 'wallet'),
+    },
+    {
+      key: 'profile',
+      label: 'Profile',
+      icon: UserRound,
+      badge: unreadNotificationCount > 0 ? unreadNotificationCount : null,
+      isActive: view === 'profile',
+      onPress: () => go('profile'),
+    },
+    {
+      key: 'admin-settings',
+      label: isAdmin ? 'Admin' : 'Settings',
+      icon: isAdmin ? ShieldCheck : Settings,
+      badge: null,
+      isActive: [
+        'admin-dashboard',
+        'admin-auctions',
+        'admin-users',
+        'admin-products',
+        'admin-monitor',
+        'admin-auction-monitor',
+      ].includes(view),
+      onPress: () => go(isAdmin ? 'admin-dashboard' : 'profile'),
+    },
+  ]
 
   return (
     <View style={s.tabBar}>
       <View style={s.tabBarInner}>
         {tabs.map((tab) => {
-          const active = view === tab.key
+          const active = tab.isActive
           const Icon = tab.icon
           return (
-            <TouchableOpacity key={tab.key} style={s.tab} onPress={() => go(tab.key as any)} activeOpacity={0.7}>
+            <TouchableOpacity key={tab.key} style={s.tab} onPress={tab.onPress} activeOpacity={0.7}>
               {active && <View style={s.activeIndicator} />}
               <View style={{ position: 'relative', marginTop: 4 }}>
                 <Icon size={21} color={active ? colors.primary : colors.neutralGray400} />

@@ -24,6 +24,7 @@ export type ProductSpecs = {
 export type Auction = {
   id: string
   publicCode?: string
+  public_code?: string
   name: string
   category: string
   images: string[]
