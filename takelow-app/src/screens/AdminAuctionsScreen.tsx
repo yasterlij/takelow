@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { View, Text, ScrollView, TouchableOpacity, Image, TextInput, StyleSheet, Alert, Platform, Modal, Dimensions, ActivityIndicator } from 'react-native'
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker'
 import * as ImagePicker from 'expo-image-picker'
-import { Plus, X, Pencil, XCircle, Trash2, Eye, Calendar, ImageIcon, Search, Filter, Upload, BarChart3, TrendingDown, ArrowUpRight, Camera, Trophy, RotateCcw, Receipt, ShieldCheck, TicketCheck, ArrowDownLeft } from 'lucide-react-native'
+import { Plus, X, Pencil, XCircle, Trash2, Eye, Calendar, ImageIcon, Search, Filter, Upload, BarChart3, TrendingDown, ArrowUpRight, Camera, Trophy, RotateCcw, Receipt, ShieldCheck, TicketCheck, ArrowDownLeft, Sliders, Check } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { api, type ApiAuctionTransactions } from '../api'
 import { AppBar, CTAButton, Badge, Card } from '../components/AuctionUI'
@@ -176,6 +176,12 @@ export function AdminAuctionsScreen() {
   const [txnData, setTxnData] = useState<ApiAuctionTransactions | null>(null)
   const [loadingTxn, setLoadingTxn] = useState(false)
   const [txnTab, setTxnTab] = useState<'bids' | 'winner' | 'fees' | 'refunds' | 'escalations'>('bids')
+  const [showMobileSplitConfig, setShowMobileSplitConfig] = useState(false)
+  const [splitWinningPrice, setSplitWinningPrice] = useState('')
+  const [splitBidFees, setSplitBidFees] = useState('')
+  const [splitPlatformShare, setSplitPlatformShare] = useState('')
+  const [splitNetToSeller, setSplitNetToSeller] = useState('')
+  const [splitSaving, setSplitSaving] = useState(false)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [name, setName] = useState('')
@@ -217,14 +223,127 @@ const [category, setCategory] = useState<string>(STANDARD_AUCTION_CATEGORIES[0])
     setTxnAuction(a)
     setLoadingTxn(true)
     setTxnTab('bids')
+    setShowMobileSplitConfig(false)
     try {
       const data = await api.adminGetAuctionTransactions(a.id)
       setTxnData(data)
+      setSplitWinningPrice(String(data.revenue_sharing.winning_amount || ''))
+      setSplitBidFees(String(data.total_bid_fees_collected || ''))
+      setSplitPlatformShare(String(data.revenue_sharing.platform_share || ''))
+      setSplitNetToSeller(String(data.revenue_sharing.net_to_seller || ''))
+      if (data.revenue_sharing.is_custom_configured) {
+        setShowMobileSplitConfig(true)
+      }
     } catch {
-      Alert.alert('Error', 'Failed to load auction transactions')
-      setTxnAuction(null)
+      const winAmt = Number(a.winning_bid_amount || 0)
+      const bidFee = Number(a.bidFee || 10)
+      const pShare = (winAmt * 10) / 100
+      const netSeller = winAmt > 0 ? Math.max(0, winAmt - pShare) : 0
+      const fallback: ApiAuctionTransactions = {
+        auction_id: a.id,
+        product_name: a.name,
+        public_code: Number(a.publicCode || a.public_code || 0),
+        status: (a.status || 'CLOSED').toUpperCase(),
+        winner_user_id: a.winner_user_id || null,
+        winner_name: a.winner_name || null,
+        winner_phone: null,
+        winning_bid_amount: winAmt,
+        payment_status: a.payment_status || 'PENDING',
+        payment_deadline: null,
+        second_winner_assigned: !!a.second_winner_assigned,
+        escalation_rule: a.escalation_rule || 'LOWEST_UNIQUE_BID',
+        bid_fee: bidFee,
+        total_bids_count: a.total_bids || a.bidsCount || 0,
+        total_bid_fees_collected: (a.total_bids || 0) * bidFee,
+        revenue_sharing: {
+          winning_amount: winAmt,
+          platform_share: pShare,
+          platform_share_percent: 10,
+          tax: (winAmt * 15) / 100,
+          tax_percent: 15,
+          commission: (winAmt * 5) / 100,
+          commission_percent: 5,
+          net_to_seller: netSeller,
+          platform_total_net: pShare,
+        },
+        bids: [],
+        winner_payments: [],
+        fee_payments: [],
+        refunds: [],
+        escalations: [],
+      }
+      setTxnData(fallback)
+      setSplitWinningPrice(String(winAmt || ''))
+      setSplitBidFees(String(fallback.total_bid_fees_collected || ''))
+      setSplitPlatformShare(String(pShare || ''))
+      setSplitNetToSeller(String(netSeller || ''))
     } finally {
       setLoadingTxn(false)
+    }
+  }
+
+  const handleSaveMobileSplit = async () => {
+    if (!txnAuction || !txnData) return
+    setSplitSaving(true)
+    try {
+      const winPrice = parseFloat(splitWinningPrice) || 0
+      const bidFees = parseFloat(splitBidFees) || 0
+      const platformShare = parseFloat(splitPlatformShare) || 0
+      const netToSeller = parseFloat(splitNetToSeller) || 0
+
+      const config = {
+        winning_price: winPrice,
+        bid_fees_collected: bidFees,
+        platform_share: platformShare,
+        net_to_seller: netToSeller,
+      }
+
+      await api.adminSaveAuctionSettlementConfig(txnAuction.id, config)
+
+      setTxnData((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          winning_bid_amount: winPrice,
+          total_bid_fees_collected: bidFees,
+          revenue_sharing: {
+            ...prev.revenue_sharing,
+            winning_amount: winPrice,
+            platform_share: platformShare,
+            net_to_seller: netToSeller,
+            platform_total_net: bidFees + platformShare,
+            is_custom_configured: true,
+            configured_by: 'Admin',
+            configured_at: new Date().toISOString(),
+          },
+        }
+      })
+
+      Alert.alert('Success', 'Settlement parameters saved & applied!')
+    } catch {
+      Alert.alert('Error', 'Failed to save settlement parameters')
+    } finally {
+      setSplitSaving(false)
+    }
+  }
+
+  const handleResetMobileSplit = async () => {
+    if (!txnAuction) return
+    setSplitSaving(true)
+    try {
+      await api.adminResetAuctionSettlementConfig(txnAuction.id)
+      const res = await api.adminGetAuctionTransactions(txnAuction.id)
+      setTxnData(res)
+      setSplitWinningPrice(String(res.revenue_sharing.winning_amount || ''))
+      setSplitBidFees(String(res.total_bid_fees_collected || ''))
+      setSplitPlatformShare(String(res.revenue_sharing.platform_share || ''))
+      setSplitNetToSeller(String(res.revenue_sharing.net_to_seller || ''))
+      setShowMobileSplitConfig(false)
+      Alert.alert('Reset', 'Reset to automated system calculations')
+    } catch {
+      Alert.alert('Error', 'Failed to reset settlement configuration')
+    } finally {
+      setSplitSaving(false)
     }
   }
   const [submitting, setSubmitting] = useState(false)
@@ -776,34 +895,122 @@ const [category, setCategory] = useState<string>(STANDARD_AUCTION_CATEGORIES[0])
             ) : txnData ? (
               <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingBottom: 10 }}>
                 {/* Revenue Sharing Split Box */}
-                <Card style={{ padding: 12, backgroundColor: '#F8FAFC', borderColor: '#E2E8F0', borderWidth: 1 }}>
-                  <Text style={{ fontSize: 11, fontWeight: '800', color: colors.navy, marginBottom: 6 }}>
-                    Automated Revenue Distribution
-                  </Text>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}>
+                <Card style={{ padding: 12, backgroundColor: txnData.revenue_sharing.is_custom_configured ? '#FFFBEB' : '#F8FAFC', borderColor: txnData.revenue_sharing.is_custom_configured ? '#FDE68A' : '#E2E8F0', borderWidth: 1 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <Text style={{ fontSize: 11, fontWeight: '800', color: colors.navy }}>
+                      Revenue & Settlement Split
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => setShowMobileSplitConfig(!showMobileSplitConfig)}
+                      style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, backgroundColor: colors.secondary, flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                    >
+                      <Sliders size={12} color={colors.primary} />
+                      <Text style={{ fontSize: 10, fontWeight: '700', color: colors.primary }}>
+                        {showMobileSplitConfig ? 'Hide' : 'Configure'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 }}>
                     <Text style={{ fontSize: 10.5, color: colors.mutedForeground }}>Winning Price</Text>
                     <Text style={{ fontSize: 11.5, fontWeight: '700', color: colors.navy }}>
                       {formatCurrency(txnData.revenue_sharing.winning_amount)}
                     </Text>
                   </View>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}>
-                    <Text style={{ fontSize: 10.5, color: colors.mutedForeground }}>Platform Share (10%)</Text>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 }}>
+                    <Text style={{ fontSize: 10.5, color: colors.mutedForeground }}>Bid Fees Collected</Text>
+                    <Text style={{ fontSize: 11.5, fontWeight: '700', color: colors.navy }}>
+                      {formatCurrency(txnData.total_bid_fees_collected)}
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 }}>
+                    <Text style={{ fontSize: 10.5, color: colors.mutedForeground }}>Platform Share</Text>
                     <Text style={{ fontSize: 11.5, fontWeight: '700', color: colors.primary }}>
                       {formatCurrency(txnData.revenue_sharing.platform_share)}
                     </Text>
                   </View>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}>
-                    <Text style={{ fontSize: 10.5, color: colors.mutedForeground }}>VAT Withholding (15%)</Text>
-                    <Text style={{ fontSize: 11.5, fontWeight: '700', color: colors.navy }}>
-                      {formatCurrency(txnData.revenue_sharing.tax)}
-                    </Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, borderTopWidth: 1, borderTopColor: '#CBD5E1', marginTop: 4 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3, borderTopWidth: 1, borderTopColor: '#CBD5E1', marginTop: 4 }}>
                     <Text style={{ fontSize: 11, fontWeight: '800', color: colors.emerald700 }}>Net to Seller</Text>
                     <Text style={{ fontSize: 12, fontWeight: '800', color: colors.emerald700 }}>
                       {formatCurrency(txnData.revenue_sharing.net_to_seller)}
                     </Text>
                   </View>
+
+                  {/* Expandable Configuration Inputs */}
+                  {showMobileSplitConfig && (
+                    <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#E2E8F0', gap: 8 }}>
+                      <Text style={{ fontSize: 10.5, fontWeight: '800', color: colors.navy }}>
+                        Admin Settlement Override
+                      </Text>
+                      <View>
+                        <Text style={{ fontSize: 10, color: colors.mutedForeground, marginBottom: 2 }}>Winning Price (ETB)</Text>
+                        <TextInput
+                          value={splitWinningPrice}
+                          onChangeText={setSplitWinningPrice}
+                          keyboardType="numeric"
+                          placeholder="e.g. 2500"
+                          style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, fontSize: 11, backgroundColor: '#FFF' }}
+                        />
+                      </View>
+                      <View>
+                        <Text style={{ fontSize: 10, color: colors.mutedForeground, marginBottom: 2 }}>Bid Fees Collected (ETB)</Text>
+                        <TextInput
+                          value={splitBidFees}
+                          onChangeText={setSplitBidFees}
+                          keyboardType="numeric"
+                          placeholder="e.g. 350"
+                          style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, fontSize: 11, backgroundColor: '#FFF' }}
+                        />
+                      </View>
+                      <View>
+                        <Text style={{ fontSize: 10, color: colors.mutedForeground, marginBottom: 2 }}>Platform Share (ETB)</Text>
+                        <TextInput
+                          value={splitPlatformShare}
+                          onChangeText={setSplitPlatformShare}
+                          keyboardType="numeric"
+                          placeholder="e.g. 250"
+                          style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, fontSize: 11, backgroundColor: '#FFF' }}
+                        />
+                      </View>
+                      <View>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                          <Text style={{ fontSize: 10, color: colors.mutedForeground }}>Net to Seller (ETB)</Text>
+                          <TouchableOpacity onPress={() => {
+                            const w = parseFloat(splitWinningPrice) || 0
+                            const p = parseFloat(splitPlatformShare) || 0
+                            setSplitNetToSeller(String(Math.max(0, w - p)))
+                          }}>
+                            <Text style={{ fontSize: 9.5, fontWeight: '700', color: colors.primary }}>Auto-balance</Text>
+                          </TouchableOpacity>
+                        </View>
+                        <TextInput
+                          value={splitNetToSeller}
+                          onChangeText={setSplitNetToSeller}
+                          keyboardType="numeric"
+                          placeholder="e.g. 2000"
+                          style={{ borderWidth: 1, borderColor: '#A7F3D0', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, fontSize: 11, backgroundColor: '#ECFDF5', color: '#065F46', fontWeight: '700' }}
+                        />
+                      </View>
+                      <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
+                        {txnData.revenue_sharing.is_custom_configured && (
+                          <TouchableOpacity
+                            onPress={handleResetMobileSplit}
+                            disabled={splitSaving}
+                            style={{ flex: 1, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: colors.border, alignItems: 'center', backgroundColor: '#FFF' }}
+                          >
+                            <Text style={{ fontSize: 10.5, fontWeight: '700', color: colors.mutedForeground }}>Reset Auto</Text>
+                          </TouchableOpacity>
+                        )}
+                        <TouchableOpacity
+                          onPress={handleSaveMobileSplit}
+                          disabled={splitSaving}
+                          style={{ flex: 1, paddingVertical: 6, borderRadius: 8, backgroundColor: colors.navy, alignItems: 'center' }}
+                        >
+                          <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#FFF' }}>Save Split</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
                 </Card>
 
                 {/* Tab Navigation */}

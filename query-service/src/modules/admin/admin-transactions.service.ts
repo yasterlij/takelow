@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
+import { RedisCacheService } from '../common/redis-cache.service';
 
 export interface AuctionTransactionsSummary {
   auction_id: string;
@@ -28,6 +29,9 @@ export interface AuctionTransactionsSummary {
     commission_percent: number;
     net_to_seller: number;
     platform_total_net: number;
+    is_custom_configured?: boolean;
+    configured_by?: string;
+    configured_at?: string;
   };
   bids: Array<{
     id: string;
@@ -149,6 +153,7 @@ export class AdminTransactionsService {
   constructor(
     private prisma: PrismaService,
     private configService: ConfigService,
+    private redisCacheService: RedisCacheService,
   ) {
     this.platformSharePercent =
       this.configService.get<number>('settlement.platformSharePercent') ?? 10;
@@ -158,9 +163,111 @@ export class AdminTransactionsService {
       this.configService.get<number>('settlement.commissionPercent') ?? 5;
   }
 
+  async getAuctionSettlementConfig(auctionId: string): Promise<any | null> {
+    const cacheKey = `settlement:auction:${auctionId}`;
+    const cached = await this.redisCacheService.get<any>(cacheKey);
+    if (cached) {
+      if (cached.reset) return null;
+      return cached;
+    }
+
+    try {
+      const log = await this.prisma.auditLog.findFirst({
+        where: {
+          entity_id: auctionId,
+          action: { in: ['SETTLEMENT_CONFIG_UPDATED', 'SETTLEMENT_CONFIG_RESET'] },
+        },
+        orderBy: { created_at: 'desc' },
+      });
+      if (log?.action === 'SETTLEMENT_CONFIG_RESET') {
+        await this.redisCacheService.set(cacheKey, { reset: true }, 86400 * 365);
+        return null;
+      }
+      if (log?.details) {
+        await this.redisCacheService.set(cacheKey, log.details, 86400 * 365);
+        return log.details;
+      }
+    } catch (e: any) {
+      this.logger.warn(`Failed to retrieve audit log settlement config: ${e?.message}`);
+    }
+
+    return null;
+  }
+
+  async saveAuctionSettlementConfig(
+    auctionId: string,
+    dto: {
+      winning_price?: number;
+      bid_fees_collected?: number;
+      platform_share?: number;
+      platform_share_percent?: number;
+      tax?: number;
+      tax_percent?: number;
+      commission?: number;
+      commission_percent?: number;
+      net_to_seller?: number;
+    },
+    actorId?: string,
+  ): Promise<any> {
+    const configData = {
+      ...dto,
+      is_custom_configured: true,
+      configured_by: actorId || 'admin',
+      configured_at: new Date().toISOString(),
+    };
+
+    const cacheKey = `settlement:auction:${auctionId}`;
+    await this.redisCacheService.set(cacheKey, configData, 86400 * 365);
+
+    try {
+      await this.prisma.auditLog.create({
+        data: {
+          actor_id: actorId || 'admin',
+          action: 'SETTLEMENT_CONFIG_UPDATED',
+          entity_type: 'AUCTION',
+          entity_id: auctionId,
+          details: configData as any,
+        },
+      });
+    } catch (e: any) {
+      this.logger.warn(`Failed to create audit log for settlement config: ${e?.message}`);
+    }
+
+    return configData;
+  }
+
+  async resetAuctionSettlementConfig(
+    auctionId: string,
+    actorId?: string,
+  ): Promise<{ success: boolean }> {
+    const cacheKey = `settlement:auction:${auctionId}`;
+    await this.redisCacheService.set(cacheKey, { reset: true }, 86400 * 365);
+
+    try {
+      await this.prisma.auditLog.create({
+        data: {
+          actor_id: actorId || 'admin',
+          action: 'SETTLEMENT_CONFIG_RESET',
+          entity_type: 'AUCTION',
+          entity_id: auctionId,
+          details: { reset: true, reset_at: new Date().toISOString() },
+        },
+      });
+    } catch (e: any) {
+      this.logger.warn(`Failed to create audit log for settlement reset: ${e?.message}`);
+    }
+
+    return { success: true };
+  }
+
   async getAuctionTransactions(
     auctionId: string,
   ): Promise<AuctionTransactionsSummary> {
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!UUID_REGEX.test(auctionId)) {
+      throw new NotFoundException(`Auction not found: ${auctionId}`);
+    }
+
     const auction = await this.prisma.auction.findUnique({
       where: { id: auctionId },
       include: {
@@ -179,7 +286,7 @@ export class AdminTransactionsService {
       throw new NotFoundException(`Auction not found: ${auctionId}`);
     }
 
-    const [bids, winnerPayments, feePayments, refunds, escalations] =
+    const [bids, winnerPayments, feePayments, refunds, escalations, customConfig] =
       await Promise.all([
         this.prisma.bid.findMany({
           where: { auction_id: auctionId },
@@ -232,22 +339,62 @@ export class AdminTransactionsService {
           },
           orderBy: { created_at: 'desc' },
         }),
+        this.getAuctionSettlementConfig(auctionId),
       ]);
 
-    const winningAmount = Number(auction.winning_bid_amount || 0);
-    const bidFee = Number(auction.bid_fee || 0);
-    const totalBidFeesCollected = bids.length * bidFee;
+    const winningAmount =
+      customConfig?.winning_price != null
+        ? Number(customConfig.winning_price)
+        : Number(auction.winning_bid_amount || 0);
 
-    const platformShare =
-      (winningAmount * this.platformSharePercent) / 100;
-    const tax = (winningAmount * this.taxPercent) / 100;
-    const commission = (winningAmount * this.commissionPercent) / 100;
-    const netToSeller =
-      winningAmount > 0
-        ? Math.max(0, winningAmount - platformShare - tax - commission)
+    const bidFee = Number(auction.bid_fee || 0);
+    const feePaymentsSum = feePayments.reduce((s, f) => s + Number(f.amount), 0);
+    const autoBidFees =
+      feePaymentsSum > 0 ? feePaymentsSum : bids.length * bidFee;
+    const totalBidFeesCollected =
+      customConfig?.bid_fees_collected != null
+        ? Number(customConfig.bid_fees_collected)
+        : autoBidFees;
+
+    const effPlatformSharePercent =
+      customConfig?.platform_share_percent != null
+        ? Number(customConfig.platform_share_percent)
+        : this.platformSharePercent;
+
+    const effPlatformShare =
+      customConfig?.platform_share != null
+        ? Number(customConfig.platform_share)
+        : (winningAmount * effPlatformSharePercent) / 100;
+
+    const effTaxPercent =
+      customConfig?.tax_percent != null
+        ? Number(customConfig.tax_percent)
+        : this.taxPercent;
+
+    const effTax =
+      customConfig?.tax != null
+        ? Number(customConfig.tax)
+        : (winningAmount * effTaxPercent) / 100;
+
+    const effCommissionPercent =
+      customConfig?.commission_percent != null
+        ? Number(customConfig.commission_percent)
+        : this.commissionPercent;
+
+    const effCommission =
+      customConfig?.commission != null
+        ? Number(customConfig.commission)
+        : (winningAmount * effCommissionPercent) / 100;
+
+    const effNetToSeller =
+      customConfig?.net_to_seller != null
+        ? Number(customConfig.net_to_seller)
+        : winningAmount > 0
+        ? Math.max(0, winningAmount - effPlatformShare - effTax - effCommission)
         : 0;
+
     const platformTotalNet =
-      totalBidFeesCollected + platformShare + commission - tax;
+      totalBidFeesCollected + effPlatformShare + effCommission - effTax;
 
     return {
       auction_id: auction.id,
@@ -269,14 +416,17 @@ export class AdminTransactionsService {
       total_bid_fees_collected: totalBidFeesCollected,
       revenue_sharing: {
         winning_amount: winningAmount,
-        platform_share: platformShare,
-        platform_share_percent: this.platformSharePercent,
-        tax,
-        tax_percent: this.taxPercent,
-        commission,
-        commission_percent: this.commissionPercent,
-        net_to_seller: netToSeller,
+        platform_share: effPlatformShare,
+        platform_share_percent: effPlatformSharePercent,
+        tax: effTax,
+        tax_percent: effTaxPercent,
+        commission: effCommission,
+        commission_percent: effCommissionPercent,
+        net_to_seller: effNetToSeller,
         platform_total_net: platformTotalNet,
+        is_custom_configured: !!customConfig?.is_custom_configured,
+        configured_by: customConfig?.configured_by,
+        configured_at: customConfig?.configured_at,
       },
       bids: bids.map((b) => ({
         id: b.id,

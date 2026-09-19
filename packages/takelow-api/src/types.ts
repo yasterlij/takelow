@@ -341,6 +341,9 @@ export type ApiAuctionTransactions = {
     commission_percent: number;
     net_to_seller: number;
     platform_total_net: number;
+    is_custom_configured?: boolean;
+    configured_by?: string;
+    configured_at?: string;
   };
   bids: Array<{
     id: string;
@@ -384,6 +387,18 @@ export type ApiAuctionTransactions = {
     details: any;
     created_at: string;
   }>;
+};
+
+export type ApiSettlementConfig = {
+  winning_price?: number;
+  bid_fees_collected?: number;
+  platform_share?: number;
+  platform_share_percent?: number;
+  tax?: number;
+  commission?: number;
+  net_to_seller?: number;
+  configured_by?: string;
+  configured_at?: string;
 };
 
 export type ApiUnifiedTransaction = {

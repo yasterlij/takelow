@@ -1,6 +1,10 @@
 import {
   Controller,
   Get,
+  Post,
+  Delete,
+  Body,
+  Req,
   Param,
   Query,
   UseGuards,
@@ -53,6 +57,53 @@ export class AdminTransactionsController {
       throw new BadRequestException('Auction ID is required');
     }
     return this.transactionsService.getAuctionTransactions(id);
+  }
+
+  @Get('auctions/:id/settlement-config')
+  @ApiOperation({ summary: 'Get custom settlement configuration for an auction' })
+  async getAuctionSettlementConfig(@Param('id') id: string) {
+    if (!id) {
+      throw new BadRequestException('Auction ID is required');
+    }
+    return this.transactionsService.getAuctionSettlementConfig(id);
+  }
+
+  @Post('auctions/:id/settlement-config')
+  @ApiOperation({ summary: 'Save custom settlement configuration for an auction' })
+  async saveAuctionSettlementConfig(
+    @Param('id') id: string,
+    @Body()
+    dto: {
+      winning_price?: number;
+      bid_fees_collected?: number;
+      platform_share?: number;
+      platform_share_percent?: number;
+      tax?: number;
+      tax_percent?: number;
+      commission?: number;
+      commission_percent?: number;
+      net_to_seller?: number;
+    },
+    @Req() req: any,
+  ) {
+    if (!id) {
+      throw new BadRequestException('Auction ID is required');
+    }
+    const actorId = req.user?.sub || req.user?.id || 'admin';
+    return this.transactionsService.saveAuctionSettlementConfig(id, dto, actorId);
+  }
+
+  @Delete('auctions/:id/settlement-config')
+  @ApiOperation({ summary: 'Reset custom settlement configuration for an auction' })
+  async resetAuctionSettlementConfig(
+    @Param('id') id: string,
+    @Req() req: any,
+  ) {
+    if (!id) {
+      throw new BadRequestException('Auction ID is required');
+    }
+    const actorId = req.user?.sub || req.user?.id || 'admin';
+    return this.transactionsService.resetAuctionSettlementConfig(id, actorId);
   }
 
   @Get('transactions/export')

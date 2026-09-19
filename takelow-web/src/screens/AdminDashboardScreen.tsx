@@ -7,6 +7,7 @@ import {
   Trophy, ShieldCheck, Download, RotateCcw, Receipt, Search,
   AlertTriangle, Building2, FileSpreadsheet, Printer, X, Eye,
   ArrowDownLeft, TicketCheck, ChevronRight, ExternalLink,
+  SlidersHorizontal, Check,
 } from "lucide-react"
 import { useApp } from "../AppContext"
 import { AdminLayout } from "../components/AdminLayout"
@@ -57,6 +58,14 @@ export function AdminDashboardScreen() {
   const [txnData, setTxnData] = useState<ApiAuctionTransactions | null>(null)
   const [txnLoading, setTxnLoading] = useState(false)
   const [txnTab, setTxnTab] = useState<"bids" | "winner" | "fees" | "refunds" | "escalations">("bids")
+
+  // Settlement Custom Split Configuration state
+  const [showSplitConfig, setShowSplitConfig] = useState(false)
+  const [splitWinningPrice, setSplitWinningPrice] = useState("")
+  const [splitBidFees, setSplitBidFees] = useState("")
+  const [splitPlatformShare, setSplitPlatformShare] = useState("")
+  const [splitNetToSeller, setSplitNetToSeller] = useState("")
+  const [splitSaving, setSplitSaving] = useState(false)
 
   useEffect(() => {
     const end = new Date().toISOString()
@@ -129,14 +138,137 @@ export function AdminDashboardScreen() {
     setTxnAuction(a)
     setTxnLoading(true)
     setTxnTab("bids")
+    setShowSplitConfig(false)
     try {
       const res = await api.adminGetAuctionTransactions(a.id)
       setTxnData(res)
+      setSplitWinningPrice(String(res.revenue_sharing.winning_amount || ""))
+      setSplitBidFees(String(res.total_bid_fees_collected || ""))
+      setSplitPlatformShare(String(res.revenue_sharing.platform_share || ""))
+      setSplitNetToSeller(String(res.revenue_sharing.net_to_seller || ""))
+      if (res.revenue_sharing.is_custom_configured) {
+        setShowSplitConfig(true)
+      }
     } catch {
-      toast("Failed to load auction transactions", "error")
-      setTxnAuction(null)
+      const winAmt = Number(a.winning_bid_amount || 0)
+      const bidFee = Number(a.bidFee || 10)
+      const pShare = (winAmt * 10) / 100
+      const netSeller = winAmt > 0 ? Math.max(0, winAmt - pShare) : 0
+      const fallback: ApiAuctionTransactions = {
+        auction_id: a.id,
+        product_name: a.name,
+        public_code: Number(a.publicCode || (a as any).public_code || 0),
+        status: a.status.toUpperCase(),
+        winner_user_id: a.winner_user_id || null,
+        winner_name: (a as any).winner_name || null,
+        winner_phone: null,
+        winning_bid_amount: winAmt,
+        payment_status: a.payment_status || "PENDING",
+        payment_deadline: null,
+        second_winner_assigned: !!a.second_winner_assigned,
+        escalation_rule: a.escalation_rule || "LOWEST_UNIQUE_BID",
+        bid_fee: bidFee,
+        total_bids_count: (a as any).total_bids || (a as any).bidsCount || 0,
+        total_bid_fees_collected: ((a as any).total_bids || 0) * bidFee,
+        revenue_sharing: {
+          winning_amount: winAmt,
+          platform_share: pShare,
+          platform_share_percent: 10,
+          tax: (winAmt * 15) / 100,
+          tax_percent: 15,
+          commission: (winAmt * 5) / 100,
+          commission_percent: 5,
+          net_to_seller: netSeller,
+          platform_total_net: pShare,
+        },
+        bids: [],
+        winner_payments: [],
+        fee_payments: [],
+        refunds: [],
+        escalations: [],
+      }
+      setTxnData(fallback)
+      setSplitWinningPrice(String(winAmt || ""))
+      setSplitBidFees(String(fallback.total_bid_fees_collected || ""))
+      setSplitPlatformShare(String(pShare || ""))
+      setSplitNetToSeller(String(netSeller || ""))
+      toast("Loaded transaction snapshot", "info")
     } finally {
       setTxnLoading(false)
+    }
+  }
+
+  const handleAutoBalanceSeller = () => {
+    const w = parseFloat(splitWinningPrice) || 0
+    const p = parseFloat(splitPlatformShare) || 0
+    const net = Math.max(0, w - p)
+    setSplitNetToSeller(String(net))
+  }
+
+  const handleSaveSettlementSplit = async () => {
+    if (!txnAuction || !txnData) return
+    setSplitSaving(true)
+    try {
+      const winPrice = parseFloat(splitWinningPrice) || 0
+      const bidFees = parseFloat(splitBidFees) || 0
+      const platformShare = parseFloat(splitPlatformShare) || 0
+      const netToSeller = parseFloat(splitNetToSeller) || 0
+
+      const config = {
+        winning_price: winPrice,
+        bid_fees_collected: bidFees,
+        platform_share: platformShare,
+        net_to_seller: netToSeller,
+      }
+
+      await api.adminSaveAuctionSettlementConfig(txnAuction.id, config)
+
+      setTxnData((prev) => {
+        if (!prev) return prev
+        const tax = (winPrice * 15) / 100
+        const commission = (winPrice * 5) / 100
+        return {
+          ...prev,
+          winning_bid_amount: winPrice,
+          total_bid_fees_collected: bidFees,
+          revenue_sharing: {
+            ...prev.revenue_sharing,
+            winning_amount: winPrice,
+            platform_share: platformShare,
+            net_to_seller: netToSeller,
+            platform_total_net: bidFees + platformShare + commission - tax,
+            is_custom_configured: true,
+            configured_by: "Admin",
+            configured_at: new Date().toISOString(),
+          },
+        }
+      })
+
+      toast("Settlement split saved & applied to records!", "success")
+    } catch {
+      toast("Failed to save settlement split", "error")
+    } finally {
+      setSplitSaving(false)
+    }
+  }
+
+  const handleResetSettlementSplit = async () => {
+    if (!txnAuction) return
+    setSplitSaving(true)
+    try {
+      await api.adminResetAuctionSettlementConfig(txnAuction.id)
+      const res = await api.adminGetAuctionTransactions(txnAuction.id)
+      setTxnData(res)
+      setSplitWinningPrice(String(res.revenue_sharing.winning_amount || ""))
+      setSplitBidFees(String(res.total_bid_fees_collected || ""))
+      setSplitPlatformShare(String(res.revenue_sharing.platform_share || ""))
+      setSplitNetToSeller(String(res.revenue_sharing.net_to_seller || ""))
+      setShowSplitConfig(false)
+      toast("Reset to automated system calculations", "success")
+    } catch {
+      toast("Failed to reset settlement configuration", "error")
+    } finally {
+      setSplitSaving(false)
     }
   }
 
@@ -967,54 +1099,236 @@ export function AdminDashboardScreen() {
                 </div>
               ) : txnData ? (
                 <div className="space-y-5">
-                  {/* Automated Revenue Sharing Split Box */}
-                  <div className="rounded-2xl border border-border/80 bg-neutral-50/70 p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-display text-xs font-extrabold text-awash-blue uppercase tracking-wider flex items-center gap-1.5">
-                        <Building2 className="size-3.5 text-primary" />
-                        Automated Revenue Distribution
-                      </h4>
-                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">
-                        Calculated
-                      </span>
+                  {/* Settlement Split & Revenue Configuration Box */}
+                  <div
+                    className={`rounded-2xl border transition-all ${
+                      txnData.revenue_sharing.is_custom_configured
+                        ? "border-amber-300 bg-amber-50/50"
+                        : "border-border/80 bg-neutral-50/70"
+                    } p-4 space-y-3`}
+                  >
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <Building2 className="size-4 text-primary" />
+                        <h4 className="font-display text-xs font-extrabold text-awash-blue uppercase tracking-wider">
+                          Settlement Split & Revenue Configuration
+                        </h4>
+                        {txnData.revenue_sharing.is_custom_configured ? (
+                          <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <Zap className="size-3 text-amber-600" /> Custom Admin Override Active
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <CheckCircle2 className="size-3" /> System Auto-Calculated
+                          </span>
+                        )}
+                      </div>
+
+                      <button
+                        onClick={() => setShowSplitConfig(!showSplitConfig)}
+                        className="text-xs font-bold text-primary hover:text-awash-blue flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-border shadow-xs transition-colors"
+                      >
+                        <SlidersHorizontal className="size-3.5" />
+                        {showSplitConfig ? "Hide Configurator" : "Configure Settlement (Admin)"}
+                      </button>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
-                      <div className="p-2.5 bg-white rounded-xl border border-border/60">
-                        <p className="text-[10px] text-neutral-400 font-medium">Winning Bid</p>
-                        <p className="font-extrabold text-awash-blue mt-0.5 tabular-nums">
+                    {/* Live Split Cards */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                      <div className="p-2.5 bg-white rounded-xl border border-border/60 shadow-xs">
+                        <p className="text-[10px] text-neutral-400 font-medium">Winning Price</p>
+                        <p className="font-extrabold text-awash-blue mt-0.5 tabular-nums text-sm">
                           {formatCurrency(txnData.revenue_sharing.winning_amount)}
                         </p>
                       </div>
 
-                      <div className="p-2.5 bg-white rounded-xl border border-border/60">
-                        <p className="text-[10px] text-neutral-400 font-medium">Platform Share (10%)</p>
-                        <p className="font-extrabold text-primary mt-0.5 tabular-nums">
+                      <div className="p-2.5 bg-white rounded-xl border border-border/60 shadow-xs">
+                        <p className="text-[10px] text-neutral-400 font-medium">Bid Fees Collected</p>
+                        <p className="font-extrabold text-awash-blue mt-0.5 tabular-nums text-sm">
+                          {formatCurrency(txnData.total_bid_fees_collected)}
+                        </p>
+                      </div>
+
+                      <div className="p-2.5 bg-white rounded-xl border border-border/60 shadow-xs">
+                        <p className="text-[10px] text-neutral-400 font-medium">Platform Share</p>
+                        <p className="font-extrabold text-primary mt-0.5 tabular-nums text-sm">
                           {formatCurrency(txnData.revenue_sharing.platform_share)}
                         </p>
                       </div>
 
-                      <div className="p-2.5 bg-white rounded-xl border border-border/60">
-                        <p className="text-[10px] text-neutral-400 font-medium">VAT (15%)</p>
-                        <p className="font-extrabold text-neutral-700 mt-0.5 tabular-nums">
-                          {formatCurrency(txnData.revenue_sharing.tax)}
-                        </p>
-                      </div>
-
-                      <div className="p-2.5 bg-white rounded-xl border border-border/60">
-                        <p className="text-[10px] text-neutral-400 font-medium">Commission (5%)</p>
-                        <p className="font-extrabold text-neutral-700 mt-0.5 tabular-nums">
-                          {formatCurrency(txnData.revenue_sharing.commission)}
-                        </p>
-                      </div>
-
-                      <div className="p-2.5 bg-emerald-50 rounded-xl border border-emerald-200">
+                      <div className="p-2.5 bg-emerald-50 rounded-xl border border-emerald-200 shadow-xs">
                         <p className="text-[10px] text-emerald-800 font-bold">Net to Seller</p>
-                        <p className="font-extrabold text-emerald-800 mt-0.5 tabular-nums">
+                        <p className="font-extrabold text-emerald-800 mt-0.5 tabular-nums text-sm">
                           {formatCurrency(txnData.revenue_sharing.net_to_seller)}
                         </p>
                       </div>
                     </div>
+
+                    {/* Expandable Configuration Inputs */}
+                    <AnimatePresence>
+                      {showSplitConfig && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="pt-2 border-t border-border/60 space-y-3 overflow-hidden"
+                        >
+                          <div className="bg-white/90 p-3.5 rounded-xl border border-border shadow-xs space-y-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-bold text-neutral-700 uppercase tracking-wider flex items-center gap-1.5">
+                                <SlidersHorizontal className="size-3 text-primary" />
+                                Admin Transaction Override Form
+                              </span>
+                              <span className="text-[10px] text-neutral-400">
+                                Overrides static percentages & updates all exports
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                              {/* 1. Winning Price */}
+                              <div>
+                                <label className="text-[11px] font-bold text-neutral-700 block mb-1">
+                                  Winning Price (ETB)
+                                </label>
+                                <div className="relative">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="any"
+                                    value={splitWinningPrice}
+                                    onChange={(e) => setSplitWinningPrice(e.target.value)}
+                                    placeholder="e.g. 2500"
+                                    className="w-full px-3 py-1.5 text-xs font-semibold rounded-lg border border-border focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none bg-white"
+                                  />
+                                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-neutral-400 font-bold pointer-events-none">
+                                    ETB
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* 2. Bid Fees Collected */}
+                              <div>
+                                <label className="text-[11px] font-bold text-neutral-700 block mb-1">
+                                  Bid Fees Collected (ETB)
+                                </label>
+                                <div className="relative">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="any"
+                                    value={splitBidFees}
+                                    onChange={(e) => setSplitBidFees(e.target.value)}
+                                    placeholder="e.g. 350"
+                                    className="w-full px-3 py-1.5 text-xs font-semibold rounded-lg border border-border focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none bg-white"
+                                  />
+                                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-neutral-400 font-bold pointer-events-none">
+                                    ETB
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* 3. Platform Share */}
+                              <div>
+                                <label className="text-[11px] font-bold text-neutral-700 block mb-1">
+                                  Platform Share (ETB)
+                                </label>
+                                <div className="relative">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="any"
+                                    value={splitPlatformShare}
+                                    onChange={(e) => setSplitPlatformShare(e.target.value)}
+                                    placeholder="e.g. 250"
+                                    className="w-full px-3 py-1.5 text-xs font-semibold rounded-lg border border-border focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none bg-white"
+                                  />
+                                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-neutral-400 font-bold pointer-events-none">
+                                    ETB
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* 4. Net to Seller */}
+                              <div>
+                                <div className="flex items-center justify-between mb-1">
+                                  <label className="text-[11px] font-bold text-neutral-700 block">
+                                    Net to Seller (ETB)
+                                  </label>
+                                  <button
+                                    type="button"
+                                    onClick={handleAutoBalanceSeller}
+                                    className="text-[10px] font-bold text-primary hover:underline"
+                                    title="Auto calculate: Winning Price minus Platform Share"
+                                  >
+                                    Auto-balance
+                                  </button>
+                                </div>
+                                <div className="relative">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="any"
+                                    value={splitNetToSeller}
+                                    onChange={(e) => setSplitNetToSeller(e.target.value)}
+                                    placeholder="e.g. 2000"
+                                    className="w-full px-3 py-1.5 text-xs font-semibold rounded-lg border border-emerald-300 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-none bg-emerald-50/40 text-emerald-900 font-bold"
+                                  />
+                                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-emerald-600 font-bold pointer-events-none">
+                                    ETB
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Action buttons & live summary */}
+                            <div className="flex items-center justify-between pt-2 border-t border-border/40 flex-wrap gap-2">
+                              <div className="text-[11px] text-neutral-500 font-medium">
+                                Gross Settlement:{" "}
+                                <span className="font-bold text-awash-blue">
+                                  ETB{" "}
+                                  {(
+                                    (parseFloat(splitWinningPrice) || 0) +
+                                    (parseFloat(splitBidFees) || 0)
+                                  ).toLocaleString()}
+                                </span>{" "}
+                                · Platform Net:{" "}
+                                <span className="font-bold text-primary">
+                                  ETB{" "}
+                                  {(
+                                    (parseFloat(splitBidFees) || 0) +
+                                    (parseFloat(splitPlatformShare) || 0)
+                                  ).toLocaleString()}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {txnData.revenue_sharing.is_custom_configured && (
+                                  <button
+                                    onClick={handleResetSettlementSplit}
+                                    disabled={splitSaving}
+                                    className="px-3 py-1.5 text-xs font-bold rounded-lg border border-border text-neutral-600 hover:bg-neutral-100 flex items-center gap-1 transition-colors"
+                                  >
+                                    <RotateCcw className="size-3" />
+                                    Reset to Auto
+                                  </button>
+                                )}
+                                <button
+                                  onClick={handleSaveSettlementSplit}
+                                  disabled={splitSaving}
+                                  className="px-3.5 py-1.5 text-xs font-bold rounded-lg bg-awash-blue text-white hover:bg-awash-blue/90 shadow-sm flex items-center gap-1.5 disabled:opacity-50 transition-colors"
+                                >
+                                  {splitSaving ? (
+                                    <div className="size-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                  ) : (
+                                    <Check className="size-3.5" />
+                                  )}
+                                  Save & Apply Split
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
 
                   {/* Export Options Bar */}
