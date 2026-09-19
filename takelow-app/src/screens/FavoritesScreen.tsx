@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useCallback } from 'react'
 import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, RefreshControl, TextInput } from 'react-native'
-import { Heart, HeartOff, Search, X, Calendar, Sparkles, LogIn, ArrowRight, Clock } from 'lucide-react-native'
+import { Heart, HeartOff, Search, X, Calendar, Sparkles, LogIn, ArrowRight, Clock, RotateCcw, AlertTriangle, CheckCircle2 } from 'lucide-react-native'
 import { useApp } from '../AppContext'
 import { AppBar, Badge, Card } from '../components/AuctionUI'
 import { EmptyState } from '../components/EmptyState'
@@ -226,6 +226,25 @@ export function FavoritesScreen() {
                         <Badge tone={auction.status === 'closed' ? 'muted' : auction.status === 'ending-soon' ? 'orange' : 'green'}>
                           {auction.status === 'closed' ? 'Closed' : auction.status === 'ending-soon' ? 'Ending soon' : 'Live'}
                         </Badge>
+                        {auction.second_winner_assigned ? (
+                          <Badge tone="orange"><RotateCcw size={9} /> 2nd</Badge>
+                        ) : null}
+                        {auction.payment_status === 'EXPIRED' || auction.payment_status === 'DEFAULTED' ? (
+                          <View style={{ backgroundColor: '#ef44441a', borderWidth: 1, borderColor: '#ef44444d', borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1.5, flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                            <AlertTriangle size={9} color="#ef4444" />
+                            <Text style={{ fontSize: 9, fontWeight: '700', color: '#ef4444' }}>Defaulted</Text>
+                          </View>
+                        ) : null}
+                        {auction.payment_status === 'PAID' ? (
+                          <Badge tone="green"><CheckCircle2 size={9} /> Settled</Badge>
+                        ) : null}
+                        {(auction.publicCode || (auction as any).public_code) ? (
+                          <View style={{ borderRadius: 6, backgroundColor: colors.secondary, paddingHorizontal: 5, paddingVertical: 1.5 }}>
+                            <Text style={{ fontSize: 9, fontWeight: '800', color: colors.awashBlue }}>
+                              #{auction.publicCode || (auction as any).public_code}
+                            </Text>
+                          </View>
+                        ) : null}
                       </View>
                       <Text style={s.meta} numberOfLines={1}>
                         {auction.category} {auction.specSummary ? `• ${auction.specSummary}` : ''}
@@ -339,7 +358,7 @@ const s = StyleSheet.create({
   rowPressable: { flex: 1, flexDirection: 'row', gap: 12 },
   thumbWrap: { width: 72, height: 72, borderRadius: 12, backgroundColor: colors.secondary, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
   thumb: { width: '100%', height: '100%' },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 4, marginBottom: 4 },
   title: { flex: 1, fontSize: 13.5, fontWeight: '800', color: colors.navy },
   dropTimeBadge: {
     flexDirection: 'row',

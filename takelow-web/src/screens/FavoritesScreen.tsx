@@ -279,9 +279,20 @@ export function FavoritesScreen() {
                           ? "Ending soon"
                           : "Live"}
                       </Badge>
-                      {auction.publicCode && (
+                      {auction.second_winner_assigned && (
+                        <Badge tone="orange">2nd Winner</Badge>
+                      )}
+                      {(auction.payment_status === "EXPIRED" || auction.payment_status === "DEFAULTED") && (
+                        <span className="rounded-full bg-red-50 border border-red-200 px-2 py-0.5 text-[10px] font-bold text-red-600">
+                          Defaulted
+                        </span>
+                      )}
+                      {auction.payment_status === "PAID" && (
+                        <Badge tone="green">Settled</Badge>
+                      )}
+                      {(auction.publicCode || (auction as any).public_code) && (
                         <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-bold text-neutral-600">
-                          {auction.publicCode}
+                          #{auction.publicCode || (auction as any).public_code}
                         </span>
                       )}
                     </div>
