@@ -66,8 +66,8 @@ function TimePill({
     <span
       className={`countdown-pill ${
         urgent
-          ? "bg-primary/20 text-awash-gold border border-primary/30 animate-glow-pulse"
-          : "bg-awash-blue/80 backdrop-blur-md text-white border border-white/10"
+          ? "bg-awash-gold/90 text-white border border-awash-gold/50"
+          : "bg-black/55 backdrop-blur-sm text-white border border-white/10"
       }`}
     >
       {d !== "00" && <>{parseInt(d)}d </>}
@@ -134,6 +134,17 @@ export function AuctionCard({
               {publicCode}
             </span>
           </div>
+          <div className="absolute inset-x-0 bottom-2 flex justify-center">
+            {isClosed ? (
+              <span className="countdown-pill bg-black/50 text-white/80 border-white/20">
+                {auction.winning_bid_amount != null
+                  ? `Won at ${formatCurrency(auction.winning_bid_amount)}`
+                  : "Ended"}
+              </span>
+            ) : (
+              <TimePill seconds={auction.timeLeft} endingSoon={endingSoon} />
+            )}
+          </div>
         </div>
         <div className="flex flex-col gap-2 p-3">
           <h3 className="truncate font-display text-sm font-bold text-foreground">
@@ -161,11 +172,6 @@ export function AuctionCard({
           <div className="rounded-xl bg-awash-blue/5 px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-[0.18em] text-awash-blue/80">
             View more specs
           </div>
-          {!isClosed && (
-            <div className="flex justify-center pt-0.5">
-              <TimePill seconds={auction.timeLeft} endingSoon={endingSoon} />
-            </div>
-          )}
         </div>
         {auction.maxBid && !isClosed && (
           <div className="px-3 pb-2">

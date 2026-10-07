@@ -82,11 +82,11 @@ function TimePill({
     <View
       style={[
         s.timePill,
-        { backgroundColor: urgent ? colors.primary + "20" : colors.navy },
+        { backgroundColor: urgent ? "rgba(200,166,66,0.85)" : "rgba(0,0,0,0.55)" },
       ]}
     >
       <Text
-        style={[s.timePillText, { color: urgent ? colors.primary : "#fff" }]}
+        style={[s.timePillText, { color: "#fff" }]}
       >
         {d !== "00" ? `${parseInt(d)}d ` : ""}
         {h}:{m}:{secStr}
@@ -141,6 +141,19 @@ export function AuctionCard({
             <Text style={s.codeBadgeText}>{publicCode}</Text>
           </View>
         </View>
+        <View style={s.cardImgBottom}>
+          {isClosed ? (
+            <View style={[s.timePill, { backgroundColor: colors.muted + "40" }]}>
+              <Text style={[s.timePillText, { color: colors.mutedForeground }]}>
+                {auction.winning_bid_amount != null
+                  ? `Won at ${formatCurrency(auction.winning_bid_amount)}`
+                  : "Ended"}
+              </Text>
+            </View>
+          ) : (
+            <TimePill seconds={auction.timeLeft} endingSoon={endingSoon} />
+          )}
+        </View>
       </View>
       <View style={{ padding: 10, gap: 6 }}>
         <Text style={s.cardName} numberOfLines={1}>
@@ -184,21 +197,6 @@ export function AuctionCard({
         </View>
         <View style={s.viewSpecsBar}>
           <Text style={s.viewSpecsText}>View more specs</Text>
-        </View>
-        <View style={{ alignItems: "center", marginTop: 2 }}>
-          {isClosed ? (
-            <View
-              style={[s.timePill, { backgroundColor: colors.muted + "40" }]}
-            >
-              <Text style={[s.timePillText, { color: colors.mutedForeground }]}>
-                {auction.winning_bid_amount != null
-                  ? `Won at ${formatCurrency(auction.winning_bid_amount)}`
-                  : "Ended"}
-              </Text>
-            </View>
-          ) : (
-            <TimePill seconds={auction.timeLeft} endingSoon={endingSoon} />
-          )}
         </View>
       </View>
       {!isClosed && auction.maxBid && (
@@ -534,6 +532,13 @@ const s = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
   },
+  cardImgBottom: {
+    position: "absolute",
+    bottom: 8,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+  },
   codeBadge: {
     borderRadius: 999,
     backgroundColor: "rgba(255,255,255,0.92)",
@@ -592,6 +597,7 @@ const s = StyleSheet.create({
     borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 4,
+    backgroundColor: "rgba(0,0,0,0.55)",
   },
   timePillText: {
     fontSize: 11,
