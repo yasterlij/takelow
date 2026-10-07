@@ -110,8 +110,8 @@ export function PlaceBidScreen() {
     setSubmitError(null);
     try {
       await submitBid(values.amount);
-    } catch (e: any) {
-      setSubmitError(e?.message || "Bid submission failed. Please try again.");
+    } catch (e: unknown) {
+      setSubmitError((e instanceof Error ? e.message : undefined) || "Bid submission failed. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -142,7 +142,7 @@ export function PlaceBidScreen() {
       .catch((e: any) => {
         autoSubmittedRef.current = false;
         setSubmitError(
-          e?.message || "Bid submission failed. Please try again.",
+          (e instanceof Error ? e.message : undefined) || "Bid submission failed. Please try again.",
         );
       })
       .finally(() => setLoading(false));

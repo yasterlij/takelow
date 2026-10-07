@@ -31,8 +31,8 @@ export class AuthAuditService {
           details: { reason, timestamp: new Date().toISOString() },
         }),
       });
-    } catch (e: any) {
-      this.logger.warn(`Failed to log login attempt: ${e.message}`);
+    } catch (e: unknown) {
+      this.logger.warn(`Failed to log login attempt: ${(e instanceof Error ? e.message : String(e))}`);
     }
   }
 }

@@ -27,21 +27,21 @@ export class AdminStatsService {
       topBidders,
       dailyBidTrend,
     ] = await Promise.all([
-      q(`SELECT COUNT(*)::int AS total FROM users`).then((r: any) => r[0]),
+      q(`SELECT COUNT(*)::int AS total FROM users`).then((r: unknown[]) => (r as Array<Record<string, unknown>>)[0]),
       q(`SELECT
         COUNT(*)::int AS total,
         COUNT(*) FILTER (WHERE status = 'ACTIVE')::int AS active,
         COUNT(*) FILTER (WHERE status = 'CLOSED')::int AS closed,
         COUNT(*) FILTER (WHERE status = 'EXPIRED')::int AS expired
-       FROM auctions`).then((r: any) => r[0]),
-      q(`SELECT COUNT(*)::int AS total FROM bids`).then((r: any) => r[0]),
-      q(`SELECT COUNT(*)::int AS total FROM products`).then((r: any) => r[0]),
-      q(`SELECT COUNT(*)::int AS total FROM bids WHERE bid_time >= NOW() - INTERVAL '24 hours'`).then((r: any) => r[0]),
-      q(`SELECT COALESCE(SUM(wallet_balance), 0)::float AS total FROM users`).then((r: any) => r[0]),
-      q(`SELECT COALESCE(SUM(amount), 0)::float AS total FROM transactions WHERE type = 'BID_FEE'`).then((r: any) => r[0]),
-      q(`SELECT COALESCE(SUM(amount), 0)::float AS total FROM transactions WHERE type = 'BID_FEE' AND created_at >= NOW() - INTERVAL '24 hours'`).then((r: any) => r[0]),
-      q(`SELECT COALESCE(SUM(amount), 0)::float AS total FROM transactions WHERE type = 'DEPOSIT'`).then((r: any) => r[0]),
-      q(`SELECT COUNT(DISTINCT user_id)::int AS total FROM bids WHERE bid_time >= NOW() - INTERVAL '24 hours'`).then((r: any) => r[0]),
+       FROM auctions`).then((r: unknown[]) => (r as Array<Record<string, unknown>>)[0]),
+      q(`SELECT COUNT(*)::int AS total FROM bids`).then((r: unknown[]) => (r as Array<Record<string, unknown>>)[0]),
+      q(`SELECT COUNT(*)::int AS total FROM products`).then((r: unknown[]) => (r as Array<Record<string, unknown>>)[0]),
+      q(`SELECT COUNT(*)::int AS total FROM bids WHERE bid_time >= NOW() - INTERVAL '24 hours'`).then((r: unknown[]) => (r as Array<Record<string, unknown>>)[0]),
+      q(`SELECT COALESCE(SUM(wallet_balance), 0)::float AS total FROM users`).then((r: unknown[]) => (r as Array<Record<string, unknown>>)[0]),
+      q(`SELECT COALESCE(SUM(amount), 0)::float AS total FROM transactions WHERE type = 'BID_FEE'`).then((r: unknown[]) => (r as Array<Record<string, unknown>>)[0]),
+      q(`SELECT COALESCE(SUM(amount), 0)::float AS total FROM transactions WHERE type = 'BID_FEE' AND created_at >= NOW() - INTERVAL '24 hours'`).then((r: unknown[]) => (r as Array<Record<string, unknown>>)[0]),
+      q(`SELECT COALESCE(SUM(amount), 0)::float AS total FROM transactions WHERE type = 'DEPOSIT'`).then((r: unknown[]) => (r as Array<Record<string, unknown>>)[0]),
+      q(`SELECT COUNT(DISTINCT user_id)::int AS total FROM bids WHERE bid_time >= NOW() - INTERVAL '24 hours'`).then((r: unknown[]) => (r as Array<Record<string, unknown>>)[0]),
       q(`SELECT u.phone_number, u.full_name, COUNT(b.id)::int AS bid_count
         FROM bids b
         JOIN users u ON u.id = b.user_id
@@ -56,7 +56,7 @@ export class AdminStatsService {
          WHERE bid_time >= NOW() - INTERVAL '7 days'
          GROUP BY DATE(bid_time)
          ORDER BY day
-       ) row`).then((r: any) => r[0]),
+       ) row`).then((r: unknown[]) => (r as Array<Record<string, unknown>>)[0]),
     ]);
 
     return {
@@ -427,7 +427,7 @@ export class AdminStatsService {
       failed_payments: failedPayments,
       payment_success_rate: Number(successRate.toFixed(2)),
       average_payment_time_seconds: Number(
-        (avgPaymentTime as any[])[0]?.avg_seconds || 0,
+        (avgPaymentTime as Array<{ avg_seconds?: number }>)[0]?.avg_seconds || 0,
       ),
       failed_payments_by_gateway: failedPaymentsByGateway,
     };
@@ -440,7 +440,7 @@ export class AdminStatsService {
     );
     const endDate = new Date();
 
-    const dailyRevenue: any[] = await this.prisma.$queryRawUnsafe(
+    const dailyRevenue: Array<{ day: Date; revenue: number }> = await this.prisma.$queryRawUnsafe(
       `SELECT DATE(created_at) AS day,
               COALESCE(SUM(amount), 0)::float AS revenue
        FROM transactions

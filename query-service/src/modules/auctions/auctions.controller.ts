@@ -27,7 +27,7 @@ export class AuctionsController {
   @Get('my-bids')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get my bid history' })
-  async getMyBidHistory(@Req() req: any) {
+  async getMyBidHistory(@Req() req: { user: { id: string; role?: string } }) {
     return this.auctionsService.getUserBidHistory(req.user.id, req.user.id);
   }
 
@@ -35,7 +35,7 @@ export class AuctionsController {
   @Get('my-wins')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get my won auctions' })
-  async getMyWonAuctions(@Req() req: any) {
+  async getMyWonAuctions(@Req() req: { user: { id: string; role?: string } }) {
     return this.auctionsService.getUserWonAuctions(req.user.id, req.user.id);
   }
 
@@ -43,7 +43,7 @@ export class AuctionsController {
   @Get(':id')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get auction by ID' })
-  async getActiveAuction(@Param('id', new ParseUUIDPipe()) id: string, @Req() req: any) {
+  async getActiveAuction(@Param('id', new ParseUUIDPipe()) id: string, @Req() req: { user: { id: string; role?: string } }) {
     return this.auctionsService.getActiveAuction(id, req.user.id);
   }
 
@@ -51,7 +51,7 @@ export class AuctionsController {
   @Get(':id/bids')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get bid history for auction' })
-  async getBidHistory(@Param('id', new ParseUUIDPipe()) id: string, @Req() req: any) {
+  async getBidHistory(@Param('id', new ParseUUIDPipe()) id: string, @Req() req: { user: { id: string; role?: string } }) {
     return this.auctionsService.getBidHistory(id, req.user.id);
   }
 }

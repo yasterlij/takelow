@@ -31,7 +31,7 @@ export function NotificationsScreen() {
         if (active) setNotifications(items);
       })
       .catch((err: any) => {
-        if (active) setError(err?.message || "Failed to load notifications");
+        if (active) setError((err instanceof Error ? err.message : undefined) || "Failed to load notifications");
       })
       .finally(() => {
         if (active) setLoading(false);

@@ -26,8 +26,8 @@ export function DepositScreen() {
       await refreshWallet()
       setSuccess(true)
       setTimeout(() => go("home"), 1600)
-    } catch (e: any) {
-      setFormError(e?.message || "Deposit failed. Please try again.")
+    } catch (e: unknown) {
+      setFormError((e instanceof Error ? e.message : undefined) || "Deposit failed. Please try again.")
     } finally {
       setLoading(false)
     }

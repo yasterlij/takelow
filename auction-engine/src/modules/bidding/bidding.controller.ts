@@ -52,7 +52,7 @@ export class BiddingController {
   async placeBid(
     @Param("id") auctionId: string,
     @Body() dto: BidDto,
-    @Req() req: any,
+    @Req() req: { user: { id: string; role?: string }; auction: { end_time: Date; product?: { name?: string } } },
   ) {
     const { amount } = dto;
     const user = req.user;
@@ -68,8 +68,8 @@ export class BiddingController {
       ticketNumber,
     );
 
-    this.sendBidSms(user, auction, amount, ticketNumber).catch((e: any) =>
-      this.logger.warn(`Failed to send bid SMS: ${e.message}`),
+    this.sendBidSms(user, auction, amount, ticketNumber).catch((e: unknown) =>
+      this.logger.warn(`Failed to send bid SMS: ${e instanceof Error ? e.message : String(e)}`),
     );
 
     return {
@@ -81,7 +81,7 @@ export class BiddingController {
 
   @Get(":id/my-bids")
   @UseGuards(JwtAuthGuard)
-  async getMyBids(@Param("id") auctionId: string, @Req() req: any) {
+  async getMyBids(@Param("id") auctionId: string, @Req() req: { user: { id: string; role?: string } }) {
     const bids = await this.bidRepository.find({
       where: { auction_id: auctionId, user_id: req.user.id },
       order: { bid_time: "DESC" },
@@ -98,7 +98,7 @@ export class BiddingController {
 
   @Get(":id/result")
   @UseGuards(JwtAuthGuard)
-  async getAuctionResult(@Param("id") auctionId: string, @Req() req: any) {
+  async getAuctionResult(@Param("id") auctionId: string, @Req() req: { user: { id: string; role?: string } }) {
     const auction = await this.auctionRepository.findOne({
       where: { id: auctionId },
       relations: ["product"],

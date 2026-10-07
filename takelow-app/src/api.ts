@@ -171,19 +171,19 @@ function getCategory(status: number, errorCode: string): ErrorCategory {
 
 export function getUserFriendlyMessage(err: unknown): string {
   if (err instanceof ApiError) {
-    return FRIENDLY_ERRORS[err.errorCode] || err.message;
+    return FRIENDLY_ERRORS[err.errorCode] || (err instanceof Error ? err.message : String(err));
   }
-  if (err instanceof TypeError && err.message === "Failed to fetch") {
+  if (err instanceof TypeError && (err instanceof Error ? err.message : String(err)) === "Failed to fetch") {
     return "Unable to connect to the server. Please check your internet connection.";
   }
   if (err instanceof Error) {
-    if (err.message === "No refresh token")
+    if ((err instanceof Error ? err.message : String(err)) === "No refresh token")
       return "Your session has expired. Please sign in again.";
-    if (err.message === "Token refresh failed")
+    if ((err instanceof Error ? err.message : String(err)) === "Token refresh failed")
       return "Your session has expired. Please sign in again.";
-    if (err.message.includes("exhausted retries"))
+    if ((err instanceof Error ? err.message : String(err)).includes("exhausted retries"))
       return "The server is not responding. Please try again later.";
-    return err.message;
+    return (err instanceof Error ? err.message : String(err));
   }
   return "An unexpected error occurred. Please try again.";
 }
@@ -307,8 +307,8 @@ async function request<T>(
       }
       if (
         e instanceof Error &&
-        (e.message === "No refresh token" ||
-          e.message === "Token refresh failed")
+        ((e instanceof Error ? e.message : String(e)) === "No refresh token" ||
+          (e instanceof Error ? e.message : String(e)) === "Token refresh failed")
       ) {
         throw new ApiError(
           401,
@@ -424,6 +424,7 @@ export type ApiAuctionResult = {
   unique_bidders: number;
   lowest_unique_bid: number | null;
   all_winners: ApiWinnerInfo[];
+  bids?: ApiBid[];
   my_bid: {
     amount: number;
     bid_time: string;
@@ -432,6 +433,7 @@ export type ApiAuctionResult = {
   created_at: string;
   payment_status: string | null;
   payment_deadline: string | null;
+  second_winner_assigned?: boolean;
 };
 
 export type AuthResponse = {

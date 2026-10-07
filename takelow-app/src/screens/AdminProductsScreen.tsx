@@ -135,8 +135,8 @@ export function AdminProductsScreen() {
       }
       resetForm();
       loadProducts();
-    } catch (e: any) {
-      Alert.alert("Error", e.message || "Failed to save");
+    } catch (e: unknown) {
+      Alert.alert("Error", (e instanceof Error ? e.message : String(e)) || "Failed to save");
     }
   };
 
@@ -150,8 +150,8 @@ export function AdminProductsScreen() {
           try {
             await api.deleteProduct(id);
             loadProducts();
-          } catch (e: any) {
-            Alert.alert("Error", e.message);
+          } catch (e: unknown) {
+            Alert.alert("Error", (e instanceof Error ? e.message : String(e)));
           }
         },
       },

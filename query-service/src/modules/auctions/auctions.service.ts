@@ -41,7 +41,7 @@ export class AuctionsService {
   }
 
   private async getExistingColumns(table: string): Promise<Set<string>> {
-    const rows: any[] = await this.prisma.$queryRawUnsafe(
+    const rows: Array<{ column_name: string }> = await this.prisma.$queryRawUnsafe(
       "SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = $1",
       table,
     );
@@ -51,11 +51,11 @@ export class AuctionsService {
   private async loadAuctionRows(
     statuses: string[],
     activeOnly = false,
-  ): Promise<any[]> {
+  ): Promise<Array<Record<string, unknown>>> {
     const statusPlaceholders = statuses
       .map((_, index) => `$${index + 1}`)
       .join(", ");
-    const params: any[] = [...statuses];
+    const params: Array<string | Date> = [...statuses];
     let where = `a.status IN (${statusPlaceholders})`;
     if (activeOnly) {
       params.push(new Date());
@@ -141,7 +141,7 @@ export class AuctionsService {
     );
   }
 
-  private toAuctionRecord(row: any) {
+  private toAuctionRecord(row: Record<string, unknown>) {
     const productId = row.product_ref_id || row.product_id;
     return {
       id: row.id,
@@ -155,9 +155,9 @@ export class AuctionsService {
             image_urls: row.product_image_urls,
             current_market_price: Number(row.product_current_market_price || 0),
             category: normalizeProductCategory(
-              row.product_category,
-              row.product_name,
-              row.product_brand,
+              row.product_category as string | null | undefined,
+              row.product_name as string | null | undefined,
+              row.product_brand as string | null | undefined,
             ),
             brand: row.product_brand,
             specs: null,
@@ -188,7 +188,7 @@ export class AuctionsService {
       return cached;
     }
 
-    let auctions: any[] = [];
+    let auctions: Array<Record<string, unknown>> = [];
     try {
       auctions = await this.prisma.auction.findMany({
         where: { status: "ACTIVE", end_time: { gt: new Date() } },
@@ -265,10 +265,10 @@ export class AuctionsService {
       start_time: auction.start_time,
       end_time: auction.end_time,
       bid_fee: auction.bid_fee != null ? Number(auction.bid_fee) : null,
-      time_remaining: this.computeTimeRemaining(auction.end_time),
+      time_remaining: this.computeTimeRemaining(auction.end_time as Date),
       stats: {
-        total_bids: bidCountMap.get(auction.id) || 0,
-        unique_bidders: uniqueBidderMap.get(auction.id) || 0,
+        total_bids: bidCountMap.get(auction.id as string) || 0,
+        unique_bidders: uniqueBidderMap.get(auction.id as string) || 0,
       },
       status: auction.status,
     }));
@@ -424,7 +424,7 @@ export class AuctionsService {
       return cached;
     }
 
-    let auctions: any[] = [];
+    let auctions: Array<Record<string, unknown>> = [];
     try {
       auctions = await this.prisma.auction.findMany({
         where: {
@@ -518,7 +518,7 @@ export class AuctionsService {
     if (auctions.length === 0) return [];
 
     const result = auctions.map((auction) => {
-      const auctionWinners = winnersByAuction.get(auction.id) || [];
+      const auctionWinners = winnersByAuction.get(auction.id as string) || [];
       return {
         id: auction.id,
         public_code: auction.public_code,
@@ -540,7 +540,7 @@ export class AuctionsService {
           payment_deadline: w.payment_deadline,
         })),
         winners_count: auctionWinners.length,
-        stats: { total_bids: bidCountMap.get(auction.id) || 0 },
+        stats: { total_bids: bidCountMap.get(auction.id as string) || 0 },
         created_at: auction.created_at,
       };
     });
@@ -764,7 +764,7 @@ export class AuctionsService {
     }
 
     return auctions.map((auction) => {
-      const auctionWinners = winnersByAuction.get(auction.id) || [];
+      const auctionWinners = winnersByAuction.get(auction.id as string) || [];
       return {
         id: auction.id,
         product: auction.product,

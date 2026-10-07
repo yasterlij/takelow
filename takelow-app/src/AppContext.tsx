@@ -525,7 +525,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setWalletBalance((b) => b - fee);
         setFeePaid(true);
         navigate("place-bid");
-      } catch (e: any) {
+      } catch (e: unknown) {
         const msg = getUserFriendlyMessage(e);
         setAuthError(msg);
         toast.show(msg, "error");
@@ -570,7 +570,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           auctions.find((a) => a.id === selectedId)?.name || "Unknown";
         const smsText = `Your bid of ${amount.toFixed(2)} birr on '${name}' has been placed successfully. Your BID ticket: ${ticket || "N/A"}`;
         toast.show(`📱 SMS: ${smsText}`, "success");
-      } catch (e: any) {
+      } catch (e: unknown) {
         const msg = getUserFriendlyMessage(e);
         setAuthError(msg);
         toast.show(msg, "error");
@@ -629,7 +629,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         await api.payWinningWithWallet(selectedId);
         if (amount != null) setWalletBalance((b) => b - amount);
         navigate("payment-confirmed");
-      } catch (e: any) {
+      } catch (e: unknown) {
         const msg = getUserFriendlyMessage(e);
         setAuthError(msg);
         toast.show(msg, "error");
@@ -809,7 +809,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         });
         await refreshAuctions();
         toast.show("Auction created successfully", "success");
-      } catch (e: any) {
+      } catch (e: unknown) {
         toast.show(getUserFriendlyMessage(e), "error");
       }
       navigate("admin-auctions");
@@ -824,7 +824,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         await api.closeAuction(id);
         await refreshAuctions();
         toast.show("Auction closed successfully", "success");
-      } catch (e: any) {
+      } catch (e: unknown) {
         toast.show(getUserFriendlyMessage(e), "error");
       }
     },
@@ -838,7 +838,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         await api.forceCloseAuction(id);
         await refreshAuctions();
         toast.show("Auction force-closed successfully", "success");
-      } catch (e: any) {
+      } catch (e: unknown) {
         toast.show(getUserFriendlyMessage(e), "error");
       }
     },
@@ -852,7 +852,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         await api.reopenAuction(id, data);
         await refreshAuctions();
         toast.show("Auction reopened successfully", "success");
-      } catch (e: any) {
+      } catch (e: unknown) {
         toast.show(getUserFriendlyMessage(e), "error");
         throw e;
       }
@@ -901,7 +901,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         await refreshAuctions();
         toast.show(`Successfully reopened ${reopenedCount} auction${reopenedCount > 1 ? "s" : ""}`, "success");
         return { total: ids.length, reopened: reopenedCount };
-      } catch (e: any) {
+      } catch (e: unknown) {
         toast.show(getUserFriendlyMessage(e), "error");
         throw e;
       }
@@ -964,7 +964,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
         await refreshAuctions();
         toast.show("Auction updated successfully", "success");
-      } catch (e: any) {
+      } catch (e: unknown) {
         toast.show(getUserFriendlyMessage(e), "error");
       }
     },
@@ -978,7 +978,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         await api.deleteAuction(id);
         await refreshAuctions();
         toast.show("Auction deleted", "success");
-      } catch (e: any) {
+      } catch (e: unknown) {
         toast.show(getUserFriendlyMessage(e), "error");
       }
     },

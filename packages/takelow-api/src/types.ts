@@ -12,6 +12,19 @@ export type ErrorCategory =
   | "server"
   | "unknown";
 
+/** Canonical winner record shape shared across auction-engine and query-service. */
+export type WinnerRecord = {
+  id: string;
+  auction_id: string;
+  user_id: string;
+  amount: number;
+  rank: number;
+  payment_status: string;
+  payment_deadline: Date | string | null;
+  notified_at?: Date | string | null;
+  created_at?: Date | string | null;
+};
+
 export type ApiProduct = {
   id: string;
   name: string;

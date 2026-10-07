@@ -95,7 +95,7 @@ export function useFavoriteAuctions({
         } else {
           await api.addFavorite(auctionId)
         }
-      } catch (e: any) {
+      } catch (e: unknown) {
         setFavoriteAuctionIds((prev) =>
           currentlyFavorite ? [...prev, auctionId] : prev.filter((id) => id !== auctionId)
         )

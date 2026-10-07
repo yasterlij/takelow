@@ -17,7 +17,7 @@ import {
   Tag,
 } from "lucide-react";
 import { useApp } from "../AppContext";
-import { api } from "../api";
+import { api, type ApiProduct } from "../api";
 import { AdminLayout } from "../components/AdminLayout";
 import { CTAButton, Badge, Card } from "../components/AuctionUI";
 import { usePagination, PaginationBar } from "../components/Pagination";
@@ -234,7 +234,7 @@ const emptyForm: ProductForm = {
 
 export function AdminProductsScreen() {
   const { go, auctions } = useApp();
-  const [products, setProducts] = useState<any[]>([]);
+  const [products, setProducts] = useState<ApiProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -252,8 +252,8 @@ export function AdminProductsScreen() {
       const res = await api.listProducts(1, 500);
       const list = (res as any).data || res || [];
       setProducts(list);
-    } catch (e: any) {
-      setError(e.message || "Failed to load products");
+    } catch (e: unknown) {
+      setError((e instanceof Error ? e.message : String(e)) || "Failed to load products");
       setProducts([]);
     }
     setLoading(false);
@@ -312,8 +312,8 @@ export function AdminProductsScreen() {
       }
       resetForm();
       loadProducts();
-    } catch (e: any) {
-      alert(e.message || "Failed to save product");
+    } catch (e: unknown) {
+      alert((e instanceof Error ? e.message : String(e)) || "Failed to save product");
     }
     setSubmitting(false);
   };
@@ -323,7 +323,7 @@ export function AdminProductsScreen() {
       api
         .deleteProduct(id)
         .then(loadProducts)
-        .catch((e: any) => alert(e.message));
+        .catch((e: any) => alert((e instanceof Error ? e.message : String(e))));
     }
   };
 
@@ -331,7 +331,7 @@ export function AdminProductsScreen() {
     products.some((p) => getProductCategory(p) === category),
   );
 
-  const filtered = products.filter((p: any) => {
+  const filtered = products.filter((p: ApiProduct) => {
     const category = getProductCategory(p);
     if (
       search &&
@@ -673,7 +673,7 @@ export function AdminProductsScreen() {
             }}
             className="space-y-2"
           >
-            {paginated.map((p: any) => (
+            {paginated.map((p: ApiProduct) => (
               <motion.div
                 key={p.id}
                 variants={{

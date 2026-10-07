@@ -60,8 +60,8 @@ export function DisputesScreen() {
       await api.adminUpdateDisputeStatus(d.id, "IN_REVIEW")
       toast("Dispute marked as In Review", "success")
       loadData()
-    } catch (e: any) {
-      toast(e.message || "Failed to update dispute", "error")
+    } catch (e: unknown) {
+      toast((e instanceof Error ? e.message : String(e)) || "Failed to update dispute", "error")
     }
   }
 
@@ -87,8 +87,8 @@ export function DisputesScreen() {
       setResolutionNote("")
       setDocumentUrls("")
       loadData()
-    } catch (e: any) {
-      toast(e.message || "Failed to update dispute", "error")
+    } catch (e: unknown) {
+      toast((e instanceof Error ? e.message : String(e)) || "Failed to update dispute", "error")
     } finally {
       setActionLoading(false)
     }

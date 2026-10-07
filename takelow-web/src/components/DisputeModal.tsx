@@ -37,8 +37,8 @@ export function DisputeModal({
       setDisputeDesc("")
       onClose()
       onSuccess?.()
-    } catch (err: any) {
-      toast(err.message || "Failed to submit inquiry", "error")
+    } catch (err: unknown) {
+      toast((err instanceof Error ? err.message : String(err)) || "Failed to submit inquiry", "error")
     } finally {
       setDisputeSubmitting(false)
     }

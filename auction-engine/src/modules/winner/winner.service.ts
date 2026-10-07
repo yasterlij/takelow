@@ -4,6 +4,18 @@ import { InjectRedis } from "../common/redis.decorator";
 import { PrismaService } from "../../prisma/prisma.service";
 import { BidEncryptionService } from "../common/bid-encryption.service";
 
+export interface WinnerRecord {
+  id: string;
+  auction_id: string;
+  user_id: string;
+  amount: number;
+  rank: number;
+  payment_status: string;
+  payment_deadline: Date | string | null;
+  notified_at?: Date | string | null;
+  created_at?: Date | string | null;
+}
+
 @Injectable()
 export class WinnerService {
   private readonly logger = new Logger(WinnerService.name);
@@ -192,8 +204,9 @@ export class WinnerService {
     auctionId: string,
     winners: { amount: number; userId: string }[],
     paymentDeadline: Date,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     manager?: any,
-  ): Promise<any[]> {
+  ): Promise<WinnerRecord[]> {
     const repo = manager
       ? manager.repository("winner")
       : this.prisma.repository("winner");
@@ -441,12 +454,12 @@ export class WinnerService {
     );
   }
 
-  async getAuctionWinners(auctionId: string): Promise<any[]> {
+  async getAuctionWinners(auctionId: string): Promise<WinnerRecord[]> {
     try {
-      return await this.prisma.repository("winner").find({
+      return (await this.prisma.repository("winner").find({
         where: { auction_id: auctionId },
         order: { rank: "asc" },
-      });
+      })) as WinnerRecord[];
     } catch (e) {
       if (!this.isWinnerPersistenceSchemaError(e)) {
         throw e;
@@ -459,13 +472,13 @@ export class WinnerService {
     }
   }
 
-  async getNextUnpaidWinner(auctionId: string): Promise<any | null> {
-    return this.prisma.repository("winner").findOne({
+  async getNextUnpaidWinner(auctionId: string): Promise<WinnerRecord | null> {
+    return (await this.prisma.repository("winner").findOne({
       where: {
         auction_id: auctionId,
         payment_status: "PENDING",
       },
       order: { rank: "asc" },
-    });
+    })) as WinnerRecord | null;
   }
 }

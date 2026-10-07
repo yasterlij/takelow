@@ -79,7 +79,7 @@ export function WinnerScreen() {
       : api.getAuctionResult(selectedId);
     fetch
       .then(setWinner as any)
-      .catch((e: any) => setError(e.message || "Failed to load winner"))
+      .catch((e: any) => setError((e instanceof Error ? e.message : String(e)) || "Failed to load winner"))
       .finally(() => setLoading(false));
   }, [selectedId, isAdmin, refreshKey]);
 

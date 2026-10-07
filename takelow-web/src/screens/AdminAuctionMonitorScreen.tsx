@@ -121,8 +121,8 @@ export function AdminAuctionMonitorScreen() {
       setWinner(result);
       setShowWinner(true);
       toast("Auction closed successfully", "success");
-    } catch (e: any) {
-      const msg = e?.message || e?.response?.data?.message || "";
+    } catch (e: unknown) {
+      const msg = (e instanceof Error ? e.message : undefined) || ((e as any)?.response?.data?.message) || "";
       if (msg.includes("No unique bids") || msg.includes("no unique winner")) {
         setForceCloseWarning(msg);
         setShowForceCloseConfirm(true);
@@ -159,8 +159,8 @@ export function AdminAuctionMonitorScreen() {
       });
       setShowWinner(true);
       toast("Auction force-closed without winner", "success");
-    } catch (e: any) {
-      toast(e?.message || "Failed to force-close auction", "error");
+    } catch (e: unknown) {
+      toast((e instanceof Error ? e.message : undefined) || "Failed to force-close auction", "error");
     } finally {
       setForceClosing(false);
       setShowForceCloseConfirm(false);
@@ -175,8 +175,8 @@ export function AdminAuctionMonitorScreen() {
       setWinnerPage(0);
       setWinner(result);
       setShowWinner(true);
-    } catch (e: any) {
-      toast(e?.message || "Failed to draw winner", "error");
+    } catch (e: unknown) {
+      toast((e instanceof Error ? e.message : undefined) || "Failed to draw winner", "error");
     } finally {
       setWinnerLoading(false);
     }

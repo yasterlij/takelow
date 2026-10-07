@@ -28,7 +28,7 @@ function UserDetailModal({ user, onClose, onRoleChange, onNameChange }: { user: 
       setEditingName(false)
     } catch (e: unknown) {
       toast(
-        `Failed to save name: ${e instanceof Error ? e.message : "Unknown error"}`,
+        `Failed to save name: ${e instanceof Error ? (e instanceof Error ? e.message : String(e)) : "Unknown error"}`,
         "error",
       )
     }
@@ -140,7 +140,7 @@ export function AdminUsersScreen() {
     setError(null)
     api.adminListUsers(1, 200)
       .then((res) => { setUsers(res.data); setLoading(false) })
-      .catch((e) => { setError(e.message || 'Failed to load users'); setLoading(false) })
+      .catch((e) => { setError((e instanceof Error ? e.message : String(e)) || 'Failed to load users'); setLoading(false) })
   }
 
   useEffect(fetchUsers, [])

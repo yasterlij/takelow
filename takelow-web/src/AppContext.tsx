@@ -794,8 +794,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         });
         await refreshAuctions();
         toast("Auction created successfully", "success");
-      } catch (e: any) {
-        toast(e?.message || "Failed to create auction", "error");
+      } catch (e: unknown) {
+        toast((e instanceof Error ? e.message : undefined) || "Failed to create auction", "error");
       }
       navigate("admin-auctions");
     },
@@ -809,8 +809,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         await api.closeAuction(id);
         await refreshAuctions();
         toast("Auction closed successfully", "success");
-      } catch (e: any) {
-        toast(e?.message || "Failed to close auction", "error");
+      } catch (e: unknown) {
+        toast((e instanceof Error ? e.message : undefined) || "Failed to close auction", "error");
       }
     },
     [refreshAuctions, user],
@@ -823,8 +823,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         await api.forceCloseAuction(id);
         await refreshAuctions();
         toast("Auction force-closed without winner", "success");
-      } catch (e: any) {
-        toast(e?.message || "Failed to force-close auction", "error");
+      } catch (e: unknown) {
+        toast((e instanceof Error ? e.message : undefined) || "Failed to force-close auction", "error");
       }
     },
     [refreshAuctions, user],
@@ -837,8 +837,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         await api.adminReopenAuction(id, data);
         await refreshAuctions();
         toast("Auction reopened successfully", "success");
-      } catch (e: any) {
-        toast(e?.message || "Failed to reopen auction", "error");
+      } catch (e: unknown) {
+        toast((e instanceof Error ? e.message : undefined) || "Failed to reopen auction", "error");
         throw e;
       }
     },
@@ -886,8 +886,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         await refreshAuctions();
         toast(`Successfully reopened ${reopenedCount} of ${ids.length} auction(s)`, "success");
         return { total: ids.length, reopened: reopenedCount };
-      } catch (e: any) {
-        toast(e?.message || "Failed to bulk reopen auctions", "error");
+      } catch (e: unknown) {
+        toast((e instanceof Error ? e.message : undefined) || "Failed to bulk reopen auctions", "error");
         throw e;
       }
     },
@@ -949,8 +949,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
         await refreshAuctions();
         toast("Auction updated successfully", "success");
-      } catch (e: any) {
-        toast(e?.message || "Failed to update auction", "error");
+      } catch (e: unknown) {
+        toast((e instanceof Error ? e.message : undefined) || "Failed to update auction", "error");
       }
     },
     [refreshAuctions, user],
@@ -963,8 +963,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         await api.deleteAuction(id);
         await refreshAuctions();
         toast("Auction deleted successfully", "success");
-      } catch (e: any) {
-        toast(e?.message || "Failed to delete auction", "error");
+      } catch (e: unknown) {
+        toast((e instanceof Error ? e.message : undefined) || "Failed to delete auction", "error");
       }
     },
     [refreshAuctions, user],

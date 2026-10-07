@@ -74,15 +74,15 @@ export class SmsReminderService {
           const message = `Reminder: You won the "${productName}" auction with a bid of ETB ${winningAmount}. Please complete your payment by ${deadlineStr} to avoid losing your win.`;
 
           await this.notificationService.sendSms(phone, message);
-        } catch (error: any) {
+        } catch (error: unknown) {
           this.logger.error(
-            `Failed to send SMS reminder to winner ${winner.user_id}: ${error.message}`,
+            `Failed to send SMS reminder to winner ${winner.user_id}: ${(error instanceof Error ? error.message : String(error))}`,
           );
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.error(
-        `Failed to process winner payment SMS reminders: ${error.message}`,
+        `Failed to process winner payment SMS reminders: ${(error instanceof Error ? error.message : String(error))}`,
       );
     }
   }
@@ -133,9 +133,9 @@ export class SmsReminderService {
 
                 try {
                   await this.notificationService.sendSms(phone, message);
-                } catch (error: any) {
+                } catch (error: unknown) {
                   this.logger.error(
-                    `Failed to send ending-soon SMS to bidder ${bidder.user.id}: ${error.message}`,
+                    `Failed to send ending-soon SMS to bidder ${bidder.user.id}: ${(error instanceof Error ? error.message : String(error))}`,
                   );
                 }
               }),
@@ -144,16 +144,16 @@ export class SmsReminderService {
             this.logger.log(
               `Sent ending-soon SMS to ${bidders.length} bidders for auction ${auction.id}`,
             );
-          } catch (error: any) {
+          } catch (error: unknown) {
             this.logger.error(
-              `Failed to process ending-soon SMS for auction ${auction.id}: ${error.message}`,
+              `Failed to process ending-soon SMS for auction ${auction.id}: ${(error instanceof Error ? error.message : String(error))}`,
             );
           }
         }),
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.error(
-        `Failed to process auction ending-soon SMS: ${error.message}`,
+        `Failed to process auction ending-soon SMS: ${(error instanceof Error ? error.message : String(error))}`,
       );
     }
   }

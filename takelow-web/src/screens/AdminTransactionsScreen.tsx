@@ -231,8 +231,8 @@ export function AdminTransactionsScreen() {
           legalDisclaimer: "This certified transaction report is generated from TakeLow's read-only immutable audit trail in compliance with UNCITRAL procurement directives.",
         })
       }
-    } catch (e: any) {
-      toast(e.message || "Export failed", "error")
+    } catch (e: unknown) {
+      toast((e instanceof Error ? e.message : String(e)) || "Export failed", "error")
     } finally {
       setExporting(false)
       setBulkExportOpen(false)

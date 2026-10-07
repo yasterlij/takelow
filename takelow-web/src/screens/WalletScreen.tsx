@@ -48,8 +48,8 @@ export function WalletScreen() {
         setSuccess(false)
         form.handleChange("amount", 0)
       }, 2500)
-    } catch (e: any) {
-      setFormError(e?.message || "Deposit failed. Please try again.")
+    } catch (e: unknown) {
+      setFormError((e instanceof Error ? e.message : undefined) || "Deposit failed. Please try again.")
     } finally {
       setLoading(false)
     }

@@ -28,7 +28,7 @@ export class ErrorBoundary extends Component<Props, State> {
           </View>
           <Text style={s.title}>Something went wrong</Text>
           <Text style={s.subtitle}>An unexpected error occurred. Please try again.</Text>
-          <Text style={s.message}>{this.state.error?.message}</Text>
+          <Text style={s.message}>{this.state.error instanceof Error ? this.state.error.message : undefined}</Text>
           <TouchableOpacity
             style={s.button}
             onPress={this.handleReset}

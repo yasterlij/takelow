@@ -47,7 +47,7 @@ export class WinnerManagementController {
   async extendPaymentDeadline(
     @Param('id') winnerId: string,
     @Body() body: { new_deadline?: string },
-    @Req() req: any,
+    @Req() req: { user: { id: string; role?: string } },
   ) {
     if (!body?.new_deadline) {
       throw new BadRequestException('new_deadline is required in the body');
@@ -67,19 +67,19 @@ export class WinnerManagementController {
 
   @Post(':id/confirm-payment')
   @ApiOperation({ summary: 'Confirm winner payment' })
-  async confirmPayment(@Param('id') winnerId: string, @Req() req: any) {
+  async confirmPayment(@Param('id') winnerId: string, @Req() req: { user: { id: string; role?: string } }) {
     return this.winnerManagementService.confirmPayment(winnerId, req.user.id);
   }
 
   @Post(':id/remind')
   @ApiOperation({ summary: 'Send payment reminder to winner' })
-  async sendPaymentReminder(@Param('id') winnerId: string, @Req() req: any) {
+  async sendPaymentReminder(@Param('id') winnerId: string, @Req() req: { user: { id: string; role?: string } }) {
     return this.winnerManagementService.sendPaymentReminder(winnerId, req.user.id);
   }
 
   @Post('auction/:auctionId/rotate')
   @ApiOperation({ summary: 'Trigger winner rotation' })
-  async triggerRotation(@Param('auctionId') auctionId: string, @Req() req: any) {
+  async triggerRotation(@Param('auctionId') auctionId: string, @Req() req: { user: { id: string; role?: string } }) {
     return this.winnerManagementService.triggerRotation(
       auctionId,
       req.user.id,

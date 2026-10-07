@@ -103,8 +103,8 @@ export function AdminAuctionMonitorScreen() {
       setWinnerPage(0);
       setWinner(result);
       setShowWinner(true);
-    } catch (e: any) {
-      const msg = e?.message || e?.response?.data?.message || "";
+    } catch (e: unknown) {
+      const msg = (e instanceof Error ? e.message : undefined) || ((e as any)?.response?.data?.message) || "";
       if (
         msg.toLowerCase().includes("no unique bids") ||
         msg.toLowerCase().includes("no unique winner")
@@ -156,8 +156,8 @@ export function AdminAuctionMonitorScreen() {
         payment_deadline: null,
       });
       setShowWinner(true);
-    } catch (e: any) {
-      Alert.alert("Error", e?.message || "Failed to force-close auction");
+    } catch (e: unknown) {
+      Alert.alert("Error", (e instanceof Error ? e.message : undefined) || "Failed to force-close auction");
     }
   };
 
@@ -169,8 +169,8 @@ export function AdminAuctionMonitorScreen() {
       setWinnerPage(0);
       setWinner(result);
       setShowWinner(true);
-    } catch (e: any) {
-      Alert.alert("Error", e?.message || "Failed to draw winner");
+    } catch (e: unknown) {
+      Alert.alert("Error", (e instanceof Error ? e.message : undefined) || "Failed to draw winner");
     } finally {
       setWinnerLoading(false);
     }

@@ -27,7 +27,7 @@ export class FavoritesController {
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   async getFavorites(
-    @Req() req: any,
+    @Req() req: { user: { id: string; role?: string } },
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
@@ -40,7 +40,7 @@ export class FavoritesController {
   @Post(':auctionId')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Add favorite' })
-  async addFavorite(@Param('auctionId') auctionId: string, @Req() req: any) {
+  async addFavorite(@Param('auctionId') auctionId: string, @Req() req: { user: { id: string; role?: string } }) {
     if (!UUID_REGEX.test(auctionId)) {
       throw new BadRequestException('Invalid auction ID');
     }
@@ -51,7 +51,7 @@ export class FavoritesController {
   @Delete(':auctionId')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Remove favorite' })
-  async removeFavorite(@Param('auctionId') auctionId: string, @Req() req: any) {
+  async removeFavorite(@Param('auctionId') auctionId: string, @Req() req: { user: { id: string; role?: string } }) {
     if (!UUID_REGEX.test(auctionId)) {
       throw new BadRequestException('Invalid auction ID');
     }

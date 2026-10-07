@@ -140,9 +140,9 @@ export class AuctionClosureEventsService {
           },
         }),
       });
-    } catch (e: any) {
+    } catch (e: unknown) {
       this.logger.warn(
-        `Failed to log closure event for auction ${auctionId}: ${e.message}`,
+        `Failed to log closure event for auction ${auctionId}: ${(e instanceof Error ? e.message : String(e))}`,
       );
     }
   }

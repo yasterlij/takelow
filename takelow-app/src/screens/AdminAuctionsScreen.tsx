@@ -531,8 +531,8 @@ export function AdminAuctionsScreen() {
     try {
       await api.closeAuction(id);
       await refreshAuctions();
-    } catch (e: any) {
-      const msg = e?.message || "";
+    } catch (e: unknown) {
+      const msg = (e instanceof Error ? e.message : undefined) || "";
       if (
         msg.toLowerCase().includes("no unique bids") ||
         msg.toLowerCase().includes("no unique winners") ||
@@ -553,8 +553,8 @@ export function AdminAuctionsScreen() {
       await api.forceCloseAuction(showForceCloseConfirm);
       Alert.alert("Success", "Auction has been force-closed successfully");
       refreshAuctions();
-    } catch (e: any) {
-      Alert.alert("Error", e?.message || "Failed to force-close auction");
+    } catch (e: unknown) {
+      Alert.alert("Error", (e instanceof Error ? e.message : undefined) || "Failed to force-close auction");
     } finally {
       setForceClosing(false);
       setShowForceCloseConfirm(null);

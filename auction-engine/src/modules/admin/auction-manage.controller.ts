@@ -141,12 +141,12 @@ export class AuctionManageController {
   }
 
   @Post("auctions/:id/close")
-  async closeAuction(@Param("id") id: string, @Req() req: any) {
+  async closeAuction(@Param("id") id: string, @Req() req: { user: { id: string; role?: string } }) {
     return this.auctionService.closeAuctionEarly(id, req.user?.id);
   }
 
   @Post("auctions/:id/force-close")
-  async forceCloseAuction(@Param("id") id: string, @Req() req: any) {
+  async forceCloseAuction(@Param("id") id: string, @Req() req: { user: { id: string; role?: string } }) {
     return this.auctionService.forceCloseAuction(id, req.user?.id);
   }
 

@@ -235,6 +235,11 @@ export class WinnerManagementService {
     };
   }
 
+  /**
+   * @deprecated Winner rotation is authoritative in auction-engine's payment.service
+   * handleExpiredPayment. This admin-triggered variant exists for manual intervention only.
+   * Prefer calling the auction-engine admin API for automated rotation.
+   */
   async triggerRotation(auctionId: string, adminId: string) {
     const now = new Date();
 

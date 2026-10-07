@@ -74,7 +74,7 @@ export interface AuctionTransactionsSummary {
     action: string;
     actor_id: string;
     actor_phone: string | null;
-    details: any;
+    details: unknown;
     created_at: string;
   }>;
 }
@@ -560,7 +560,13 @@ export class AdminTransactionsService {
 
     const unified: UnifiedTransactionRow[] = [];
 
-    for (const p of paymentTxns) {
+    type PaymentTxnWithRelations = (typeof paymentTxns)[0] & {
+      user?: { phone_number?: string | null; full_name?: string | null } | null;
+      auction?: { product?: { name?: string | null } | null; second_winner_assigned?: boolean | null } | null;
+    };
+
+    for (const raw of paymentTxns) {
+      const p = raw as PaymentTxnWithRelations;
       const isWinnerPayment =
         p.payment_type === 'WINNING_BID' ||
         p.client_reference_id?.startsWith('win-') ||
@@ -751,7 +757,16 @@ export class AdminTransactionsService {
     };
   }
 
-  async exportTransactionsCsv(filters: any): Promise<string> {
+  async exportTransactionsCsv(filters: {
+    auction_id?: string;
+    user_id?: string;
+    type?: string;
+    category?: string;
+    status?: string;
+    start?: string;
+    end?: string;
+    search?: string;
+  }): Promise<string> {
     const res = await this.getAllTransactions(filters, 1, 10000);
     const header = [
       'Transaction ID',

@@ -100,8 +100,8 @@ export function SettlementReportScreen() {
       link.click()
       document.body.removeChild(link)
       toast("Settlement CSV exported successfully", "success")
-    } catch (e: any) {
-      toast(e.message || "Failed to export CSV", "error")
+    } catch (e: unknown) {
+      toast((e instanceof Error ? e.message : String(e)) || "Failed to export CSV", "error")
     } finally {
       setExporting(false)
     }

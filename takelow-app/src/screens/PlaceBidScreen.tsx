@@ -107,8 +107,8 @@ export function PlaceBidScreen() {
     setLoading(true)
     try {
       await submitBid(amount)
-    } catch (e: any) {
-      setSubmitError(e?.message || 'Bid submission failed. Please try again.')
+    } catch (e: unknown) {
+      setSubmitError((e instanceof Error ? e.message : undefined) || 'Bid submission failed. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -132,7 +132,7 @@ export function PlaceBidScreen() {
     Promise.resolve(submitBid(pendingBidAmount))
       .catch((e: any) => {
         autoSubmittedRef.current = false
-        setSubmitError(e?.message || 'Bid submission failed. Please try again.')
+        setSubmitError((e instanceof Error ? e.message : undefined) || 'Bid submission failed. Please try again.')
       })
       .finally(() => setLoading(false))
   }, [auction, feePaid, pendingBidAmount, submitBid, hasPlacedBid])

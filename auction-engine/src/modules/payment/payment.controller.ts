@@ -42,7 +42,7 @@ export class PaymentController {
   @Post(":auctionId/link")
   async createPaymentLink(
     @Param("auctionId") auctionId: string,
-    @Req() req: any,
+    @Req() req: { user: { id: string; role?: string } },
     @Query("payment_method") paymentMethod?: string,
     @Query("customer_phone") customerPhone?: string,
   ) {
@@ -83,7 +83,7 @@ export class PaymentController {
 
   @UseGuards(JwtAuthGuard)
   @Post(":auctionId/confirm")
-  async confirmPayment(@Param("auctionId") auctionId: string, @Req() req: any) {
+  async confirmPayment(@Param("auctionId") auctionId: string, @Req() req: { user: { id: string; role?: string } }) {
     try {
       await this.paymentService.confirmWinningPayment(auctionId, req.user.id);
       return { paid: true };
@@ -98,7 +98,7 @@ export class PaymentController {
   @Get(":auctionId/status")
   async getPaymentLinkStatus(
     @Param("auctionId") auctionId: string,
-    @Req() req: any,
+    @Req() req: { user: { id: string; role?: string } },
   ) {
     return this.paymentService.getWinningPaymentStatus(auctionId, req.user.id);
   }
@@ -107,7 +107,7 @@ export class PaymentController {
   @Post("bid-fee/:auctionId/link")
   async createBidFeePaymentLink(
     @Param("auctionId") auctionId: string,
-    @Req() req: any,
+    @Req() req: { user: { id: string; role?: string } },
   ) {
     const user = req.user;
     const auction = await this.auctionRepository.findOne({
@@ -141,7 +141,7 @@ export class PaymentController {
   @Get("bid-fee/:auctionId/status")
   async getBidFeePaymentStatus(
     @Param("auctionId") auctionId: string,
-    @Req() req: any,
+    @Req() req: { user: { id: string; role?: string } },
   ) {
     return this.paymentService.getBidFeePaymentStatus(auctionId, req.user.id);
   }
@@ -150,7 +150,7 @@ export class PaymentController {
   @Post("bid-fee/:auctionId/confirm")
   async confirmBidFeePayment(
     @Param("auctionId") auctionId: string,
-    @Req() req: any,
+    @Req() req: { user: { id: string; role?: string } },
   ) {
     try {
       const result = await this.paymentService.getBidFeePaymentStatus(
@@ -173,7 +173,7 @@ export class PaymentController {
   @Post("bid-fee/:auctionId/wallet-pay")
   async payBidFeeWithWallet(
     @Param("auctionId") auctionId: string,
-    @Req() req: any,
+    @Req() req: { user: { id: string; role?: string } },
   ) {
     const user = req.user;
     const auction = await this.auctionRepository.findOne({
@@ -203,7 +203,7 @@ export class PaymentController {
   @Post(":auctionId/wallet-pay")
   async payWinningWithWallet(
     @Param("auctionId") auctionId: string,
-    @Req() req: any,
+    @Req() req: { user: { id: string; role?: string } },
   ) {
     const user = req.user;
     const auction = await this.auctionRepository.findOne({

@@ -158,13 +158,13 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Get("profile")
-  async getProfile(@Req() req: any) {
+  async getProfile(@Req() req: { user: { id: string; role?: string } }) {
     return this.authService.getProfile(req.user.id);
   }
 
   @UseGuards(JwtAuthGuard)
   @Patch("profile")
-  async updateProfile(@Req() req: any, @Body() data: UpdateProfileDto) {
+  async updateProfile(@Req() req: { user: { id: string; role?: string } }, @Body() data: UpdateProfileDto) {
     const user = await this.authService.updateProfile(req.user.id, data);
     if (!user) {
       return { id: req.user.id, full_name: data.full_name, email: data.email };
@@ -174,7 +174,7 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Post("fcm-token")
-  async registerFcmToken(@Req() req: any, @Body() dto: RegisterPushTokenDto) {
+  async registerFcmToken(@Req() req: { user: { id: string; role?: string } }, @Body() dto: RegisterPushTokenDto) {
     await this.authService.registerPushToken(
       req.user.id,
       dto.token,

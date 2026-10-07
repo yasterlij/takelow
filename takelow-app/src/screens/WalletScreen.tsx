@@ -77,8 +77,8 @@ export function WalletScreen() {
       await refreshWallet()
       setTopUpAmount('')
       toast.show(`Successfully deposited ${formatCurrency(depositValue)}!`, 'success')
-    } catch (e: any) {
-      toast.show(e?.message || 'Deposit failed. Please try again.', 'error')
+    } catch (e: unknown) {
+      toast.show((e instanceof Error ? e.message : undefined) || 'Deposit failed. Please try again.', 'error')
     } finally {
       setLoading(false)
     }

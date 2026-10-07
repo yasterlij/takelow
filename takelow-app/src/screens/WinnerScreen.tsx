@@ -31,7 +31,7 @@ import { useApp } from "../AppContext";
 import { CTAButton, Card } from "../components/AuctionUI";
 import { WinnerPaymentCta } from "../components/WinnerPaymentCta";
 import { WinnerStatsCard } from "../components/WinnerStatsCard";
-import { api, type ApiWinnerResult, type ApiAuctionResult } from "../api";
+import { api, type ApiWinnerResult, type ApiAuctionResult, type ApiWinnerInfo } from "../api";
 import { formatCurrency } from "../mockDataV0";
 import { colors } from "../theme";
 function formatDeadlineRemaining(hrs: number | null): string {
@@ -74,7 +74,7 @@ export function WinnerScreen() {
       : api.getAuctionResult(selectedId);
     fetch
       .then(setWinner as any)
-      .catch((e) => setError(e.message || "Failed to load winner"))
+      .catch((e) => setError((e instanceof Error ? e.message : String(e)) || "Failed to load winner"))
       .finally(() => setLoading(false));
   }, [selectedId, isAdmin]);
 
@@ -116,27 +116,33 @@ export function WinnerScreen() {
   const deadlineHrs = deadline
     ? Math.max(0, Math.round((deadline.getTime() - Date.now()) / 3600000))
     : null;
-  const allWinners =
+  const allWinners: ApiWinnerInfo[] | undefined =
     "all_winners" in (winner || {})
-      ? ((winner as any).all_winners as any[])
+      ? (winner as ApiAuctionResult).all_winners
       : undefined;
-  const userWinnerInfo = allWinners?.find((w: any) => w.user_id === user?.id);
+  const userWinnerInfo = allWinners?.find((w) => w.user_id === user?.id);
   const isPrimaryWinner = winner?.winner_user_id === user?.id;
-  const isSecondWinnerAssigned = Boolean(auction.second_winner_assigned || (winner as any)?.second_winner_assigned);
+  const isSecondWinnerAssigned = Boolean(
+    auction.second_winner_assigned ||
+      ("second_winner_assigned" in (winner || {}) &&
+        (winner as ApiAuctionResult & { second_winner_assigned?: boolean })
+          .second_winner_assigned),
+  );
   const isPaymentExpired = (deadlineHrs !== null && deadlineHrs <= 0) ||
     auction.payment_status === "PAYMENT_DEFAULTED" ||
     userWinnerInfo?.payment_status === "DEFAULTED" ||
     userWinnerInfo?.payment_status === "EXPIRED";
 
-  const allBids =
+  type BidRow = { amount: number; ticket_number?: string; user_id?: string; user_name?: string | null; bid_time?: string };
+  const allBids: BidRow[] =
     "bids" in (winner || {})
-      ? ((winner as any).bids as any[]).map((bid: any) => ({
+      ? ((winner as ApiAuctionResult).bids ?? []).map((bid) => ({
           ...bid,
           amount: Number(bid.amount),
         }))
       : [];
   const amountCount = new Map<number, number>();
-  allBids.forEach((b: any) =>
+  allBids.forEach((b) =>
     amountCount.set(b.amount, (amountCount.get(b.amount) || 0) + 1),
   );
   const winningAmount =
@@ -148,10 +154,10 @@ export function WinnerScreen() {
       ? [
           ...new Set(
             allBids
-              .filter((b: any) => b.amount < winningAmount)
-              .map((b: any) => b.amount),
+              .filter((b) => b.amount < winningAmount)
+              .map((b) => b.amount),
           ),
-        ].sort((a: number, b: number) => a - b)
+        ].sort((a, b) => a - b)
       : [];
   const lowerBidsGrouped = lowerAmounts.map((amount: number) => ({
     amount,
@@ -1128,7 +1134,7 @@ export function WinnerScreen() {
                               numberOfLines={1}
                             >
                               {winnerBid.user_name ||
-                                winnerBid.user_id.slice(0, 8)}
+                                (winnerBid.user_id ? winnerBid.user_id.slice(0, 8) : 'Unknown')}
                             </Text>
                             {winnerBid.user_id === user?.id && (
                               <View

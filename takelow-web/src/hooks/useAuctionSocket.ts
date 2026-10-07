@@ -66,7 +66,7 @@ export function useAuctionSocket(
     })
 
     socket.on("connect_error", (error) => {
-      const message = error?.message || ""
+      const message = (error instanceof Error ? error.message : undefined) || ""
       if (/auth|jwt|token|unauthorized|forbidden/i.test(message)) {
         socket.io.opts.reconnection = false
         window.dispatchEvent(new CustomEvent("session-expired"))

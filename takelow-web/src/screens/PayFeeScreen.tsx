@@ -223,8 +223,8 @@ export function PayFeeScreen() {
       setAttemptsRemaining(status.locked ? 0 : status.attemptsRemaining);
       setNeedsPinSetup(!status.hasPin);
       setShowPinModal(true);
-    } catch (err: any) {
-      setPinError(err?.message || "Failed to check wallet PIN status");
+    } catch (err: unknown) {
+      setPinError((err instanceof Error ? err.message : undefined) || "Failed to check wallet PIN status");
       setNeedsPinSetup(false);
       setPinLocked(false);
       setShowPinModal(true);
@@ -280,8 +280,8 @@ export function PayFeeScreen() {
           setPinError("Invalid wallet PIN");
         }
       }
-    } catch (err: any) {
-      setPinError(err?.message || "Unable to verify PIN. Please try again.");
+    } catch (err: unknown) {
+      setPinError((err instanceof Error ? err.message : undefined) || "Unable to verify PIN. Please try again.");
     } finally {
       setPinLoading(false);
     }

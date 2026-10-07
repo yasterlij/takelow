@@ -50,7 +50,7 @@ export class NotificationService {
         const first = result.data?.[0];
         if (first?.status === 'error') { this.logger.warn(`Expo push error for user ${userId}: ${first.message}`); }
       } else { this.logger.warn(`Expo push HTTP ${res.status} for user ${userId}`); }
-    } catch (error: any) { this.logger.error(`Push failed for user ${userId}: ${error.message}`); }
+    } catch (error: unknown) { this.logger.error(`Push failed for user ${userId}: ${(error instanceof Error ? error.message : String(error))}`); }
   }
 
   async sendSms(phone: string, text: string): Promise<void> {
@@ -61,7 +61,7 @@ export class NotificationService {
       const res = await fetch(SMSETHIOPIA_URL, { method: 'POST', headers: { KEY: apiKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ msisdn, text }) });
       if (res.ok) { this.logger.log(`[SMS] Sent to ${msisdn}: "${text.slice(0, 50)}..."`); }
       else { const body = await res.text(); this.logger.warn(`[SMS] Failed (${res.status}): ${body}`); }
-    } catch (error: any) { this.logger.error(`[SMS] Error sending to ${msisdn}: ${error.message}`); }
+    } catch (error: unknown) { this.logger.error(`[SMS] Error sending to ${msisdn}: ${(error instanceof Error ? error.message : String(error))}`); }
   }
 
   async persistNotification(log: any): Promise<any> {

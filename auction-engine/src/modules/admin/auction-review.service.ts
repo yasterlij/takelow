@@ -10,7 +10,7 @@ export class AuctionReviewService {
 
   private isLegacyBidSchemaError(error: unknown): boolean {
     const message =
-      error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+      error instanceof Error ? (error instanceof Error ? error.message : String(error)).toLowerCase() : String(error).toLowerCase();
 
     const isSchemaError =
       message.includes("does not exist") ||
@@ -58,7 +58,7 @@ export class AuctionReviewService {
       }
 
       this.logger.warn(
-        `Legacy bid schema detected for ${auctionId}, falling back to base bid columns: ${e.message}`,
+        `Legacy bid schema detected for ${auctionId}, falling back to base bid columns: ${(e instanceof Error ? e.message : String(e))}`,
       );
 
       const rows = await this.prisma
@@ -100,9 +100,9 @@ export class AuctionReviewService {
         name: data.full_name || data.phone_number || null,
         phone: data.phone_number || null,
       };
-    } catch (e: any) {
+    } catch (e: unknown) {
       this.logger.warn(
-        `Failed to resolve winner info for ${userId}: ${e.message}`,
+        `Failed to resolve winner info for ${userId}: ${(e instanceof Error ? e.message : String(e))}`,
       );
       return null;
     }

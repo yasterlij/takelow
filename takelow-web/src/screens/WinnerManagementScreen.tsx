@@ -82,8 +82,8 @@ export function WinnerManagementScreen() {
       toast(`Extended payment deadline by ${extendHours} hours`, "success")
       setExtendModalWinner(null)
       loadData()
-    } catch (e: any) {
-      toast(e.message || "Failed to extend deadline", "error")
+    } catch (e: unknown) {
+      toast((e instanceof Error ? e.message : String(e)) || "Failed to extend deadline", "error")
     } finally {
       setActionLoading(false)
     }
@@ -96,8 +96,8 @@ export function WinnerManagementScreen() {
       await api.adminReassignWinner(winner.id)
       toast("Winner promoted to next eligible unique bidder", "success")
       loadData()
-    } catch (e: any) {
-      toast(e.message || "Failed to reassign winner", "error")
+    } catch (e: unknown) {
+      toast((e instanceof Error ? e.message : String(e)) || "Failed to reassign winner", "error")
     } finally {
       setActionLoading(false)
     }
@@ -111,8 +111,8 @@ export function WinnerManagementScreen() {
       await api.adminCancelWinner(winner.id, reason)
       toast("Winner cancelled", "success")
       loadData()
-    } catch (e: any) {
-      toast(e.message || "Failed to cancel winner", "error")
+    } catch (e: unknown) {
+      toast((e instanceof Error ? e.message : String(e)) || "Failed to cancel winner", "error")
     } finally {
       setActionLoading(false)
     }
@@ -123,8 +123,8 @@ export function WinnerManagementScreen() {
     try {
       const res = await api.adminGetBidderHistory(userId)
       setSelectedBidderHistory(res)
-    } catch (e: any) {
-      toast(e.message || "Failed to load bidder history", "error")
+    } catch (e: unknown) {
+      toast((e instanceof Error ? e.message : String(e)) || "Failed to load bidder history", "error")
     } finally {
       setBidderHistoryLoading(false)
     }
@@ -135,8 +135,8 @@ export function WinnerManagementScreen() {
     try {
       const res = await api.adminSendPaymentReminder(winner.id)
       toast(res.message || "Payment reminder dispatched via SMS, Push, and In-App notification", "success")
-    } catch (e: any) {
-      toast(e.message || "Failed to send payment reminder", "error")
+    } catch (e: unknown) {
+      toast((e instanceof Error ? e.message : String(e)) || "Failed to send payment reminder", "error")
     } finally {
       setRemindingId(null)
     }

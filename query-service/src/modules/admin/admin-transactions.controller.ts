@@ -85,12 +85,12 @@ export class AdminTransactionsController {
       commission_percent?: number;
       net_to_seller?: number;
     },
-    @Req() req: any,
+    @Req() req: { user: { id: string; role?: string } },
   ) {
     if (!id) {
       throw new BadRequestException('Auction ID is required');
     }
-    const actorId = req.user?.sub || req.user?.id || 'admin';
+    const actorId = req.user?.id || 'admin';
     return this.transactionsService.saveAuctionSettlementConfig(id, dto, actorId);
   }
 
@@ -98,12 +98,12 @@ export class AdminTransactionsController {
   @ApiOperation({ summary: 'Reset custom settlement configuration for an auction' })
   async resetAuctionSettlementConfig(
     @Param('id') id: string,
-    @Req() req: any,
+    @Req() req: { user: { id: string; role?: string } },
   ) {
     if (!id) {
       throw new BadRequestException('Auction ID is required');
     }
-    const actorId = req.user?.sub || req.user?.id || 'admin';
+    const actorId = req.user?.id || 'admin';
     return this.transactionsService.resetAuctionSettlementConfig(id, actorId);
   }
 

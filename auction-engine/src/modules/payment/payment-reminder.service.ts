@@ -78,16 +78,16 @@ export class PaymentReminderService {
             this.logger.log(
               `Payment reminder sent to user ${winner.user_id} for auction ${winner.auction_id}`,
             );
-          } catch (error: any) {
+          } catch (error: unknown) {
             this.logger.error(
-              `Failed to send payment reminder to winner ${winner.user_id}: ${error.message}`,
+              `Failed to send payment reminder to winner ${winner.user_id}: ${(error instanceof Error ? error.message : String(error))}`,
             );
           }
         }),
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.error(
-        `Failed to process payment reminders: ${error.message}`,
+        `Failed to process payment reminders: ${(error instanceof Error ? error.message : String(error))}`,
       );
     }
   }
@@ -110,9 +110,9 @@ export class PaymentReminderService {
           sent_at: new Date().toISOString(),
         },
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.warn(
-        `Failed to log payment reminder audit entry: ${error.message}`,
+        `Failed to log payment reminder audit entry: ${(error instanceof Error ? error.message : String(error))}`,
       );
     }
   }

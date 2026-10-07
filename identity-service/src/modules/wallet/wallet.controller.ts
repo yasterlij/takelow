@@ -33,7 +33,7 @@ export class WalletController {
 
   @UseGuards(JwtAuthGuard)
   @Get("balance")
-  async getBalance(@Req() req: any) {
+  async getBalance(@Req() req: { user: { id: string; role?: string } }) {
     const balance = await this.walletService.getBalance(req.user.id);
     return { balance };
   }
@@ -41,7 +41,7 @@ export class WalletController {
   @UseGuards(JwtAuthGuard)
   @Get("transactions")
   async getTransactions(
-    @Req() req: any,
+    @Req() req: { user: { id: string; role?: string } },
     @Query("page") page?: string,
     @Query("limit") limit?: string,
   ) {
@@ -55,7 +55,7 @@ export class WalletController {
   @UseGuards(JwtAuthGuard)
   @Post("deposit")
   @HttpCode(200)
-  async deposit(@Req() req: any, @Body() dto: DepositDto) {
+  async deposit(@Req() req: { user: { id: string; role?: string } }, @Body() dto: DepositDto) {
     const user = await this.walletService.deposit(
       req.user.id,
       dto.amount,
@@ -74,7 +74,7 @@ export class WalletController {
   @UseGuards(JwtAuthGuard)
   @Post("set-pin")
   @HttpCode(200)
-  async setPin(@Req() req: any, @Body() dto: SetPinDto) {
+  async setPin(@Req() req: { user: { id: string; role?: string } }, @Body() dto: SetPinDto) {
     await this.walletPinService.setPin(req.user.id, dto.pin);
     return { set: true };
   }
@@ -82,28 +82,28 @@ export class WalletController {
   @UseGuards(JwtAuthGuard)
   @Post("verify-pin")
   @HttpCode(200)
-  async verifyPin(@Req() req: any, @Body() dto: VerifyPinDto) {
+  async verifyPin(@Req() req: { user: { id: string; role?: string } }, @Body() dto: VerifyPinDto) {
     const result = await this.walletPinService.verifyPin(req.user.id, dto.pin);
     return result;
   }
 
   @UseGuards(JwtAuthGuard)
   @Get("has-pin")
-  async hasPin(@Req() req: any) {
+  async hasPin(@Req() req: { user: { id: string; role?: string } }) {
     const hasPin = await this.walletPinService.hasPin(req.user.id);
     return { hasPin };
   }
 
   @UseGuards(JwtAuthGuard)
   @Get("pin-status")
-  async getPinStatus(@Req() req: any) {
+  async getPinStatus(@Req() req: { user: { id: string; role?: string } }) {
     return this.walletPinService.getPinStatus(req.user.id);
   }
 
   @UseGuards(AuthOrInternalGuard)
   @Post("deduct-fee")
   @HttpCode(200)
-  async deductFee(@Req() req: any, @Body() dto: DeductFeeDto) {
+  async deductFee(@Req() req: { user: { id: string; role?: string } }, @Body() dto: DeductFeeDto) {
     const { user_id: userId, amount } = dto;
     if (!userId || !amount || amount <= 0) {
       throw new BadRequestException("Invalid user_id or amount");

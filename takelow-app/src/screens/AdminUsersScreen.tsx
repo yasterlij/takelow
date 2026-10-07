@@ -158,7 +158,7 @@ export function AdminUsersScreen() {
     setError(null)
     api.adminListUsers(1, 200)
       .then((res) => setUserList(res.data))
-      .catch((e) => setError(e.message || 'Failed to load users'))
+      .catch((e) => setError((e instanceof Error ? e.message : String(e)) || 'Failed to load users'))
       .finally(() => setLoading(false))
   }
 
