@@ -3,6 +3,7 @@ import { Redis } from "ioredis";
 import { InjectRedis } from "../common/redis.decorator";
 import { PrismaService } from "../../prisma/prisma.service";
 import { BidEncryptionService } from "../common/bid-encryption.service";
+import { MIN_VALID_BID_AMOUNT } from "../../config/constants";
 
 export interface WinnerRecord {
   id: string;
@@ -34,6 +35,10 @@ export class WinnerService {
 
   private normalizeAmount(amount: string | number): string {
     return Number(amount).toFixed(2);
+  }
+
+  private isValidBidAmount(amount: number | string): boolean {
+    return Number(amount) >= MIN_VALID_BID_AMOUNT;
   }
 
   private readBidAmount(
@@ -165,7 +170,7 @@ export class WinnerService {
     const frequency = new Map<string, number>();
     for (const bid of bids) {
       const realAmount = this.readBidAmount(bid);
-      if (realAmount === null) continue;
+      if (realAmount === null || !this.isValidBidAmount(realAmount)) continue;
       frequency.set(realAmount, (frequency.get(realAmount) || 0) + 1);
     }
 
@@ -261,11 +266,15 @@ export class WinnerService {
       return { found: true, winningAmounts: [], totalBids, winners: [] };
     }
 
-    const winningAmounts = amounts.map((a) => Number(this.normalizeAmount(a)));
+    const winningAmounts = amounts
+      .map((a) => Number(this.normalizeAmount(a)))
+      .filter((a) => this.isValidBidAmount(a));
     const freqKey = `takelow:auction:${auctionId}:frequencies`;
 
     const freqResults = await Promise.all(
-      amounts.map((a) => this.redis.zscore(freqKey, this.normalizeAmount(a))),
+      winningAmounts.map((a) =>
+        this.redis.zscore(freqKey, this.normalizeAmount(a)),
+      ),
     );
 
     const uniqueAmounts = winningAmounts.filter(
@@ -309,7 +318,7 @@ export class WinnerService {
     const earliestPerAmount = new Map<string, string>();
     for (const bid of bids) {
       const realAmount = this.readBidAmount(bid);
-      if (realAmount === null) continue;
+      if (realAmount === null || !this.isValidBidAmount(realAmount)) continue;
       frequency.set(realAmount, (frequency.get(realAmount) || 0) + 1);
       if (!earliestPerAmount.has(realAmount)) {
         earliestPerAmount.set(realAmount, bid.user_id);

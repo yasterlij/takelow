@@ -27,6 +27,7 @@ import { Auction, AuctionStatus } from "../winner/entities/auction.entity";
 import { Winner } from "../winner/entities/winner.entity";
 import { Bid } from "../bidding/entities/bid.entity";
 import { NotificationDispatchService } from "../worker/notification-dispatch.service";
+import { MIN_VALID_BID_AMOUNT } from "../../config/constants";
 
 @Controller("auctions")
 export class BiddingController {
@@ -118,8 +119,15 @@ export class BiddingController {
       order: { rank: "ASC" },
     });
 
+    const validPersistedWinners = persistedWinners.filter(
+      (w) => Number(w.amount) >= MIN_VALID_BID_AMOUNT,
+    );
+    const validCalculatedWinners = winners.filter(
+      (w) => w.amount >= MIN_VALID_BID_AMOUNT,
+    );
+
     const allWinners = await Promise.all(
-      (persistedWinners.length > 0 ? persistedWinners : winners).map(
+      (validPersistedWinners.length > 0 ? validPersistedWinners : validCalculatedWinners).map(
         async (w: any) => {
           const info = await this.resolveWinnerUserInfo(w.user_id || w.userId);
           return {
@@ -135,6 +143,14 @@ export class BiddingController {
       ),
     );
 
+    const winningAmount =
+      auction.winning_bid_amount != null &&
+      Number(auction.winning_bid_amount) >= MIN_VALID_BID_AMOUNT
+        ? Number(auction.winning_bid_amount)
+        : validCalculatedWinners.length > 0
+          ? validCalculatedWinners[0].amount
+          : null;
+
     const primaryWinnerInfo = auction.winner_user_id
       ? await this.resolveWinnerUserInfo(auction.winner_user_id)
       : null;
@@ -143,12 +159,10 @@ export class BiddingController {
       id: auction.id,
       product: auction.product,
       status: auction.status,
-      winner_user_id: auction.winner_user_id,
-      winner_name: primaryWinnerInfo?.name || null,
-      winner_phone: primaryWinnerInfo?.phone || null,
-      winning_bid_amount:
-        auction.winning_bid_amount ??
-        (winners.length > 0 ? winners[0].amount : null),
+      winner_user_id: allWinners.length > 0 ? auction.winner_user_id : null,
+      winner_name: allWinners.length > 0 ? (primaryWinnerInfo?.name || null) : null,
+      winner_phone: allWinners.length > 0 ? (primaryWinnerInfo?.phone || null) : null,
+      winning_bid_amount: winningAmount,
       total_bids: stats.totalBids,
       unique_bidders: stats.uniqueBidders,
       lowest_unique_bid: stats.lowestUniqueBid,

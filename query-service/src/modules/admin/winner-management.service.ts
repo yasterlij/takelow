@@ -1,13 +1,18 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 
+const MIN_VALID_BID_AMOUNT = 1.0;
+
 @Injectable()
 export class WinnerManagementService {
   constructor(private prisma: PrismaService) {}
 
   async getWinners(auctionId: string) {
     const winners = await this.prisma.winner.findMany({
-      where: { auction_id: auctionId },
+      where: {
+        auction_id: auctionId,
+        amount: { gte: MIN_VALID_BID_AMOUNT },
+      },
       include: {
         user: {
           select: {
@@ -59,7 +64,7 @@ export class WinnerManagementService {
 
   async getPendingWinners() {
     const winners = await this.prisma.winner.findMany({
-      where: { payment_status: 'PENDING' },
+      where: { payment_status: 'PENDING', amount: { gte: MIN_VALID_BID_AMOUNT } },
       include: {
         user: {
           select: {
@@ -95,6 +100,7 @@ export class WinnerManagementService {
       where: {
         payment_status: 'PENDING',
         payment_deadline: { lt: now },
+        amount: { gte: MIN_VALID_BID_AMOUNT },
       },
       include: {
         user: {

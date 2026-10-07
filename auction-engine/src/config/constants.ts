@@ -1,3 +1,4 @@
 export const PAYMENT_DEADLINE_HOURS = 24;
 export const AUCTION_STATE_TTL_BUFFER_SECONDS = 3600;
 export const LOCK_TTL_MS = 5000;
+export const MIN_VALID_BID_AMOUNT = 1.0;
