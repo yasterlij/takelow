@@ -24,6 +24,8 @@ import {
 import { useToast } from "./components/Toast";
 import { useAuctionSocket, applySocketUpdate } from "./hooks/useAuctionSocket";
 import { useFavoriteAuctions } from "./hooks/useFavoriteAuctions";
+import { useAuthSession } from "./hooks/useAuthSession";
+import { useWalletBalance } from "./hooks/useWalletBalance";
 import {
   registerForPushNotifications,
   useNotificationObserver,
@@ -272,7 +274,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [pendingBidAmount, setPendingBidAmount] = useState<number | null>(null);
   const [bidTicketNumber, setBidTicketNumber] = useState<string | null>(null);
   const [feePaid, setFeePaid] = useState(false);
-  const [walletBalance, setWalletBalance] = useState(INITIAL_BALANCE);
   const [paymentMethod, setPaymentMethodState] = useState<
     "SIKINAPAY" | "AWASH"
   >("AWASH");
@@ -282,20 +283,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
     "bid-fee" | "winning" | null
   >(null);
   const [myBids, setMyBids] = useState<PlacedBid[]>([]);
-  const [user, setUser] = useState<User | null>(null);
   const [allBids, setAllBids] = useState<PlacedBid[]>([]);
   const [auctions, setAuctions] = useState<Auction[]>([]);
   const [auctionsLoading, setAuctionsLoading] = useState(false);
-  const [authError, setAuthError] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const users: User[] = [];
   const refreshing = useRef(false);
   const logoutRef = useRef<(reason?: SessionExpireReason) => void>(() => {});
-  const sessionStartedAtRef = useRef<number | null>(null);
   const idleWarnTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [sessionEndReason, setSessionEndReason] =
-    useState<SessionExpireReason | null>(null);
+
+  const {
+    user, setUser,
+    authError, setAuthError,
+    sessionEndReason, setSessionEndReason,
+    sessionStartedAtRef,
+    login: authLogin, register: authRegister, logout: authLogout, restoreSession,
+  } = useAuthSession();
+
+  const { walletBalance, setWalletBalance, refreshWallet } = useWalletBalance({
+    onError: (msg) => toast.show(msg, "error"),
+  });
+
   const {
     favoriteAuctionIds,
     favoritesLoading,
@@ -343,27 +352,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (saved.myBids?.length) setMyBids(saved.myBids);
         if (saved.walletBalance != null) setWalletBalance(saved.walletBalance);
         if (saved.accessToken && saved.refreshToken && saved.user) {
-          setApiToken(saved.accessToken);
-          setRefreshToken(saved.refreshToken);
-          try {
-            const profile = await api.auth.profile();
-            setUser({
-              ...saved.user,
-              name: profile.full_name || profile.phone_number,
-            });
+          const ok = await restoreSession(
+            saved.user as User,
+            saved.accessToken,
+            saved.refreshToken,
+          );
+          if (ok) {
             refreshWallet();
             resetTo("home");
-          } catch {
-            try {
-              const refreshed = await api.auth.refresh(saved.refreshToken);
-              setApiToken(refreshed.access_token);
-              setRefreshToken(refreshed.refresh_token);
-              setUser(saved.user);
-              resetTo("home");
-            } catch {
-              setApiToken(null);
-              setRefreshToken(null);
-            }
           }
         }
       })
@@ -655,99 +651,43 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setSikinaPayContext(null);
   }, [resetTo]);
 
-  const refreshWallet = useCallback(async () => {
-    try {
-      const res = await api.wallet.balance();
-      setWalletBalance(res.balance);
-    } catch {
-      toast.show("Failed to fetch wallet balance", "error");
-    }
-  }, [toast]);
-
   const login = useCallback(
     async (phone: string, password: string): Promise<string | null> => {
-      try {
-        setAuthError(null);
-        setSessionEndReason(null);
-        sessionStartedAtRef.current = Date.now();
-        const res = await api.auth.login(phone, password);
-        setApiToken(res.access_token);
-        setRefreshToken(res.refresh_token);
-        const appUser: User = {
-          id: res.user.id,
-          name: "",
-          phone: res.user.phone_number,
-          role: res.user.role as UserRole,
-        };
-        try {
-          const profile = await api.auth.profile();
-          appUser.name = profile.full_name || profile.phone_number;
-        } catch {
-          appUser.name = res.user.phone_number;
-        }
-        setUser(appUser);
+      const err = await authLogin(phone, password);
+      if (!err) {
         resetTo("home");
         refreshWallet();
         refreshAuctions();
         registerForPushNotifications();
-        return null;
-      } catch (e: unknown) {
-        const msg = getUserFriendlyMessage(e);
-        setAuthError(msg);
-        return msg;
       }
+      return err;
     },
-    [],
+    [authLogin, resetTo, refreshWallet, refreshAuctions],
   );
 
   const register = useCallback(
-    async (
-      name: string,
-      phone: string,
-      password: string,
-    ): Promise<string | null> => {
-      try {
-        setAuthError(null);
-        setSessionEndReason(null);
-        sessionStartedAtRef.current = Date.now();
-        const res = await api.auth.register(phone, password, name);
-        setApiToken(res.access_token);
-        setRefreshToken(res.refresh_token);
-        const appUser: User = {
-          id: res.user.id,
-          name,
-          phone: res.user.phone_number,
-          role: res.user.role as UserRole,
-        };
-        setUser(appUser);
+    async (name: string, phone: string, password: string): Promise<string | null> => {
+      const err = await authRegister(phone, password, name);
+      if (!err) {
         resetTo("home");
         refreshWallet();
         refreshAuctions();
-        return null;
-      } catch (e: unknown) {
-        const msg = getUserFriendlyMessage(e);
-        setAuthError(msg);
-        return msg;
       }
+      return err;
     },
-    [],
+    [authRegister, resetTo, refreshWallet, refreshAuctions],
   );
 
   const logout = useCallback((reason: SessionExpireReason = "logout") => {
-    setSessionEndReason(reason);
-    sessionStartedAtRef.current = null;
-    setApiToken(null);
-    setRefreshToken(null);
-    setUser(null);
+    authLogout(reason);
     setSelectedId(null);
     setUserBid(null);
     setBidTicketNumber(null);
     setFeePaid(false);
-    setWalletBalance(INITIAL_BALANCE);
+    setWalletBalance(0);
     setMyBids([]);
     setAllBids([]);
     setAuctions([]);
-    setAuthError(null);
     AsyncStorage.getItem(STORAGE_KEY)
       .then((raw) => {
         const saved = raw ? JSON.parse(raw) : {};
@@ -764,7 +704,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       })
       .catch(() => {});
     resetTo("login");
-  }, [resetTo]);
+  }, [authLogout, resetTo]);
 
   useEffect(() => {
     logoutRef.current = logout;

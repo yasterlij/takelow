@@ -23,6 +23,9 @@ import { toast } from "./store/toast.store";
 import { useAuctionSocket, applySocketUpdate } from "./hooks/useAuctionSocket";
 import { useFavoriteAuctions } from "./hooks/useFavoriteAuctions";
 import { useUnreadNotifications } from "./hooks/useUnreadNotifications";
+import { useAuthSession } from "./hooks/useAuthSession";
+import { useWalletBalance } from "./hooks/useWalletBalance";
+import { useAuctionStore, mapAuction } from "./hooks/useAuctionStore";
 import { normalizeAuctionCategory } from "./lib/auctionCategories";
 import type { Auction, ProductSpecs } from "./mockDataV0";
 import { formatSpecSummary } from "./mockDataV0";
@@ -209,59 +212,6 @@ const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 const ABSOLUTE_TIMEOUT_MS = 12 * 60 * 60 * 1000;
 const IDLE_WARNING_MS = 60 * 1000;
 
-function mapAuction(apiAuction: ApiAuction): Auction {
-  const timeLeft = Math.max(
-    0,
-    Math.floor((new Date(apiAuction.end_time).getTime() - Date.now()) / 1000),
-  );
-  return {
-    id: apiAuction.id,
-    publicCode: apiAuction.public_code,
-    productId: apiAuction.product_id,
-    name: apiAuction.product?.name || "Unknown Product",
-    category: normalizeAuctionCategory(
-      apiAuction.product?.category,
-      apiAuction.product?.name,
-    ),
-    images: apiAuction.product?.image_urls || [],
-    marketPrice: Number(apiAuction.product?.current_market_price || 0),
-    bidFee: apiAuction.bid_fee != null ? Number(apiAuction.bid_fee) : 1,
-    bidders: apiAuction.stats?.total_bids ?? 0,
-    uniqueBidders: apiAuction.stats?.unique_bidders ?? 0,
-    totalBids: apiAuction.stats?.total_bids ?? 0,
-    timeLeft,
-    endTime: apiAuction.end_time,
-    status: (apiAuction.status === "ACTIVE"
-      ? timeLeft < 3600
-        ? "ending-soon"
-        : "live"
-      : "closed") as Auction["status"],
-    description: apiAuction.product?.description || "",
-    highlights: [],
-    specs: apiAuction.product?.specs || null,
-    specSummary: formatSpecSummary(apiAuction.product?.specs),
-    minBid: apiAuction.min_bid ?? undefined,
-    maxBid: apiAuction.max_bid ?? undefined,
-    winners: apiAuction.winners?.map((w: any) => ({
-      user_id: w.user_id,
-      amount: w.amount,
-      rank: w.rank,
-      payment_status: w.payment_status,
-      payment_deadline: w.payment_deadline,
-      name: w.name || w.user_name || null,
-      phone: w.phone,
-    })),
-    winnersCount: apiAuction.winners_count ?? apiAuction.winners?.length ?? 0,
-    winning_bid_amount: apiAuction.winning_bid_amount ?? null,
-    winner_user_id: apiAuction.winner_user_id ?? null,
-    payment_status: apiAuction.payment_status ?? undefined,
-    payment_deadline: apiAuction.payment_deadline ?? null,
-    payment_deadline_hours: apiAuction.payment_deadline_hours ?? null,
-    escalation_rule: apiAuction.escalation_rule ?? null,
-    second_winner_assigned: Boolean(apiAuction.second_winner_assigned),
-    raw_status: apiAuction.status,
-  };
-}
 
 const POLL_INTERVAL = 30000;
 const LIVE_VIEWS: View[] = [
@@ -281,7 +231,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [pendingBidAmount, setPendingBidAmount] = useState<number | null>(null);
   const [bidTicketNumber, setBidTicketNumber] = useState<string | null>(null);
   const [feePaid, setFeePaid] = useState(false);
-  const [walletBalance, setWalletBalance] = useState(INITIAL_BALANCE);
   const [paymentMethod, setPaymentMethodState] = useState<
     "SIKINAPAY" | "AWASH" | "WALLET"
   >("AWASH");
@@ -299,23 +248,38 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [sikinaProxyUrl, setSikinaProxyUrl] = useState<string | null>(null);
   const [myBids, setMyBids] = useState<PlacedBid[]>([]);
   const [allBids, setAllBids] = useState<PlacedBid[]>([]);
-  const [auctions, setAuctions] = useState<Auction[]>([]);
-  const [auctionsLoading, setAuctionsLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
-  useAuctionSocket(selectedId, (payload) => {
-    setAuctions((prev) => applySocketUpdate(prev, payload));
-  });
-  const [user, setUser] = useState<User | null>(null);
-  const [authError, setAuthError] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
-  const refreshing = useRef(false);
   const logoutRef = useRef<(reason?: SessionExpireReason) => void>(() => {});
-  const sessionStartedAtRef = useRef<number | null>(null);
   const sessionChannelRef = useRef<BroadcastChannel | null>(null);
   const idleWarnTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [sessionEndReason, setSessionEndReason] =
-    useState<SessionExpireReason | null>(null);
+
+  const {
+    user, setUser,
+    authError, setAuthError,
+    sessionEndReason, setSessionEndReason,
+    sessionStartedAtRef,
+    login: authLogin, register: authRegister, logout: authLogout, restoreSession,
+  } = useAuthSession();
+
+  const { walletBalance, setWalletBalance, refreshWallet } = useWalletBalance({
+    onError: (msg) => toast(msg, "error"),
+  });
+
+  const {
+    auctions, setAuctions,
+    auctionsLoading,
+    refreshAuctions,
+    fetchAuctionById,
+    getAuction,
+    upsertAuction,
+  } = useAuctionStore({ onError: (msg) => toast(msg, "error") });
+
+  useAuctionSocket(selectedId, (payload) => {
+    setAuctions((prev) => applySocketUpdate(prev, payload));
+  });
+
   const {
     favoriteAuctionIds,
     favoritesLoading,
@@ -341,7 +305,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           if (saved.auctions?.length) {
             const unique = Array.from(
               new Map<string, Auction>(
-                saved.auctions.map((a: any) => [
+                saved.auctions.map((a: Auction) => [
                   a.id,
                   {
                     ...a,
@@ -359,37 +323,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
           if (saved.walletBalance != null)
             setWalletBalance(saved.walletBalance);
           if (saved.accessToken && saved.refreshToken && saved.user) {
-            setApiToken(saved.accessToken);
-            setRefreshToken(saved.refreshToken);
-            try {
-              const profile = await api.auth.profile();
-              setUser({
-                ...(saved.user as User),
-                id: profile.id,
-                name: profile.full_name || profile.phone_number,
-                phone: profile.phone_number,
-                role: profile.role as UserRole,
-              });
-              resetTo("home");
-            } catch {
-              try {
-                const refreshed = await api.auth.refresh(saved.refreshToken);
-                setApiToken(refreshed.access_token);
-                setRefreshToken(refreshed.refresh_token);
-                const profile = await api.auth.profile();
-                setUser({
-                  id: profile.id,
-                  name: profile.full_name || profile.phone_number,
-                  phone: profile.phone_number,
-                  role: profile.role as UserRole,
-                });
-                resetTo("home");
-              } catch {
-                setApiToken(null);
-                setRefreshToken(null);
-                setUser(null);
-              }
-            }
+            const ok = await restoreSession(
+              saved.user as User,
+              saved.accessToken,
+              saved.refreshToken,
+            );
+            if (ok) resetTo("home");
           }
         } catch {
           // ignore corrupt data
@@ -748,138 +687,46 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setMyBids([]);
   }, [resetTo]);
 
-  const refreshAuctions = useCallback(async () => {
-    if (refreshing.current) return;
-    refreshing.current = true;
-    setAuctionsLoading(true);
-    try {
-      const [activeRes, closedRes] = await Promise.all([
-        api.listAuctions(),
-        api.listClosedAuctions().catch(() => ({ data: [] })),
-      ]);
-      const auctionMap = new Map<string, Auction>();
-      for (const a of (closedRes.data || []).map(mapAuction)) {
-        auctionMap.set(a.id, a);
-      }
-      for (const a of (activeRes.data || []).map(mapAuction)) {
-        auctionMap.set(a.id, a);
-      }
-      setAuctions(Array.from(auctionMap.values()));
-    } catch {
-      toast("Failed to refresh auctions", "error");
-    } finally {
-      setAuctionsLoading(false);
-      refreshing.current = false;
-    }
-  }, []);
 
-  const refreshWallet = useCallback(async () => {
-    try {
-      const res = await api.wallet.balance();
-      setWalletBalance(res.balance);
-    } catch {
-      toast("Failed to fetch wallet balance", "error");
-    }
-  }, []);
 
-  const fetchAuctionById = useCallback(
-    async (id: string): Promise<Auction | undefined> => {
-      const cached = auctions.find((a) => a.id === id);
-      if (cached) return cached;
-      try {
-        const data = await api.getAuction(id);
-        const mapped = mapAuction(data);
-        setAuctions((prev) => {
-          const exists = prev.find((a) => a.id === mapped.id);
-          if (exists) return prev;
-          return [...prev, mapped];
-        });
-        return mapped;
-      } catch {
-        return undefined;
-      }
-    },
-    [auctions],
-  );
 
   const login = useCallback(
     async (phone: string, password: string): Promise<boolean> => {
-      try {
-        setAuthError(null);
-        setSessionEndReason(null);
-        sessionStartedAtRef.current = Date.now();
-        const res = await api.auth.login(phone, password);
-        setApiToken(res.access_token);
-        setRefreshToken(res.refresh_token);
-        const appUser: User = {
-          id: res.user.id,
-          name: "",
-          phone: res.user.phone_number,
-          role: res.user.role as UserRole,
-        };
-        try {
-          const profile = await api.auth.profile();
-          appUser.name = profile.full_name || profile.phone_number;
-        } catch {
-          appUser.name = res.user.phone_number;
-        }
-        setUser(appUser);
+      const ok = await authLogin(phone, password);
+      if (ok) {
         resetTo("home");
         refreshWallet();
         refreshAuctions();
-        return true;
-      } catch (e: unknown) {
-        setAuthError(getUserFriendlyMessage(e));
-        return false;
       }
+      return ok;
     },
-    [resetTo],
+    [authLogin, resetTo, refreshWallet, refreshAuctions],
   );
 
   const register = useCallback(
     async (phone: string, password: string, name: string): Promise<boolean> => {
-      try {
-        setAuthError(null);
-        setSessionEndReason(null);
-        sessionStartedAtRef.current = Date.now();
-        const res = await api.auth.register(phone, password, name);
-        setApiToken(res.access_token);
-        setRefreshToken(res.refresh_token);
-        const appUser: User = {
-          id: res.user.id,
-          name,
-          phone: res.user.phone_number,
-          role: res.user.role as UserRole,
-        };
-        setUser(appUser);
+      const ok = await authRegister(phone, password, name);
+      if (ok) {
         resetTo("home");
         refreshWallet();
         refreshAuctions();
-        return true;
-      } catch (e: unknown) {
-        setAuthError(getUserFriendlyMessage(e));
-        return false;
       }
+      return ok;
     },
-    [resetTo],
+    [authRegister, resetTo, refreshWallet, refreshAuctions],
   );
 
   const logout = useCallback((reason: SessionExpireReason = "logout") => {
-    setSessionEndReason(reason);
-    sessionStartedAtRef.current = null;
-    setApiToken(null);
-    setRefreshToken(null);
-    setUser(null);
+    authLogout(reason);
     setSelectedId(null);
     setUserBid(null);
     setPendingBidAmount(null);
     setBidTicketNumber(null);
     setFeePaid(false);
-    setWalletBalance(INITIAL_BALANCE);
+    setWalletBalance(0);
     setMyBids([]);
     setAllBids([]);
     setAuctions([]);
-    setAuthError(null);
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       try {
@@ -905,7 +752,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       });
     }
     resetTo("login");
-  }, [resetTo]);
+  }, [authLogout, resetTo]);
   logoutRef.current = logout;
 
   const addAuction = useCallback(
@@ -1121,14 +968,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     },
     [refreshAuctions, user],
-  );
-
-  const getAuction = useCallback(
-    (id: string | null | undefined): Auction | undefined => {
-      if (!id) return undefined;
-      return auctions.find((a) => a.id === id);
-    },
-    [auctions],
   );
 
   const value = useMemo(

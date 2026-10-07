@@ -7,6 +7,8 @@ import { WinnerManagementService } from './winner-management.service';
 import { WinnerManagementController } from './winner-management.controller';
 import { AdminTransactionsService } from './admin-transactions.service';
 import { AdminTransactionsController } from './admin-transactions.controller';
+import { SettlementConfigService } from './settlement-config.service';
+import { ComplianceReportService } from './compliance-report.service';
 
 @Module({
   controllers: [
@@ -20,7 +22,10 @@ import { AdminTransactionsController } from './admin-transactions.controller';
     SettlementService,
     WinnerManagementService,
     AdminTransactionsService,
+    SettlementConfigService,
+    ComplianceReportService,
   ],
+  exports: [SettlementConfigService],
 })
 export class AdminModule {}
 

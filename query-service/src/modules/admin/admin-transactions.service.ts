@@ -2,6 +2,8 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RedisCacheService } from '../common/redis-cache.service';
+import { SettlementConfigService, SettlementConfigDto } from './settlement-config.service';
+import { ComplianceReportService } from './compliance-report.service';
 
 export interface AuctionTransactionsSummary {
   auction_id: string;
@@ -161,6 +163,8 @@ export class AdminTransactionsService {
     private prisma: PrismaService,
     private configService: ConfigService,
     private redisCacheService: RedisCacheService,
+    private settlementConfigService: SettlementConfigService,
+    private complianceReportService: ComplianceReportService,
   ) {
     this.platformSharePercent =
       this.configService.get<number>('settlement.platformSharePercent') ?? 10;
@@ -170,101 +174,23 @@ export class AdminTransactionsService {
       this.configService.get<number>('settlement.commissionPercent') ?? 5;
   }
 
-  async getAuctionSettlementConfig(auctionId: string): Promise<any | null> {
-    const cacheKey = `settlement:auction:${auctionId}`;
-    const cached = await this.redisCacheService.get<any>(cacheKey);
-    if (cached) {
-      if (cached.reset) return null;
-      return cached;
-    }
-
-    try {
-      const log = await this.prisma.auditLog.findFirst({
-        where: {
-          entity_id: auctionId,
-          action: { in: ['SETTLEMENT_CONFIG_UPDATED', 'SETTLEMENT_CONFIG_RESET'] },
-        },
-        orderBy: { created_at: 'desc' },
-      });
-      if (log?.action === 'SETTLEMENT_CONFIG_RESET') {
-        await this.redisCacheService.set(cacheKey, { reset: true }, this.SETTLEMENT_CACHE_TTL_SECONDS);
-        return null;
-      }
-      if (log?.details) {
-        await this.redisCacheService.set(cacheKey, log.details, this.SETTLEMENT_CACHE_TTL_SECONDS);
-        return log.details;
-      }
-    } catch (e: any) {
-      this.logger.warn(`Failed to retrieve audit log settlement config: ${e?.message}`);
-    }
-
-    return null;
+  async getAuctionSettlementConfig(auctionId: string): Promise<SettlementConfigDto | null> {
+    return this.settlementConfigService.getAuctionSettlementConfig(auctionId);
   }
 
   async saveAuctionSettlementConfig(
     auctionId: string,
-    dto: {
-      winning_price?: number;
-      bid_fees_collected?: number;
-      platform_share?: number;
-      platform_share_percent?: number;
-      tax?: number;
-      tax_percent?: number;
-      commission?: number;
-      commission_percent?: number;
-      net_to_seller?: number;
-    },
+    dto: Omit<SettlementConfigDto, 'is_custom_configured' | 'configured_by' | 'configured_at'>,
     actorId?: string,
-  ): Promise<any> {
-    const configData = {
-      ...dto,
-      is_custom_configured: true,
-      configured_by: actorId || 'admin',
-      configured_at: new Date().toISOString(),
-    };
-
-    const cacheKey = `settlement:auction:${auctionId}`;
-    await this.redisCacheService.set(cacheKey, configData, this.SETTLEMENT_CACHE_TTL_SECONDS);
-
-    try {
-      await this.prisma.auditLog.create({
-        data: {
-          actor_id: actorId || 'admin',
-          action: 'SETTLEMENT_CONFIG_UPDATED',
-          entity_type: 'AUCTION',
-          entity_id: auctionId,
-          details: configData as any,
-        },
-      });
-    } catch (e: any) {
-      this.logger.warn(`Failed to create audit log for settlement config: ${e?.message}`);
-    }
-
-    return configData;
+  ): Promise<SettlementConfigDto> {
+    return this.settlementConfigService.saveAuctionSettlementConfig(auctionId, dto, actorId);
   }
 
   async resetAuctionSettlementConfig(
     auctionId: string,
     actorId?: string,
   ): Promise<{ success: boolean }> {
-    const cacheKey = `settlement:auction:${auctionId}`;
-    await this.redisCacheService.set(cacheKey, { reset: true }, this.SETTLEMENT_CACHE_TTL_SECONDS);
-
-    try {
-      await this.prisma.auditLog.create({
-        data: {
-          actor_id: actorId || 'admin',
-          action: 'SETTLEMENT_CONFIG_RESET',
-          entity_type: 'AUCTION',
-          entity_id: auctionId,
-          details: { reset: true, reset_at: new Date().toISOString() },
-        },
-      });
-    } catch (e: any) {
-      this.logger.warn(`Failed to create audit log for settlement reset: ${e?.message}`);
-    }
-
-    return { success: true };
+    return this.settlementConfigService.resetAuctionSettlementConfig(auctionId, actorId);
   }
 
   async getAuctionTransactions(
@@ -883,116 +809,7 @@ export class AdminTransactionsService {
     startDateStr: string,
     endDateStr: string,
   ): Promise<ComplianceReportResponse> {
-    const start = new Date(startDateStr);
-    const end = new Date(endDateStr);
-
-    const [
-      totalAuctions,
-      closedAuctions,
-      totalBids,
-      winningProceedsRow,
-      feeProceedsRow,
-      secondWinnersRow,
-      disputesRow,
-      escrowRow,
-    ] = await Promise.all([
-      this.prisma.auction.count({
-        where: { created_at: { gte: start, lte: end } },
-      }),
-      this.prisma.auction.count({
-        where: {
-          status: { in: ['CLOSED', 'EXPIRED'] },
-          created_at: { gte: start, lte: end },
-        },
-      }),
-      this.prisma.bid.count({
-        where: { bid_time: { gte: start, lte: end } },
-      }),
-      this.prisma.paymentTransaction.aggregate({
-        where: {
-          OR: [
-            { payment_type: 'WINNING_BID' },
-            { client_reference_id: { startsWith: 'win-' } },
-            { payment_type: 'WALLET', auction_id: { not: null as any } },
-          ],
-          status: 'SUCCESSFUL',
-          created_at: { gte: start, lte: end },
-        },
-        _sum: { amount: true },
-        _count: true,
-      }),
-      this.prisma.transaction.aggregate({
-        where: {
-          type: 'BID_FEE',
-          created_at: { gte: start, lte: end },
-        },
-        _sum: { amount: true },
-      }),
-      this.prisma.auction.count({
-        where: {
-          second_winner_assigned: true,
-          created_at: { gte: start, lte: end },
-        },
-      }),
-      this.prisma.dispute.findMany({
-        where: { created_at: { gte: start, lte: end } },
-      }),
-      this.prisma.$queryRawUnsafe<any[]>(
-        `SELECT
-           COALESCE(SUM(CASE WHEN a.payment_status = 'PENDING' THEN pt.amount ELSE 0 END), 0)::float as held_in_escrow,
-           COALESCE(SUM(CASE WHEN a.payment_status = 'PAID' THEN pt.amount ELSE 0 END), 0)::float as released_platform
-         FROM payment_transactions pt
-         JOIN auctions a ON a.id = pt.auction_id
-         WHERE (pt.payment_type = 'WINNING_BID' OR pt.client_reference_id LIKE 'win-%' OR (pt.payment_type = 'WALLET' AND pt.auction_id IS NOT NULL))
-           AND pt.status = 'SUCCESSFUL'
-           AND pt.created_at >= $1 AND pt.created_at <= $2`,
-        start,
-        end,
-      ),
-    ]);
-
-    const totalClosed = closedAuctions || 1;
-    const paidWinnersCount = Number(winningProceedsRow._count || 0);
-    const complianceRate = Math.min(
-      100,
-      Math.round((paidWinnersCount / totalClosed) * 100),
-    );
-    const defaultRate = Math.max(0, 100 - complianceRate);
-
-    const openDisputes = disputesRow.filter(
-      (d) => d.status === 'OPEN' || d.status === 'PENDING',
-    ).length;
-
-    return {
-      generated_at: new Date().toISOString(),
-      period: {
-        start: startDateStr,
-        end: endDateStr,
-      },
-      standards: {
-        icc_auction_guidelines: 'ICC Commission on Commercial Law & Practice §4',
-        uncitral_procurement_standards: 'UNCITRAL Model Law on Public Procurement Article 37',
-        tamper_proof_status: 'Compliant & Verified Read-Only Audit Ledger',
-      },
-      metrics: {
-        total_auctions: totalAuctions,
-        closed_auctions: closedAuctions,
-        total_bids: totalBids,
-        total_bid_fee_volume: Number(feeProceedsRow._sum.amount || 0),
-        winning_bids_total_volume: Number(winningProceedsRow._sum.amount || 0),
-        winner_payments_collected: Number(escrowRow[0]?.released_platform || 0),
-        winner_payments_held_in_escrow: Number(
-          escrowRow[0]?.held_in_escrow || 0,
-        ),
-        payment_compliance_rate_percent: complianceRate,
-        payment_default_rate_percent: defaultRate,
-        second_winners_assigned_count: secondWinnersRow,
-        total_disputes_filed: disputesRow.length,
-        unresolved_disputes: openDisputes,
-      },
-      legal_attestation:
-        'This document confirms that all reverse unique bid auctions conducted during this period complied with the transparent winner selection algorithm, non-discrimination bidding rules, automated escalation protocols, and cryptographic bid integrity standards.',
-    };
+    return this.complianceReportService.getComplianceReport(startDateStr, endDateStr);
   }
 
   private csvEscape(value: string): string {

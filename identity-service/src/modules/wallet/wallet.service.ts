@@ -4,6 +4,7 @@ import {
   Logger,
   NotFoundException,
 } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { Transaction, TransactionType } from "./entities/transaction.entity";
 import { User } from "../auth/entities/user.entity";
@@ -27,8 +28,8 @@ export class WalletService {
     userId: string,
     amount: number,
     referenceId: string,
-  ): Promise<User> {
-    return this.prisma.$transaction(async (tx: any) => {
+  ): Promise<{ id: string; wallet_balance: string | number | unknown }> {
+    return this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const existing = await tx.transaction.findFirst({
         where: { reference_id: referenceId },
       });
@@ -40,7 +41,7 @@ export class WalletService {
         return user;
       }
 
-      const rows = await tx.$queryRaw`
+      const rows = await tx.$queryRaw<Array<{ id: string; wallet_balance: string }>>`
         UPDATE users
         SET wallet_balance = wallet_balance + ${amount}
         WHERE id = ${userId}
@@ -65,8 +66,8 @@ export class WalletService {
   }
 
   async deductBidFee(userId: string, feeAmount: number): Promise<void> {
-    await this.prisma.$transaction(async (tx: any) => {
-      const rows = await tx.$queryRaw`
+    await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const rows = await tx.$queryRaw<Array<{ id: string; wallet_balance: string }>>`
         UPDATE users
         SET wallet_balance = wallet_balance - ${feeAmount}
         WHERE id = ${userId} AND wallet_balance >= ${feeAmount}
@@ -96,9 +97,9 @@ export class WalletService {
     userId: string,
     amount: number,
     referenceId: string,
-  ): Promise<User> {
-    return this.prisma.$transaction(async (tx: any) => {
-      const rows = await tx.$queryRaw`
+  ): Promise<{ id: string; wallet_balance: string | number | unknown }> {
+    return this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const rows = await tx.$queryRaw<Array<{ id: string; wallet_balance: string }>>`
         UPDATE users
         SET wallet_balance = wallet_balance + ${amount}
         WHERE id = ${userId}

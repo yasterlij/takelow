@@ -29,6 +29,8 @@ import {
 } from "lucide-react-native";
 import { useApp } from "../AppContext";
 import { CTAButton, Card } from "../components/AuctionUI";
+import { WinnerPaymentCta } from "../components/WinnerPaymentCta";
+import { WinnerStatsCard } from "../components/WinnerStatsCard";
 import { api, type ApiWinnerResult, type ApiAuctionResult } from "../api";
 import { formatCurrency } from "../mockDataV0";
 import { colors } from "../theme";
@@ -1435,37 +1437,15 @@ export function WinnerScreen() {
           ) : null}
         </ScrollView>
       </View>
-      <Card style={[s.bottomCta, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-        {winner?.winner_user_id &&
-        allWinners?.some((w: any) => w.user_id === user?.id) ? (
-          userWinnerInfo?.payment_status === "PAID" ? (
-            <CTAButton onPress={() => goBack()}>
-              <CheckCircle2 size={18} /> Payment Complete — Back Home
-            </CTAButton>
-          ) : isPaymentExpired ? (
-            <View style={{ gap: 8 }}>
-              <Text style={{ fontSize: 13, fontWeight: "600", color: colors.destructive, textAlign: "center" }}>
-                This auction is no longer eligible for payment. The payment deadline has expired.
-              </Text>
-              <CTAButton variant="outline" onPress={() => goBack()}>
-                Back to Dashboard
-              </CTAButton>
-            </View>
-          ) : !isPrimaryWinner ? (
-            <CTAButton variant="outline" onPress={() => {}}>
-              <Clock size={18} /> Waiting for higher-ranked winners
-            </CTAButton>
-          ) : (
-            <CTAButton onPress={() => go("pay-winning")}>
-              <CreditCard size={18} /> Process Payment
-            </CTAButton>
-          )
-        ) : (
-          <CTAButton variant="outline" onPress={() => goBack()}>
-            Back to Dashboard
-          </CTAButton>
-        )}
-      </Card>
+      <WinnerPaymentCta
+        hasWinner={Boolean(winner?.winner_user_id)}
+        userIsWinner={Boolean(allWinners?.some((w: any) => w.user_id === user?.id))}
+        userPaymentStatus={userWinnerInfo?.payment_status as any}
+        isPaymentExpired={isPaymentExpired}
+        isPrimaryWinner={isPrimaryWinner}
+        onPay={() => go("pay-winning")}
+        onBack={() => goBack()}
+      />
     </View>
   );
 }
