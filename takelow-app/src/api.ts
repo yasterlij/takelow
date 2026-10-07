@@ -1,7 +1,8 @@
 import { Platform } from "react-native";
 import Constants from "expo-constants";
 
-const PROD_HOST = "196.189.237.158";
+const PROD_HOST =
+  process.env.EXPO_PUBLIC_API_HOST ?? "196.189.237.158";
 const debuggerHost =
   Constants.expoConfig?.hostUri ||
   (Constants as any).manifest2?.extra?.expoGo?.debuggerHost;

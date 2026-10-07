@@ -35,7 +35,10 @@ export class WinnerService {
       return this.normalizeAmount(
         this.bidEncryptionService.decrypt(bid.encrypted_amount),
       );
-    } catch {
+    } catch (e) {
+      this.logger.warn(
+        `Failed to decrypt bid amount (encrypted_amount present): ${e instanceof Error ? e.message : String(e)}`,
+      );
       return null;
     }
   }
@@ -130,15 +133,13 @@ export class WinnerService {
     const amounts = await this.redis.zrange(uniqueKey, 0, -1);
     const freqKey = `takelow:auction:${auctionId}:frequencies`;
 
-    for (const amount of amounts) {
-      const freq = await this.redis.zscore(
-        freqKey,
-        this.normalizeAmount(amount),
-      );
-      if (freq && Number(freq) === 1) return true;
-    }
+    const scores = await Promise.all(
+      amounts.map((amount) =>
+        this.redis.zscore(freqKey, this.normalizeAmount(amount)),
+      ),
+    );
 
-    return false;
+    return scores.some((freq) => freq !== null && Number(freq) === 1);
   }
 
   private async hasUniqueBidsFromDb(auctionId: string): Promise<boolean> {

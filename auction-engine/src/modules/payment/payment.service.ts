@@ -30,8 +30,8 @@ import { BidEncryptionService } from "../common/bid-encryption.service";
 import { NotificationDispatchService } from "../worker/notification-dispatch.service";
 import { PaymentLinkService } from "./payment-link.service";
 import { PrismaService } from "../../prisma/prisma.service";
+import { PAYMENT_DEADLINE_HOURS } from "../../config/constants";
 
-const PAYMENT_DEADLINE_HOURS = 24;
 const WINNING_PAYMENT_TYPES = [PaymentType.WINNING_BID, PaymentType.WALLET];
 
 @Injectable()
@@ -596,15 +596,15 @@ export class PaymentService {
       take: 50,
     });
 
-    for (const auction of overdue) {
-      try {
-        await this.handleExpiredPayment(auction);
-      } catch (e) {
-        this.logger.error(
-          `Failed to handle expired payment for auction ${auction.id}: ${e.message}`,
-        );
-      }
-    }
+    await Promise.allSettled(
+      (overdue as Auction[]).map((auction) =>
+        this.handleExpiredPayment(auction).catch((e: unknown) =>
+          this.logger.error(
+            `Failed to handle expired payment for auction ${auction.id}: ${e instanceof Error ? e.message : String(e)}`,
+          ),
+        ),
+      ),
+    );
   }
 
   @Cron(CronExpression.EVERY_30_MINUTES)
@@ -620,45 +620,49 @@ export class PaymentService {
       `Reconciling ${pendingTransactions.length} pending payments`,
     );
 
-    for (const txn of pendingTransactions) {
-      try {
-        const transactionDate = txn.created_at.toISOString().split("T")[0];
+    await Promise.allSettled(
+      (pendingTransactions as PaymentTransaction[]).map(async (txn) => {
+        try {
+          const transactionDate = txn.created_at.toISOString().split("T")[0];
 
-        const status =
-          txn.gateway === PaymentGateway.AWASH
-            ? await this.awashService.getPaymentStatus(txn.client_reference_id)
-            : await this.sikinaService.getPaymentStatus(
-                txn.client_reference_id,
-                transactionDate,
-              );
+          const status =
+            txn.gateway === PaymentGateway.AWASH
+              ? await this.awashService.getPaymentStatus(
+                  txn.client_reference_id,
+                )
+              : await this.sikinaService.getPaymentStatus(
+                  txn.client_reference_id,
+                  transactionDate,
+                );
 
-        if (status === "SUCCESSFUL") {
-          this.logger.log(
-            `Reconciliation: payment ${txn.client_reference_id} is SUCCESSFUL`,
+          if (status === "SUCCESSFUL") {
+            this.logger.log(
+              `Reconciliation: payment ${txn.client_reference_id} is SUCCESSFUL`,
+            );
+            await this.handleSuccessfulPayment(txn.client_reference_id, "", {});
+          } else if (
+            ["FAILED", "EXPIRED", "CANCELLED", "REVOKED"].includes(status)
+          ) {
+            this.logger.log(
+              `Reconciliation: payment ${txn.client_reference_id} is ${status}`,
+            );
+            await this.paymentTransactionRepository.update(
+              { id: txn.id },
+              { status: status as PaymentTransactionStatus },
+            );
+          }
+        } catch (error) {
+          this.logger.warn(
+            `Reconciliation failed for transaction ${txn.id}: ${error.message}`,
           );
-          await this.handleSuccessfulPayment(txn.client_reference_id, "", {});
-        } else if (
-          ["FAILED", "EXPIRED", "CANCELLED", "REVOKED"].includes(status)
-        ) {
-          this.logger.log(
-            `Reconciliation: payment ${txn.client_reference_id} is ${status}`,
-          );
-          await this.paymentTransactionRepository.update(
+          await this.paymentTransactionRepository.increment(
             { id: txn.id },
-            { status: status as PaymentTransactionStatus },
+            "retry_count",
+            1,
           );
         }
-      } catch (error) {
-        this.logger.warn(
-          `Reconciliation failed for transaction ${txn.id}: ${error.message}`,
-        );
-        await this.paymentTransactionRepository.increment(
-          { id: txn.id },
-          "retry_count",
-          1,
-        );
-      }
-    }
+      }),
+    );
   }
 
   private async handleExpiredPayment(auction: Auction): Promise<void> {

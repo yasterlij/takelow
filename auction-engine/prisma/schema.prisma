@@ -162,6 +162,7 @@ model Auction {
   @@index([status])
   @@index([winner_user_id])
   @@index([end_time, id])
+  @@index([status, end_time])
   @@map("auctions")
 }
 
@@ -210,6 +211,7 @@ model Winner {
   @@index([auction_id])
   @@index([user_id])
   @@index([payment_status])
+  @@index([payment_status, payment_deadline])
   @@map("winners")
 }
 
@@ -227,6 +229,7 @@ model Transaction {
   @@index([user_id])
   @@index([reference_id])
   @@index([created_at])
+  @@index([user_id, created_at])
   @@map("transactions")
 }
 
@@ -260,6 +263,8 @@ model PaymentTransaction {
   @@index([status])
   @@index([gateway])
   @@index([awash_transaction_id])
+  @@index([auction_id, payment_type])
+  @@index([auction_id, status])
   @@map("payment_transactions")
 }
 
@@ -315,6 +320,7 @@ model AuditLog {
   @@index([actor_id])
   @@index([action])
   @@index([created_at])
+  @@index([entity_id, action, created_at])
   @@map("audit_logs")
 }
 

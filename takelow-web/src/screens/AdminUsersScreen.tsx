@@ -7,6 +7,7 @@ import { Badge, Card, CTAButton } from "../components/AuctionUI"
 import { api, type ApiUser } from "../api"
 import { formatCurrency, formatETB } from "../mockDataV0"
 import { usePagination, PaginationBar } from "../components/Pagination"
+import { toast } from "../store/toast.store"
 
 function UserDetailModal({ user, onClose, onRoleChange, onNameChange }: { user: ApiUser; onClose: () => void; onRoleChange: (id: string, role: string) => void; onNameChange: (id: string, name: string) => void }) {
   const { allBids } = useApp()
@@ -24,8 +25,13 @@ function UserDetailModal({ user, onClose, onRoleChange, onNameChange }: { user: 
     try {
       await api.updateUser(user.id, { full_name: nameValue.trim() })
       onNameChange(user.id, nameValue.trim())
-    } catch { /* silent */ }
-    setEditingName(false)
+      setEditingName(false)
+    } catch (e: unknown) {
+      toast(
+        `Failed to save name: ${e instanceof Error ? e.message : "Unknown error"}`,
+        "error",
+      )
+    }
   }
 
   return (

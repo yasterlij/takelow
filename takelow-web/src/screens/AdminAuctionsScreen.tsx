@@ -41,9 +41,11 @@ const emptySpecs = {
 
 function AuctionThumb({
   src,
+  alt,
   onClick,
 }: {
   src?: string;
+  alt?: string;
   onClick?: () => void;
 }) {
   const [err, setErr] = useState(false);
@@ -64,7 +66,7 @@ function AuctionThumb({
     >
       <img
         src={src}
-        alt=""
+        alt={alt ?? "Product image"}
         loading="lazy"
         decoding="async"
         onError={() => setErr(true)}
@@ -241,7 +243,7 @@ function ImageUploadBox({
   );
 }
 
-function ImageLightbox({ src, onClose }: { src: string; onClose: () => void }) {
+function ImageLightbox({ src, alt, onClose }: { src: string; alt?: string; onClose: () => void }) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-scale-in"
@@ -255,7 +257,7 @@ function ImageLightbox({ src, onClose }: { src: string; onClose: () => void }) {
       </button>
       <img
         src={src}
-        alt=""
+        alt={alt ?? "Product image preview"}
         loading="lazy"
         decoding="async"
         className="max-h-[85vh] max-w-[90vw] rounded-lg object-contain shadow-2xl"

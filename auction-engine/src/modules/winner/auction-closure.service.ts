@@ -15,11 +15,13 @@ import { BullMqWorker } from "../worker/bullmq.worker";
 import { BidEncryptionService } from "../common/bid-encryption.service";
 import { InjectRedis } from "../common/redis.decorator";
 import { AuctionClosureEventsService } from "./auction-closure-events.service";
+import {
+  PAYMENT_DEADLINE_HOURS,
+  AUCTION_STATE_TTL_BUFFER_SECONDS,
+} from "../../config/constants";
 
 const MAX_RETRIES = 5;
 const RETRY_DELAY_MS = 300;
-const PAYMENT_DEADLINE_HOURS = 24;
-const AUCTION_STATE_TTL_BUFFER_SECONDS = 3600;
 
 @Injectable()
 export class AuctionClosureService {
@@ -74,16 +76,16 @@ export class AuctionClosureService {
       take: 100,
     });
 
-    for (const auction of expiredAuctions) {
-      try {
-        await this.closeAuction(auction);
-      } catch (error) {
-        this.logger.error(
-          `Failed to close auction ${auction.id}: ${error.message}`,
-          error.stack,
-        );
-      }
-    }
+    await Promise.allSettled(
+      expiredAuctions.map((auction) =>
+        this.closeAuction(auction).catch((error) =>
+          this.logger.error(
+            `Failed to close auction ${auction.id}: ${error.message}`,
+            error.stack,
+          ),
+        ),
+      ),
+    );
   }
 
   private async closeAuction(auction: Auction): Promise<void> {

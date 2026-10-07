@@ -38,9 +38,9 @@ export class AuthService {
     }
 
     const user = new User();
-    user.phone_number = dto.phone_number || (null as any);
-    user.email = dto.email || (null as any);
-    user.full_name = dto.full_name || (null as any);
+    user.phone_number = dto.phone_number ?? null;
+    user.email = dto.email ?? null;
+    user.full_name = dto.full_name ?? null;
 
     if (dto.password) {
       user.password_hash = await bcrypt.hash(dto.password, 12);
@@ -185,9 +185,13 @@ export class AuthService {
     refresh_token: string;
     user: { id: string; role: string; phone_number: string };
   }> {
-    let payload: any;
+    let payload: { sub: string; phone?: string; role?: string };
     try {
-      payload = this.authTokenService.verifyRefreshToken(refreshToken);
+      payload = this.authTokenService.verifyRefreshToken(refreshToken) as {
+        sub: string;
+        phone?: string;
+        role?: string;
+      };
     } catch {
       throw new BadRequestException("Invalid refresh token");
     }

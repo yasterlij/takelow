@@ -4,8 +4,7 @@ import { Repository } from "typeorm";
 import { Auction } from "./entities/auction.entity";
 import { Bid } from "../bidding/entities/bid.entity";
 import { NotificationDispatchService } from "../worker/notification-dispatch.service";
-
-const PAYMENT_DEADLINE_HOURS = 24;
+import { PAYMENT_DEADLINE_HOURS } from "../../config/constants";
 
 @Injectable()
 export class AuctionClosureEventsService {

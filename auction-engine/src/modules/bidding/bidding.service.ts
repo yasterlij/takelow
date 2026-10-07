@@ -25,9 +25,10 @@ import {
 import { BidEncryptionService } from "../common/bid-encryption.service";
 import { NotificationDispatchService } from "../worker/notification-dispatch.service";
 import { PrismaService } from "../../prisma/prisma.service";
-
-const LOCK_TTL = 5000;
-const AUCTION_STATE_TTL_BUFFER_SECONDS = 3600;
+import {
+  AUCTION_STATE_TTL_BUFFER_SECONDS,
+  LOCK_TTL_MS as LOCK_TTL,
+} from "../../config/constants";
 
 @Injectable()
 export class BiddingService {

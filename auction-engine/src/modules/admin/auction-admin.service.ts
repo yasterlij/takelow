@@ -382,9 +382,9 @@ export class AuctionAdminService {
           )
         : new Date(baseStart.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-    for (const auctionId of dto.auction_ids) {
-      try {
-        await this.reopenAuction(
+    const outcomes = await Promise.allSettled(
+      dto.auction_ids.map((auctionId) =>
+        this.reopenAuction(
           auctionId,
           {
             start_time: baseStart.toISOString(),
@@ -392,15 +392,24 @@ export class AuctionAdminService {
             bid_fee: dto.bid_fee,
           },
           actorId,
-        );
+        ),
+      ),
+    );
+
+    for (const [i, outcome] of outcomes.entries()) {
+      const auctionId = dto.auction_ids[i];
+      if (outcome.status === "fulfilled") {
         reopened += 1;
         results.push({ id: auctionId, success: true });
-      } catch (error) {
+      } else {
         failed += 1;
         results.push({
           id: auctionId,
           success: false,
-          error: error instanceof Error ? error.message : String(error),
+          error:
+            outcome.reason instanceof Error
+              ? outcome.reason.message
+              : String(outcome.reason),
         });
       }
     }

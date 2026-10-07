@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { Gavel, Wallet, ArrowRight, Eye, EyeOff, Trophy, Sparkles, ChevronLeft, ChevronRight, TrendingDown, Users, Flame, ShieldCheck, Lock, Eye as EyeIcon, Headset, Search, CreditCard, Award, Clock, Zap, Package, CheckCircle2, Heart, Calendar, Bell } from "lucide-react"
 import { useApp } from "../AppContext"
@@ -274,19 +274,48 @@ export function HomeScreen() {
   const winnerScrollRef = useRef<HTMLDivElement>(null)
   const comingSoonScrollRef = useRef<HTMLDivElement>(null)
 
-  const activeAuctions = auctions.filter((a) => a.status !== "closed")
-  const closedAuctions = auctions.filter((a) => a.status === "closed")
-  const endingSoon = activeAuctions.filter((a) => a.status === "ending-soon" || a.timeLeft < 3600)
-  const displayHero = endingSoon.length > 0 ? endingSoon : activeAuctions
-  const heroIds = new Set(displayHero.slice(0, 10).map((a) => a.id))
-  const liveGrid = activeAuctions.filter((a) => !heroIds.has(a.id))
-
-  const bidAuctionIds = new Set(myBids.map((b) => b.auctionId))
-  const bidCategories = new Set(
-    myBids.map((b) => getAuction(b.auctionId)?.category).filter((c): c is string => !!c),
+  const activeAuctions = useMemo(
+    () => auctions.filter((a) => a.status !== "closed"),
+    [auctions],
   )
-  const suggestedAuctions = activeAuctions.filter(
-    (a) => !heroIds.has(a.id) && !bidAuctionIds.has(a.id) && bidCategories.has(a.category),
+  const closedAuctions = useMemo(
+    () => auctions.filter((a) => a.status === "closed"),
+    [auctions],
+  )
+  const endingSoon = useMemo(
+    () => activeAuctions.filter((a) => a.status === "ending-soon" || a.timeLeft < 3600),
+    [activeAuctions],
+  )
+  const displayHero = useMemo(
+    () => (endingSoon.length > 0 ? endingSoon : activeAuctions),
+    [endingSoon, activeAuctions],
+  )
+  const heroIds = useMemo(
+    () => new Set(displayHero.slice(0, 10).map((a) => a.id)),
+    [displayHero],
+  )
+  const liveGrid = useMemo(
+    () => activeAuctions.filter((a) => !heroIds.has(a.id)),
+    [activeAuctions, heroIds],
+  )
+
+  const bidAuctionIds = useMemo(
+    () => new Set(myBids.map((b) => b.auctionId)),
+    [myBids],
+  )
+  const bidCategories = useMemo(
+    () =>
+      new Set(
+        myBids.map((b) => getAuction(b.auctionId)?.category).filter((c): c is string => !!c),
+      ),
+    [myBids, getAuction],
+  )
+  const suggestedAuctions = useMemo(
+    () =>
+      activeAuctions.filter(
+        (a) => !heroIds.has(a.id) && !bidAuctionIds.has(a.id) && bidCategories.has(a.category),
+      ),
+    [activeAuctions, heroIds, bidAuctionIds, bidCategories],
   )
   const showSuggested = myBids.length > 0 && suggestedAuctions.length > 0
 

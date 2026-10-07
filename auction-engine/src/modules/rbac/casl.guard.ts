@@ -3,6 +3,7 @@ import {
   CanActivate,
   ExecutionContext,
   ForbiddenException,
+  Logger,
   SetMetadata,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
@@ -22,6 +23,8 @@ export const RequireAbility = (action: AppAction, subject: AppSubject) =>
 
 @Injectable()
 export class CaslGuard implements CanActivate {
+  private readonly logger = new Logger(CaslGuard.name);
+
   constructor(
     private reflector: Reflector,
     private prisma: PrismaService,
@@ -50,7 +53,11 @@ export class CaslGuard implements CanActivate {
                 ${granted ? 'Permission granted' : 'Permission denied'},
                 ${request.ip || null}, ${request.headers['user-agent'] || null})
       `;
-    } catch {}
+    } catch (e: unknown) {
+      this.logger.warn(
+        `Failed to record access decision for user=${user.id} action=${required.action} subject=${required.subject}: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
 
     if (!granted) {
       throw new ForbiddenException(

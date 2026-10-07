@@ -13,6 +13,7 @@ import {
   HttpStatus,
   Inject,
 } from "@nestjs/common";
+import * as crypto from "crypto";
 import { Redis } from "ioredis";
 import { AuthService } from "./auth.service";
 import { RegisterDto } from "./dto/register.dto";
@@ -144,7 +145,9 @@ export class AuthController {
   ) {
     const adapter = this.superAppRegistry.get(provider);
     return {
-      url: adapter.getAuthorizationUrl(state || Math.random().toString(36)),
+      url: adapter.getAuthorizationUrl(
+        state || crypto.randomBytes(16).toString("hex"),
+      ),
     };
   }
 
