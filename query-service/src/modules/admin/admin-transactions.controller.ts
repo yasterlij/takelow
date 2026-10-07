@@ -36,6 +36,7 @@ export class AdminTransactionsController {
     @Query('auction_id') auction_id?: string,
     @Query('user_id') user_id?: string,
     @Query('type') type?: string,
+    @Query('category') category?: string,
     @Query('status') status?: string,
     @Query('start') start?: string,
     @Query('end') end?: string,
@@ -44,7 +45,7 @@ export class AdminTransactionsController {
     @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit?: number,
   ) {
     return this.transactionsService.getAllTransactions(
-      { auction_id, user_id, type, status, start, end, search },
+      { auction_id, user_id, type, category, status, start, end, search },
       page,
       limit,
     );
@@ -112,6 +113,7 @@ export class AdminTransactionsController {
     @Query('auction_id') auction_id: string,
     @Query('user_id') user_id: string,
     @Query('type') type: string,
+    @Query('category') category: string,
     @Query('status') status: string,
     @Query('start') start: string,
     @Query('end') end: string,
@@ -122,6 +124,7 @@ export class AdminTransactionsController {
       auction_id,
       user_id,
       type,
+      category,
       status,
       start,
       end,

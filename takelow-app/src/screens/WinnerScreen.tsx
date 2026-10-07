@@ -52,7 +52,7 @@ export function WinnerScreen() {
     insets.top,
     Platform.OS === "android" ? StatusBar.currentHeight ?? 0 : 0
   );
-  const { go, selectedId, getAuction, user } = useApp();
+  const { go, goBack, selectedId, getAuction, user } = useApp();
   const isAdmin = user?.role === "admin";
   const auction = getAuction(selectedId);
   const [winner, setWinner] = useState<
@@ -205,7 +205,7 @@ export function WinnerScreen() {
           }}
         >
           <TouchableOpacity
-            onPress={() => go("home")}
+            onPress={() => goBack()}
             style={{
               width: 44,
               height: 44,
@@ -1439,7 +1439,7 @@ export function WinnerScreen() {
         {winner?.winner_user_id &&
         allWinners?.some((w: any) => w.user_id === user?.id) ? (
           userWinnerInfo?.payment_status === "PAID" ? (
-            <CTAButton onPress={() => go("home")}>
+            <CTAButton onPress={() => goBack()}>
               <CheckCircle2 size={18} /> Payment Complete — Back Home
             </CTAButton>
           ) : isPaymentExpired ? (
@@ -1447,7 +1447,7 @@ export function WinnerScreen() {
               <Text style={{ fontSize: 13, fontWeight: "600", color: colors.destructive, textAlign: "center" }}>
                 This auction is no longer eligible for payment. The payment deadline has expired.
               </Text>
-              <CTAButton variant="outline" onPress={() => go("home")}>
+              <CTAButton variant="outline" onPress={() => goBack()}>
                 Back to Dashboard
               </CTAButton>
             </View>
@@ -1461,7 +1461,7 @@ export function WinnerScreen() {
             </CTAButton>
           )
         ) : (
-          <CTAButton variant="outline" onPress={() => go("home")}>
+          <CTAButton variant="outline" onPress={() => goBack()}>
             Back to Dashboard
           </CTAButton>
         )}

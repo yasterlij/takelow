@@ -10,7 +10,7 @@ import { colors } from '../theme'
 export function AdminDashboardScreen() {
   const insets = useSafeAreaInsets()
   const topInset = Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 0)
-  const { go, allBids, user, users, auctions } = useApp()
+  const { go, goBack, allBids, user, users, auctions } = useApp()
   const active = auctions.filter((a) => a.status !== 'closed')
   const closed = auctions.filter((a) => a.status === 'closed')
   const extended = auctions.filter((a) => a.endTime && new Date(a.endTime).getTime() > Date.now() + 86400000)
@@ -217,7 +217,7 @@ export function AdminDashboardScreen() {
         </View>
         <View style={{ marginTop: 12, flexDirection: 'row', gap: 12 }}>
           <View style={{ flex: 1 }}><CTAButton variant="primary" onPress={() => go('admin-auctions')}>+ New Auction</CTAButton></View>
-          <View style={{ flex: 1 }}><CTAButton variant="outline" onPress={() => go('home')}>Back to App</CTAButton></View>
+          <View style={{ flex: 1 }}><CTAButton variant="outline" onPress={() => goBack()}>Back to App</CTAButton></View>
         </View>
       </ScrollView>
     </View>

@@ -107,6 +107,9 @@ type AppState = {
   allBids: PlacedBid[];
   auctions: Auction[];
   auctionsLoading: boolean;
+  selectedCategory: string;
+  setSelectedCategory: (cat: string) => void;
+  selectCategory: (cat: string) => void;
   authError: string | null;
   sessionEndReason: SessionExpireReason | null;
   go: (view: View) => void;
@@ -298,6 +301,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [allBids, setAllBids] = useState<PlacedBid[]>([]);
   const [auctions, setAuctions] = useState<Auction[]>([]);
   const [auctionsLoading, setAuctionsLoading] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>("All");
   useAuctionSocket(selectedId, (payload) => {
     setAuctions((prev) => applySocketUpdate(prev, payload));
   });
@@ -560,6 +564,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       navigate(next);
     },
     [user, navigate],
+  );
+
+  const selectCategory = useCallback(
+    (cat: string) => {
+      setSelectedCategory(cat);
+      navigate("auctions");
+    },
+    [navigate],
   );
 
   const selectAuction = useCallback(
@@ -1144,6 +1156,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       allBids,
       auctions,
       auctionsLoading,
+      selectedCategory,
+      setSelectedCategory,
+      selectCategory,
       authError,
       sessionEndReason,
       go,
@@ -1202,6 +1217,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       allBids,
       auctions,
       auctionsLoading,
+      selectedCategory,
+      setSelectedCategory,
+      selectCategory,
       authError,
       sessionEndReason,
       go,

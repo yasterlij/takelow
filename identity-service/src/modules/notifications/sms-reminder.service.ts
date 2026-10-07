@@ -110,44 +110,47 @@ export class SmsReminderService {
         return;
       }
 
-      for (const auction of endingAuctions) {
-        try {
-          const bidders = await this.prisma.bid.findMany({
-            where: { auction_id: auction.id },
-            select: {
-              user: { select: { id: true, phone_number: true } },
-            },
-            distinct: ['user_id'],
-          });
+      await Promise.allSettled(
+        endingAuctions.map(async (auction) => {
+          try {
+            const bidders = await this.prisma.bid.findMany({
+              where: { auction_id: auction.id },
+              select: {
+                user: { select: { id: true, phone_number: true } },
+              },
+              distinct: ['user_id'],
+            });
 
-          if (bidders.length === 0) continue;
+            if (bidders.length === 0) return;
 
-          const productName = auction.product?.name || 'an auction';
-
-          for (const bidder of bidders) {
-            const phone = bidder.user?.phone_number;
-            if (!phone) continue;
-
+            const productName = auction.product?.name || 'an auction';
             const message = `Hurry! The "${productName}" auction ends in ${ENDING_SOON_MINUTES} minutes. Place your bid now on TakeLow!`;
 
-            try {
-              await this.notificationService.sendSms(phone, message);
-            } catch (error: any) {
-              this.logger.error(
-                `Failed to send ending-soon SMS to bidder ${bidder.user.id}: ${error.message}`,
-              );
-            }
-          }
+            await Promise.allSettled(
+              bidders.map(async (bidder) => {
+                const phone = bidder.user?.phone_number;
+                if (!phone || !bidder.user?.id) return;
 
-          this.logger.log(
-            `Sent ending-soon SMS to ${bidders.length} bidders for auction ${auction.id}`,
-          );
-        } catch (error: any) {
-          this.logger.error(
-            `Failed to process ending-soon SMS for auction ${auction.id}: ${error.message}`,
-          );
-        }
-      }
+                try {
+                  await this.notificationService.sendSms(phone, message);
+                } catch (error: any) {
+                  this.logger.error(
+                    `Failed to send ending-soon SMS to bidder ${bidder.user.id}: ${error.message}`,
+                  );
+                }
+              }),
+            );
+
+            this.logger.log(
+              `Sent ending-soon SMS to ${bidders.length} bidders for auction ${auction.id}`,
+            );
+          } catch (error: any) {
+            this.logger.error(
+              `Failed to process ending-soon SMS for auction ${auction.id}: ${error.message}`,
+            );
+          }
+        }),
+      );
     } catch (error: any) {
       this.logger.error(
         `Failed to process auction ending-soon SMS: ${error.message}`,

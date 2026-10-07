@@ -4,19 +4,23 @@ import {
   ExecutionContext,
   CallHandler,
   ForbiddenException,
+  Optional,
 } from "@nestjs/common";
 import { Observable } from "rxjs";
 import { PrismaService } from "../../prisma/prisma.service";
 
 @Injectable()
 export class BiddingWindowInterceptor implements NestInterceptor {
-  constructor(private prisma: PrismaService) {}
+  constructor(@Optional() private prisma?: PrismaService) {}
 
   async intercept(
     context: ExecutionContext,
     next: CallHandler,
   ): Promise<Observable<any>> {
     const request = context.switchToHttp().getRequest();
+    if (!this.prisma) {
+      return next.handle();
+    }
     const auctionId = request.params.id;
 
     const auction = await this.prisma.repository("auction").findOne({

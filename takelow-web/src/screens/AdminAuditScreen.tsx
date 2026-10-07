@@ -159,6 +159,8 @@ export function AdminAuditScreen() {
             rows={filtered}
             rowKey={(l) => l.id}
             loading={loading}
+            showPagination
+            pageSize={15}
             empty={{ icon: <ScrollText className="size-6" />, title: "No audit logs", message: "Security events will appear here" }}
           />
         </motion.div>

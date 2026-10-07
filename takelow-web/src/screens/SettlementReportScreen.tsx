@@ -16,6 +16,10 @@ import {
   ShieldCheck,
   CreditCard,
   FileSpreadsheet,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
 } from "lucide-react"
 import { AdminLayout } from "../components/AdminLayout"
 import { StatCard } from "../components/StatCard"
@@ -33,6 +37,8 @@ export function SettlementReportScreen() {
   const [report, setReport] = useState<ApiSettlementReport | null>(null)
   const [loading, setLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
   const dateBounds = useMemo(() => {
     const end = new Date()
@@ -526,40 +532,113 @@ export function SettlementReportScreen() {
                     </td>
                   </tr>
                 ) : (
-                  report.details.map((row, i) => (
-                    <tr key={row.auction_id || i} className="hover:bg-neutral-50/80 transition-colors">
-                      <td className="px-4 py-3">
-                        <div className="font-semibold text-foreground">{row.product_name}</div>
-                        <div className="font-mono text-[10px] text-neutral-400">{row.auction_id.slice(0, 8)}</div>
-                      </td>
-                      <td className="px-4 py-3 font-semibold text-foreground tabular-nums">
-                        {formatCurrency(row.winning_amount)}
-                      </td>
-                      <td className="px-4 py-3 text-neutral-600 tabular-nums">
-                        {formatCurrency(row.participation_fee_revenue)}
-                      </td>
-                      <td className="px-4 py-3 font-semibold text-primary tabular-nums">
-                        {formatCurrency(row.platform_share)}
-                      </td>
-                      <td className="px-4 py-3 font-semibold text-emerald-600 tabular-nums">
-                        {formatCurrency(row.net_to_seller)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
-                          row.payment_status === "PAID"
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                            : "bg-amber-50 text-amber-700 border border-amber-200"
-                        }`}>
-                          <CheckCircle2 className="size-3" />
-                          {row.payment_status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
+                  report.details
+                    .slice((page - 1) * pageSize, page * pageSize)
+                    .map((row, i) => (
+                      <tr key={row.auction_id || i} className="hover:bg-neutral-50/80 transition-colors">
+                        <td className="px-4 py-3">
+                          <div className="font-semibold text-foreground">{row.product_name}</div>
+                          <div className="font-mono text-[10px] text-neutral-400">{row.auction_id.slice(0, 8)}</div>
+                        </td>
+                        <td className="px-4 py-3 font-semibold text-foreground tabular-nums">
+                          {formatCurrency(row.winning_amount)}
+                        </td>
+                        <td className="px-4 py-3 text-neutral-600 tabular-nums">
+                          {formatCurrency(row.participation_fee_revenue)}
+                        </td>
+                        <td className="px-4 py-3 font-semibold text-primary tabular-nums">
+                          {formatCurrency(row.platform_share)}
+                        </td>
+                        <td className="px-4 py-3 font-semibold text-emerald-600 tabular-nums">
+                          {formatCurrency(row.net_to_seller)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                            row.payment_status === "PAID"
+                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              : "bg-amber-50 text-amber-700 border border-amber-200"
+                          }`}>
+                            <CheckCircle2 className="size-3" />
+                            {row.payment_status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
                 )}
               </tbody>
             </table>
           </div>
+
+          {/* Pagination bar */}
+          {report?.details && report.details.length > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-border/60 px-4 py-3 text-xs text-neutral-600 bg-white">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="font-medium text-neutral-500">
+                  Showing <strong className="text-foreground">{(page - 1) * pageSize + 1}</strong>–<strong className="text-foreground">{Math.min(page * pageSize, report.details.length)}</strong> of{" "}
+                  <strong className="text-foreground">{report.details.length}</strong> auctions
+                </span>
+
+                <div className="flex items-center gap-1.5 pl-3 border-l border-border/60">
+                  <span className="text-neutral-400 font-medium">Rows:</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => {
+                      setPageSize(Number(e.target.value))
+                      setPage(1)
+                    }}
+                    className="h-7 rounded-lg border border-border/80 bg-neutral-50 px-2 text-xs font-bold text-foreground outline-none transition-colors hover:bg-white focus:border-primary"
+                  >
+                    <option value={5}>5</option>
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                  </select>
+                </div>
+              </div>
+
+              {Math.ceil(report.details.length / pageSize) > 1 && (
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setPage(1)}
+                    disabled={page <= 1}
+                    title="First Page"
+                    className="p-1.5 rounded-lg border border-border/60 hover:bg-neutral-100 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                  >
+                    <ChevronsLeft className="size-3.5 text-neutral-600" />
+                  </button>
+                  <button
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page <= 1}
+                    title="Previous Page"
+                    className="p-1.5 rounded-lg border border-border/60 hover:bg-neutral-100 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                  >
+                    <ChevronLeft className="size-3.5 text-neutral-600" />
+                  </button>
+
+                  <span className="px-2 font-bold text-neutral-700">
+                    Page {page} of {Math.ceil(report.details.length / pageSize)}
+                  </span>
+
+                  <button
+                    onClick={() => setPage((p) => Math.min(Math.ceil(report.details.length / pageSize), p + 1))}
+                    disabled={page >= Math.ceil(report.details.length / pageSize)}
+                    title="Next Page"
+                    className="p-1.5 rounded-lg border border-border/60 hover:bg-neutral-100 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                  >
+                    <ChevronRight className="size-3.5 text-neutral-600" />
+                  </button>
+                  <button
+                    onClick={() => setPage(Math.ceil(report.details.length / pageSize))}
+                    disabled={page >= Math.ceil(report.details.length / pageSize)}
+                    title="Last Page"
+                    className="p-1.5 rounded-lg border border-border/60 hover:bg-neutral-100 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                  >
+                    <ChevronsRight className="size-3.5 text-neutral-600" />
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </AdminLayout>

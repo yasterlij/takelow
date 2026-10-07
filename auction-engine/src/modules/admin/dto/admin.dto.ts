@@ -12,7 +12,7 @@ import {
   ArrayMaxSize,
   IsUUID,
 } from "class-validator";
-import { AuctionStatus } from "@prisma/client";
+import { AuctionStatus } from "../../winner/entities/auction.entity";
 
 export class CreateProductDto {
   @IsString()
@@ -39,11 +39,6 @@ export class CreateProductDto {
   @IsNumber()
   @Min(0)
   current_market_price: number;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(255)
-  brand?: string;
 
   @IsOptional()
   @IsObject()
@@ -79,11 +74,6 @@ export class UpdateProductDto {
   current_market_price?: number;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(255)
-  brand?: string;
-
-  @IsOptional()
   @IsObject()
   specs?: Record<string, string>;
 }
@@ -110,14 +100,6 @@ export class CreateAuctionDto {
   @IsNumber()
   @Min(0)
   bid_fee?: number;
-
-  @IsOptional()
-  @IsNumber()
-  payment_deadline_hours?: number;
-
-  @IsOptional()
-  @IsString()
-  escalation_rule?: string;
 }
 
 export class UpdateAuctionDto {
@@ -147,87 +129,6 @@ export class UpdateAuctionDto {
   bid_fee?: number;
 
   @IsOptional()
-  @IsNumber()
-  payment_deadline_hours?: number;
-
-  @IsOptional()
-  @IsString()
-  escalation_rule?: string;
-
-  @IsOptional()
   @IsEnum(AuctionStatus)
   status?: AuctionStatus;
 }
-
-export class ReopenAuctionDto {
-  @IsDateString()
-  start_time: string;
-
-  @IsDateString()
-  end_time: string;
-
-  @IsOptional()
-  @IsNumber()
-  min_bid?: number;
-
-  @IsOptional()
-  @IsNumber()
-  max_bid?: number;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  bid_fee?: number;
-
-  @IsOptional()
-  @IsString()
-  @MinLength(2)
-  @MaxLength(120)
-  name?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(80)
-  category?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(2000)
-  description?: string;
-
-  @IsOptional()
-  @IsArray()
-  @ArrayMaxSize(8)
-  @IsString({ each: true })
-  image_urls?: string[];
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  current_market_price?: number;
-}
-
-export class BulkReopenAuctionsDto {
-  @IsArray()
-  @IsUUID(4, { each: true })
-  auction_ids: string[];
-
-  @IsOptional()
-  @IsDateString()
-  start_time?: string;
-
-  @IsOptional()
-  @IsDateString()
-  end_time?: string;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  bid_fee?: number;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(1)
-  duration_days?: number;
-}
-

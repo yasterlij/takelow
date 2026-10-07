@@ -10,142 +10,38 @@ import {
   Req,
   HttpCode,
   HttpStatus,
+  NotFoundException,
   Logger,
-  BadRequestException,
 } from "@nestjs/common";
 import { BiddingService } from "./bidding.service";
 import { BidDto } from "./dto/bid.dto";
 import { BiddingWindowInterceptor } from "../common/bidding-window.interceptor";
 import { ThrottleGuard } from "../common/throttle.guard";
 import { NonceGuard } from "../common/nonce.guard";
+import { WinnerService } from "../winner/winner.service";
 import { BidEncryptionService } from "../common/bid-encryption.service";
 import { JwtAuthGuard } from "../common/jwt-auth.guard";
-import { PrismaService } from "../../prisma/prisma.service";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { Auction, AuctionStatus } from "../winner/entities/auction.entity";
+import { Winner } from "../winner/entities/winner.entity";
+import { Bid } from "../bidding/entities/bid.entity";
 import { NotificationDispatchService } from "../worker/notification-dispatch.service";
-import { AuctionReviewService } from "../admin/auction-review.service";
-import { ApiTags, ApiOperation, ApiBearerAuth } from "@nestjs/swagger";
 
-@ApiTags("bidding")
 @Controller("auctions")
 export class BiddingController {
   private readonly logger = new Logger(BiddingController.name);
 
-  private isLegacyBidSchemaError(error: unknown): boolean {
-    const message =
-      error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
-
-    const isSchemaError =
-      message.includes("does not exist") ||
-      message.includes("unknown column") ||
-      message.includes("no such column");
-
-    return (
-      isSchemaError &&
-      (message.includes("encrypted_amount") || message.includes("ticket_number"))
-    );
-  }
-
-  private normalizeBoolean(value: unknown): boolean {
-    if (typeof value === "boolean") return value;
-    if (typeof value === "number") return value !== 0;
-    if (typeof value === "string") {
-      const normalized = value.toLowerCase();
-      return normalized === "true" || normalized === "1" || normalized === "t";
-    }
-    return value != null;
-  }
-
-  private mapLegacyBidRow(row: Record<string, unknown>): any {
-    return {
-      id: String(row.bid_id ?? ""),
-      user_id: String(row.bid_user_id ?? ""),
-      auction_id: String(row.bid_auction_id ?? ""),
-      amount: Number(row.bid_amount ?? 0),
-      bid_time: row.bid_bid_time as Date,
-      service_fee_paid: this.normalizeBoolean(row.bid_service_fee_paid),
-      ticket_number: "",
-      encrypted_amount: "",
-    };
-  }
-
-  private async loadUserBids(auctionId: string, userId: string): Promise<any[]> {
-    try {
-      return await this.prisma.repository("bid").find({
-        where: { auction_id: auctionId, user_id: userId },
-        order: { bid_time: "DESC" },
-      });
-    } catch (e) {
-      if (!this.isLegacyBidSchemaError(e)) {
-        throw e;
-      }
-
-      this.logger.warn(
-        `Legacy bid schema detected for auction=${auctionId} user=${userId}, falling back to base bid columns: ${e.message}`,
-      );
-
-      const rows = await this.prisma
-        .repository("bid")
-        .createQueryBuilder("bid")
-        .select(
-          "bid.id",
-          "bid.user_id",
-          "bid.auction_id",
-          "bid.amount",
-          "bid.bid_time",
-          "bid.service_fee_paid",
-        )
-        .where({ auction_id: auctionId })
-        .andWhere({ user_id: userId })
-        .orderBy("bid.bid_time", "DESC")
-        .getRawMany();
-
-      return rows.map((row) => this.mapLegacyBidRow(row));
-    }
-  }
-
-  private async loadLatestUserBid(
-    auctionId: string,
-    userId: string,
-  ): Promise<any | null> {
-    try {
-      return await this.prisma.repository("bid").findOne({
-        where: { auction_id: auctionId, user_id: userId },
-        order: { bid_time: "DESC" },
-      });
-    } catch (e) {
-      if (!this.isLegacyBidSchemaError(e)) {
-        throw e;
-      }
-
-      this.logger.warn(
-        `Legacy bid schema detected for latest bid auction=${auctionId} user=${userId}, falling back to base bid columns: ${e.message}`,
-      );
-
-      const row = await this.prisma
-        .repository("bid")
-        .createQueryBuilder("bid")
-        .select(
-          "bid.id",
-          "bid.user_id",
-          "bid.auction_id",
-          "bid.amount",
-          "bid.bid_time",
-          "bid.service_fee_paid",
-        )
-        .where({ auction_id: auctionId })
-        .andWhere({ user_id: userId })
-        .orderBy("bid.bid_time", "DESC")
-        .getRawOne();
-
-      return row ? this.mapLegacyBidRow(row) : null;
-    }
-  }
-
   constructor(
     private biddingService: BiddingService,
-    private auctionReviewService: AuctionReviewService,
+    private winnerService: WinnerService,
     private bidEncryptionService: BidEncryptionService,
-    private prisma: PrismaService,
+    @InjectRepository(Auction)
+    private auctionRepository: Repository<Auction>,
+    @InjectRepository(Bid)
+    private bidRepository: Repository<Bid>,
+    @InjectRepository(Winner)
+    private winnerRepository: Repository<Winner>,
     private notificationDispatchService: NotificationDispatchService,
   ) {}
 
@@ -153,8 +49,6 @@ export class BiddingController {
   @UseInterceptors(BiddingWindowInterceptor)
   @UseGuards(JwtAuthGuard, ThrottleGuard, NonceGuard)
   @HttpCode(HttpStatus.ACCEPTED)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: "Place a bid on an auction" })
   async placeBid(
     @Param("id") auctionId: string,
     @Body() dto: BidDto,
@@ -163,12 +57,6 @@ export class BiddingController {
     const { amount } = dto;
     const user = req.user;
     const auction = req.auction;
-
-    if (!user?.tc_accepted) {
-      throw new BadRequestException(
-        "You must accept Terms & Conditions before bidding",
-      );
-    }
 
     const ticketNumber = `BID_${crypto.randomBytes(6).toString("hex")}`;
 
@@ -193,10 +81,11 @@ export class BiddingController {
 
   @Get(":id/my-bids")
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: "Get my bids for an auction" })
   async getMyBids(@Param("id") auctionId: string, @Req() req: any) {
-    const bids = await this.loadUserBids(auctionId, req.user.id);
+    const bids = await this.bidRepository.find({
+      where: { auction_id: auctionId, user_id: req.user.id },
+      order: { bid_time: "DESC" },
+    });
     return {
       auction_id: auctionId,
       bids: bids.map((b) => ({
@@ -209,16 +98,62 @@ export class BiddingController {
 
   @Get(":id/result")
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: "Get auction result" })
   async getAuctionResult(@Param("id") auctionId: string, @Req() req: any) {
-    const { bids: _bids, ...result } =
-      await this.auctionReviewService.drawWinner(auctionId);
+    const auction = await this.auctionRepository.findOne({
+      where: { id: auctionId },
+      relations: ["product"],
+    });
+    if (!auction) throw new NotFoundException("Auction not found");
 
-    const userBid = await this.loadLatestUserBid(auctionId, req.user.id);
+    const stats = await this.winnerService.getAuctionStats(auctionId);
+    const { winners } = await this.winnerService.calculateWinners(auctionId);
+
+    const userBid = await this.bidRepository.findOne({
+      where: { auction_id: auctionId, user_id: req.user.id },
+      order: { bid_time: "DESC" },
+    });
+
+    const persistedWinners = await this.winnerRepository.find({
+      where: { auction_id: auctionId },
+      order: { rank: "ASC" },
+    });
+
+    const allWinners = await Promise.all(
+      (persistedWinners.length > 0 ? persistedWinners : winners).map(
+        async (w: any) => {
+          const info = await this.resolveWinnerUserInfo(w.user_id || w.userId);
+          return {
+            user_id: w.user_id || w.userId,
+            amount: w.amount,
+            rank: w.rank,
+            payment_status: w.payment_status,
+            payment_deadline: w.payment_deadline,
+            name: info?.name || null,
+            phone: info?.phone || null,
+          };
+        },
+      ),
+    );
+
+    const primaryWinnerInfo = auction.winner_user_id
+      ? await this.resolveWinnerUserInfo(auction.winner_user_id)
+      : null;
 
     return {
-      ...result,
+      id: auction.id,
+      product: auction.product,
+      status: auction.status,
+      winner_user_id: auction.winner_user_id,
+      winner_name: primaryWinnerInfo?.name || null,
+      winner_phone: primaryWinnerInfo?.phone || null,
+      winning_bid_amount:
+        auction.winning_bid_amount ??
+        (winners.length > 0 ? winners[0].amount : null),
+      total_bids: stats.totalBids,
+      unique_bidders: stats.uniqueBidders,
+      lowest_unique_bid: stats.lowestUniqueBid,
+      all_winners: allWinners,
+      winners_count: allWinners.length,
       my_bid: userBid
         ? {
             amount: this.resolveBidAmount(userBid),
@@ -228,6 +163,9 @@ export class BiddingController {
             service_fee_paid: userBid.service_fee_paid,
           }
         : null,
+      payment_status: auction.payment_status,
+      payment_deadline: auction.payment_deadline,
+      created_at: auction.created_at,
     };
   }
 
@@ -252,7 +190,34 @@ export class BiddingController {
     }
   }
 
-  private resolveBidAmount(bid: any): number {
+  private async resolveWinnerUserInfo(
+    userId: string | null,
+  ): Promise<{ name: string | null; phone: string | null } | null> {
+    if (!userId) return null;
+    try {
+      const internalHeaders: Record<string, string> = {};
+      const internalApiKey = process.env.INTERNAL_API_KEY || "";
+      if (internalApiKey)
+        internalHeaders["x-internal-api-key"] = internalApiKey;
+      const res = await fetch(
+        `http://identity-service:3000/api/v1/wallet/user/${userId}/internal`,
+        { headers: internalHeaders },
+      );
+      if (!res.ok) return null;
+      const data = await res.json();
+      return {
+        name: data.full_name || data.phone_number || null,
+        phone: data.phone_number || null,
+      };
+    } catch (e) {
+      this.logger.warn(
+        `Failed to resolve winner info for ${userId}: ${e.message}`,
+      );
+      return null;
+    }
+  }
+
+  private resolveBidAmount(bid: Bid): number {
     if (bid.amount !== 0 || !bid.encrypted_amount) return Number(bid.amount);
     try {
       return Number(this.bidEncryptionService.decrypt(bid.encrypted_amount));

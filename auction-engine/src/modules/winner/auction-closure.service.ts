@@ -1,9 +1,16 @@
 import { Injectable, Logger, BadRequestException } from "@nestjs/common";
 import { Redis } from "ioredis";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, LessThan } from "typeorm";
 import { Cron, CronExpression } from "@nestjs/schedule";
-import { PrismaService } from "../../prisma/prisma.service";
-import { PrismaRepository } from "../../prisma/prisma-repository";
+import {
+  Auction,
+  AuctionStatus as AS,
+  PaymentStatus,
+} from "./entities/auction.entity";
+import { Winner, WinnerPaymentStatus } from "./entities/winner.entity";
 import { WinnerService } from "./winner.service";
+import { Bid } from "../bidding/entities/bid.entity";
 import { BullMqWorker } from "../worker/bullmq.worker";
 import { BidEncryptionService } from "../common/bid-encryption.service";
 import { InjectRedis } from "../common/redis.decorator";
@@ -11,7 +18,7 @@ import { AuctionClosureEventsService } from "./auction-closure-events.service";
 
 const MAX_RETRIES = 5;
 const RETRY_DELAY_MS = 300;
-const PAYMENT_DEADLINE_HOURS = Number(process.env.PAYMENT_DEADLINE_HOURS) || 30 * 24;
+const PAYMENT_DEADLINE_HOURS = 24;
 const AUCTION_STATE_TTL_BUFFER_SECONDS = 3600;
 
 @Injectable()
@@ -42,7 +49,12 @@ export class AuctionClosureService {
   }
 
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectRepository(Auction)
+    private auctionRepository: Repository<Auction>,
+    @InjectRepository(Bid)
+    private bidRepository: Repository<Bid>,
+    @InjectRepository(Winner)
+    private winnerRepository: Repository<Winner>,
     private winnerService: WinnerService,
     private bullMqWorker: BullMqWorker,
     private bidEncryptionService: BidEncryptionService,
@@ -54,10 +66,10 @@ export class AuctionClosureService {
   async closeExpiredAuctions(): Promise<void> {
     const now = new Date();
 
-    const expiredAuctions = await this.prisma.repository("auction").find({
+    const expiredAuctions = await this.auctionRepository.find({
       where: {
-        status: "ACTIVE",
-        end_time: { lt: now },
+        status: AS.ACTIVE,
+        end_time: LessThan(now),
       },
       take: 100,
     });
@@ -74,7 +86,7 @@ export class AuctionClosureService {
     }
   }
 
-  private async closeAuction(auction: any): Promise<void> {
+  private async closeAuction(auction: Auction): Promise<void> {
     await this.bullMqWorker.flushAuction(auction.id);
     const { winningAmounts, totalBids, winners } =
       await this.winnerService.calculateWinners(auction.id);
@@ -86,7 +98,7 @@ export class AuctionClosureService {
     ) {
       const extendMs = 24 * 60 * 60 * 1000;
       auction.end_time = new Date(Date.now() + extendMs);
-      await this.prisma.repository("auction").save(auction);
+      await this.auctionRepository.save(auction);
       await this.refreshAuctionRedisTtl(auction.id, auction.end_time);
       this.logger.log(
         `Auction ${auction.id}: Only ${totalBids}/${auction.min_bid} bids, extended 24h`,
@@ -104,7 +116,7 @@ export class AuctionClosureService {
     if (totalBids > 0 && winners.length === 0) {
       auction.extensions = (auction.extensions || 0) + 1;
       auction.end_time = new Date(Date.now() + 24 * 60 * 60 * 1000);
-      await this.prisma.repository("auction").save(auction);
+      await this.auctionRepository.save(auction);
       await this.refreshAuctionRedisTtl(auction.id, auction.end_time);
       this.logger.log(
         `Auction ${auction.id}: No unique bids among ${totalBids} bids (extension #${auction.extensions}), extended 24h for fair play`,
@@ -119,95 +131,101 @@ export class AuctionClosureService {
       return;
     }
 
+    const queryRunner =
+      this.auctionRepository.manager.connection.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
     try {
-      await this.prisma.$transaction(async (tx) => {
-        const auctionRepo = new PrismaRepository(tx as any, "auction");
-        const bidRepo = new PrismaRepository(tx as any, "bid");
-        if (totalBids === 0) {
-          auction.status = "EXPIRED";
-          this.logger.log(`Auction ${auction.id}: No bids, expired`);
-          await auctionRepo.save(auction);
-        } else if (winners.length > 0) {
-          const winningBids: any[] = [];
-          for (const w of winners) {
-            const bid = await this.findWinBidWithRetry(
-              bidRepo,
-              auction.id,
-              w.amount,
-              w.userId,
-            );
-            if (bid) winningBids.push(bid);
-          }
-
-          if (winningBids.length === 0) {
-            auction.status = "EXPIRED";
-            this.logger.warn(
-              `Auction ${auction.id}: No winning bids found in DB, expired`,
-            );
-            await auctionRepo.save(auction);
-          } else {
-            const deadlineHours =
-              Number(auction.payment_deadline_hours) || PAYMENT_DEADLINE_HOURS;
-            const paymentDeadline = new Date(
-              Date.now() + deadlineHours * 60 * 60 * 1000,
-            );
-
-            auction.winner_user_id = winningBids[0].user_id;
-            const winAmount =
-              Number(winningBids[0].amount) === 0 &&
-              winningBids[0].encrypted_amount
-                ? this.normalizeAmount(
-                    this.bidEncryptionService.decrypt(
-                      winningBids[0].encrypted_amount,
-                    ),
-                  )
-                : this.normalizeAmount(winningBids[0].amount);
-            auction.winning_bid_amount = Number(winAmount);
-            auction.status = "CLOSED";
-            auction.payment_status = "PENDING";
-            auction.payment_deadline = paymentDeadline;
-
-            await auctionRepo.save(auction);
-
-            const winnerRepo = new PrismaRepository(tx as any, "winner");
-            const winnerEntities = await this.winnerService.persistWinners(
-              auction.id,
-              winners,
-              paymentDeadline,
-              { repository: (model: any) => new PrismaRepository(tx as any, model) },
-            );
-
-            this.logger.log(
-              `Auction ${auction.id}: CLOSED with ${winnerEntities.length} winner(s). ` +
-                `Amounts: [${winners.map((w) => w.amount).join(", ")}]`,
-            );
-
-            this.closureEventsService
-              .logClosureEvent(auction.id, "AUTO_CLOSE", winners)
-              .catch((e) =>
-                this.logger.warn(`Failed to log closure event: ${e.message}`),
-              );
-            this.closureEventsService
-              .notifyWinners(auction, winners)
-              .catch((e) =>
-                this.logger.warn(
-                  `Failed to send winner notifications: ${e.message}`,
-                ),
-              );
-          }
-        } else {
-          auction.status = "EXPIRED";
-          this.logger.log(
-            `Auction ${auction.id}: All bid amounts duplicated, expired`,
+      if (totalBids === 0) {
+        auction.status = AS.EXPIRED;
+        this.logger.log(`Auction ${auction.id}: No bids, expired`);
+        await queryRunner.manager.save(auction);
+        await queryRunner.commitTransaction();
+      } else if (winners.length > 0) {
+        const winningBids: Bid[] = [];
+        for (const w of winners) {
+          const bid = await this.findWinBidWithRetry(
+            queryRunner,
+            auction.id,
+            w.amount,
+            w.userId,
           );
-          await auctionRepo.save(auction);
+          if (bid) winningBids.push(bid);
         }
-      });
+
+        if (winningBids.length === 0) {
+          auction.status = AS.EXPIRED;
+          this.logger.warn(
+            `Auction ${auction.id}: No winning bids found in DB, expired`,
+          );
+          await queryRunner.manager.save(auction);
+          await queryRunner.commitTransaction();
+        } else {
+          const paymentDeadline = new Date(
+            Date.now() + PAYMENT_DEADLINE_HOURS * 60 * 60 * 1000,
+          );
+
+          auction.winner_user_id = winningBids[0].user_id;
+          const winAmount =
+            Number(winningBids[0].amount) === 0 &&
+            winningBids[0].encrypted_amount
+              ? this.normalizeAmount(
+                  this.bidEncryptionService.decrypt(
+                    winningBids[0].encrypted_amount,
+                  ),
+                )
+              : this.normalizeAmount(winningBids[0].amount);
+          auction.winning_bid_amount = Number(winAmount);
+          auction.status = AS.CLOSED;
+          auction.payment_status = PaymentStatus.PENDING;
+          auction.payment_deadline = paymentDeadline;
+
+          await queryRunner.manager.save(auction);
+
+          const winnerEntities = await this.winnerService.persistWinners(
+            auction.id,
+            winners,
+            paymentDeadline,
+            queryRunner.manager,
+          );
+
+          await queryRunner.commitTransaction();
+
+          this.logger.log(
+            `Auction ${auction.id}: CLOSED with ${winnerEntities.length} winner(s). ` +
+              `Amounts: [${winners.map((w) => w.amount).join(", ")}]`,
+          );
+
+          this.closureEventsService
+            .logClosureEvent(auction.id, "AUTO_CLOSE", winners)
+            .catch((e) =>
+              this.logger.warn(`Failed to log closure event: ${e.message}`),
+            );
+          this.closureEventsService
+            .notifyWinners(auction, winners)
+            .catch((e) =>
+              this.logger.warn(
+                `Failed to send winner notifications: ${e.message}`,
+              ),
+            );
+        }
+      } else {
+        auction.status = AS.EXPIRED;
+        this.logger.log(
+          `Auction ${auction.id}: All bid amounts duplicated, expired`,
+        );
+        await queryRunner.manager.save(auction);
+        await queryRunner.commitTransaction();
+      }
     } catch (error) {
+      await queryRunner.rollbackTransaction();
       this.logger.error(
         `Transaction failed for auction ${auction.id}: ${error.message}`,
       );
       throw error;
+    } finally {
+      await queryRunner.release();
     }
 
     await this.winnerService.cleanupAuctionKeys(auction.id);
@@ -216,19 +234,19 @@ export class AuctionClosureService {
   async closeSingleAuction(
     auctionId: string,
     actorId?: string,
-  ): Promise<any> {
-    const auction = await this.prisma.repository("auction").findOne({
+  ): Promise<Auction> {
+    const auction = await this.auctionRepository.findOne({
       where: { id: auctionId },
     });
     if (!auction) throw new Error(`Auction ${auctionId} not found`);
-    if (auction.status !== "ACTIVE")
+    if (auction.status !== AS.ACTIVE)
       throw new Error(
         `Auction ${auctionId} is not active (status: ${auction.status})`,
       );
 
     await this.bullMqWorker.flushAuction(auction.id);
 
-    const totalBids = await this.prisma.repository("bid").count({
+    const totalBids = await this.bidRepository.count({
       where: { auction_id: auctionId },
     });
     const hasUnique = await this.winnerService.hasUniqueBids(auctionId);
@@ -239,43 +257,43 @@ export class AuctionClosureService {
     }
 
     auction.end_time = new Date();
-    await this.prisma.repository("auction").save(auction);
+    await this.auctionRepository.save(auction);
 
     await this.closeAuction(auction);
 
     if (actorId) {
-      const closedAuction = await this.prisma.repository("auction").findOne({
+      const closedAuction = await this.auctionRepository.findOne({
         where: { id: auctionId },
-        include: { product: true },
+        relations: ["product"],
       });
-      const winners = await this.prisma.repository("winner").find({
+      const winners = await this.winnerRepository.find({
         where: { auction_id: auctionId },
-        order: { rank: "asc" },
+        order: { rank: "ASC" },
       });
       await this.closureEventsService.logClosureEvent(
         auctionId,
         "ADMIN_CLOSE",
         winners.map((w) => ({ amount: w.amount, userId: w.user_id })),
       );
-      return closedAuction as any;
+      return closedAuction as Auction;
     }
 
-    return this.prisma.repository("auction").findOne({
+    return this.auctionRepository.findOne({
       where: { id: auctionId },
-      include: { product: true },
-    }) as Promise<any>;
+      relations: ["product"],
+    }) as Promise<Auction>;
   }
 
   async forceCloseSingleAuction(
     auctionId: string,
     actorId?: string,
-  ): Promise<any> {
-    const auction = await this.prisma.repository("auction").findOne({
+  ): Promise<Auction> {
+    const auction = await this.auctionRepository.findOne({
       where: { id: auctionId },
-      include: { product: true },
+      relations: ["product"],
     });
     if (!auction) throw new Error(`Auction ${auctionId} not found`);
-    if (auction.status !== "ACTIVE")
+    if (auction.status !== AS.ACTIVE)
       throw new Error(
         `Auction ${auctionId} is not active (status: ${auction.status})`,
       );
@@ -283,10 +301,10 @@ export class AuctionClosureService {
     await this.bullMqWorker.flushAuction(auction.id);
 
     auction.end_time = new Date();
-    auction.status = "CLOSED";
+    auction.status = AS.CLOSED;
     auction.winner_user_id = null as any;
     auction.winning_bid_amount = null as any;
-    await this.prisma.repository("auction").save(auction);
+    await this.auctionRepository.save(auction);
 
     await this.winnerService.cleanupAuctionKeys(auction.id);
 
@@ -310,24 +328,24 @@ export class AuctionClosureService {
       );
     }
 
-    return this.prisma.repository("auction").findOne({
+    return this.auctionRepository.findOne({
       where: { id: auctionId },
-      include: { product: true },
-    }) as Promise<any>;
+      relations: ["product"],
+    }) as Promise<Auction>;
   }
 
   private async findWinBidWithRetry(
-    bidRepo: PrismaRepository<any>,
+    queryRunner: any,
     auctionId: string,
     amount: number,
     userId: string,
-  ): Promise<any | null> {
+  ): Promise<Bid | null> {
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-      const bids = await bidRepo.find({
+      const bids = await queryRunner.manager.find(Bid, {
         where: { auction_id: auctionId, user_id: userId },
-        order: { bid_time: "asc" },
+        order: { bid_time: "ASC" },
       });
-      const match = bids.find((b: any) => {
+      const match = bids.find((b: Bid) => {
         if (Number(b.amount) !== 0 || !b.encrypted_amount)
           return (
             this.normalizeAmount(b.amount) === this.normalizeAmount(amount)

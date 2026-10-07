@@ -1,27 +1,73 @@
-import { useState } from "react"
-import { motion } from "framer-motion"
-import { ArrowLeft, Wallet, Eye, EyeOff, TicketCheck, Trophy, Shield, LogOut, ChevronRight, Phone, Bell, Heart } from "lucide-react"
-import { useApp } from "../AppContext"
-import { Badge } from "../components/AuctionUI"
-import { formatCurrency } from "../mockDataV0"
+import { useState } from "react";
+import { motion } from "framer-motion";
+import {
+  ArrowLeft,
+  Wallet,
+  Eye,
+  EyeOff,
+  TicketCheck,
+  Trophy,
+  Shield,
+  LogOut,
+  ChevronRight,
+  Phone,
+  Bell,
+  Heart,
+} from "lucide-react";
+import { useApp } from "../AppContext";
+import { Badge } from "../components/AuctionUI";
+import { formatCurrency } from "../mockDataV0";
 
 function getInitials(name: string) {
-  return name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
+  return name
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 }
 
 export function ProfileScreen() {
-  const { go, goBack, user, walletBalance, logout, unreadNotificationCount } = useApp()
-  const [showBalance, setShowBalance] = useState(true)
-  const isAdmin = user?.role === "admin"
+  const { go, goBack, user, walletBalance, logout, unreadNotificationCount } = useApp();
+  const [showBalance, setShowBalance] = useState(true);
+  const isAdmin = user?.role === "admin";
 
   const menuItems = [
-    { id: "wallet", label: "My Wallet", icon: Wallet, onClick: () => go("wallet") },
-    { id: "my-bids", label: "My Bids", icon: TicketCheck, onClick: () => go("my-bids") },
-    { id: "winners", label: "Winners", icon: Trophy, onClick: () => go("closed-auctions") },
-    { id: "favorites", label: "Favorites", icon: Heart, onClick: () => go("favorites") },
-    { id: "notifications", label: "Notifications", icon: Bell, onClick: () => go("notifications") },
-    ...(isAdmin ? [{ id: "admin", label: "Admin Panel", icon: Shield, onClick: () => go("admin-dashboard") }] : []),
-  ]
+    {
+      id: "my-bids",
+      label: "My Bids",
+      icon: TicketCheck,
+      onClick: () => go("my-bids"),
+    },
+    {
+      id: "winners",
+      label: "Winners",
+      icon: Trophy,
+      onClick: () => go("closed-auctions"),
+    },
+    {
+      id: "favorites",
+      label: "Favorites",
+      icon: Heart,
+      onClick: () => go("favorites"),
+    },
+    {
+      id: "notifications",
+      label: "Notifications",
+      icon: Bell,
+      onClick: () => go("notifications"),
+    },
+    ...(isAdmin
+      ? [
+          {
+            id: "admin",
+            label: "Admin Panel",
+            icon: Shield,
+            onClick: () => go("admin-dashboard"),
+          },
+        ]
+      : []),
+  ];
 
   return (
     <motion.div
@@ -32,12 +78,19 @@ export function ProfileScreen() {
     >
       {/* ── Header ── */}
       <div className="flex items-center gap-3">
-        <button onClick={goBack} className="flex size-10 items-center justify-center rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm text-awash-blue hover:bg-white transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5 active:scale-[0.97]">
+        <button
+          onClick={() => goBack()}
+          className="flex size-10 items-center justify-center rounded-xl border border-border/60 bg-white/80 backdrop-blur-sm text-awash-blue hover:bg-white transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5 active:scale-[0.97]"
+        >
           <ArrowLeft className="size-5" />
         </button>
         <div>
-          <h1 className="font-display text-2xl font-extrabold text-foreground">Profile</h1>
-          <p className="text-sm font-medium text-neutral-500">Your account and activity</p>
+          <h1 className="font-display text-2xl font-extrabold text-foreground">
+            Profile
+          </h1>
+          <p className="text-sm font-medium text-neutral-500">
+            Your account and activity
+          </p>
         </div>
       </div>
 
@@ -46,12 +99,18 @@ export function ProfileScreen() {
         <div className="absolute top-0 right-0 w-64 h-64 bg-awash-gold/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
         <div className="relative z-10 flex items-center gap-4">
           <div className="flex size-16 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-sm border border-white/10 shadow-lg">
-            <span className="font-display text-xl font-extrabold text-awash-gold-light">{getInitials(user?.name || "?")}</span>
+            <span className="font-display text-xl font-extrabold text-awash-gold-light">
+              {getInitials(user?.name || "?")}
+            </span>
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <h2 className="truncate font-display text-xl font-extrabold text-white">{user?.name || "User"}</h2>
-              <Badge tone={isAdmin ? "gold" : "green"}>{isAdmin ? "Admin" : "User"}</Badge>
+              <h2 className="truncate font-display text-xl font-extrabold text-white">
+                {user?.name || "User"}
+              </h2>
+              <Badge tone={isAdmin ? "gold" : "green"}>
+                {isAdmin ? "Admin" : "User"}
+              </Badge>
             </div>
             <div className="mt-1 flex items-center gap-2 text-sm font-medium text-white/60">
               <Phone className="size-3.5" />
@@ -69,17 +128,29 @@ export function ProfileScreen() {
               <Wallet className="size-5" />
             </span>
             <div>
-              <p className="text-xs font-medium text-neutral-500">Wallet Balance</p>
+              <p className="text-xs font-medium text-neutral-500">
+                Wallet Balance
+              </p>
               <p className="font-display text-2xl font-extrabold text-awash-blue tabular-nums tracking-tight">
                 {showBalance ? formatCurrency(walletBalance) : "••••••"}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => setShowBalance((s) => !s)} className="rounded-lg bg-neutral-100 px-2.5 py-2 text-xs font-medium text-neutral-500 transition-all hover:bg-neutral-200 border border-border/60">
-              {showBalance ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
+            <button
+              onClick={() => setShowBalance((s) => !s)}
+              className="rounded-lg bg-neutral-100 px-2.5 py-2 text-xs font-medium text-neutral-500 transition-all hover:bg-neutral-200 border border-border/60"
+            >
+              {showBalance ? (
+                <Eye className="size-4" />
+              ) : (
+                <EyeOff className="size-4" />
+              )}
             </button>
-            <button onClick={() => go("wallet")} className="rounded-lg bg-gradient-to-r from-awash-gold to-awash-gold-light px-3.5 py-2 text-xs font-bold text-awash-blue shadow-lg shadow-primary/20 transition-all hover:shadow-primary/30 hover:scale-105 active:scale-[0.97]">
+            <button
+              onClick={() => go("deposit")}
+              className="rounded-lg bg-gradient-to-r from-awash-gold to-awash-gold-light px-3.5 py-2 text-xs font-bold text-awash-blue shadow-lg shadow-primary/20 transition-all hover:shadow-primary/30 hover:scale-105 active:scale-[0.97]"
+            >
               + Top Up
             </button>
           </div>
@@ -100,7 +171,9 @@ export function ProfileScreen() {
             <span className="flex size-10 items-center justify-center rounded-xl bg-awash-blue/10 border border-awash-blue/15 text-awash-blue transition-colors group-hover:bg-awash-gold/10 group-hover:border-awash-gold/25 group-hover:text-awash-gold-dark">
               <item.icon className="size-4" />
             </span>
-            <span className="flex-1 text-sm font-bold text-foreground">{item.label}</span>
+            <span className="flex-1 text-sm font-bold text-foreground">
+              {item.label}
+            </span>
             {item.id === "notifications" && unreadNotificationCount > 0 && (
               <Badge tone="orange">{unreadNotificationCount}</Badge>
             )}
@@ -124,5 +197,5 @@ export function ProfileScreen() {
         <ChevronRight className="size-4 text-red-400" />
       </motion.button>
     </motion.div>
-  )
+  );
 }

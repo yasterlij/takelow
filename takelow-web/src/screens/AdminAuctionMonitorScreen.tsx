@@ -608,6 +608,8 @@ export function AdminAuctionMonitorScreen() {
             rows={bids}
             rowKey={(b) => b.id || b.ticket_number || b.bid_time}
             loading={bidsLoading}
+            showPagination
+            pageSize={10}
             empty={{
               icon: <Gavel className="size-6" />,
               title: "No bids placed yet",

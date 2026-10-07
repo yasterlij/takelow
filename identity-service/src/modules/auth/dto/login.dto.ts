@@ -1,9 +1,15 @@
-import { IsString, IsOptional, Matches, MinLength, MaxLength, IsEmail } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  Matches,
+  MaxLength,
+  MinLength,
+} from "class-validator";
 
 export class LoginDto {
   @IsOptional()
   @IsString()
-  @IsEmail()
+  @MaxLength(120)
   email?: string;
 
   @IsOptional()
@@ -11,8 +17,28 @@ export class LoginDto {
   @Matches(/^\d{9,15}$/)
   phone_number?: string;
 
+  @IsOptional()
   @IsString()
   @MinLength(4)
-  @MaxLength(255)
-  password: string;
+  @MaxLength(128)
+  password?: string;
+
+  @IsOptional()
+  @IsString()
+  otp?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  provider?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(512)
+  access_token?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(10)
+  refresh_token?: string;
 }

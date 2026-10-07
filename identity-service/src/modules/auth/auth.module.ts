@@ -1,34 +1,32 @@
-import { Module } from '@nestjs/common';
-import { JwtModule } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
-import { AuthController } from './auth.controller';
-import { AuthAuditService } from './auth-audit.service';
-import { AuthService } from './auth.service';
-import { AuthTokenService } from './auth-token.service';
-import { TcService } from './tc.service';
-import { TcController } from './tc.controller';
-import { SuperAppRegistry } from './adapters/super-app-registry';
-import { BetterAuthModule } from '../../auth/better-auth.module';
+import { Module } from "@nestjs/common";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { JwtModule } from "@nestjs/jwt";
+import { ConfigService } from "@nestjs/config";
+import { AuthController } from "./auth.controller";
+import { AuthAuditService } from "./auth-audit.service";
+import { AuthService } from "./auth.service";
+import { AuthTokenService } from "./auth-token.service";
+import { User } from "./entities/user.entity";
+import { SuperAppRegistry } from "./adapters/super-app-registry";
 
 @Module({
   imports: [
+    TypeOrmModule.forFeature([User]),
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        secret: config.get<string>('app.jwtSecret'),
-        signOptions: { expiresIn: '15m' },
+        secret: config.get<string>("app.jwtSecret"),
+        signOptions: { expiresIn: "15m" },
       }),
     }),
-    BetterAuthModule,
   ],
-  controllers: [AuthController, TcController],
+  controllers: [AuthController],
   providers: [
     AuthService,
     AuthTokenService,
     AuthAuditService,
-    TcService,
     SuperAppRegistry,
   ],
-  exports: [SuperAppRegistry, AuthTokenService, AuthAuditService, TcService],
+  exports: [SuperAppRegistry, AuthTokenService, AuthAuditService],
 })
 export class AuthModule {}

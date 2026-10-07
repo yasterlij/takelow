@@ -278,7 +278,7 @@ async function request<T>(
   const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
   const headers: Record<string, string> = {};
   if (!isFormData) headers["Content-Type"] = "application/json";
-  if (_token) headers["Authorization"] = `Bearer ${_token}`;
+  if (_token) headers["Authorization"] = "Bearer " + _token;
   if (extraHeaders) Object.assign(headers, extraHeaders);
   const url = `${base || IDENTITY_API}${path}`;
 
@@ -309,7 +309,7 @@ async function request<T>(
 
       if (res.status === 401 && _refreshToken && attempt < MAX_RETRIES) {
         await refreshAuth();
-        if (_token) headers["Authorization"] = `Bearer ${_token}`;
+        if (_token) headers["Authorization"] = "Bearer " + _token;
         continue;
       }
 
@@ -1292,6 +1292,7 @@ const api = {
     auction_id?: string;
     user_id?: string;
     type?: string;
+    category?: "all" | "auction" | "wallet";
     status?: string;
     start?: string;
     end?: string;
@@ -1303,6 +1304,7 @@ const api = {
     if (filters.auction_id) q.set("auction_id", filters.auction_id);
     if (filters.user_id) q.set("user_id", filters.user_id);
     if (filters.type) q.set("type", filters.type);
+    if (filters.category && filters.category !== "all") q.set("category", filters.category);
     if (filters.status) q.set("status", filters.status);
     if (filters.start) q.set("start", filters.start);
     if (filters.end) q.set("end", filters.end);
@@ -1320,6 +1322,7 @@ const api = {
     auction_id?: string;
     user_id?: string;
     type?: string;
+    category?: "all" | "auction" | "wallet";
     status?: string;
     start?: string;
     end?: string;
@@ -1329,6 +1332,7 @@ const api = {
     if (filters.auction_id) q.set("auction_id", filters.auction_id);
     if (filters.user_id) q.set("user_id", filters.user_id);
     if (filters.type) q.set("type", filters.type);
+    if (filters.category && filters.category !== "all") q.set("category", filters.category);
     if (filters.status) q.set("status", filters.status);
     if (filters.start) q.set("start", filters.start);
     if (filters.end) q.set("end", filters.end);

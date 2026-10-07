@@ -15,6 +15,7 @@ import {
   Gavel,
 } from "lucide-react"
 import { AdminLayout } from "../components/AdminLayout"
+import { usePagination, PaginationBar } from "../components/Pagination"
 import { api, type ApiDispute } from "../api"
 import { toast } from "../store/toast.store"
 
@@ -102,6 +103,12 @@ export function DisputesScreen() {
     const type = d.type?.toLowerCase() || ""
     return name.includes(q) || phone.includes(q) || desc.includes(q) || type.includes(q)
   })
+
+  const { page, setPage, perPage, setPerPage, totalPages, paginated, resetPage } = usePagination(filtered, 10)
+
+  useEffect(() => {
+    resetPage()
+  }, [filter, search, resetPage])
 
   const openCount = disputes.filter((d) => d.status === "OPEN").length
   const inReviewCount = disputes.filter((d) => d.status === "IN_REVIEW").length
@@ -217,7 +224,7 @@ export function DisputesScreen() {
               No disputes found matching current filters.
             </div>
           ) : (
-            filtered.map((d, i) => {
+            paginated.map((d, i) => {
               const style = STATUS_STYLES[d.status] || STATUS_STYLES.OPEN
               return (
                 <motion.div
@@ -316,6 +323,17 @@ export function DisputesScreen() {
             })
           )}
         </div>
+
+        {filtered.length > 0 && (
+          <PaginationBar
+            page={page}
+            totalPages={totalPages}
+            totalItems={filtered.length}
+            perPage={perPage}
+            onPageChange={setPage}
+            onPerPageChange={setPerPage}
+          />
+        )}
       </div>
 
       {/* Resolution Modal */}

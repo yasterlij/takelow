@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { Gavel, Wallet, ArrowRight, Eye, EyeOff, Trophy, Sparkles, ChevronLeft, ChevronRight, TrendingDown, Users, Flame, Smartphone, Headphones, Gamepad2, Laptop, Tv, Tablet, ShieldCheck, Lock, Eye as EyeIcon, Headset, Search, CreditCard, Award, Clock, Zap, Package, CheckCircle2, Heart, Calendar, Bell } from "lucide-react"
+import { Gavel, Wallet, ArrowRight, Eye, EyeOff, Trophy, Sparkles, ChevronLeft, ChevronRight, TrendingDown, Users, Flame, ShieldCheck, Lock, Eye as EyeIcon, Headset, Search, CreditCard, Award, Clock, Zap, Package, CheckCircle2, Heart, Calendar, Bell } from "lucide-react"
 import { useApp } from "../AppContext"
 import { formatCurrency, formatCountdown, COMING_SOON_ITEMS } from "../mockDataV0"
 import { useCountdown } from "../components/Countdown"
@@ -301,37 +301,6 @@ export function HomeScreen() {
       transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
       className="flex flex-1 flex-col gap-8 pb-8 stagger-enter"
     >
-      {/* ── Quick Header / Status Strip ── */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-gradient-to-r from-awash-blue/5 via-primary/5 to-transparent p-3 sm:p-4 rounded-2xl border border-border/50">
-        <div className="flex items-center gap-2 sm:gap-3">
-          <div className="flex size-9 items-center justify-center rounded-xl bg-awash-blue text-white shadow-sm">
-            <Sparkles className="size-4 text-primary" />
-          </div>
-          <div>
-            <p className="text-xs font-semibold text-foreground">Welcome to Awash Reverse Auction</p>
-            <p className="text-[11px] text-neutral-500">Lowest unique bid wins authentic brand new items</p>
-          </div>
-        </div>
-
-        <button
-          onClick={() => go("favorites")}
-          className="flex items-center gap-2.5 bg-white hover:bg-neutral-50 border border-border/60 px-3.5 py-1.5 rounded-full shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98] group"
-        >
-          <div className="flex size-6 items-center justify-center rounded-full bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-            <Heart className="size-3.5" fill={favoriteAuctionIds.length > 0 ? "currentColor" : "none"} />
-          </div>
-          <div className="text-left">
-            <p className="text-[10px] font-medium text-neutral-500 uppercase tracking-wider leading-none">Watchlist</p>
-            <p className="text-xs font-bold text-foreground tabular-nums leading-tight">
-              {favoriteAuctionIds.length} {favoriteAuctionIds.length === 1 ? "Item" : "Items"}
-            </p>
-          </div>
-          <span className="text-[11px] font-bold text-primary bg-primary/10 group-hover:bg-primary/20 px-2 py-0.5 rounded-full">
-            View &rarr;
-          </span>
-        </button>
-      </div>
-
       {/* ── Live Auctions Carousel ── */}
       <section>
         <div className="mb-4 flex items-center justify-between">
@@ -575,9 +544,6 @@ export function HomeScreen() {
         productsListed={new Set(auctions.map((a) => a.productId || a.id)).size}
       />
 
-      {/* ── Featured Categories ── */}
-      <FeaturedCategories />
-
       {/* ── How It Works ── */}
       <HowItWorks />
 
@@ -619,53 +585,6 @@ function StatsBanner({ totalAuctions, happyWinners, totalBids, productsListed }:
               <p className="text-[11px] font-medium text-neutral-400">{s.label}</p>
             </div>
           </motion.div>
-        ))}
-      </div>
-    </motion.section>
-  )
-}
-
-const categoryItems = [
-  { icon: Smartphone, label: "Smartphones", color: "bg-white text-foreground" },
-  { icon: Headphones, label: "Audio", color: "bg-white text-foreground" },
-  { icon: Gamepad2, label: "Gaming", color: "bg-white text-foreground" },
-  { icon: Laptop, label: "Computers", color: "bg-white text-foreground" },
-  { icon: Tv, label: "Electronics", color: "bg-white text-foreground" },
-  { icon: Tablet, label: "Tablets", color: "bg-white text-foreground" },
-]
-
-function FeaturedCategories() {
-  return (
-    <motion.section
-      initial={{ opacity: 0, y: 16 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-    >
-      <div className="mb-4 flex items-center gap-3">
-        <span className="flex size-11 items-center justify-center rounded-2xl bg-canvas text-foreground">
-          <Package className="size-5" />
-        </span>
-        <div>
-          <h2 className="font-display text-2xl font-semibold tracking-[-0.022em] text-foreground">Featured Categories</h2>
-          <p className="text-sm font-medium text-neutral-500">Browse by category — find your next winning bid</p>
-        </div>
-      </div>
-      <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
-        {categoryItems.map((cat, i) => (
-          <motion.button
-            key={cat.label}
-            initial={{ opacity: 0, scale: 0.85 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: i * 0.05 }}
-            whileTap={{ scale: 0.97 }}
-            className="group flex flex-col items-center gap-2.5 rounded-2xl bg-canvas p-4 transition-colors hover:bg-cool-wash"
-          >
-            <div className={`flex size-12 items-center justify-center rounded-2xl ${cat.color}`}>
-              <cat.icon className="size-5" />
-            </div>
-            <span className="text-xs font-bold text-foreground">{cat.label}</span>
-          </motion.button>
         ))}
       </div>
     </motion.section>

@@ -6,6 +6,7 @@ import { AdminLayout } from "../components/AdminLayout"
 import { Badge, Card, CTAButton } from "../components/AuctionUI"
 import { api, type ApiUser } from "../api"
 import { formatCurrency, formatETB } from "../mockDataV0"
+import { usePagination, PaginationBar } from "../components/Pagination"
 
 function UserDetailModal({ user, onClose, onRoleChange, onNameChange }: { user: ApiUser; onClose: () => void; onRoleChange: (id: string, role: string) => void; onNameChange: (id: string, name: string) => void }) {
   const { allBids } = useApp()
@@ -127,8 +128,6 @@ export function AdminUsersScreen() {
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState("")
   const [selectedUser, setSelectedUser] = useState<ApiUser | null>(null)
-  const [page, setPage] = useState(1)
-  const perPage = 20
 
   const fetchUsers = () => {
     setLoading(true)
@@ -149,12 +148,7 @@ export function AdminUsersScreen() {
     return list
   }, [users, search])
 
-  const paginated = useMemo(() => {
-    const start = (page - 1) * perPage
-    return filtered.slice(start, start + perPage)
-  }, [filtered, page])
-
-  const totalPages = Math.ceil(filtered.length / perPage)
+  const { page, setPage, perPage, setPerPage, totalPages, paginated, resetPage } = usePagination(filtered, 20)
 
   const adminCount = users.filter((u) => u.role === "admin").length
   const totalBids = allBids.length
@@ -172,7 +166,7 @@ export function AdminUsersScreen() {
     setSelectedUser((prev) => prev?.id === id ? { ...prev, full_name: name } : prev)
   }
 
-  useEffect(() => { setPage(1) }, [search])
+  useEffect(() => { resetPage() }, [search, resetPage])
 
   return (
     <AdminLayout title="Manage Users" subtitle={`${users.length} users`}>
@@ -299,40 +293,15 @@ export function AdminUsersScreen() {
           </motion.div>
         )}
 
-        {totalPages > 1 && (
-          <motion.div
-            variants={{ hidden: { opacity: 0 }, visible: { opacity: 1 } }}
-            className="mt-4 flex items-center justify-center gap-2"
-          >
-            <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1}
-              className="rounded-lg border border-border/60 px-3 py-1.5 text-xs font-semibold text-awash-blue transition-colors hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95"
-            >
-              Previous
-            </button>
-            <span className="text-xs font-medium text-neutral-400">
-              Page {page} of {totalPages}
-            </span>
-            <button
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page >= totalPages}
-              className="rounded-lg border border-border/60 px-3 py-1.5 text-xs font-semibold text-awash-blue transition-colors hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95"
-            >
-              Next
-            </button>
-          </motion.div>
-        )}
-
-        {users.length > 0 && (
-          <motion.div
-            variants={{ hidden: { opacity: 0 }, visible: { opacity: 1 } }}
-            className="mt-4 rounded-xl border border-border/60 bg-white/50 backdrop-blur-sm p-3 text-center"
-          >
-            <p className="text-xs font-medium text-neutral-400">
-              Showing {paginated.length} of {filtered.length} users. Click a user to view details and manage roles.
-            </p>
-          </motion.div>
+        {filtered.length > 0 && (
+          <PaginationBar
+            page={page}
+            totalPages={totalPages}
+            totalItems={filtered.length}
+            perPage={perPage}
+            onPageChange={setPage}
+            onPerPageChange={setPerPage}
+          />
         )}
 
       <AnimatePresence>

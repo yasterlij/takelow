@@ -12,7 +12,7 @@ const steps = [
 ]
 
 export function DeliveryScreen() {
-  const { go, goBack, selectedId, reset, getAuction } = useApp()
+  const { go, goBack, selectedId, getAuction } = useApp()
   const auction = getAuction(selectedId)
   if (!auction) return null
 
@@ -129,7 +129,7 @@ export function DeliveryScreen() {
         </motion.div>
       </motion.div>
       <div className="absolute inset-x-0 bottom-0 border-t border-border/60 bg-white/90 p-4 backdrop-blur-xl lg:static">
-        <CTAButton variant="navy" onClick={reset}>
+        <CTAButton variant="navy" onClick={() => goBack()}>
           <Home className="size-[18px]" /> Back to Home
         </CTAButton>
       </div>

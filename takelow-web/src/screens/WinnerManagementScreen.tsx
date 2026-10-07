@@ -17,6 +17,10 @@ import {
   Bell,
   Send,
   ShieldCheck,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
 } from "lucide-react"
 import { AdminLayout } from "../components/AdminLayout"
 import {
@@ -35,6 +39,8 @@ export function WinnerManagementScreen() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<"ALL" | "PENDING" | "EXPIRED" | "SECOND_WINNER">("ALL")
   const [search, setSearch] = useState("")
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
   const [selectedBidderHistory, setSelectedBidderHistory] = useState<ApiBidderHistory | null>(null)
   const [bidderHistoryLoading, setBidderHistoryLoading] = useState(false)
@@ -257,7 +263,10 @@ export function WinnerManagementScreen() {
             <input
               type="text"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value)
+                setPage(1)
+              }}
               placeholder="Search by winner name, phone, or auction..."
               className="w-full rounded-xl border border-border/60 bg-white py-2 pl-9 pr-4 text-xs font-medium text-foreground placeholder:text-neutral-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-sm"
             />
@@ -272,7 +281,10 @@ export function WinnerManagementScreen() {
             ].map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => {
+                  setActiveTab(tab.id as any)
+                  setPage(1)
+                }}
                 className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                   activeTab === tab.id
                     ? "bg-primary text-primary-foreground shadow-sm"
@@ -315,161 +327,232 @@ export function WinnerManagementScreen() {
                     </td>
                   </tr>
                 ) : (
-                  filtered.map((w, i) => {
-                    const isExpired = w.payment_deadline && new Date(w.payment_deadline) < new Date() && w.payment_status === "PENDING"
-                    const deadlineDate = w.payment_deadline ? new Date(w.payment_deadline) : null
-                    const hoursLeft = deadlineDate ? Math.round((deadlineDate.getTime() - Date.now()) / 3600000) : null
+                  filtered
+                    .slice((page - 1) * pageSize, page * pageSize)
+                    .map((w, i) => {
+                      const isExpired = w.payment_deadline && new Date(w.payment_deadline) < new Date() && w.payment_status === "PENDING"
+                      const deadlineDate = w.payment_deadline ? new Date(w.payment_deadline) : null
+                      const hoursLeft = deadlineDate ? Math.round((deadlineDate.getTime() - Date.now()) / 3600000) : null
+                      const isDefaulted = w.auction?.payment_status === "PAYMENT_DEFAULTED" || w.payment_status === "DEFAULTED" || w.payment_status === "PAYMENT_DEFAULTED"
+                      const paymentStatusTone = w.payment_status === "PAID"
+                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                        : isDefaulted
+                        ? "bg-rose-50 text-rose-700 border border-rose-200"
+                        : isExpired
+                        ? "bg-destructive/10 text-destructive border border-destructive/20"
+                        : "bg-amber-50 text-amber-700 border border-amber-200"
+                      const paymentStatusIcon = w.payment_status === "PAID"
+                        ? <CheckCircle2 className="size-3" />
+                        : isDefaulted
+                        ? <Ban className="size-3" />
+                        : isExpired
+                        ? <XCircle className="size-3" />
+                        : <Clock className="size-3" />
+                      const paymentStatusLabel = isDefaulted ? "DEFAULTED" : isExpired ? "EXPIRED" : w.payment_status
 
-                    return (
-                      <motion.tr
-                        key={w.id}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ delay: i * 0.03 }}
-                        className="hover:bg-neutral-50/80 transition-colors"
-                      >
-                        <td className="px-4 py-3">
-                          <button
-                            type="button"
-                            onClick={() => handleViewBidderHistory(w.user_id)}
-                            className="text-left group cursor-pointer"
-                            title="View Bidder History & Compliance Profile"
-                          >
-                            <div className="font-semibold text-foreground group-hover:text-primary transition-colors flex items-center gap-1">
-                              {w.user?.full_name || "Anonymous Winner"}
-                              <UserCheck className="size-3 text-neutral-400 group-hover:text-primary transition-colors" />
+                      return (
+                        <motion.tr
+                          key={w.id}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          transition={{ delay: i * 0.03 }}
+                          className="hover:bg-neutral-50/80 transition-colors"
+                        >
+                          <td className="px-4 py-3">
+                            <button
+                              type="button"
+                              onClick={() => handleViewBidderHistory(w.user_id)}
+                              className="text-left group cursor-pointer"
+                              title="View Bidder History & Compliance Profile"
+                            >
+                              <div className="font-semibold text-foreground group-hover:text-primary transition-colors flex items-center gap-1">
+                                {w.user?.full_name || "Anonymous Winner"}
+                                <UserCheck className="size-3 text-neutral-400 group-hover:text-primary transition-colors" />
+                              </div>
+                              <div className="text-[11px] text-neutral-400">
+                                {w.user?.phone_number || "No phone"}
+                              </div>
+                            </button>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="font-semibold text-foreground">
+                              {w.auction?.product?.name || "Auction Item"}
                             </div>
-                            <div className="text-[11px] text-neutral-400">
-                              {w.user?.phone_number || "No phone"}
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className="font-mono text-[10px] text-primary">
+                                {w.auction?.public_code || w.auction_id.slice(0, 8)}
+                              </span>
+                              {w.auction?.second_winner_assigned && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold text-primary border border-primary/20">
+                                  <Trophy className="size-2.5" /> 2nd Winner Assigned
+                                </span>
+                              )}
                             </div>
-                          </button>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="font-semibold text-foreground">
-                            {w.auction?.product?.name || "Auction Item"}
-                          </div>
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className="font-mono text-[10px] text-primary">
-                              {w.auction?.public_code || w.auction_id.slice(0, 8)}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="font-bold text-emerald-600">
+                              {formatCurrency(w.amount)}
                             </span>
-                            {w.auction?.second_winner_assigned && (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold text-primary border border-primary/20">
-                                <Trophy className="size-2.5" /> 2nd Winner Assigned
-                              </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex items-center justify-center size-6 rounded-full text-xs font-bold ${
+                              w.rank === 1
+                                ? "bg-amber-100 text-amber-700 border border-amber-200"
+                                : "bg-neutral-100 text-neutral-600"
+                            }`}>
+                              #{w.rank}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            {deadlineDate ? (
+                              <div>
+                                <div>{deadlineDate.toLocaleDateString("en", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</div>
+                                <span className={`text-[10px] font-semibold ${
+                                  isExpired ? "text-destructive" : hoursLeft != null && hoursLeft < 6 ? "text-amber-600" : "text-emerald-600"
+                                }`}>
+                                  {isExpired ? "Expired" : hoursLeft != null ? `${hoursLeft}h remaining` : ""}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-neutral-400">—</span>
                             )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="font-bold text-emerald-600">
-                            {formatCurrency(w.amount)}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex items-center justify-center size-6 rounded-full text-xs font-bold ${
-                            w.rank === 1
-                              ? "bg-amber-100 text-amber-700 border border-amber-200"
-                              : "bg-neutral-100 text-neutral-600"
-                          }`}>
-                            #{w.rank}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          {deadlineDate ? (
-                            <div>
-                              <div>{deadlineDate.toLocaleDateString("en", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</div>
-                              <span className={`text-[10px] font-semibold ${
-                                isExpired ? "text-destructive" : hoursLeft != null && hoursLeft < 6 ? "text-amber-600" : "text-emerald-600"
-                              }`}>
-                                {isExpired ? "Expired" : hoursLeft != null ? `${hoursLeft}h remaining` : ""}
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="text-neutral-400">—</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          {(() => {
-                            const isDefaulted = w.auction?.payment_status === "PAYMENT_DEFAULTED" || w.payment_status === "DEFAULTED" || w.payment_status === "PAYMENT_DEFAULTED";
-                            return (
-                              <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
-                                w.payment_status === "PAID"
-                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                  : isDefaulted
-                                  ? "bg-rose-50 text-rose-700 border border-rose-200"
-                                  : isExpired
-                                  ? "bg-destructive/10 text-destructive border border-destructive/20"
-                                  : "bg-amber-50 text-amber-700 border border-amber-200"
-                              }`}>
-                                {w.payment_status === "PAID" ? (
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${paymentStatusTone}`}>
+                              {paymentStatusIcon}
+                              {paymentStatusLabel}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {w.payment_status === "PENDING" ? (
+                                <button
+                                  onClick={() => handleSendReminder(w)}
+                                  disabled={remindingId === w.id}
+                                  title="Send Multi-Channel Payment Reminder"
+                                  className="flex items-center gap-1 rounded-lg border border-primary/40 bg-primary/5 px-2 py-1 text-[11px] font-semibold text-primary hover:bg-primary/10 transition-colors disabled:opacity-50"
+                                >
+                                  {remindingId === w.id ? (
+                                    <Loader2 className="size-3 animate-spin" />
+                                  ) : (
+                                    <Send className="size-3" />
+                                  )}
+                                  Remind
+                                </button>
+                              ) : null}
+                              {w.payment_status === "PAID" ? (
+                                <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 border border-emerald-200">
                                   <CheckCircle2 className="size-3" />
-                                ) : isDefaulted ? (
-                                  <Ban className="size-3" />
-                                ) : isExpired ? (
-                                  <XCircle className="size-3" />
-                                ) : (
-                                  <Clock className="size-3" />
-                                )}
-                                {w.payment_status === "PAID"
-                                  ? "PAID"
-                                  : isDefaulted
-                                  ? "PAYMENT DEFAULTED"
-                                  : isExpired
-                                  ? "EXPIRED"
-                                  : w.payment_status}
-                              </span>
-                            );
-                          })()}
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            {w.payment_status === "PENDING" && (
-                              <button
-                                onClick={() => handleSendReminder(w)}
-                                disabled={remindingId === w.id}
-                                title="Dispatch Automated Multi-channel Payment Reminder"
-                                className="flex items-center gap-1 rounded-lg border border-primary/30 bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary hover:bg-primary/20 shadow-sm transition-all disabled:opacity-50"
-                              >
-                                {remindingId === w.id ? (
-                                  <Loader2 className="size-3 animate-spin" />
-                                ) : (
-                                  <Bell className="size-3" />
-                                )}
-                                Remind
-                              </button>
-                            )}
-                            <button
-                              onClick={() => setExtendModalWinner(w)}
-                              disabled={actionLoading}
-                              title="Extend Payment Deadline"
-                              className="rounded-lg border border-border/60 bg-white px-2.5 py-1 text-[11px] font-semibold text-foreground hover:bg-neutral-50 shadow-sm transition-all"
-                            >
-                              Extend
-                            </button>
-                            <button
-                              onClick={() => handleReassign(w)}
-                              disabled={actionLoading}
-                              title="Promote Next Eligible Bidder"
-                              className="rounded-lg border border-border/60 bg-white px-2.5 py-1 text-[11px] font-semibold text-amber-700 hover:bg-amber-50 shadow-sm transition-all"
-                            >
-                              Rotate
-                            </button>
-                            <button
-                              onClick={() => handleCancel(w)}
-                              disabled={actionLoading}
-                              title="Cancel Winner"
-                              className="rounded-lg border border-border/60 bg-white px-2.5 py-1 text-[11px] font-semibold text-destructive hover:bg-destructive/10 shadow-sm transition-all"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </td>
-                      </motion.tr>
-                    )
-                  })
+                                  Settled
+                                </span>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => setExtendModalWinner(w)}
+                                    disabled={actionLoading}
+                                    title="Extend Payment Deadline"
+                                    className="rounded-lg border border-border/60 bg-white px-2.5 py-1 text-[11px] font-semibold text-foreground hover:bg-neutral-50 shadow-sm transition-all"
+                                  >
+                                    Extend
+                                  </button>
+                                  <button
+                                    onClick={() => handleReassign(w)}
+                                    disabled={actionLoading}
+                                    title="Promote Next Eligible Bidder"
+                                    className="rounded-lg border border-border/60 bg-white px-2.5 py-1 text-[11px] font-semibold text-amber-700 hover:bg-amber-50 shadow-sm transition-all"
+                                  >
+                                    Rotate
+                                  </button>
+                                  <button
+                                    onClick={() => handleCancel(w)}
+                                    disabled={actionLoading}
+                                    title="Cancel Winner"
+                                    className="rounded-lg border border-border/60 bg-white px-2.5 py-1 text-[11px] font-semibold text-destructive hover:bg-destructive/10 shadow-sm transition-all"
+                                  >
+                                    Cancel
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </motion.tr>
+                      )
+                    })
                 )}
               </tbody>
             </table>
           </div>
+
+          {/* Pagination bar */}
+          {filtered.length > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-border/60 px-4 py-3 text-xs text-neutral-600 bg-white">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="font-medium text-neutral-500">
+                  Showing <strong className="text-foreground">{(page - 1) * pageSize + 1}</strong>–<strong className="text-foreground">{Math.min(page * pageSize, filtered.length)}</strong> of{" "}
+                  <strong className="text-foreground">{filtered.length}</strong> winners
+                </span>
+
+                <div className="flex items-center gap-1.5 pl-3 border-l border-border/60">
+                  <span className="text-neutral-400 font-medium">Rows:</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => {
+                      setPageSize(Number(e.target.value))
+                      setPage(1)
+                    }}
+                    className="h-7 rounded-lg border border-border/80 bg-neutral-50 px-2 text-xs font-bold text-foreground outline-none transition-colors hover:bg-white focus:border-primary"
+                  >
+                    <option value={5}>5</option>
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                  </select>
+                </div>
+              </div>
+
+              {Math.ceil(filtered.length / pageSize) > 1 && (
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setPage(1)}
+                    disabled={page <= 1}
+                    title="First Page"
+                    className="p-1.5 rounded-lg border border-border/60 hover:bg-neutral-100 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                  >
+                    <ChevronsLeft className="size-3.5 text-neutral-600" />
+                  </button>
+                  <button
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page <= 1}
+                    title="Previous Page"
+                    className="p-1.5 rounded-lg border border-border/60 hover:bg-neutral-100 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                  >
+                    <ChevronLeft className="size-3.5 text-neutral-600" />
+                  </button>
+
+                  <span className="px-2 font-bold text-neutral-700">
+                    Page {page} of {Math.ceil(filtered.length / pageSize)}
+                  </span>
+
+                  <button
+                    onClick={() => setPage((p) => Math.min(Math.ceil(filtered.length / pageSize), p + 1))}
+                    disabled={page >= Math.ceil(filtered.length / pageSize)}
+                    title="Next Page"
+                    className="p-1.5 rounded-lg border border-border/60 hover:bg-neutral-100 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                  >
+                    <ChevronRight className="size-3.5 text-neutral-600" />
+                  </button>
+                  <button
+                    onClick={() => setPage(Math.ceil(filtered.length / pageSize))}
+                    disabled={page >= Math.ceil(filtered.length / pageSize)}
+                    title="Last Page"
+                    className="p-1.5 rounded-lg border border-border/60 hover:bg-neutral-100 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                  >
+                    <ChevronsRight className="size-3.5 text-neutral-600" />
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

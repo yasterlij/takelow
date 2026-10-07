@@ -40,49 +40,51 @@ export class PaymentReminderService {
         `Sending payment reminders to ${pendingWinners.length} pending winners`,
       );
 
-      for (const winner of pendingWinners) {
-        try {
-          const productName = winner.auction?.product?.name || "your auction";
-          const winningAmount =
-            winner.auction?.winning_bid_amount ?? winner.amount;
-          const deadline = winner.auction?.payment_deadline;
-          const deadlineStr = deadline
-            ? new Date(deadline).toLocaleString("en-GB", {
-                day: "2-digit",
-                month: "short",
-                hour: "2-digit",
-                minute: "2-digit",
-              })
-            : "soon";
+      await Promise.allSettled(
+        pendingWinners.map(async (winner) => {
+          try {
+            const productName = winner.auction?.product?.name || "your auction";
+            const winningAmount =
+              winner.auction?.winning_bid_amount ?? winner.amount;
+            const deadline = winner.auction?.payment_deadline;
+            const deadlineStr = deadline
+              ? new Date(deadline).toLocaleString("en-GB", {
+                  day: "2-digit",
+                  month: "short",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
+              : "soon";
 
-          await this.notificationDispatchService.dispatch(
-            "/api/v1/notify/winner",
-            {
-              user_id: winner.user_id,
-              auction_id: winner.auction_id,
+            await this.notificationDispatchService.dispatch(
+              "/api/v1/notify/winner",
+              {
+                user_id: winner.user_id,
+                auction_id: winner.auction_id,
+                product_name: productName,
+                winning_amount: Number(winningAmount),
+                payment_deadline: deadline
+                  ? new Date(deadline).toISOString()
+                  : undefined,
+              },
+            );
+
+            await this.logReminderSent(winner.auction_id, winner.user_id, {
               product_name: productName,
               winning_amount: Number(winningAmount),
-              payment_deadline: deadline
-                ? new Date(deadline).toISOString()
-                : undefined,
-            },
-          );
+              payment_deadline: deadlineStr,
+            });
 
-          await this.logReminderSent(winner.auction_id, winner.user_id, {
-            product_name: productName,
-            winning_amount: Number(winningAmount),
-            payment_deadline: deadlineStr,
-          });
-
-          this.logger.log(
-            `Payment reminder sent to user ${winner.user_id} for auction ${winner.auction_id}`,
-          );
-        } catch (error: any) {
-          this.logger.error(
-            `Failed to send payment reminder to winner ${winner.user_id}: ${error.message}`,
-          );
-        }
-      }
+            this.logger.log(
+              `Payment reminder sent to user ${winner.user_id} for auction ${winner.auction_id}`,
+            );
+          } catch (error: any) {
+            this.logger.error(
+              `Failed to send payment reminder to winner ${winner.user_id}: ${error.message}`,
+            );
+          }
+        }),
+      );
     } catch (error: any) {
       this.logger.error(
         `Failed to process payment reminders: ${error.message}`,

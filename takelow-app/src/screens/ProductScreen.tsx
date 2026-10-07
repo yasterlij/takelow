@@ -10,7 +10,6 @@ import {
   TextInput,
   ActivityIndicator,
   Alert,
-  Share,
 } from "react-native";
 import {
   Users,
@@ -27,7 +26,6 @@ import {
   ChevronDown,
   ChevronUp,
   Building2,
-  Share2,
 } from "lucide-react-native";
 import { useApp } from "../AppContext";
 import { AppBar, Card, Badge, AwashMark } from "../components/AuctionUI";
@@ -114,11 +112,6 @@ export function ProductScreen() {
   const [lightboxIdx, setLightboxIdx] = useState(0);
   const [showSpecs, setShowSpecs] = useState(false);
   const [serverBidAmounts, setServerBidAmounts] = useState<number[]>([]);
-  const [showBidConfirmModal, setShowBidConfirmModal] = useState(false);
-  const [bidAgreementAccepted, setBidAgreementAccepted] = useState(false);
-  const [pendingPaymentMethod, setPendingPaymentMethod] = useState<
-    "SIKINAPAY" | "AWASH" | null
-  >(null);
 
   const {
     loadingMethod,
@@ -187,35 +180,6 @@ export function ProductScreen() {
   const specEntries = getSpecEntries(auction.specs);
   const favorite = isFavorite(auction.id);
 
-  const handleOpenPaymentConfirmation = useCallback(
-    (method: "SIKINAPAY" | "AWASH") => {
-      if (!hasValidBid) {
-        setBidError("Enter a valid bid amount to continue");
-        return;
-      }
-
-      if (isDuplicate) {
-        Alert.alert(
-          "Duplicate Bid",
-          `You've already placed a bid of ${formatCurrency(numericBid)} on this auction. Please enter a different bid amount.`,
-          [{ text: "Change Bid Amount" }],
-        );
-        return;
-      }
-
-      setPendingPaymentMethod(method);
-      setBidAgreementAccepted(false);
-      setShowBidConfirmModal(true);
-    },
-    [hasValidBid, isDuplicate, numericBid, setBidError],
-  );
-
-  const handleConfirmPayment = useCallback(() => {
-    if (!pendingPaymentMethod || !bidAgreementAccepted) return;
-    setShowBidConfirmModal(false);
-    handlePayment(pendingPaymentMethod, isDuplicate);
-  }, [bidAgreementAccepted, handlePayment, isDuplicate, pendingPaymentMethod]);
-
   useEffect(() => {
     if (!selectedId) return;
     let active = true;
@@ -230,50 +194,39 @@ export function ProductScreen() {
     };
   }, [selectedId]);
 
+  useEffect(() => {
+    if (!isDuplicate) return;
+    Alert.alert(
+      "Duplicate Bid",
+      `You've already placed a bid of ${formatCurrency(numericBid)} on this auction. Please enter a different bid amount.`,
+      [{ text: "Change Bid Amount" }],
+    );
+  }, [isDuplicate, numericBid]);
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <View style={{ backgroundColor: colors.navy }}>
+        <StatusBarCustom />
+      </View>
       <AppBar
         title="Product Details"
-        onBack={goBack}
+        onBack={() => goBack()}
         right={
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-            <TouchableOpacity
-              onPress={async () => {
-                try {
-                  await Share.share({
-                    message: `Check out ${auction.name} on TakeLow! Lowest unique bid wins! Auction Code: ${auctionCode}`,
-                  });
-                } catch {}
-              }}
-              style={{
-                width: 40,
-                height: 40,
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-              hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-              activeOpacity={0.7}
-            >
-              <Share2 size={18} color={colors.navyForeground} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => toggleFavorite(auction.id)}
-              style={{
-                width: 40,
-                height: 40,
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-              hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-              activeOpacity={0.7}
-            >
-              <Heart
-                size={19}
-                color={favorite ? colors.primary : colors.navyForeground}
-                fill={favorite ? colors.primary : "transparent"}
-              />
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            onPress={() => toggleFavorite(auction.id)}
+            style={{
+              width: 34,
+              height: 34,
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            <Heart
+              size={20}
+              color={favorite ? colors.primary : colors.navyForeground}
+              fill={favorite ? colors.primary : "transparent"}
+            />
+          </TouchableOpacity>
         }
       />
       <LightboxModal
@@ -290,7 +243,6 @@ export function ProductScreen() {
           paddingBottom: 32,
           gap: 16,
         }}
-        keyboardShouldPersistTaps="handled"
       >
         <ProductHeroSection
           auction={auction}
@@ -352,7 +304,7 @@ export function ProductScreen() {
           hasValidBid={hasValidBid}
           authError={authError}
           isEnding={isEnding}
-          onSubmit={handleOpenPaymentConfirmation}
+          onSubmit={(method) => handlePayment(method, isDuplicate)}
         />
 
         <View style={{ paddingHorizontal: 4 }}>
@@ -385,96 +337,6 @@ export function ProductScreen() {
           )}
         </View>
       </ScrollView>
-
-      <Modal
-        visible={showBidConfirmModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowBidConfirmModal(false)}
-      >
-        <View style={s.confirmModalBackdrop}>
-          <View style={s.confirmModalCard}>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 8 }}>
-              <View style={s.confirmModalHeader}>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.confirmModalTitle}>Confirm Your Bid</Text>
-                  <Text style={s.confirmModalSubtitle}>
-                    Review the bid details and bid fee before proceeding to
-                    payment.
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  onPress={() => setShowBidConfirmModal(false)}
-                  style={s.confirmModalClose}
-                >
-                  <X size={18} color={colors.mutedForeground} />
-                </TouchableOpacity>
-              </View>
-
-              <View style={s.confirmDetailsCard}>
-                <Text style={s.confirmLabel}>Your Bid Item</Text>
-                <Text style={s.confirmValuePrimary}>{auction.name}</Text>
-
-                <View style={s.confirmDivider} />
-
-                <View style={s.confirmRow}>
-                  <Text style={s.confirmLabel}>Your Bid Amount</Text>
-                  <Text style={s.confirmValue}>{formatCurrency(numericBid)}</Text>
-                </View>
-
-                <View style={s.confirmDivider} />
-
-                <View style={s.confirmRow}>
-                  <Text style={s.confirmLabel}>Bid Service Fee</Text>
-                  <Text style={s.confirmFeeValue}>
-                    {formatCurrency(auction.bidFee)} (Non-refundable)
-                  </Text>
-                </View>
-
-                <Text style={s.confirmBodyText}>
-                  The bid service fee is non-refundable and is paid to participate
-                  in the auction. Your bid amount is not charged when you place
-                  the bid. Only the winning bidder will later pay the winning bid
-                  amount, in addition to this participation fee.
-                </Text>
-              </View>
-
-              <TouchableOpacity
-                onPress={() => setBidAgreementAccepted((value) => !value)}
-                style={s.confirmAgreementRow}
-              >
-                <View
-                  style={[
-                    s.confirmCheckbox,
-                    bidAgreementAccepted ? s.confirmCheckboxChecked : null,
-                  ]}
-                >
-                  {bidAgreementAccepted ? (
-                    <CheckCircle2 size={16} color="#FFF" />
-                  ) : null}
-                </View>
-                <Text style={s.confirmAgreementText}>I agree to continue</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={handleConfirmPayment}
-                disabled={!bidAgreementAccepted}
-                style={[
-                  s.confirmContinueBtn,
-                  !bidAgreementAccepted ? s.confirmContinueBtnDisabled : null,
-                ]}
-              >
-                <Text style={s.confirmContinueBtnText}>
-                  Continue to{" "}
-                  {pendingPaymentMethod === "AWASH"
-                    ? "Awash Wallet"
-                    : "SikinaPay"}
-                </Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
 
       <Modal
         visible={showPinModal}
@@ -713,6 +575,29 @@ export function ProductScreen() {
   );
 }
 
+function StatusBarCustom() {
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        justifyContent: "space-between",
+        paddingHorizontal: 20,
+        paddingTop: 8,
+        paddingBottom: 4,
+      }}
+    >
+      <Text
+        style={{
+          fontSize: 13,
+          fontWeight: "600",
+          color: colors.navyForeground,
+        }}
+      >
+        9:41
+      </Text>
+    </View>
+  );
+}
 
 const s = StyleSheet.create({
   imageArea: {
@@ -900,132 +785,5 @@ const s = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
     padding: 16,
-  },
-  confirmModalBackdrop: {
-    flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: "rgba(15,23,42,0.48)",
-    padding: 16,
-  },
-  confirmModalCard: {
-    borderRadius: 28,
-    backgroundColor: colors.card,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
-    maxHeight: '90%',
-  },
-  confirmModalHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
-  },
-  confirmModalClose: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.secondary,
-  },
-  confirmModalTitle: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: colors.navy,
-  },
-  confirmModalSubtitle: {
-    marginTop: 6,
-    fontSize: 13,
-    lineHeight: 20,
-    color: colors.mutedForeground,
-  },
-  confirmDetailsCard: {
-    marginTop: 18,
-    borderRadius: 22,
-    backgroundColor: colors.secondary,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  confirmRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 12,
-    alignItems: "center",
-  },
-  confirmLabel: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: colors.mutedForeground,
-  },
-  confirmValuePrimary: {
-    marginTop: 8,
-    fontSize: 18,
-    fontWeight: "800",
-    color: colors.primary,
-  },
-  confirmValue: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: colors.emerald700,
-  },
-  confirmFeeValue: {
-    flex: 1,
-    textAlign: "right",
-    fontSize: 16,
-    fontWeight: "700",
-    color: colors.destructive,
-  },
-  confirmDivider: {
-    height: 1,
-    backgroundColor: colors.border,
-    marginVertical: 16,
-  },
-  confirmBodyText: {
-    marginTop: 18,
-    fontSize: 14,
-    lineHeight: 28,
-    color: colors.mutedForeground,
-  },
-  confirmAgreementRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    marginTop: 20,
-  },
-  confirmCheckbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.card,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  confirmCheckboxChecked: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  confirmAgreementText: {
-    fontSize: 15,
-    fontWeight: "500",
-    color: colors.navy,
-  },
-  confirmContinueBtn: {
-    marginTop: 22,
-    borderRadius: 16,
-    backgroundColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 15,
-  },
-  confirmContinueBtnDisabled: {
-    opacity: 0.45,
-  },
-  confirmContinueBtnText: {
-    fontSize: 15,
-    fontWeight: "800",
-    color: colors.primaryForeground,
   },
 });

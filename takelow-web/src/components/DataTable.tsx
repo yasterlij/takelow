@@ -1,6 +1,18 @@
 import { useState, useMemo, type ReactNode } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Loader2, Inbox, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Search, ArrowUpDown } from "lucide-react"
+import {
+  Loader2,
+  Inbox,
+  ChevronUp,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  Search,
+  ArrowUpDown,
+} from "lucide-react"
+import { windowedPages, PER_PAGE_OPTIONS } from "./Pagination"
 
 export type Column<T> = {
   key: string
@@ -46,6 +58,7 @@ export function DataTable<T>({
   const [sortKey, setSortKey] = useState<string | null>(null)
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
   const [page, setPage] = useState(0)
+  const [perPage, setPerPage] = useState(pageSize)
 
   const filtered = useMemo(() => {
     let result = [...rows]
@@ -77,10 +90,10 @@ export function DataTable<T>({
     return result
   }, [rows, search, sortKey, sortDir, columns])
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
-  const safePage = Math.min(page, totalPages - 1)
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
+  const safePage = Math.min(page, Math.max(0, totalPages - 1))
   const pageData = showPagination
-    ? filtered.slice(safePage * pageSize, safePage * pageSize + pageSize)
+    ? filtered.slice(safePage * perPage, safePage * perPage + perPage)
     : filtered
 
   const toggleSort = (key: string) => {
@@ -187,28 +200,84 @@ export function DataTable<T>({
         )}
       </div>
 
-      {showPagination && totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-xs font-medium text-neutral-400">
-            Showing {safePage * pageSize + 1}–{Math.min((safePage + 1) * pageSize, filtered.length)} of {filtered.length}
-          </p>
-          <div className="flex items-center gap-2">
+      {showPagination && filtered.length > 0 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-border/60 pt-3 text-xs text-neutral-600">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="font-medium text-neutral-500">
+              Showing <strong className="text-foreground">{safePage * perPage + 1}</strong>–<strong className="text-foreground">{Math.min((safePage + 1) * perPage, filtered.length)}</strong> of{" "}
+              <strong className="text-foreground">{filtered.length}</strong>
+            </span>
+
+            <div className="flex items-center gap-1.5 pl-3 border-l border-border/60">
+              <span className="text-neutral-400 font-medium">Rows:</span>
+              <select
+                value={perPage}
+                onChange={(e) => {
+                  setPerPage(Number(e.target.value))
+                  setPage(0)
+                }}
+                className="h-7 rounded-lg border border-border/60 bg-white px-2 text-xs font-bold text-foreground outline-none transition-colors hover:border-primary focus:border-primary"
+              >
+                {Array.from(new Set([10, 15, 20, 50, pageSize])).sort((a, b) => a - b).map((opt) => (
+                  <option key={opt} value={opt}>{opt} / page</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setPage(0)}
+              disabled={safePage === 0}
+              title="First Page"
+              className="flex size-7 items-center justify-center rounded-lg border border-border/60 bg-white text-neutral-600 transition-all hover:bg-neutral-50 disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <ChevronsLeft className="size-3.5" />
+            </button>
             <button
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={safePage === 0}
-              className="flex size-8 items-center justify-center rounded-lg border border-border/60 bg-white text-neutral-500 transition-all hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Previous Page"
+              className="flex size-7 items-center justify-center rounded-lg border border-border/60 bg-white text-neutral-600 transition-all hover:bg-neutral-50 disabled:opacity-30 disabled:cursor-not-allowed"
             >
-              <ChevronLeft className="size-4" />
+              <ChevronLeft className="size-3.5" />
             </button>
-            <span className="text-xs font-bold text-awash-blue tabular-nums">
-              {safePage + 1} / {totalPages}
-            </span>
+
+            <div className="flex items-center gap-1 mx-1">
+              {windowedPages(safePage + 1, totalPages).map((p, idx) =>
+                p === "…" ? (
+                  <span key={`dots-${idx}`} className="px-1 text-neutral-400 font-mono text-xs">…</span>
+                ) : (
+                  <button
+                    key={`page-${p}`}
+                    onClick={() => setPage((p as number) - 1)}
+                    className={`min-w-7 h-7 px-1.5 rounded-lg text-xs font-bold transition-all ${
+                      safePage + 1 === p
+                        ? "bg-primary text-primary-foreground shadow-xs"
+                        : "border border-border/60 bg-white hover:bg-neutral-100 text-neutral-700"
+                    }`}
+                  >
+                    {p}
+                  </button>
+                )
+              )}
+            </div>
+
             <button
               onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
               disabled={safePage >= totalPages - 1}
-              className="flex size-8 items-center justify-center rounded-lg border border-border/60 bg-white text-neutral-500 transition-all hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Next Page"
+              className="flex size-7 items-center justify-center rounded-lg border border-border/60 bg-white text-neutral-600 transition-all hover:bg-neutral-50 disabled:opacity-30 disabled:cursor-not-allowed"
             >
-              <ChevronRight className="size-4" />
+              <ChevronRight className="size-3.5" />
+            </button>
+            <button
+              onClick={() => setPage(totalPages - 1)}
+              disabled={safePage >= totalPages - 1}
+              title="Last Page"
+              className="flex size-7 items-center justify-center rounded-lg border border-border/60 bg-white text-neutral-600 transition-all hover:bg-neutral-50 disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <ChevronsRight className="size-3.5" />
             </button>
           </div>
         </div>

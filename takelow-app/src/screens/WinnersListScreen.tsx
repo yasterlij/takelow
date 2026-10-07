@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react'
+import React, { useState, useCallback, useMemo, useEffect } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, RefreshControl, Image, TextInput, Platform, StatusBar } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient'
@@ -11,10 +11,15 @@ import { formatCurrency, formatETB } from '../mockDataV0'
 export function WinnersListScreen() {
   const insets = useSafeAreaInsets()
   const topInset = Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 0)
-  const { go, auctions, refreshAuctions, selectAuction, user } = useApp()
+  const { go, goBack, auctions, refreshAuctions, selectAuction, user } = useApp()
   const [refreshing, setRefreshing] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterTab, setFilterTab] = useState<'all' | 'highest-savings' | 'my-wins'>('all')
+  const [displayCount, setDisplayCount] = useState(10)
+
+  useEffect(() => {
+    setDisplayCount(10)
+  }, [filterTab, searchQuery])
 
   const closedAuctions = useMemo(() => auctions.filter((a) => a.status === 'closed'), [auctions])
 
@@ -61,7 +66,7 @@ export function WinnersListScreen() {
       <StatusBar barStyle="light-content" />
       <LinearGradient colors={['#002B5C', '#001F3F']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ paddingTop: topInset + 6, paddingBottom: 16, paddingHorizontal: 16 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 56, marginBottom: 4 }}>
-          <TouchableOpacity onPress={() => go('home')} style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' }}>
+          <TouchableOpacity onPress={() => goBack()} style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' }}>
             <ArrowLeft size={20} color="#FFF" />
           </TouchableOpacity>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -148,7 +153,7 @@ export function WinnersListScreen() {
           </View>
         ) : (
           <View style={{ gap: 14 }}>
-            {filtered.map((a) => {
+            {filtered.slice(0, displayCount).map((a) => {
               const savings = a.winning_bid_amount != null && a.marketPrice > 0 ? Math.round((1 - a.winning_bid_amount / a.marketPrice) * 100) : 0
               const winnerCount = a.winnersCount ?? a.winners?.length ?? 0
               const primaryWinner = a.winners?.[0]
@@ -215,6 +220,34 @@ export function WinnersListScreen() {
                 </TouchableOpacity>
               )
             })}
+
+            {filtered.length > displayCount && (
+              <TouchableOpacity
+                onPress={() => setDisplayCount((prev) => prev + 10)}
+                style={{
+                  paddingVertical: 12,
+                  alignItems: 'center',
+                  backgroundColor: colors.card,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  marginTop: 6,
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>
+                  Load More Winners ({filtered.length - displayCount} remaining)
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {filtered.length > 0 && (
+              <View style={{ padding: 10, borderRadius: 10, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, alignItems: 'center', marginTop: 8 }}>
+                <Text style={{ fontSize: 11, fontWeight: '600', color: colors.mutedForeground }}>
+                  Showing {Math.min(displayCount, filtered.length)} of {filtered.length} closed auctions
+                </Text>
+              </View>
+            )}
           </View>
         )}
       </ScrollView>

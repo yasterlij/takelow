@@ -1218,7 +1218,7 @@ export function AdminAuctionMonitorScreen() {
                       variant="navy"
                       onPress={() => {
                         setShowWinner(false);
-                        go("admin-monitor");
+                        goBack();
                       }}
                     >
                       Back to List

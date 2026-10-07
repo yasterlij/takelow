@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react"
+import { useMemo, useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { Trophy, ArrowLeft, Users, Clock, CreditCard, Gavel, Sparkles, Loader2 } from "lucide-react"
 import { useApp } from "../AppContext"
 import { Card, Badge } from "../components/AuctionUI"
 import { formatCurrency, formatETB } from "../mockDataV0"
+import { usePagination, PaginationBar } from "../components/Pagination"
 
 export function ClosedAuctionsScreen() {
   const { go, goBack, selectAuction, auctions, auctionsLoading } = useApp()
@@ -20,6 +21,12 @@ export function ClosedAuctionsScreen() {
     if (filter === "paid") return closedAuctions.filter((a) => a.winners?.some((w) => w.payment_status === "PAID"))
     return closedAuctions
   }, [closedAuctions, filter])
+
+  const { page, setPage, perPage, setPerPage, totalPages, paginated, resetPage } = usePagination(filtered, 10)
+
+  useEffect(() => {
+    resetPage()
+  }, [filter, resetPage])
 
   return (
     <motion.div
@@ -87,7 +94,7 @@ export function ClosedAuctionsScreen() {
         >
           <Trophy className="size-10 text-neutral-300" />
           <p className="text-sm font-medium text-neutral-400">No closed auctions yet</p>
-          <button onClick={() => go("home")} className="text-sm font-semibold text-primary transition-colors hover:text-awash-gold-dark">Back to Home</button>
+            <button onClick={() => goBack()} className="text-sm font-semibold text-primary transition-colors hover:text-awash-gold-dark">Back to Home</button>
         </motion.div>
       ) : (
         <motion.div
@@ -97,7 +104,7 @@ export function ClosedAuctionsScreen() {
           }}
           className="flex flex-col gap-4"
         >
-          {filtered.map((auction) => {
+          {paginated.map((auction) => {
             const winners = auction.winners || []
             const paidCount = winners.filter((w) => w.payment_status === "PAID").length
             const totalWinners = winners.length
@@ -188,6 +195,17 @@ export function ClosedAuctionsScreen() {
             )
           })}
         </motion.div>
+      )}
+
+      {filtered.length > 0 && (
+        <PaginationBar
+          page={page}
+          totalPages={totalPages}
+          totalItems={filtered.length}
+          perPage={perPage}
+          onPageChange={setPage}
+          onPerPageChange={setPerPage}
+        />
       )}
     </motion.div>
   )

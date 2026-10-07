@@ -13,11 +13,8 @@ import {
   PartyPopper,
   ShieldQuestion,
   X,
-  Send,
   RotateCcw,
-  Calendar,
   Gavel,
-  Sparkles,
   ArrowRight,
 } from "lucide-react";
 import { useApp } from "../AppContext";
@@ -30,6 +27,8 @@ import {
 } from "../api";
 import { formatCurrency } from "../mockDataV0";
 import { toast } from "../store/toast.store";
+import { AuctionReopenModal } from "../components/admin";
+import { DisputeModal } from "../components/DisputeModal";
 
 const confettiParticles = Array.from({ length: 20 }, (_, i) => ({
   id: i,
@@ -38,11 +37,6 @@ const confettiParticles = Array.from({ length: 20 }, (_, i) => ({
   duration: `${0.8 + Math.random() * 0.8}s`,
   color: i % 3 === 0 ? "#0071e3" : i % 3 === 1 ? "#1d1d1f" : "#86868b",
 }));
-
-function toDatetimeLocal(date: Date): string {
-  const pad = (n: number) => n.toString().padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
 
 function formatDeadlineRemaining(hrs: number | null): string {
   if (hrs == null) return "";
@@ -72,85 +66,8 @@ export function WinnerScreen() {
   const [bidsPage, setBidsPage] = useState(0);
 
   const [disputeModalOpen, setDisputeModalOpen] = useState(false);
-  const [disputeType, setDisputeType] = useState("WINNER_DISPUTE");
-  const [disputeDesc, setDisputeDesc] = useState("");
-  const [disputeSubmitting, setDisputeSubmitting] = useState(false);
-
   const [reopenModalOpen, setReopenModalOpen] = useState(false);
-  const [reopenConfirming, setReopenConfirming] = useState(false);
-  const [reopening, setReopening] = useState(false);
-  const [reopenForm, setReopenForm] = useState({
-    startTime: toDatetimeLocal(new Date()),
-    endTime: toDatetimeLocal(new Date(Date.now() + 7 * 86400000)),
-    minBid: "",
-    maxBid: "",
-    bidFee: "10",
-    name: "",
-    category: "",
-    marketPrice: "",
-    description: "",
-  });
-
-  const openReopenModal = () => {
-    if (!auction) return;
-    setReopenForm({
-      startTime: toDatetimeLocal(new Date()),
-      endTime: toDatetimeLocal(new Date(Date.now() + 7 * 86400000)),
-      minBid: auction.minBid != null ? String(auction.minBid) : "",
-      maxBid: auction.maxBid != null ? String(auction.maxBid) : "",
-      bidFee: auction.bidFee != null ? String(auction.bidFee) : "10",
-      name: auction.name || "",
-      category: auction.category || "",
-      marketPrice: auction.marketPrice ? String(auction.marketPrice) : "",
-      description: auction.description || "",
-    });
-    setReopenConfirming(false);
-    setReopenModalOpen(true);
-  };
-
-  const handleReopenSubmit = async () => {
-    if (!auction) return;
-    setReopening(true);
-    try {
-      await reopenAuction(auction.id, {
-        start_time: new Date(reopenForm.startTime).toISOString(),
-        end_time: new Date(reopenForm.endTime).toISOString(),
-        min_bid: reopenForm.minBid ? Number(reopenForm.minBid) : undefined,
-        max_bid: reopenForm.maxBid ? Number(reopenForm.maxBid) : undefined,
-        bid_fee: reopenForm.bidFee ? Number(reopenForm.bidFee) : undefined,
-        name: reopenForm.name || undefined,
-        category: reopenForm.category || undefined,
-        current_market_price: reopenForm.marketPrice ? Number(reopenForm.marketPrice) : undefined,
-        description: reopenForm.description || undefined,
-      });
-      setReopenModalOpen(false);
-      go("admin-auctions");
-    } catch {
-      // error handled in AppContext
-    } finally {
-      setReopening(false);
-    }
-  };
-
-  const handleDisputeSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!disputeDesc.trim() || !auction) return;
-    setDisputeSubmitting(true);
-    try {
-      await api.createDispute({
-        auction_id: auction.id,
-        type: disputeType,
-        description: disputeDesc.trim(),
-      });
-      toast("Your claim has been submitted to the governance audit team.", "success");
-      setDisputeModalOpen(false);
-      setDisputeDesc("");
-    } catch (err: any) {
-      toast(err.message || "Failed to submit inquiry", "error");
-    } finally {
-      setDisputeSubmitting(false);
-    }
-  };
+  const openReopenModal = () => setReopenModalOpen(true);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -323,7 +240,7 @@ export function WinnerScreen() {
           <AlertTriangle className="size-10 text-amber-400" />
           <p className="text-sm font-medium text-neutral-500">{error}</p>
           <button
-            onClick={() => go("home")}
+              onClick={() => goBack()}
             className="text-sm font-semibold text-primary hover:underline"
           >
             Back to Dashboard
@@ -333,7 +250,7 @@ export function WinnerScreen() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="flex w-full max-w-2xl flex-col items-center gap-6"
+          className="flex w-full flex-col gap-6"
         >
           {/* ── Trophy / Live Icon ── */}
           <motion.div
@@ -395,7 +312,7 @@ export function WinnerScreen() {
             <motion.div
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              className="w-full max-w-md rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50/50 p-4 text-center shadow-sm"
+              className="w-full rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50/50 p-4 text-center shadow-sm"
             >
               <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-emerald-800">
                 <span className="relative flex h-2 w-2">
@@ -427,7 +344,7 @@ export function WinnerScreen() {
             <motion.div
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              className="w-full max-w-md rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50/50 p-4 text-center shadow-sm"
+              className="w-full rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50/50 p-4 text-center shadow-sm"
             >
               <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-amber-800">
                 <RotateCcw className="size-3.5 text-amber-600" /> Unsold Auction Relisting
@@ -449,7 +366,7 @@ export function WinnerScreen() {
             <motion.div
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              className="w-full max-w-md rounded-2xl border border-primary/30 bg-primary/10 p-4 text-left shadow-sm"
+              className="w-full rounded-2xl border border-primary/30 bg-primary/10 p-4 text-left shadow-sm"
             >
               <div className="flex items-center gap-2 text-primary font-extrabold text-sm">
                 <Trophy className="size-4" />
@@ -467,7 +384,7 @@ export function WinnerScreen() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              className="w-full max-w-md"
+              className="w-full"
             >
               <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-awash-gold/10 via-awash-gold-light/5 to-white/50 backdrop-blur-sm p-6 shadow-[0_4px_20px_rgba(200,166,66,0.06)]">
                 <div className="mx-auto flex size-24 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-awash-blue/10 via-white to-awash-gold/10 border border-border/60 p-1 shadow-[0_12px_32px_rgba(0,43,92,0.16)]">
@@ -553,7 +470,7 @@ export function WinnerScreen() {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
-            className="w-full max-w-md rounded-2xl border border-primary/20 bg-gradient-to-br from-awash-gold/10 to-awash-gold-light/5 backdrop-blur-sm p-4"
+            className="w-full rounded-2xl border border-primary/20 bg-gradient-to-br from-awash-gold/10 to-awash-gold-light/5 backdrop-blur-sm p-4"
           >
             <div className="flex items-start gap-2">
               <Info className="size-4 text-primary mt-0.5 flex-shrink-0" />
@@ -577,7 +494,7 @@ export function WinnerScreen() {
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.33 }}
-              className="w-full max-w-md rounded-2xl border border-awash-blue/15 bg-white/85 backdrop-blur-sm p-4 shadow-sm"
+              className="w-full rounded-2xl border border-awash-blue/15 bg-white/85 backdrop-blur-sm p-4 shadow-sm"
             >
               <div className="flex items-start gap-2">
                 <Info className="mt-0.5 size-4 flex-shrink-0 text-awash-blue" />
@@ -644,7 +561,7 @@ export function WinnerScreen() {
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.35 }}
-              className="w-full max-w-md rounded-2xl border border-primary/20 bg-white/80 backdrop-blur-sm p-4"
+              className="w-full rounded-2xl border border-primary/20 bg-white/80 backdrop-blur-sm p-4"
             >
               <div className="flex items-center gap-1.5 mb-3">
                 <Users className="size-4 text-primary" />
@@ -751,7 +668,7 @@ export function WinnerScreen() {
 
           {/* ── My Bid Info ── */}
           {myBidInfo && (
-            <div className="w-full max-w-md rounded-2xl border border-primary/20 bg-white/80 backdrop-blur-sm p-4">
+            <div className="w-full rounded-2xl border border-primary/20 bg-white/80 backdrop-blur-sm p-4">
               <h3 className="mb-2 text-sm font-bold text-foreground">
                 Your Bid
               </h3>
@@ -778,7 +695,7 @@ export function WinnerScreen() {
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 }}
-              className="w-full max-w-md rounded-2xl border border-blue-200/60 bg-gradient-to-br from-blue-50 to-blue-100/30 p-4"
+              className="w-full rounded-2xl border border-blue-200/60 bg-gradient-to-br from-blue-50 to-blue-100/30 p-4"
             >
               <div className="flex items-start gap-2">
                 <Info className="size-4 text-primary mt-0.5 flex-shrink-0" />
@@ -826,7 +743,7 @@ export function WinnerScreen() {
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.45 }}
-              className="w-full max-w-md rounded-2xl border border-border/60 bg-white/80 backdrop-blur-sm p-4"
+              className="w-full rounded-2xl border border-border/60 bg-white/80 backdrop-blur-sm p-4"
             >
               <div className="mb-3 flex items-center justify-between">
                 <div>
@@ -958,11 +875,11 @@ export function WinnerScreen() {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5 }}
-            className="w-full max-w-md space-y-2"
+            className="w-full space-y-2"
           >
             {winner.winner_user_id && isUserWinner ? (
               userWinnerInfo?.payment_status === "PAID" ? (
-                <button onClick={() => go("home")} className="btn-primary">
+                <button onClick={() => goBack()} className="btn-primary">
                   <CheckCircle2 className="size-[18px]" /> Payment Complete —
                   Back Home
                 </button>
@@ -971,7 +888,7 @@ export function WinnerScreen() {
                   <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-3 text-center text-xs font-semibold text-destructive">
                     This auction is no longer eligible for payment. The payment deadline has expired.
                   </div>
-                  <button onClick={() => go("home")} className="btn-outline">
+                  <button onClick={() => goBack()} className="btn-outline">
                     Back to Dashboard
                   </button>
                 </div>
@@ -989,7 +906,7 @@ export function WinnerScreen() {
                 </button>
               )
             ) : (
-              <button onClick={() => go("home")} className="btn-outline">
+              <button onClick={() => goBack()} className="btn-outline">
                 Back to Home
               </button>
             )}
@@ -1004,245 +921,24 @@ export function WinnerScreen() {
       ) : null}
 
       {/* ── Dispute / Claim Modal ── */}
-      {disputeModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-          <motion.div
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.95, opacity: 0 }}
-            className="w-full max-w-md rounded-2xl border border-border/60 bg-white p-6 shadow-xl"
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-foreground">
-                <ShieldQuestion className="size-5 text-primary" />
-                <h3 className="font-display text-base font-bold">Submit Auction Inquiry</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setDisputeModalOpen(false)}
-                className="rounded-full p-1 text-neutral-400 hover:text-foreground"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-
-            <p className="mt-2 text-xs text-neutral-500">
-              File an inquiry or transparency review for <strong className="text-foreground">{auction.name}</strong>. Our audit committee reviews all bid frequency logs.
-            </p>
-
-            <form onSubmit={handleDisputeSubmit} className="mt-4 space-y-3">
-              <div>
-                <label className="text-xs font-semibold text-foreground">Inquiry Type</label>
-                <select
-                  value={disputeType}
-                  onChange={(e) => setDisputeType(e.target.value)}
-                  className="mt-1.5 w-full rounded-xl border border-border/60 bg-white px-3 py-2 text-xs text-foreground focus:border-primary focus:outline-none shadow-sm"
-                >
-                  <option value="WINNER_DISPUTE">Winner Determination / Unique Bid Verification</option>
-                  <option value="BID_DISPUTE">Bid Registration or Nonce Dispute</option>
-                  <option value="PAYMENT_DISPUTE">Participation Fee / Payment Inquiry</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-foreground">Explanation / Claim</label>
-                <textarea
-                  required
-                  rows={4}
-                  value={disputeDesc}
-                  onChange={(e) => setDisputeDesc(e.target.value)}
-                  placeholder="Describe what you observed (e.g. Your bid amount, transaction details)..."
-                  className="mt-1.5 w-full rounded-xl border border-border/60 bg-white p-3 text-xs text-foreground placeholder:text-neutral-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-sm"
-                />
-              </div>
-
-              <div className="mt-6 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setDisputeModalOpen(false)}
-                  className="rounded-xl border border-border/60 bg-white px-4 py-2 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={disputeSubmitting || !disputeDesc.trim()}
-                  className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground shadow-sm hover:opacity-90 transition-opacity disabled:opacity-50"
-                >
-                  {disputeSubmitting ? <Loader2 className="size-3 animate-spin" /> : <Send className="size-3" />}
-                  Submit Claim
-                </button>
-              </div>
-            </form>
-          </motion.div>
-        </div>
+      {auction && (
+        <DisputeModal
+          isOpen={disputeModalOpen}
+          auctionId={auction.id}
+          auctionName={auction.name}
+          onClose={() => setDisputeModalOpen(false)}
+        />
       )}
 
       {/* ── Reopen Auction Modal ── */}
-      {reopenModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-scale-in">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 16 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl border border-awash-gold/30 bg-white p-6 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={() => { setReopenModalOpen(false); setReopenConfirming(false); }}
-              className="absolute right-4 top-4 rounded-xl p-1.5 text-neutral-400 hover:bg-neutral-100"
-            >
-              <X className="size-5" />
-            </button>
-
-            <div className="flex items-center gap-3">
-              <div className="flex size-11 items-center justify-center rounded-2xl bg-amber-50 border border-amber-200/60 text-amber-700">
-                <RotateCcw className="size-5.5" />
-              </div>
-              <div>
-                <h2 className="font-display text-lg font-bold text-awash-blue">Reopen Unsold Auction</h2>
-                <p className="text-xs font-medium text-neutral-500">
-                  Re-list "{auction.name}" with a fresh bidding window
-                </p>
-              </div>
-            </div>
-
-            {!reopenConfirming ? (
-              <div className="mt-5 space-y-4">
-                <div className="flex items-start gap-2.5 rounded-2xl border border-amber-200/80 bg-gradient-to-br from-amber-50 to-orange-50/60 p-3.5 text-xs text-amber-900">
-                  <AlertTriangle className="size-4 shrink-0 mt-0.5 text-amber-600" />
-                  <div>
-                    <p className="font-bold">Lifecycle State Reset Notice</p>
-                    <p className="mt-0.5 text-[11px] text-amber-800 leading-relaxed">
-                      Reopening transitions this auction back to <strong>ACTIVE</strong>. Prior bids below reserve are archived, prior winner records are purged, and Redis tallies are cleared for a clean start.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-border/70 bg-neutral-50/70 p-3.5 space-y-3">
-                  <div className="flex items-center gap-2 text-xs font-bold text-awash-blue">
-                    <Calendar className="size-3.5 text-primary" /> Schedule New Duration
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-500 mb-1">New Start Time</label>
-                      <input
-                        type="datetime-local"
-                        value={reopenForm.startTime}
-                        onChange={(e) => setReopenForm({ ...reopenForm, startTime: e.target.value })}
-                        className="w-full rounded-xl border border-border/60 bg-white px-3 py-2 text-xs text-foreground outline-none focus:border-primary"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-500 mb-1">New End Time</label>
-                      <input
-                        type="datetime-local"
-                        value={reopenForm.endTime}
-                        onChange={(e) => setReopenForm({ ...reopenForm, endTime: e.target.value })}
-                        className="w-full rounded-xl border border-border/60 bg-white px-3 py-2 text-xs text-foreground outline-none focus:border-primary"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-border/70 bg-neutral-50/70 p-3.5 space-y-3">
-                  <div className="flex items-center gap-2 text-xs font-bold text-awash-blue">
-                    <Gavel className="size-3.5 text-primary" /> Pricing & Bidding Rules
-                  </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                    <div>
-                      <label className="block text-[10px] font-bold text-neutral-500 mb-1">Market Price</label>
-                      <input
-                        value={reopenForm.marketPrice}
-                        onChange={(e) => setReopenForm({ ...reopenForm, marketPrice: e.target.value.replace(/[^\d.]/g, "") })}
-                        placeholder="e.g. 50000"
-                        className="w-full rounded-xl border border-border/60 bg-white px-2.5 py-1.5 text-xs text-foreground outline-none focus:border-primary"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-neutral-500 mb-1">Bid Fee (ETB)</label>
-                      <input
-                        value={reopenForm.bidFee}
-                        onChange={(e) => setReopenForm({ ...reopenForm, bidFee: e.target.value.replace(/[^\d.]/g, "") })}
-                        placeholder="e.g. 10"
-                        className="w-full rounded-xl border border-border/60 bg-white px-2.5 py-1.5 text-xs text-foreground outline-none focus:border-primary"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-neutral-500 mb-1">Min Bids (Reserve)</label>
-                      <input
-                        value={reopenForm.minBid}
-                        onChange={(e) => setReopenForm({ ...reopenForm, minBid: e.target.value.replace(/[^\d]/g, "") })}
-                        placeholder="None"
-                        className="w-full rounded-xl border border-border/60 bg-white px-2.5 py-1.5 text-xs text-foreground outline-none focus:border-primary"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-neutral-500 mb-1">Max Bids</label>
-                      <input
-                        value={reopenForm.maxBid}
-                        onChange={(e) => setReopenForm({ ...reopenForm, maxBid: e.target.value.replace(/[^\d]/g, "") })}
-                        placeholder="None"
-                        className="w-full rounded-xl border border-border/60 bg-white px-2.5 py-1.5 text-xs text-foreground outline-none focus:border-primary"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-end gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setReopenModalOpen(false)}
-                    className="rounded-xl border border-border px-4 py-2 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setReopenConfirming(true)}
-                    className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-awash-gold to-awash-gold-light px-5 py-2 text-xs font-bold text-awash-blue shadow-md hover:shadow-lg"
-                  >
-                    Review & Reopen <Sparkles className="size-3.5" />
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="mt-6 space-y-4 text-center">
-                <div className="mx-auto flex size-14 items-center justify-center rounded-full bg-emerald-50 border border-emerald-200 text-emerald-600">
-                  <CheckCircle2 className="size-7" />
-                </div>
-                <div>
-                  <h3 className="font-display text-base font-bold text-awash-blue">Confirm Auction Reopening</h3>
-                  <p className="mt-1 text-xs text-neutral-600 max-w-md mx-auto">
-                    Are you sure you want to reopen <strong>"{auction.name}"</strong> until{" "}
-                    <span className="font-bold text-awash-blue">
-                      {new Date(reopenForm.endTime).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}
-                    </span>?
-                  </p>
-                </div>
-
-                <div className="flex items-center justify-center gap-3 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => setReopenConfirming(false)}
-                    disabled={reopening}
-                    className="rounded-xl border border-border px-4 py-2 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
-                  >
-                    Go Back & Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleReopenSubmit}
-                    disabled={reopening}
-                    className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-2 text-xs font-bold text-white shadow-lg shadow-emerald-600/20 hover:shadow-emerald-600/30 disabled:opacity-50"
-                  >
-                    {reopening ? "Reopening..." : <><RotateCcw className="size-3.5" /> Confirm & Reopen Now</>}
-                  </button>
-                </div>
-              </div>
-            )}
-          </motion.div>
-        </div>
-      )}
-    </motion.div>
+      <AuctionReopenModal
+        auction={reopenModalOpen && auction ? auction : null}
+        onClose={() => setReopenModalOpen(false)}
+        onSuccess={() => {
+          setReopenModalOpen(false);
+          go("admin-auctions");
+        }}
+      />
+      </motion.div>
   );
 }

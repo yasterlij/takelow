@@ -10,7 +10,7 @@ import { api } from '../api'
 
 export function ClosedScreen() {
   const insets = useSafeAreaInsets()
-  const { go, selectedId, user, getAuction } = useApp()
+  const { go, goBack, selectedId, user, getAuction } = useApp()
   const auction = getAuction(selectedId)
   const isAdmin = user?.role === 'admin'
   const [progress, setProgress] = useState(0)
@@ -54,7 +54,7 @@ export function ClosedScreen() {
     <View style={{ flex: 1, backgroundColor: colors.neutralGray50 }}>
       <AppBar
         title="Auction Closed"
-        onBack={() => go('home')}
+        onBack={() => goBack()}
         right={<AwashLogo variant="light" size={22} />}
       />
 
@@ -180,7 +180,7 @@ export function ClosedScreen() {
             )}
           </CTAButton>
         ) : (
-          <CTAButton variant="outline" onPress={() => go('home')}>Back to Home</CTAButton>
+          <CTAButton variant="outline" onPress={() => goBack()}>Back to Home</CTAButton>
         )}
       </Card>
     </View>

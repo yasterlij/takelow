@@ -1,27 +1,33 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { PrismaService } from "../../prisma/prisma.service";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { Auction } from "./entities/auction.entity";
+import { Bid } from "../bidding/entities/bid.entity";
 import { NotificationDispatchService } from "../worker/notification-dispatch.service";
 
-const PAYMENT_DEADLINE_HOURS = Number(process.env.PAYMENT_DEADLINE_HOURS) || 30 * 24;
+const PAYMENT_DEADLINE_HOURS = 24;
 
 @Injectable()
 export class AuctionClosureEventsService {
   private readonly logger = new Logger(AuctionClosureEventsService.name);
 
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectRepository(Auction)
+    private auctionRepository: Repository<Auction>,
+    @InjectRepository(Bid)
+    private bidRepository: Repository<Bid>,
     private notificationDispatchService: NotificationDispatchService,
   ) {}
 
   async notifyFairPlayExtension(auctionId: string): Promise<void> {
-    const auction = await this.prisma.repository("auction").findOne({
+    const auction = await this.auctionRepository.findOne({
       where: { id: auctionId },
-      include: { product: true },
+      relations: ["product"],
     });
     if (!auction) return;
 
     const productName = auction.product?.name || auctionId;
-    const totalBids = await this.prisma.repository("bid").count({
+    const totalBids = await this.bidRepository.count({
       where: { auction_id: auctionId },
     });
 
@@ -37,14 +43,14 @@ export class AuctionClosureEventsService {
   }
 
   async notifyForcedClosure(auctionId: string): Promise<void> {
-    const auction = await this.prisma.repository("auction").findOne({
+    const auction = await this.auctionRepository.findOne({
       where: { id: auctionId },
-      include: { product: true },
+      relations: ["product"],
     });
     if (!auction) return;
 
     const productName = auction.product?.name || auctionId;
-    const totalBids = await this.prisma.repository("bid").count({
+    const totalBids = await this.bidRepository.count({
       where: { auction_id: auctionId },
     });
 
@@ -59,12 +65,12 @@ export class AuctionClosureEventsService {
   }
 
   async notifyWinners(
-    auction: any,
+    auction: Auction,
     winners: { amount: number; userId: string }[],
   ): Promise<void> {
-    const auctionWithProduct = await this.prisma.repository("auction").findOne({
+    const auctionWithProduct = await this.auctionRepository.findOne({
       where: { id: auction.id },
-      include: { product: true },
+      relations: ["product"],
     });
     const productName = auctionWithProduct?.product?.name || auction.id;
     const productDescription =

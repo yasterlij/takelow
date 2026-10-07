@@ -81,6 +81,7 @@ export interface UnifiedTransactionRow {
   id: string;
   type: string;
   payment_type: string;
+  category: 'AUCTION' | 'WALLET';
   amount: number;
   status: string;
   gateway: string | null;
@@ -90,6 +91,7 @@ export interface UnifiedTransactionRow {
   user_phone: string | null;
   user_name: string | null;
   reference_id: string | null;
+  ticket_number?: string | null;
   created_at: string;
   escalation_flag: string | null;
 }
@@ -104,6 +106,8 @@ export interface TransactionsListResponse {
   };
   summary: {
     total_volume: number;
+    auction_volume: number;
+    wallet_topup_volume: number;
     winning_bid_volume: number;
     bid_fee_volume: number;
     deposit_volume: number;
@@ -111,6 +115,8 @@ export interface TransactionsListResponse {
     successful_count: number;
     pending_count: number;
     defaulted_count: number;
+    auction_transactions_count: number;
+    wallet_transactions_count: number;
   };
 }
 
@@ -286,61 +292,103 @@ export class AdminTransactionsService {
       throw new NotFoundException(`Auction not found: ${auctionId}`);
     }
 
-    const [bids, winnerPayments, feePayments, refunds, escalations, customConfig] =
-      await Promise.all([
-        this.prisma.bid.findMany({
-          where: { auction_id: auctionId },
-          include: {
-            user: {
-              select: {
-                id: true,
-                phone_number: true,
-                full_name: true,
-              },
+    const [
+      bids,
+      winnerPayments,
+      feePaymentsGateway,
+      feePaymentsWallet,
+      refunds,
+      escalations,
+      customConfig,
+    ] = await Promise.all([
+      this.prisma.bid.findMany({
+        where: { auction_id: auctionId },
+        include: {
+          user: {
+            select: {
+              id: true,
+              phone_number: true,
+              full_name: true,
             },
           },
-          orderBy: { bid_time: 'desc' },
-        }),
-        this.prisma.paymentTransaction.findMany({
-          where: {
-            auction_id: auctionId,
-            payment_type: 'WINNING_BID',
+        },
+        orderBy: { bid_time: 'desc' },
+      }),
+      this.prisma.paymentTransaction.findMany({
+        where: {
+          OR: [
+            { auction_id: auctionId, payment_type: 'WINNING_BID' },
+            { client_reference_id: { startsWith: `win-${auctionId}` } },
+            { auction_id: auctionId, payment_type: 'WALLET' },
+            { auction_id: auctionId, client_reference_id: { startsWith: 'win-' } },
+          ],
+        },
+        orderBy: { created_at: 'desc' },
+      }),
+      this.prisma.paymentTransaction.findMany({
+        where: {
+          auction_id: auctionId,
+          OR: [
+            { payment_type: 'BID_FEE' },
+            { client_reference_id: { startsWith: 'fee-' } },
+          ],
+        },
+        orderBy: { created_at: 'desc' },
+      }),
+      this.prisma.transaction.findMany({
+        where: {
+          reference_id: auctionId,
+          type: 'BID_FEE',
+        },
+        orderBy: { created_at: 'desc' },
+      }),
+      this.prisma.transaction.findMany({
+        where: {
+          reference_id: auctionId,
+          type: 'REFUND',
+        },
+        orderBy: { created_at: 'desc' },
+      }),
+      this.prisma.auditLog.findMany({
+        where: {
+          entity_id: auctionId,
+          action: {
+            in: [
+              'PRIMARY_WINNER_ASSIGNED',
+              'PRIMARY_WINNER_DEFAULTED',
+              'SECOND_WINNER_ASSIGNED',
+              'PAYMENT_REMINDER_SENT',
+              'AUCTION_CLOSED',
+              'PAYMENT_CONFIRMED',
+              'DEADLINE_EXTENDED',
+            ],
           },
-          orderBy: { created_at: 'desc' },
-        }),
-        this.prisma.transaction.findMany({
-          where: {
-            reference_id: auctionId,
-            type: 'BID_FEE',
-          },
-          orderBy: { created_at: 'desc' },
-        }),
-        this.prisma.transaction.findMany({
-          where: {
-            reference_id: auctionId,
-            type: 'REFUND',
-          },
-          orderBy: { created_at: 'desc' },
-        }),
-        this.prisma.auditLog.findMany({
-          where: {
-            entity_id: auctionId,
-            action: {
-              in: [
-                'PRIMARY_WINNER_ASSIGNED',
-                'PRIMARY_WINNER_DEFAULTED',
-                'SECOND_WINNER_ASSIGNED',
-                'PAYMENT_REMINDER_SENT',
-                'AUCTION_CLOSED',
-                'PAYMENT_CONFIRMED',
-                'DEADLINE_EXTENDED',
-              ],
-            },
-          },
-          orderBy: { created_at: 'desc' },
-        }),
-        this.getAuctionSettlementConfig(auctionId),
-      ]);
+        },
+        orderBy: { created_at: 'desc' },
+      }),
+      this.getAuctionSettlementConfig(auctionId),
+    ]);
+
+    const combinedFeePayments = [
+      ...feePaymentsGateway.map((f) => ({
+        id: f.id,
+        amount: Number(f.amount),
+        user_id: f.user_id,
+        type: 'BID_FEE',
+        reference_id: f.client_reference_id,
+        gateway: f.gateway || 'SIKINAPAY',
+        created_at: f.created_at.toISOString(),
+      })),
+      ...feePaymentsWallet.map((f) => ({
+        id: f.id,
+        amount: Number(f.amount),
+        user_id: f.user_id,
+        type: f.type,
+        reference_id: f.reference_id,
+        gateway: 'AWASH_WALLET',
+        created_at: f.created_at.toISOString(),
+      })),
+    ];
 
     const winningAmount =
       customConfig?.winning_price != null
@@ -348,7 +396,10 @@ export class AdminTransactionsService {
         : Number(auction.winning_bid_amount || 0);
 
     const bidFee = Number(auction.bid_fee || 0);
-    const feePaymentsSum = feePayments.reduce((s, f) => s + Number(f.amount), 0);
+    const feePaymentsSum = combinedFeePayments.reduce(
+      (s, f) => s + Number(f.amount),
+      0,
+    );
     const autoBidFees =
       feePaymentsSum > 0 ? feePaymentsSum : bids.length * bidFee;
     const totalBidFeesCollected =
@@ -447,13 +498,13 @@ export class AdminTransactionsService {
         client_reference_id: p.client_reference_id,
         created_at: p.created_at.toISOString(),
       })),
-      fee_payments: feePayments.map((f) => ({
+      fee_payments: combinedFeePayments.map((f) => ({
         id: f.id,
         amount: Number(f.amount),
         user_id: f.user_id,
         type: f.type,
         reference_id: f.reference_id,
-        created_at: f.created_at.toISOString(),
+        created_at: f.created_at,
       })),
       refunds: refunds.map((r) => ({
         id: r.id,
@@ -478,6 +529,7 @@ export class AdminTransactionsService {
       auction_id?: string;
       user_id?: string;
       type?: string;
+      category?: string;
       status?: string;
       start?: string;
       end?: string;
@@ -489,76 +541,116 @@ export class AdminTransactionsService {
     const startDate = filters.start ? new Date(filters.start) : new Date(0);
     const endDate = filters.end ? new Date(filters.end) : new Date();
 
-    const [paymentTxns, walletTxns] = await Promise.all([
-      this.prisma.paymentTransaction.findMany({
-        where: {
-          created_at: {
-            gte: startDate,
-            lte: endDate,
-          },
-          ...(filters.auction_id ? { auction_id: filters.auction_id } : {}),
-          ...(filters.user_id ? { user_id: filters.user_id } : {}),
-          ...(filters.status && filters.status !== 'all'
-            ? { status: filters.status as any }
-            : {}),
-          ...(filters.type && filters.type !== 'all'
-            ? filters.type === 'WINNING_BID' || filters.type === 'BID_FEE'
-              ? { payment_type: filters.type as any }
-              : { id: 'none' }
-            : {}),
-        },
-        include: {
-          user: {
-            select: {
-              id: true,
-              phone_number: true,
-              full_name: true,
+    const fetchAuctionTxns = !filters.category || filters.category === 'all' || filters.category === 'auction';
+    const fetchWalletTxns = !filters.category || filters.category === 'all' || filters.category === 'wallet';
+
+    const [paymentTxns, walletTxns, bids] = await Promise.all([
+      fetchAuctionTxns || (!filters.type || filters.type === 'all' || filters.type === 'WINNING_BID' || filters.type === 'BID_FEE')
+        ? this.prisma.paymentTransaction.findMany({
+            where: {
+              created_at: {
+                gte: startDate,
+                lte: endDate,
+              },
+              ...(filters.auction_id ? { auction_id: filters.auction_id } : {}),
+              ...(filters.user_id ? { user_id: filters.user_id } : {}),
+              ...(filters.status && filters.status !== 'all'
+                ? { status: filters.status as any }
+                : {}),
             },
-          },
-          auction: {
             include: {
-              product: {
-                select: { name: true },
+              user: {
+                select: {
+                  id: true,
+                  phone_number: true,
+                  full_name: true,
+                },
+              },
+              auction: {
+                include: {
+                  product: {
+                    select: { name: true },
+                  },
+                },
               },
             },
-          },
-        },
-        orderBy: { created_at: 'desc' },
-      }),
-      this.prisma.transaction.findMany({
-        where: {
-          created_at: {
-            gte: startDate,
-            lte: endDate,
-          },
-          ...(filters.user_id ? { user_id: filters.user_id } : {}),
-          ...(filters.auction_id ? { reference_id: filters.auction_id } : {}),
-          ...(filters.type && filters.type !== 'all'
-            ? filters.type === 'DEPOSIT' || filters.type === 'REFUND'
-              ? { type: filters.type as any }
-              : { id: 'none' }
-            : {}),
-        },
-        include: {
-          user: {
-            select: {
-              id: true,
-              phone_number: true,
-              full_name: true,
+            orderBy: { created_at: 'desc' },
+          })
+        : Promise.resolve([]),
+      fetchWalletTxns || (!filters.type || filters.type === 'all' || filters.type === 'DEPOSIT' || filters.type === 'REFUND')
+        ? this.prisma.transaction.findMany({
+            where: {
+              created_at: {
+                gte: startDate,
+                lte: endDate,
+              },
+              ...(filters.user_id ? { user_id: filters.user_id } : {}),
+              ...(filters.auction_id ? { reference_id: filters.auction_id } : {}),
             },
-          },
-        },
-        orderBy: { created_at: 'desc' },
-      }),
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  phone_number: true,
+                  full_name: true,
+                },
+              },
+            },
+            orderBy: { created_at: 'desc' },
+          })
+        : Promise.resolve([]),
+      fetchAuctionTxns && (!filters.type || filters.type === 'all' || filters.type === 'BID')
+        ? this.prisma.bid.findMany({
+            where: {
+              bid_time: {
+                gte: startDate,
+                lte: endDate,
+              },
+              ...(filters.auction_id ? { auction_id: filters.auction_id } : {}),
+              ...(filters.user_id ? { user_id: filters.user_id } : {}),
+            },
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  phone_number: true,
+                  full_name: true,
+                },
+              },
+              auction: {
+                include: {
+                  product: {
+                    select: { name: true },
+                  },
+                },
+              },
+            },
+            orderBy: { bid_time: 'desc' },
+            take: 1000,
+          })
+        : Promise.resolve([]),
     ]);
 
     const unified: UnifiedTransactionRow[] = [];
 
     for (const p of paymentTxns) {
+      const isWinnerPayment =
+        p.payment_type === 'WINNING_BID' ||
+        p.client_reference_id?.startsWith('win-') ||
+        (p.payment_type === 'WALLET' && p.auction_id != null);
+      const isBidFee =
+        p.payment_type === 'BID_FEE' ||
+        p.client_reference_id?.startsWith('fee-');
+      const isAuction = isWinnerPayment || isBidFee || !!p.auction_id;
+
+      const type = isWinnerPayment ? 'WINNING_BID' : isBidFee ? 'BID_FEE' : p.payment_type;
+      const category: 'AUCTION' | 'WALLET' = isAuction ? 'AUCTION' : 'WALLET';
+
       unified.push({
         id: p.id,
-        type: p.payment_type,
+        type,
         payment_type: p.payment_type,
+        category,
         amount: Number(p.amount),
         status: p.status,
         gateway: p.gateway,
@@ -568,6 +660,7 @@ export class AdminTransactionsService {
         user_phone: p.user?.phone_number || p.customer_phone || null,
         user_name: p.user?.full_name || null,
         reference_id: p.client_reference_id,
+        ticket_number: null,
         created_at: p.created_at.toISOString(),
         escalation_flag: p.auction?.second_winner_assigned
           ? 'SECOND_WINNER_ASSIGNED'
@@ -577,25 +670,53 @@ export class AdminTransactionsService {
       });
     }
 
-    if (!filters.type || filters.type === 'all' || filters.type === 'DEPOSIT' || filters.type === 'REFUND') {
-      for (const w of walletTxns) {
-        unified.push({
-          id: w.id,
-          type: w.type,
-          payment_type: 'WALLET',
-          amount: Number(w.amount),
-          status: 'SUCCESSFUL',
-          gateway: 'AWASH_WALLET',
-          auction_id: w.reference_id?.length === 36 ? w.reference_id : null,
-          product_name: null,
-          user_id: w.user_id,
-          user_phone: w.user?.phone_number || null,
-          user_name: w.user?.full_name || null,
-          reference_id: w.reference_id,
-          created_at: w.created_at.toISOString(),
-          escalation_flag: null,
-        });
-      }
+    for (const w of walletTxns) {
+      const isDeposit = w.type === 'DEPOSIT' || w.reference_id?.startsWith('deposit_');
+      const isRefund = w.type === 'REFUND';
+      const isBidFee = w.type === 'BID_FEE';
+      const isAuction = isBidFee || (w.reference_id && w.reference_id.length === 36);
+
+      const category: 'AUCTION' | 'WALLET' = isAuction ? 'AUCTION' : 'WALLET';
+
+      unified.push({
+        id: w.id,
+        type: w.type,
+        payment_type: 'WALLET',
+        category,
+        amount: Number(w.amount),
+        status: 'SUCCESSFUL',
+        gateway: 'AWASH_WALLET',
+        auction_id: w.reference_id?.length === 36 ? w.reference_id : null,
+        product_name: null,
+        user_id: w.user_id,
+        user_phone: w.user?.phone_number || null,
+        user_name: w.user?.full_name || null,
+        reference_id: w.reference_id,
+        ticket_number: null,
+        created_at: w.created_at.toISOString(),
+        escalation_flag: null,
+      });
+    }
+
+    for (const b of bids) {
+      unified.push({
+        id: b.id,
+        type: 'BID',
+        payment_type: 'BID',
+        category: 'AUCTION',
+        amount: Number(b.amount),
+        status: 'SUCCESSFUL',
+        gateway: 'INTERNAL',
+        auction_id: b.auction_id,
+        product_name: b.auction?.product?.name || null,
+        user_id: b.user_id,
+        user_phone: b.user?.phone_number || null,
+        user_name: b.user?.full_name || null,
+        reference_id: b.ticket_number || b.id.slice(0, 8),
+        ticket_number: b.ticket_number || null,
+        created_at: b.bid_time.toISOString(),
+        escalation_flag: null,
+      });
     }
 
     unified.sort(
@@ -604,11 +725,23 @@ export class AdminTransactionsService {
     );
 
     let filteredList = unified;
+    if (filters.category && filters.category !== 'all') {
+      const cat = filters.category.toUpperCase();
+      filteredList = filteredList.filter((t) => t.category === cat);
+    }
+    if (filters.type && filters.type !== 'all') {
+      filteredList = filteredList.filter((t) => t.type === filters.type);
+    }
+    if (filters.status && filters.status !== 'all') {
+      filteredList = filteredList.filter((t) => t.status === filters.status);
+    }
+
     if (filters.search?.trim()) {
       const q = filters.search.toLowerCase().trim();
       filteredList = filteredList.filter(
         (t) =>
           (t.reference_id && t.reference_id.toLowerCase().includes(q)) ||
+          (t.ticket_number && t.ticket_number.toLowerCase().includes(q)) ||
           (t.user_phone && t.user_phone.toLowerCase().includes(q)) ||
           (t.user_name && t.user_name.toLowerCase().includes(q)) ||
           (t.product_name && t.product_name.toLowerCase().includes(q)) ||
@@ -621,7 +754,6 @@ export class AdminTransactionsService {
     const startIndex = (page - 1) * limit;
     const paginated = filteredList.slice(startIndex, startIndex + limit);
 
-    const totalVolume = filteredList.reduce((s, t) => s + t.amount, 0);
     const winningBidVolume = filteredList
       .filter((t) => t.type === 'WINNING_BID')
       .reduce((s, t) => s + t.amount, 0);
@@ -635,8 +767,20 @@ export class AdminTransactionsService {
       .filter((t) => t.type === 'REFUND')
       .reduce((s, t) => s + t.amount, 0);
 
+    const auctionVolume = winningBidVolume + bidFeeVolume;
+    const walletTopupVolume = depositVolume;
+
+    const totalVolume =
+      filters.type && filters.type !== 'all'
+        ? filteredList.reduce((s, t) => s + t.amount, 0)
+        : filters.category?.toLowerCase() === 'auction'
+        ? auctionVolume
+        : filters.category?.toLowerCase() === 'wallet'
+        ? walletTopupVolume
+        : auctionVolume + walletTopupVolume;
+
     const successfulCount = filteredList.filter(
-      (t) => t.status === 'SUCCESSFUL',
+      (t) => t.status === 'SUCCESSFUL' || t.status === 'PAID',
     ).length;
     const pendingCount = filteredList.filter(
       (t) => t.status === 'PENDING',
@@ -646,6 +790,13 @@ export class AdminTransactionsService {
         t.status === 'EXPIRED' ||
         t.escalation_flag === 'PAYMENT_DEFAULTED' ||
         t.escalation_flag === 'SECOND_WINNER_ASSIGNED',
+    ).length;
+
+    const auctionTransactionsCount = filteredList.filter(
+      (t) => t.category === 'AUCTION',
+    ).length;
+    const walletTransactionsCount = filteredList.filter(
+      (t) => t.category === 'WALLET',
     ).length;
 
     return {
@@ -658,6 +809,8 @@ export class AdminTransactionsService {
       },
       summary: {
         total_volume: totalVolume,
+        auction_volume: auctionVolume,
+        wallet_topup_volume: walletTopupVolume,
         winning_bid_volume: winningBidVolume,
         bid_fee_volume: bidFeeVolume,
         deposit_volume: depositVolume,
@@ -665,6 +818,8 @@ export class AdminTransactionsService {
         successful_count: successfulCount,
         pending_count: pendingCount,
         defaulted_count: defaultedCount,
+        auction_transactions_count: auctionTransactionsCount,
+        wallet_transactions_count: walletTransactionsCount,
       },
     };
   }
@@ -673,6 +828,7 @@ export class AdminTransactionsService {
     const res = await this.getAllTransactions(filters, 1, 10000);
     const header = [
       'Transaction ID',
+      'Category',
       'Type',
       'Amount',
       'Status',
@@ -681,7 +837,7 @@ export class AdminTransactionsService {
       'Product Name',
       'User ID',
       'User Phone',
-      'Reference ID',
+      'Reference / Ticket',
       'Created At',
       'Escalation Flag',
     ].join(',');
@@ -689,6 +845,7 @@ export class AdminTransactionsService {
     const rows = res.data.map((t) =>
       [
         t.id,
+        t.category,
         t.type,
         t.amount.toFixed(2),
         t.status,
@@ -697,7 +854,7 @@ export class AdminTransactionsService {
         this.csvEscape(t.product_name || 'N/A'),
         t.user_id,
         t.user_phone || 'N/A',
-        this.csvEscape(t.reference_id || 'N/A'),
+        this.csvEscape(t.ticket_number || t.reference_id || 'N/A'),
         t.created_at,
         t.escalation_flag || 'NONE',
       ].join(','),
@@ -706,11 +863,15 @@ export class AdminTransactionsService {
     const summary = [
       '',
       '# Summary Statistics',
-      `# Total Volume,${res.summary.total_volume.toFixed(2)}`,
+      `# Auction Proceeds Volume,${res.summary.auction_volume.toFixed(2)}`,
+      `# Wallet Top-Up Volume,${res.summary.wallet_topup_volume.toFixed(2)}`,
+      `# Total Combined Volume,${res.summary.total_volume.toFixed(2)}`,
       `# Winning Bid Volume,${res.summary.winning_bid_volume.toFixed(2)}`,
       `# Bid Fee Volume,${res.summary.bid_fee_volume.toFixed(2)}`,
       `# Deposit Volume,${res.summary.deposit_volume.toFixed(2)}`,
       `# Total Transactions,${res.meta.total}`,
+      `# Auction Transactions Count,${res.summary.auction_transactions_count}`,
+      `# Wallet Transactions Count,${res.summary.wallet_transactions_count}`,
       `# Compliance Standard,UNCITRAL Article 37 / ICC Guideline §4.2`,
     ];
 
@@ -748,7 +909,11 @@ export class AdminTransactionsService {
       }),
       this.prisma.paymentTransaction.aggregate({
         where: {
-          payment_type: 'WINNING_BID',
+          OR: [
+            { payment_type: 'WINNING_BID' },
+            { client_reference_id: { startsWith: 'win-' } },
+            { payment_type: 'WALLET', auction_id: { not: null as any } },
+          ],
           status: 'SUCCESSFUL',
           created_at: { gte: start, lte: end },
         },
@@ -777,7 +942,7 @@ export class AdminTransactionsService {
            COALESCE(SUM(CASE WHEN a.payment_status = 'PAID' THEN pt.amount ELSE 0 END), 0)::float as released_platform
          FROM payment_transactions pt
          JOIN auctions a ON a.id = pt.auction_id
-         WHERE pt.payment_type = 'WINNING_BID'
+         WHERE (pt.payment_type = 'WINNING_BID' OR pt.client_reference_id LIKE 'win-%' OR (pt.payment_type = 'WALLET' AND pt.auction_id IS NOT NULL))
            AND pt.status = 'SUCCESSFUL'
            AND pt.created_at >= $1 AND pt.created_at <= $2`,
         start,

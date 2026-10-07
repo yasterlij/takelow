@@ -1,12 +1,20 @@
 import { Injectable, Logger } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
 import { ConfigService } from "@nestjs/config";
+import { Repository } from "typeorm";
 import * as crypto from "node:crypto";
 import { SikinaService } from "./sikina.service";
 import { AwashService } from "./awash.service";
+import {
+  PaymentGateway,
+  PaymentTransaction,
+  PaymentTransactionStatus,
+  PaymentType,
+} from "./entities/payment-transaction.entity";
 import { BidEncryptionService } from "../common/bid-encryption.service";
-import { PrismaService } from "../../prisma/prisma.service";
+import { In } from "typeorm";
 
-const WINNING_PAYMENT_TYPES = ["WINNING_BID", "WALLET"];
+const WINNING_PAYMENT_TYPES = [PaymentType.WINNING_BID, PaymentType.WALLET];
 
 @Injectable()
 export class PaymentLinkService {
@@ -16,7 +24,8 @@ export class PaymentLinkService {
   private readonly proxySecret: string;
 
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectRepository(PaymentTransaction)
+    private paymentTransactionRepository: Repository<PaymentTransaction>,
     private sikinaService: SikinaService,
     private awashService: AwashService,
     private configService: ConfigService,
@@ -106,12 +115,12 @@ export class PaymentLinkService {
     const shortAuctionId = auctionId.split("-")[0];
     const clientReferenceId = `pay-${shortAuctionId}-${Date.now()}`;
 
-    const existing = await this.prisma.repository("paymentTransaction").findOne({
+    const existing = await this.paymentTransactionRepository.findOne({
       where: {
         auction_id: auctionId,
         user_id: userId,
-        payment_type: "WINNING_BID",
-        status: "PENDING",
+        payment_type: PaymentType.WINNING_BID,
+        status: PaymentTransactionStatus.PENDING,
       },
     });
     if (existing?.sikina_payment_url || existing?.awash_payment_url) {
@@ -122,7 +131,7 @@ export class PaymentLinkService {
     }
 
     let paymentUrl: string;
-    let gateway: string;
+    let gateway: PaymentGateway;
 
     if (paymentMethod === "AWASH") {
       const awashResponse = await this.awashService.generatePaymentLink({
@@ -134,7 +143,7 @@ export class PaymentLinkService {
         redirectFailUrl: this.failedRedirectUrl,
       });
       paymentUrl = awashResponse.paymentUrl;
-      gateway = "AWASH";
+      gateway = PaymentGateway.AWASH;
     } else {
       const sikinaParams: any = {
         amount,
@@ -151,27 +160,27 @@ export class PaymentLinkService {
       const sikinaResponse =
         await this.sikinaService.generatePaymentLink(sikinaParams);
       paymentUrl = sikinaResponse.paymentUrl;
-      gateway = "SIKINAPAY";
+      gateway = PaymentGateway.SIKINAPAY;
     }
 
     const encryptedAmount = this.bidEncryptionService.encrypt(amount);
 
-    const transaction = {
+    const transaction = this.paymentTransactionRepository.create({
       auction_id: auctionId,
       user_id: userId,
       amount,
       encrypted_amount: encryptedAmount,
       client_reference_id: clientReferenceId,
-      payment_type: "WINNING_BID",
-      status: "PENDING",
+      payment_type: PaymentType.WINNING_BID,
+      status: PaymentTransactionStatus.PENDING,
       currency: "ETB",
       gateway,
       customer_phone: customerPhone,
       sikina_payment_url:
         paymentMethod === "SIKINAPAY" ? paymentUrl : undefined,
       awash_payment_url: paymentMethod === "AWASH" ? paymentUrl : undefined,
-    };
-    const saved = await this.prisma.repository("paymentTransaction").save(transaction);
+    });
+    const saved = await this.paymentTransactionRepository.save(transaction);
 
     this.logger.log(
       `Payment link created for auction ${auctionId}, user ${userId} via ${gateway}: ${paymentUrl}`,
@@ -184,12 +193,12 @@ export class PaymentLinkService {
   async findTransaction(
     auctionId: string,
     userId: string,
-  ): Promise<any> {
-    return this.prisma.repository("paymentTransaction").findOne({
+  ): Promise<PaymentTransaction | null> {
+    return this.paymentTransactionRepository.findOne({
       where: {
         auction_id: auctionId,
         user_id: userId,
-        payment_type: { in: WINNING_PAYMENT_TYPES },
+        payment_type: In(WINNING_PAYMENT_TYPES),
       },
       order: { created_at: "DESC" },
     });
@@ -197,8 +206,8 @@ export class PaymentLinkService {
 
   async findTransactionById(
     transactionId: string,
-  ): Promise<any> {
-    return this.prisma.repository("paymentTransaction").findOne({
+  ): Promise<PaymentTransaction | null> {
+    return this.paymentTransactionRepository.findOne({
       where: { id: transactionId },
     });
   }
@@ -213,12 +222,12 @@ export class PaymentLinkService {
     const clientReferenceId = `fee-${shortAuctionId}-${userId.split("-")[0]}-${Date.now()}`;
     const description = `Bid fee for auction ${auctionId}`;
 
-    const existing = await this.prisma.repository("paymentTransaction").findOne({
+    const existing = await this.paymentTransactionRepository.findOne({
       where: {
         auction_id: auctionId,
         user_id: userId,
-        payment_type: "BID_FEE",
-        status: "PENDING",
+        payment_type: PaymentType.BID_FEE,
+        status: PaymentTransactionStatus.PENDING,
       },
     });
     if (existing?.sikina_payment_url || existing?.awash_payment_url) {
@@ -229,7 +238,7 @@ export class PaymentLinkService {
     }
 
     let paymentUrl: string;
-    let gateway: string;
+    let gateway: PaymentGateway;
 
     if (paymentMethod === "AWASH") {
       const awashResponse = await this.awashService.generatePaymentLink({
@@ -240,7 +249,7 @@ export class PaymentLinkService {
         redirectFailUrl: this.failedRedirectUrl,
       });
       paymentUrl = awashResponse.paymentUrl;
-      gateway = "AWASH";
+      gateway = PaymentGateway.AWASH;
     } else {
       const sikinaParams: any = {
         amount,
@@ -259,10 +268,10 @@ export class PaymentLinkService {
       const sikinaResponse =
         await this.sikinaService.generatePaymentLink(sikinaParams);
       paymentUrl = sikinaResponse.paymentUrl;
-      gateway = "SIKINAPAY";
+      gateway = PaymentGateway.SIKINAPAY;
     }
 
-    const transaction = {
+    const transaction = this.paymentTransactionRepository.create({
       auction_id: auctionId,
       user_id: userId,
       amount,
@@ -270,12 +279,12 @@ export class PaymentLinkService {
       sikina_payment_url:
         paymentMethod === "SIKINAPAY" ? paymentUrl : undefined,
       awash_payment_url: paymentMethod === "AWASH" ? paymentUrl : undefined,
-      status: "PENDING",
+      status: PaymentTransactionStatus.PENDING,
       currency: "ETB",
-      payment_type: "BID_FEE",
+      payment_type: PaymentType.BID_FEE,
       gateway,
-    };
-    const saved = await this.prisma.repository("paymentTransaction").save(transaction);
+    });
+    const saved = await this.paymentTransactionRepository.save(transaction);
 
     this.logger.log(
       `Bid fee payment link created for auction ${auctionId}, user ${userId} via ${gateway}: ${paymentUrl}`,

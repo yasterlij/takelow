@@ -30,11 +30,16 @@ import { api, type ApiSettlementReport } from '../api'
 type DateRange = 'today' | 'week' | 'month' | 'quarter'
 
 export function AdminSettlementScreen() {
-  const { go } = useApp()
+  const { go, goBack } = useApp()
   const [range, setRange] = useState<DateRange>('month')
   const [report, setReport] = useState<ApiSettlementReport | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [displayCount, setDisplayCount] = useState(10)
+
+  useEffect(() => {
+    setDisplayCount(10)
+  }, [range])
 
   const getDateBounds = useCallback(() => {
     const end = new Date()
@@ -78,7 +83,7 @@ export function AdminSettlementScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <AppBar title="Revenue & Settlement" onBack={() => go('admin-dashboard')} />
+      <AppBar title="Revenue & Settlement" onBack={() => goBack()} />
 
       <ScrollView
         style={{ flex: 1 }}
@@ -259,7 +264,7 @@ export function AdminSettlementScreen() {
               <Text style={{ fontSize: 13, fontWeight: '800', color: colors.navy, marginTop: 6 }}>
                 Settled Auctions ({report.details.length})
               </Text>
-              {report.details.map((d) => (
+              {report.details.slice(0, displayCount).map((d) => (
                 <Card key={d.auction_id} style={{ padding: 12 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <View style={{ flex: 1 }}>
@@ -297,6 +302,34 @@ export function AdminSettlementScreen() {
                   </View>
                 </Card>
               ))}
+
+              {report.details.length > displayCount && (
+                <TouchableOpacity
+                  onPress={() => setDisplayCount((prev) => prev + 10)}
+                  style={{
+                    paddingVertical: 12,
+                    alignItems: 'center',
+                    backgroundColor: colors.card,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    marginTop: 6,
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>
+                    Load More Settled Auctions ({report.details.length - displayCount} remaining)
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {report.details.length > 0 && (
+                <View style={{ padding: 10, borderRadius: 10, backgroundColor: colors.secondary, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 11, fontWeight: '600', color: colors.mutedForeground }}>
+                    Showing {Math.min(displayCount, report.details.length)} of {report.details.length} settled auctions
+                  </Text>
+                </View>
+              )}
             </View>
           </View>
         ) : null}

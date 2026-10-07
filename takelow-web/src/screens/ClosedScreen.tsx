@@ -197,7 +197,7 @@ export function ClosedScreen() {
               {revealing ? <><Loader2 className="size-4 animate-spin" /> Closing & Drawing...</> : done ? <><Trophy className="size-4" /> Reveal Winner</> : "Determining..."}
             </button>
           ) : (
-            <button onClick={() => go("home")}
+            <button onClick={() => goBack()}
               className="btn-outline">
               <ArrowLeft className="size-4" /> Back to Home
             </button>

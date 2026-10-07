@@ -114,7 +114,7 @@ export function DeliveryScreen() {
       </ScrollView>
 
       <View style={s.bottomCta}>
-        <CTAButton variant="navy" onPress={() => reset()}>
+        <CTAButton variant="navy" onPress={() => goBack()}>
           <Home size={18} /> Back to Home
         </CTAButton>
       </View>

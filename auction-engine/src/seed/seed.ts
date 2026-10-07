@@ -1,5 +1,9 @@
-import { PrismaClient } from "@prisma/client";
-import { PrismaPg } from "@prisma/adapter-pg";
+import { DataSource } from "typeorm";
+import { Product } from "../modules/admin/entities/product.entity";
+import {
+  Auction,
+  AuctionStatus,
+} from "../modules/winner/entities/auction.entity";
 
 const MOCK_AUCTIONS = [
   {
@@ -55,47 +59,59 @@ const MOCK_AUCTIONS = [
 ];
 
 async function seed() {
-  const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) });
-  await prisma.$connect();
+  const ds = new DataSource({
+    type: "postgres",
+    url:
+      process.env.DATABASE_URL ||
+      "postgresql://admin:secret@localhost:5432/takelow_db",
+    entities: [Product, Auction],
+  });
+
+  await ds.initialize();
   console.log("Connected to database");
 
+  const productRepo = ds.getRepository(Product);
+  const auctionRepo = ds.getRepository(Auction);
   let productsCreated = 0;
   let auctionsCreated = 0;
 
   for (const item of MOCK_AUCTIONS) {
-    let product: any = await prisma.product.findFirst({
+    // Check if product already exists by name + category
+    let product = await productRepo.findOne({
       where: { name: item.name, category: item.category },
     });
     if (!product) {
-      product = await prisma.product.create({
-        data: {
-          name: item.name,
-          description: item.description,
-          image_urls: [item.image],
-          current_market_price: 0,
-          category: item.category,
-        },
+      product = productRepo.create({
+        name: item.name,
+        description: item.description,
+        image_urls: [item.image],
+        current_market_price: 0,
+        category: item.category,
       });
+      await productRepo.save(product);
       productsCreated++;
       console.log(`  Created product: ${item.name}`);
     } else {
       console.log(`  Skipped product (exists): ${item.name}`);
     }
 
-    const existing = await prisma.auction.findFirst({
-      where: { product_id: product.id, status: "ACTIVE" },
+    // Check for an active auction on this product
+    const existing = await auctionRepo.findOne({
+      where: { product_id: product.id, status: AuctionStatus.ACTIVE },
     });
     if (!existing) {
       const now = new Date();
-      const auctionStatus = "ACTIVE";
-      const auction = await prisma.auction.create({
-        data: {
-          product_id: product.id,
-          start_time: now,
-          end_time: new Date(now.getTime() + item.timeLeft * 1000),
-          status: auctionStatus,
-        },
+      const auctionStatus =
+        item.status === "ending-soon"
+          ? AuctionStatus.ACTIVE
+          : AuctionStatus.ACTIVE;
+      const auction = auctionRepo.create({
+        product_id: product.id,
+        start_time: now,
+        end_time: new Date(now.getTime() + item.timeLeft * 1000),
+        status: auctionStatus,
       });
+      await auctionRepo.save(auction);
       auctionsCreated++;
       console.log(
         `  Created auction for: ${item.name} (ends ${auction.end_time.toISOString()})`,
@@ -108,7 +124,7 @@ async function seed() {
   console.log(
     `\nDone — ${productsCreated} products, ${auctionsCreated} auctions created`,
   );
-  await prisma.$disconnect();
+  await ds.destroy();
 }
 
 seed().catch((err) => {

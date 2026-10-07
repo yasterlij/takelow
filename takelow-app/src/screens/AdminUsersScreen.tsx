@@ -170,6 +170,13 @@ export function AdminUsersScreen() {
     return userList.filter((u) => u.full_name?.toLowerCase().includes(q) || u.phone_number?.includes(q) || u.id?.toLowerCase().includes(q))
   }, [userList, search])
 
+  const [displayCount, setDisplayCount] = useState(15)
+  const paginatedUsers = useMemo(() => filtered.slice(0, displayCount), [filtered, displayCount])
+
+  useEffect(() => {
+    setDisplayCount(15)
+  }, [search])
+
   const adminCount = userList.filter((u) => u.role === 'admin').length
   const totalBids = allBids.length
 
@@ -242,7 +249,7 @@ export function AdminUsersScreen() {
             </Text>
           </View>
         ) : (
-          filtered.map((u) => {
+          paginatedUsers.map((u) => {
             const userBids = allBids.filter((b) => b.userId === u.id)
             const isAdmin = u.role === 'admin'
             const uniqueAuctions = new Set(userBids.map((b) => b.auctionId)).size
@@ -268,10 +275,30 @@ export function AdminUsersScreen() {
           })
         )}
 
-        {userList.length > 0 && (
-          <View style={{ marginTop: 12, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card + '80', alignItems: 'center' }}>
-            <Text style={{ fontSize: 10, fontWeight: '500', color: colors.mutedForeground, textAlign: 'center' }}>
-              Showing {filtered.length} of {userList.length} users. Tap a user for details and role management.
+        {filtered.length > displayCount && (
+          <TouchableOpacity
+            onPress={() => setDisplayCount((prev) => prev + 15)}
+            style={{
+              paddingVertical: 12,
+              alignItems: 'center',
+              backgroundColor: colors.card,
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: colors.border,
+              marginVertical: 8,
+            }}
+            activeOpacity={0.8}
+          >
+            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>
+              Load More Users ({filtered.length - displayCount} remaining)
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {filtered.length > 0 && (
+          <View style={{ marginTop: 8, padding: 10, borderRadius: 10, backgroundColor: colors.secondary, alignItems: 'center' }}>
+            <Text style={{ fontSize: 11, fontWeight: '600', color: colors.mutedForeground, textAlign: 'center' }}>
+              Showing {Math.min(displayCount, filtered.length)} of {filtered.length} matching users
             </Text>
           </View>
         )}

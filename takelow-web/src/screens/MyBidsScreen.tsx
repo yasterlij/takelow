@@ -1,10 +1,11 @@
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { motion } from "framer-motion"
 import { Gavel, Clock, TicketCheck, Trophy, ChevronRight, Hash, TrendingDown, TrendingUp, Search, X, Copy, Check } from "lucide-react"
 import { useApp } from "../AppContext"
 import { Badge } from "../components/AuctionUI"
 import { useCountdown } from "../components/Countdown"
 import { formatCurrency, formatETB, formatCountdown } from "../mockDataV0"
+import { usePagination, PaginationBar } from "../components/Pagination"
 
 function TimeLeft({ seconds }: { seconds: number }) {
   const t = useCountdown(seconds)
@@ -68,6 +69,12 @@ export function MyBidsScreen() {
       },
     }
   }, [myBids, getAuction, filterTab, searchQuery])
+
+  const { page, setPage, perPage, setPerPage, totalPages, paginated, resetPage } = usePagination(filteredBids, 10)
+
+  useEffect(() => {
+    resetPage()
+  }, [searchQuery, filterTab, resetPage])
 
   return (
     <motion.div
@@ -210,7 +217,7 @@ export function MyBidsScreen() {
           variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}
           className="flex flex-col gap-3"
         >
-          {filteredBids.map(({ bid, auction, isClosed }, i) => {
+          {paginated.map(({ bid, auction, isClosed }, i) => {
             if (!auction) return null
             const isCopied = copiedTicket === bid.ticketNumber
 
@@ -286,6 +293,17 @@ export function MyBidsScreen() {
             )
           })}
         </motion.div>
+      )}
+
+      {filteredBids.length > 0 && (
+        <PaginationBar
+          page={page}
+          totalPages={totalPages}
+          totalItems={filteredBids.length}
+          perPage={perPage}
+          onPageChange={setPage}
+          onPerPageChange={setPerPage}
+        />
       )}
 
       {myBids.length > 0 && (

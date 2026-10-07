@@ -151,7 +151,7 @@ export function BidConfirmedScreen() {
         className="border-t border-border/60 bg-white/80 backdrop-blur-md p-4 pb-8"
       >
         <div className="flex flex-col gap-2">
-          <button onClick={() => go("auctions")} className="btn-primary animate-shine">
+            <button onClick={() => goBack()} className="btn-primary animate-shine">
             <Home className="size-[18px]" /> Back to Auctions
           </button>
           {isAdmin && (

@@ -405,6 +405,7 @@ export type ApiUnifiedTransaction = {
   id: string;
   type: string;
   payment_type: string;
+  category: "AUCTION" | "WALLET";
   amount: number;
   status: string;
   gateway: string | null;
@@ -414,6 +415,7 @@ export type ApiUnifiedTransaction = {
   user_phone: string | null;
   user_name: string | null;
   reference_id: string | null;
+  ticket_number?: string | null;
   created_at: string;
   escalation_flag: string | null;
 };
@@ -428,6 +430,8 @@ export type ApiTransactionsListResponse = {
   };
   summary: {
     total_volume: number;
+    auction_volume: number;
+    wallet_topup_volume: number;
     winning_bid_volume: number;
     bid_fee_volume: number;
     deposit_volume: number;
@@ -435,6 +439,8 @@ export type ApiTransactionsListResponse = {
     successful_count: number;
     pending_count: number;
     defaulted_count: number;
+    auction_transactions_count: number;
+    wallet_transactions_count: number;
   };
 };
 

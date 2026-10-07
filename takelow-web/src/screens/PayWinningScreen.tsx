@@ -25,7 +25,7 @@ const paymentMethods = [
 ]
 
 export function PayWinningScreen() {
-  const { go, selectedId, userBid, payWinning, getAuction, authError, setPaymentMethod, walletBalance, refreshWallet } = useApp()
+  const { go, goBack, selectedId, userBid, payWinning, getAuction, authError, setPaymentMethod, walletBalance, refreshWallet } = useApp()
   const auction = getAuction(selectedId)
   const [loading, setLoading] = useState(false)
   const [showMethods, setShowMethods] = useState(false)
@@ -426,7 +426,7 @@ export function PayWinningScreen() {
           <button disabled className="btn-primary opacity-50 cursor-not-allowed">
             Payment Expired
           </button>
-          <button onClick={() => go("home")} className="btn-outline">
+          <button onClick={() => goBack()} className="btn-outline">
             Back to Dashboard
           </button>
         </div>

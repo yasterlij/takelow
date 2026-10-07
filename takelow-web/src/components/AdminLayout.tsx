@@ -50,7 +50,7 @@ export function AdminLayout({ children, title, subtitle, actions }: {
   subtitle?: string
   actions?: ReactNode
 }) {
-  const { view, go, user } = useApp()
+  const { view, go, goBack, user } = useApp()
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
   const groups = Array.from(new Set(NAV.map((n) => n.group)))
@@ -102,7 +102,7 @@ export function AdminLayout({ children, title, subtitle, actions }: {
 
       <div className="border-t border-white/10 px-4 py-4">
         <button
-          onClick={() => go("home")}
+          onClick={() => goBack()}
           className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-white/60 transition-all hover:bg-white/5 hover:text-white"
         >
           <ArrowLeft className="size-4" />

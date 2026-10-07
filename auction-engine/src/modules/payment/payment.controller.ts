@@ -13,13 +13,17 @@ import {
   Logger,
   HttpStatus,
 } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
 import { PaymentService } from "./payment.service";
+import {
+  Auction,
+  AuctionStatus as AS,
+  PaymentStatus,
+} from "../winner/entities/auction.entity";
 import { ConfigService } from "@nestjs/config";
 import { JwtAuthGuard } from "../common/jwt-auth.guard";
-import { PrismaService } from "../../prisma/prisma.service";
-import { ApiTags, ApiOperation, ApiBearerAuth } from "@nestjs/swagger";
 
-@ApiTags("payments")
 @Controller("payments")
 export class PaymentController {
   private readonly logger = new Logger(PaymentController.name);
@@ -28,15 +32,14 @@ export class PaymentController {
   constructor(
     private paymentService: PaymentService,
     private configService: ConfigService,
-    private readonly prisma: PrismaService,
+    @InjectRepository(Auction)
+    private auctionRepository: Repository<Auction>,
   ) {
     this.bidFee = this.configService.get<number>("app.bidFee")!;
   }
 
   @UseGuards(JwtAuthGuard)
   @Post(":auctionId/link")
-  @ApiBearerAuth()
-  @ApiOperation({ summary: "Create payment link for winning bid" })
   async createPaymentLink(
     @Param("auctionId") auctionId: string,
     @Req() req: any,
@@ -44,22 +47,19 @@ export class PaymentController {
     @Query("customer_phone") customerPhone?: string,
   ) {
     const user = req.user;
-    const auction = await this.prisma.repository("auction").findOne({
+    const auction = await this.auctionRepository.findOne({
       where: { id: auctionId },
-      include: { product: true },
+      relations: ["product"],
     });
     if (!auction) throw new NotFoundException("Auction not found");
     if (auction.winner_user_id !== user.id) {
       throw new BadRequestException("Only the winner can initiate payment");
     }
     if (
-      auction.status !== "CLOSED" ||
-      auction.payment_status !== "PENDING" ||
-      (auction.payment_deadline && new Date() > new Date(auction.payment_deadline))
+      auction.status !== AS.CLOSED ||
+      auction.payment_status !== PaymentStatus.PENDING
     ) {
-      throw new BadRequestException(
-        "This auction is no longer eligible for payment. The payment deadline has expired.",
-      );
+      throw new BadRequestException("Auction is not eligible for payment");
     }
 
     const method = (paymentMethod as "SIKINAPAY" | "AWASH") || "SIKINAPAY";
@@ -83,8 +83,6 @@ export class PaymentController {
 
   @UseGuards(JwtAuthGuard)
   @Post(":auctionId/confirm")
-  @ApiBearerAuth()
-  @ApiOperation({ summary: "Confirm winning payment" })
   async confirmPayment(@Param("auctionId") auctionId: string, @Req() req: any) {
     try {
       await this.paymentService.confirmWinningPayment(auctionId, req.user.id);
@@ -98,8 +96,6 @@ export class PaymentController {
 
   @UseGuards(JwtAuthGuard)
   @Get(":auctionId/status")
-  @ApiBearerAuth()
-  @ApiOperation({ summary: "Get payment link status" })
   async getPaymentLinkStatus(
     @Param("auctionId") auctionId: string,
     @Req() req: any,
@@ -109,18 +105,16 @@ export class PaymentController {
 
   @UseGuards(JwtAuthGuard)
   @Post("bid-fee/:auctionId/link")
-  @ApiBearerAuth()
-  @ApiOperation({ summary: "Create bid fee payment link" })
   async createBidFeePaymentLink(
     @Param("auctionId") auctionId: string,
     @Req() req: any,
   ) {
     const user = req.user;
-    const auction = await this.prisma.repository("auction").findOne({
+    const auction = await this.auctionRepository.findOne({
       where: { id: auctionId },
     });
     if (!auction) throw new NotFoundException("Auction not found");
-    if (auction.status !== "ACTIVE") {
+    if (auction.status !== AS.ACTIVE) {
       throw new BadRequestException("Auction is not active");
     }
     if (Date.now() > auction.end_time.getTime()) {
@@ -145,8 +139,6 @@ export class PaymentController {
 
   @UseGuards(JwtAuthGuard)
   @Get("bid-fee/:auctionId/status")
-  @ApiBearerAuth()
-  @ApiOperation({ summary: "Get bid fee payment status" })
   async getBidFeePaymentStatus(
     @Param("auctionId") auctionId: string,
     @Req() req: any,
@@ -156,8 +148,6 @@ export class PaymentController {
 
   @UseGuards(JwtAuthGuard)
   @Post("bid-fee/:auctionId/confirm")
-  @ApiBearerAuth()
-  @ApiOperation({ summary: "Confirm bid fee payment" })
   async confirmBidFeePayment(
     @Param("auctionId") auctionId: string,
     @Req() req: any,
@@ -181,18 +171,16 @@ export class PaymentController {
 
   @UseGuards(JwtAuthGuard)
   @Post("bid-fee/:auctionId/wallet-pay")
-  @ApiBearerAuth()
-  @ApiOperation({ summary: "Pay bid fee with wallet" })
   async payBidFeeWithWallet(
     @Param("auctionId") auctionId: string,
     @Req() req: any,
   ) {
     const user = req.user;
-    const auction = await this.prisma.repository("auction").findOne({
+    const auction = await this.auctionRepository.findOne({
       where: { id: auctionId },
     });
     if (!auction) throw new NotFoundException("Auction not found");
-    if (auction.status !== "ACTIVE") {
+    if (auction.status !== AS.ACTIVE) {
       throw new BadRequestException("Auction is not active");
     }
     if (Date.now() > auction.end_time.getTime()) {
@@ -213,29 +201,24 @@ export class PaymentController {
 
   @UseGuards(JwtAuthGuard)
   @Post(":auctionId/wallet-pay")
-  @ApiBearerAuth()
-  @ApiOperation({ summary: "Pay winning amount with wallet" })
   async payWinningWithWallet(
     @Param("auctionId") auctionId: string,
     @Req() req: any,
   ) {
     const user = req.user;
-    const auction = await this.prisma.repository("auction").findOne({
+    const auction = await this.auctionRepository.findOne({
       where: { id: auctionId },
-      include: { product: true },
+      relations: ["product"],
     });
     if (!auction) throw new NotFoundException("Auction not found");
     if (auction.winner_user_id !== user.id) {
       throw new BadRequestException("Only the winner can initiate payment");
     }
     if (
-      auction.status !== "CLOSED" ||
-      auction.payment_status !== "PENDING" ||
-      (auction.payment_deadline && new Date() > new Date(auction.payment_deadline))
+      auction.status !== AS.CLOSED ||
+      auction.payment_status !== PaymentStatus.PENDING
     ) {
-      throw new BadRequestException(
-        "This auction is no longer eligible for payment. The payment deadline has expired.",
-      );
+      throw new BadRequestException("Auction is not eligible for payment");
     }
 
     await this.paymentService.createWinningWalletPayment(
@@ -247,7 +230,6 @@ export class PaymentController {
   }
 
   @Get("proxy/:transactionId")
-  @ApiOperation({ summary: "Proxy payment page" })
   async proxyPaymentPage(
     @Param("transactionId") transactionId: string,
     @Query("token") token: string,

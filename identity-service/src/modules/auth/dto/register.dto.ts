@@ -1,22 +1,47 @@
-import { IsString, IsEmail, IsOptional, MinLength, MaxLength, Matches } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsEmail,
+  MinLength,
+  MaxLength,
+  Matches,
+} from "class-validator";
 
 export class RegisterDto {
+  @IsOptional()
   @IsString()
-  @Matches(/^\+?[0-9]{10,15}$/)
-  phone_number: string;
+  @Matches(/^\d{9,15}$/)
+  phone_number?: string;
 
   @IsOptional()
   @IsEmail()
-  @MaxLength(255)
+  @MaxLength(120)
   email?: string;
 
+  @IsOptional()
   @IsString()
   @MinLength(8)
-  @MaxLength(255)
-  password: string;
+  @MaxLength(128)
+  password?: string;
 
+  @IsOptional()
   @IsString()
   @MinLength(2)
-  @MaxLength(255)
-  full_name: string;
+  @MaxLength(80)
+  full_name?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  provider?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  provider_id?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(512)
+  access_token?: string;
 }

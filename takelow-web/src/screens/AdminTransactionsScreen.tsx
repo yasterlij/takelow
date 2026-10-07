@@ -4,35 +4,85 @@ import {
   Receipt, Download, RefreshCw, ArrowDownCircle, ArrowUpCircle, Wallet,
   Search, X, Filter, Calendar, Trophy, AlertTriangle, ShieldCheck,
   FileSpreadsheet, FileText, CheckCircle2, XCircle, Clock, ExternalLink,
-  Layers, ChevronLeft, ChevronRight, Lock
+  Layers, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Lock, Eye, Printer, Tag
 } from "lucide-react"
 import { AdminLayout } from "../components/AdminLayout"
-import { DataTable } from "../components/DataTable"
+import { DataTable, type Column } from "../components/DataTable"
 import { Badge } from "../components/AuctionUI"
 import { api, type ApiUnifiedTransaction } from "../api"
 import { toast } from "../store/toast.store"
 import { formatCurrency } from "../mockDataV0"
 import { exportToCsv, exportToXlsx, exportToPdf } from "../utils/exportUtils"
+import { windowedPages } from "../components/Pagination"
+import { TransactionAuditSlipModal } from "../components/admin"
 
 type DatePreset = "all" | "today" | "week" | "month" | "custom"
 
-const TYPE_CONFIG: Record<string, { label: string; icon: typeof Wallet; color: string; bg: string }> = {
-  WINNING_BID: { label: "Winner Payment", icon: Trophy, color: "text-primary", bg: "bg-primary/10 border-primary/30" },
-  BID_FEE: { label: "Bid Participation Fee", icon: ArrowUpCircle, color: "text-amber-600", bg: "bg-amber-50 border-amber-200" },
-  DEPOSIT: { label: "Wallet Deposit", icon: ArrowDownCircle, color: "text-emerald-600", bg: "bg-emerald-50 border-emerald-200" },
-  REFUND: { label: "Refund", icon: ArrowDownCircle, color: "text-blue-600", bg: "bg-blue-50 border-blue-200" },
-  WITHDRAWAL: { label: "Withdrawal", icon: ArrowUpCircle, color: "text-destructive", bg: "bg-red-50 border-red-200" },
-  WALLET: { label: "Wallet Transaction", icon: Wallet, color: "text-neutral-600", bg: "bg-neutral-100 border-neutral-200" },
+const TYPE_CONFIG: Record<string, { label: string; icon: typeof Wallet; color: string; bg: string; badgeBg: string }> = {
+  WINNING_BID: {
+    label: "Winner Payment",
+    icon: Trophy,
+    color: "text-amber-700",
+    bg: "bg-amber-100 border-amber-300",
+    badgeBg: "bg-amber-50 text-amber-900 border-amber-300",
+  },
+  BID_FEE: {
+    label: "Bid Participation Fee",
+    icon: ArrowUpCircle,
+    color: "text-orange-700",
+    bg: "bg-orange-100 border-orange-200",
+    badgeBg: "bg-orange-50 text-orange-900 border-orange-200",
+  },
+  BID: {
+    label: "Auction Bid Ticket",
+    icon: Layers,
+    color: "text-indigo-700",
+    bg: "bg-indigo-100 border-indigo-200",
+    badgeBg: "bg-indigo-50 text-indigo-900 border-indigo-200",
+  },
+  DEPOSIT: {
+    label: "Wallet Top-Up",
+    icon: ArrowDownCircle,
+    color: "text-emerald-700",
+    bg: "bg-emerald-100 border-emerald-200",
+    badgeBg: "bg-emerald-50 text-emerald-900 border-emerald-200",
+  },
+  REFUND: {
+    label: "Refund",
+    icon: ArrowDownCircle,
+    color: "text-sky-700",
+    bg: "bg-sky-100 border-sky-200",
+    badgeBg: "bg-sky-50 text-sky-900 border-sky-200",
+  },
+  WITHDRAWAL: {
+    label: "Withdrawal",
+    icon: ArrowUpCircle,
+    color: "text-rose-700",
+    bg: "bg-rose-100 border-rose-200",
+    badgeBg: "bg-rose-50 text-rose-900 border-rose-200",
+  },
+  WALLET: {
+    label: "Wallet Transaction",
+    icon: Wallet,
+    color: "text-neutral-700",
+    bg: "bg-neutral-100 border-neutral-200",
+    badgeBg: "bg-neutral-50 text-neutral-800 border-neutral-200",
+  },
 }
 
 export function AdminTransactionsScreen() {
   const [txns, setTxns] = useState<ApiUnifiedTransaction[]>([])
+  const [selectedTxn, setSelectedTxn] = useState<ApiUnifiedTransaction | null>(null)
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState<number>(20)
   const [totalPages, setTotalPages] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
+  const [categoryFilter, setCategoryFilter] = useState<"all" | "auction" | "wallet">("all")
   const [summary, setSummary] = useState({
     total_volume: 0,
+    auction_volume: 0,
+    wallet_topup_volume: 0,
     winning_bid_volume: 0,
     bid_fee_volume: 0,
     deposit_volume: 0,
@@ -40,6 +90,8 @@ export function AdminTransactionsScreen() {
     successful_count: 0,
     pending_count: 0,
     defaulted_count: 0,
+    auction_transactions_count: 0,
+    wallet_transactions_count: 0,
   })
 
   // Filters
@@ -77,13 +129,14 @@ export function AdminTransactionsScreen() {
   const loadData = useCallback(() => {
     setLoading(true)
     api.adminListEnhancedTransactions({
+      category: categoryFilter !== "all" ? categoryFilter : undefined,
       type: typeFilter !== "all" ? typeFilter : undefined,
       status: statusFilter !== "all" ? statusFilter : undefined,
       start: dateBounds.start,
       end: dateBounds.end,
       search: searchQuery.trim() || undefined,
       page,
-      limit: 50,
+      limit: pageSize,
     })
       .then((res) => {
         setTxns(res.data || [])
@@ -93,13 +146,14 @@ export function AdminTransactionsScreen() {
       })
       .catch((err) => {
         // Fallback gracefully if enhanced endpoint is warming up
-        api.adminListTransactions(page, 50)
+        api.adminListTransactions(page, pageSize)
           .then((fallbackRes: any) => {
             const rawList = fallbackRes.data || fallbackRes || []
             setTxns(rawList.map((r: any) => ({
               id: r.id,
               type: r.type,
               payment_type: r.type,
+              category: r.type === "DEPOSIT" || r.type === "REFUND" ? "WALLET" : "AUCTION",
               amount: Number(r.amount),
               status: "SUCCESSFUL",
               gateway: "WALLET",
@@ -109,14 +163,17 @@ export function AdminTransactionsScreen() {
               user_phone: null,
               user_name: null,
               reference_id: r.reference_id,
+              ticket_number: null,
               created_at: r.created_at,
               escalation_flag: null,
             })))
+            setTotalPages(Math.max(1, Math.ceil(rawList.length / pageSize)))
+            setTotalCount(rawList.length)
           })
           .catch(() => toast("Failed to load transactions", "error"))
       })
       .finally(() => setLoading(false))
-  }, [typeFilter, statusFilter, dateBounds, searchQuery, page])
+  }, [categoryFilter, typeFilter, statusFilter, dateBounds, searchQuery, page, pageSize])
 
   useEffect(() => {
     loadData()
@@ -128,26 +185,28 @@ export function AdminTransactionsScreen() {
     try {
       const headers = [
         "Transaction ID",
+        "Category",
         "Type",
         "Amount (ETB)",
         "Status",
         "Gateway",
         "Auction / Product",
         "Bidder / User",
-        "Reference ID",
+        "Reference / Ticket",
         "Date & Time",
         "Escalation Flag",
       ]
 
       const rows = txns.map((t) => [
         t.id.slice(0, 12),
+        t.category || (t.auction_id ? "AUCTION" : "WALLET"),
         TYPE_CONFIG[t.type]?.label || t.type,
         t.amount,
         t.status,
         t.gateway || "N/A",
         t.product_name || (t.auction_id ? `Auction #${t.auction_id.slice(0, 8)}` : "Wallet Transfer"),
         t.user_phone || t.user_name || t.user_id.slice(0, 8),
-        t.reference_id || "—",
+        t.ticket_number || t.reference_id || "—",
         new Date(t.created_at).toLocaleString(),
         t.escalation_flag ? t.escalation_flag.replace(/_/g, " ") : "Normal",
       ])
@@ -158,6 +217,8 @@ export function AdminTransactionsScreen() {
       if (format === "csv") {
         exportToCsv(filename, headers, rows, [
           `Export Period: ${periodStr}`,
+          `Auction Proceeds Volume: ETB ${summary.auction_volume.toFixed(2)}`,
+          `Wallet Top-Up Volume: ETB ${summary.wallet_topup_volume.toFixed(2)}`,
           `Total Volume: ETB ${summary.total_volume.toFixed(2)}`,
           `Winning Bid Volume: ETB ${summary.winning_bid_volume.toFixed(2)}`,
           `Bid Fee Volume: ETB ${summary.bid_fee_volume.toFixed(2)}`,
@@ -166,6 +227,8 @@ export function AdminTransactionsScreen() {
         toast("CSV exported successfully", "success")
       } else if (format === "xlsx") {
         exportToXlsx(filename, "Transactions", headers, rows, [
+          { label: "Auction Proceeds Volume", value: `ETB ${summary.auction_volume.toFixed(2)}` },
+          { label: "Wallet Top-Up Volume", value: `ETB ${summary.wallet_topup_volume.toFixed(2)}` },
           { label: "Total Volume", value: `ETB ${summary.total_volume.toFixed(2)}` },
           { label: "Winning Bids Volume", value: `ETB ${summary.winning_bid_volume.toFixed(2)}` },
           { label: "Bid Fees Volume", value: `ETB ${summary.bid_fee_volume.toFixed(2)}` },
@@ -184,9 +247,10 @@ export function AdminTransactionsScreen() {
             { label: "Integrity Status", value: "🔒 Verified Immutable" },
           ],
           summaryKpis: [
-            { label: "Total Volume", value: formatCurrency(summary.total_volume) },
+            { label: "Auction Proceeds", value: formatCurrency(summary.auction_volume), color: "#6B21A8" },
             { label: "Winner Payments", value: formatCurrency(summary.winning_bid_volume), color: "#0B192C" },
             { label: "Bid Fees Collected", value: formatCurrency(summary.bid_fee_volume), color: "#854D0E" },
+            { label: "Wallet Top-Ups", value: formatCurrency(summary.wallet_topup_volume), color: "#047857" },
             { label: "Successful", value: summary.successful_count, color: "#16A34A" },
           ],
           headers,
@@ -202,39 +266,147 @@ export function AdminTransactionsScreen() {
     }
   }
 
-  const columns = [
+  const handleExportSingleSlip = (t: ApiUnifiedTransaction) => {
+    const isAuction = t.category === "AUCTION" || Boolean(t.auction_id)
+    const typeLabel = TYPE_CONFIG[t.type]?.label || t.type
+    exportToPdf({
+      title: "OFFICIAL TRANSACTION FORENSIC AUDIT SLIP",
+      subtitle: `Cryptographic audit certificate for Transaction #${t.id}`,
+      metadata: [
+        { label: "Ledger ID", value: t.id },
+        { label: "Category", value: t.category || (isAuction ? "AUCTION" : "WALLET") },
+        { label: "Transaction Nature", value: typeLabel },
+        { label: "Auction Product", value: t.product_name || "N/A" },
+        { label: "Ticket Number", value: t.ticket_number || "N/A" },
+        { label: "Bidder Phone / Name", value: t.user_phone || t.user_name || "N/A" },
+        { label: "Gateway Channel", value: t.gateway || (t.payment_type === "WALLET" ? "Internal Wallet" : "System") },
+        { label: "Timestamp (UTC)", value: new Date(t.created_at).toISOString() },
+      ],
+      summaryKpis: [
+        { label: "Amount", value: formatCurrency(t.amount), color: "#0B192C" },
+        { label: "Status", value: t.status, color: t.status === "SUCCESSFUL" || t.status === "PAID" ? "#16A34A" : "#DC2626" },
+        { label: "Category", value: t.category || (isAuction ? "AUCTION" : "WALLET"), color: isAuction ? "#6B21A8" : "#047857" },
+      ],
+      headers: ["Audit Field", "Ledger Record Value"],
+      rows: [
+        ["Transaction ID", t.id],
+        ["Classification", t.category || (isAuction ? "AUCTION" : "WALLET")],
+        ["Transaction Nature", typeLabel],
+        ["Transaction Amount", `${t.amount} ETB`],
+        ["Product Name", t.product_name || "N/A"],
+        ["Auction Reference ID", t.auction_id || "N/A"],
+        ["Bid Ticket Number", t.ticket_number || "N/A"],
+        ["Bidder User ID", t.user_id],
+        ["Bidder Phone", t.user_phone || "N/A"],
+        ["Payment Gateway", t.gateway || (t.payment_type === "WALLET" ? "Internal Wallet" : "System")],
+        ["Client Reference ID", t.reference_id || "N/A"],
+        ["Payment Status", t.status],
+        ["Escalation Flag", t.escalation_flag || "NONE"],
+        ["Created At (UTC)", new Date(t.created_at).toISOString()],
+        ["Created At (Local)", new Date(t.created_at).toLocaleString()],
+      ],
+      legalDisclaimer: "UNCITRAL Article 37 & ICC §4.2 Certified Record. This forensic transaction slip represents an immutable ledger entry on TakeLow.",
+    })
+  }
+
+  const columns: Column<ApiUnifiedTransaction>[] = [
+    {
+      key: "category",
+      header: "Category",
+      render: (t: ApiUnifiedTransaction) => {
+        const isAuction = t.category === "AUCTION" || Boolean(t.auction_id)
+        return (
+          <span
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${
+              isAuction
+                ? "bg-purple-100 text-purple-800 border border-purple-200"
+                : "bg-emerald-100 text-emerald-800 border border-emerald-200"
+            }`}
+          >
+            {isAuction ? <Trophy className="size-3 text-purple-600" /> : <Wallet className="size-3 text-emerald-600" />}
+            {t.category || (t.auction_id ? "AUCTION" : "WALLET")}
+          </span>
+        )
+      },
+    },
     {
       key: "type",
-      header: "Type & Details",
+      header: "Transaction Type",
       render: (t: ApiUnifiedTransaction) => {
-        const config = TYPE_CONFIG[t.type] || { label: t.type, icon: Wallet, color: "text-neutral-500", bg: "bg-neutral-100" }
+        const config = TYPE_CONFIG[t.type] || {
+          label: t.type,
+          icon: Wallet,
+          color: "text-neutral-600",
+          bg: "bg-neutral-100 border-neutral-200",
+          badgeBg: "bg-neutral-100 text-neutral-800 border-neutral-200",
+        }
         return (
-          <div className="flex items-center gap-2.5">
-            <div className={`flex size-8 shrink-0 items-center justify-center rounded-lg border ${config.bg}`}>
-              <config.icon className={`size-4 ${config.color}`} />
+          <div className="flex items-center gap-2">
+            <div className={`flex size-7 shrink-0 items-center justify-center rounded-lg border ${config.bg}`}>
+              <config.icon className={`size-3.5 ${config.color}`} />
             </div>
-            <div className="min-w-0">
-              <p className="truncate text-xs font-bold text-awash-blue">{config.label}</p>
-              <p className="truncate text-[10px] font-medium text-neutral-400">
-                {t.product_name || (t.auction_id ? `Auction #${t.auction_id.slice(0, 8)}` : "Wallet")}
-              </p>
-            </div>
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold border ${config.badgeBg}`}>
+              {config.label}
+            </span>
+          </div>
+        )
+      },
+    },
+    {
+      key: "reference",
+      header: "Auction / Item & Ticket",
+      render: (t: ApiUnifiedTransaction) => {
+        const isAuction = t.category === "AUCTION" || Boolean(t.auction_id)
+        return (
+          <div className="min-w-0 max-w-[260px]">
+            {isAuction ? (
+              <>
+                <p className="truncate text-xs font-bold text-awash-blue" title={t.product_name || "Auction Item"}>
+                  {t.product_name || `Auction #${t.auction_id?.slice(0, 8)}`}
+                </p>
+                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                  {t.ticket_number && (
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-primary/10 text-primary border border-primary/20">
+                      #{t.ticket_number}
+                    </span>
+                  )}
+                  {t.auction_id && (
+                    <span className="text-[10px] font-mono text-neutral-400">
+                      ID: {t.auction_id.slice(0, 8)}
+                    </span>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="truncate text-xs font-semibold text-neutral-700">
+                  User Wallet Top-Up / Settlement
+                </p>
+                {t.reference_id && (
+                  <span className="text-[10px] font-mono text-neutral-400 truncate block">
+                    Ref: {t.reference_id}
+                  </span>
+                )}
+              </>
+            )}
           </div>
         )
       },
     },
     {
       key: "amount",
-      header: "Amount",
+      header: "Amount (ETB)",
       align: "right" as const,
       render: (t: ApiUnifiedTransaction) => (
-        <div>
-          <span className="font-display text-sm font-extrabold tabular-nums text-awash-blue">
+        <div className="text-right">
+          <span className="font-display text-sm font-black tabular-nums text-awash-blue">
             {formatCurrency(t.amount)}
           </span>
-          {t.gateway && (
-            <p className="text-[10px] font-semibold uppercase text-neutral-400">{t.gateway}</p>
-          )}
+          <div className="mt-0.5">
+            <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-neutral-100 text-neutral-600 border border-neutral-200">
+              {t.gateway || (t.payment_type === "WALLET" ? "Wallet" : "System")}
+            </span>
+          </div>
         </div>
       ),
     },
@@ -243,14 +415,12 @@ export function AdminTransactionsScreen() {
       header: "Bidder / Account",
       render: (t: ApiUnifiedTransaction) => (
         <div>
-          <p className="font-mono text-xs font-semibold text-neutral-700">
-            {t.user_phone || (t.user_name ? t.user_name : t.user_id.slice(0, 8))}
+          <p className="font-mono text-xs font-semibold text-neutral-800">
+            {t.user_phone || t.user_name || "Anonymous User"}
           </p>
-          {t.reference_id && (
-            <span className="text-[10px] font-mono text-neutral-400 truncate max-w-[120px] inline-block">
-              Ref: {t.reference_id.slice(0, 14)}
-            </span>
-          )}
+          <span className="text-[10px] font-mono text-neutral-400">
+            UID: {t.user_id.slice(0, 8)}
+          </span>
         </div>
       ),
     },
@@ -263,14 +433,22 @@ export function AdminTransactionsScreen() {
         return (
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-1.5">
-              <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                isSuccess
-                  ? "bg-emerald-50 text-emerald-700"
-                  : isPending
-                  ? "bg-amber-50 text-amber-700"
-                  : "bg-red-50 text-red-700"
-              }`}>
-                {isSuccess ? <CheckCircle2 className="size-2.5" /> : isPending ? <Clock className="size-2.5" /> : <XCircle className="size-2.5" />}
+              <span
+                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                  isSuccess
+                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                    : isPending
+                    ? "bg-amber-50 text-amber-700 border border-amber-200"
+                    : "bg-red-50 text-red-700 border border-red-200"
+                }`}
+              >
+                {isSuccess ? (
+                  <CheckCircle2 className="size-2.5" />
+                ) : isPending ? (
+                  <Clock className="size-2.5" />
+                ) : (
+                  <XCircle className="size-2.5" />
+                )}
                 {t.status}
               </span>
             </div>
@@ -293,14 +471,37 @@ export function AdminTransactionsScreen() {
       header: "Timestamp",
       align: "right" as const,
       render: (t: ApiUnifiedTransaction) => (
-        <span className="text-[11px] font-medium text-neutral-500 tabular-nums">
-          {new Date(t.created_at).toLocaleString("en-US", {
-            month: "short",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
-        </span>
+        <div className="text-right">
+          <span className="text-[11px] font-medium text-neutral-600 tabular-nums block">
+            {new Date(t.created_at).toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            })}
+          </span>
+          <span className="text-[10px] text-neutral-400 tabular-nums">
+            {new Date(t.created_at).toLocaleTimeString("en-US", {
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+            })}
+          </span>
+        </div>
+      ),
+    },
+    {
+      key: "action",
+      header: "Audit Slip",
+      align: "center" as const,
+      render: (t: ApiUnifiedTransaction) => (
+        <button
+          onClick={() => setSelectedTxn(t)}
+          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-awash-blue bg-neutral-100 hover:bg-primary hover:text-white transition-all shadow-xs"
+          title="Inspect Cryptographic Audit Slip"
+        >
+          <Receipt className="size-3.5" />
+          <span>Slip</span>
+        </button>
       ),
     },
   ]
@@ -351,21 +552,23 @@ export function AdminTransactionsScreen() {
           </div>
         </div>
 
-        {/* ── Top Summary KPI Cards ── */}
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {/* ── Top Summary KPI Cards: Separate Auction Proceeds from Wallet Top-Ups ── */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            className="rounded-2xl border border-border/60 bg-white p-4 shadow-sm"
+            className="rounded-2xl border border-purple-200 bg-purple-50/50 p-4 shadow-sm"
           >
-            <div className="flex items-center justify-between text-neutral-400">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Total Volume</span>
-              <Receipt className="size-4 text-awash-blue" />
+            <div className="flex items-center justify-between text-purple-700">
+              <span className="text-[11px] font-extrabold uppercase tracking-wider">Auction Proceeds</span>
+              <Trophy className="size-4 text-purple-700" />
             </div>
-            <p className="mt-2 font-display text-xl font-extrabold tabular-nums text-awash-blue">
-              {formatCurrency(summary.total_volume)}
+            <p className="mt-2 font-display text-xl font-black tabular-nums text-purple-900">
+              {formatCurrency(summary.auction_volume)}
             </p>
-            <p className="mt-0.5 text-[11px] font-medium text-neutral-500">Across {totalCount} transactions</p>
+            <p className="mt-0.5 text-[11px] font-medium text-purple-700/80">
+              Winner pay + bid fees ({summary.auction_transactions_count} txns)
+            </p>
           </motion.div>
 
           <motion.div
@@ -376,12 +579,12 @@ export function AdminTransactionsScreen() {
           >
             <div className="flex items-center justify-between text-neutral-400">
               <span className="text-[11px] font-bold uppercase tracking-wider text-primary">Winner Payments</span>
-              <Trophy className="size-4 text-primary" />
+              <Receipt className="size-4 text-primary" />
             </div>
             <p className="mt-2 font-display text-xl font-extrabold tabular-nums text-primary">
               {formatCurrency(summary.winning_bid_volume)}
             </p>
-            <p className="mt-0.5 text-[11px] font-medium text-neutral-500">Completed auction payments</p>
+            <p className="mt-0.5 text-[11px] font-medium text-neutral-500">Completed settlements</p>
           </motion.div>
 
           <motion.div
@@ -397,7 +600,7 @@ export function AdminTransactionsScreen() {
             <p className="mt-2 font-display text-xl font-extrabold tabular-nums text-amber-800">
               {formatCurrency(summary.bid_fee_volume)}
             </p>
-            <p className="mt-0.5 text-[11px] font-medium text-amber-700/70">Bid fees collected</p>
+            <p className="mt-0.5 text-[11px] font-medium text-amber-700/70">Auction fees collected</p>
           </motion.div>
 
           <motion.div
@@ -406,8 +609,26 @@ export function AdminTransactionsScreen() {
             transition={{ delay: 0.15 }}
             className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4 shadow-sm"
           >
+            <div className="flex items-center justify-between text-emerald-700">
+              <span className="text-[11px] font-extrabold uppercase tracking-wider">Wallet Top-Ups</span>
+              <ArrowDownCircle className="size-4 text-emerald-600" />
+            </div>
+            <p className="mt-2 font-display text-xl font-black tabular-nums text-emerald-900">
+              {formatCurrency(summary.wallet_topup_volume)}
+            </p>
+            <p className="mt-0.5 text-[11px] font-medium text-emerald-700/80">
+              Deposits ({summary.wallet_transactions_count} user funding)
+            </p>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="rounded-2xl border border-border/70 bg-white p-4 shadow-sm"
+          >
             <div className="flex items-center justify-between text-neutral-400">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">Compliance Status</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-700">Compliance Status</span>
               <CheckCircle2 className="size-4 text-emerald-600" />
             </div>
             <div className="mt-2 flex items-baseline gap-2">
@@ -419,10 +640,59 @@ export function AdminTransactionsScreen() {
                 <span className="text-xs font-bold text-red-600">({summary.defaulted_count} defaulted)</span>
               )}
             </div>
-            <p className="mt-0.5 text-[11px] font-medium text-emerald-700/70">
+            <p className="mt-0.5 text-[11px] font-medium text-neutral-500">
               {summary.pending_count} pending settlement
             </p>
           </motion.div>
+        </div>
+
+        {/* ── Category Filter Tabs ── */}
+        <div className="flex items-center gap-2 border-b border-border/70 pb-1">
+          <button
+            onClick={() => {
+              setCategoryFilter("all")
+              setTypeFilter("all")
+              setPage(1)
+            }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              categoryFilter === "all"
+                ? "bg-awash-blue text-white shadow-sm"
+                : "bg-white text-neutral-600 hover:bg-neutral-100 border border-border/60"
+            }`}
+          >
+            <Layers className="size-3.5" />
+            All Transactions
+          </button>
+          <button
+            onClick={() => {
+              setCategoryFilter("auction")
+              setTypeFilter("all")
+              setPage(1)
+            }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              categoryFilter === "auction"
+                ? "bg-purple-700 text-white shadow-sm"
+                : "bg-white text-neutral-600 hover:bg-neutral-100 border border-border/60"
+            }`}
+          >
+            <Trophy className="size-3.5" />
+            Auction Transactions (Proceeds & Bids)
+          </button>
+          <button
+            onClick={() => {
+              setCategoryFilter("wallet")
+              setTypeFilter("all")
+              setPage(1)
+            }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              categoryFilter === "wallet"
+                ? "bg-emerald-700 text-white shadow-sm"
+                : "bg-white text-neutral-600 hover:bg-neutral-100 border border-border/60"
+            }`}
+          >
+            <Wallet className="size-3.5" />
+            Wallet Top-Ups & Refunds
+          </button>
         </div>
 
         {/* ── Filters Bar ── */}
@@ -436,7 +706,7 @@ export function AdminTransactionsScreen() {
                 setSearchQuery(e.target.value)
                 setPage(1)
               }}
-              placeholder="Search by Reference, Phone, Auction ID, or Product..."
+              placeholder="Search by Reference, Ticket, Phone, Auction ID, or Product..."
               className="w-full rounded-xl border border-border/80 bg-neutral-50/50 pl-9 pr-8 py-2 text-xs font-medium text-foreground outline-none transition-all focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/15"
             />
             {searchQuery && (
@@ -459,11 +729,26 @@ export function AdminTransactionsScreen() {
               }}
               className="h-9 rounded-xl border border-border/80 bg-white px-3 text-xs font-semibold text-foreground outline-none focus:border-primary"
             >
-              <option value="all">All Types</option>
-              <option value="WINNING_BID">Winner Payments</option>
-              <option value="BID_FEE">Bid Participation Fees</option>
-              <option value="DEPOSIT">Wallet Deposits</option>
-              <option value="REFUND">Refunds</option>
+              <option value="all">
+                {categoryFilter === "auction"
+                  ? "All Auction Types"
+                  : categoryFilter === "wallet"
+                  ? "All Wallet Types"
+                  : "All Types"}
+              </option>
+              {categoryFilter !== "wallet" && (
+                <>
+                  <option value="WINNING_BID">Winner Payments</option>
+                  <option value="BID_FEE">Bid Participation Fees</option>
+                  <option value="BID">Auction Bids</option>
+                </>
+              )}
+              {categoryFilter !== "auction" && (
+                <>
+                  <option value="DEPOSIT">Wallet Top-Ups</option>
+                  <option value="REFUND">Refunds</option>
+                </>
+              )}
             </select>
 
             {/* Status selector */}
@@ -565,28 +850,97 @@ export function AdminTransactionsScreen() {
             }}
           />
 
-          {/* Pagination bar */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between border-t border-border/60 px-4 py-3 text-xs text-neutral-500">
-              <span>Page {page} of {totalPages} ({totalCount} items)</span>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page <= 1}
-                  className="p-1.5 rounded-lg border border-border/60 hover:bg-neutral-100 disabled:opacity-40"
+          {/* ── Rich Pagination Bar ── */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-border/60 px-4 py-3 text-xs text-neutral-600 bg-white">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="font-medium text-neutral-500">
+                Showing <strong className="text-foreground">{(page - 1) * pageSize + (totalCount > 0 ? 1 : 0)}</strong>–<strong className="text-foreground">{Math.min(page * pageSize, totalCount)}</strong> of{" "}
+                <strong className="text-foreground">{totalCount}</strong> transactions
+              </span>
+
+              <div className="flex items-center gap-1.5 pl-3 border-l border-border/60">
+                <span className="text-neutral-400 font-medium">Rows:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value))
+                    setPage(1)
+                  }}
+                  className="h-7 rounded-lg border border-border/80 bg-neutral-50 px-2 text-xs font-bold text-foreground outline-none transition-colors hover:bg-white focus:border-primary"
                 >
-                  <ChevronLeft className="size-4" />
-                </button>
-                <button
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page >= totalPages}
-                  className="p-1.5 rounded-lg border border-border/60 hover:bg-neutral-100 disabled:opacity-40"
-                >
-                  <ChevronRight className="size-4" />
-                </button>
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
               </div>
             </div>
-          )}
+
+            <div className="flex items-center gap-1">
+              {/* First page button */}
+              <button
+                onClick={() => setPage(1)}
+                disabled={page <= 1}
+                title="First Page"
+                className="p-1.5 rounded-lg border border-border/60 hover:bg-neutral-100 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+              >
+                <ChevronsLeft className="size-3.5 text-neutral-600" />
+              </button>
+
+              {/* Prev page button */}
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                title="Previous Page"
+                className="p-1.5 rounded-lg border border-border/60 hover:bg-neutral-100 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+              >
+                <ChevronLeft className="size-3.5 text-neutral-600" />
+              </button>
+
+              {/* Page Number Buttons */}
+              <div className="flex items-center gap-1 mx-1">
+                {windowedPages(page, totalPages).map((p, idx) =>
+                  p === "…" ? (
+                    <span key={`dots-${idx}`} className="px-1.5 text-neutral-400 font-mono text-xs">
+                      …
+                    </span>
+                  ) : (
+                    <button
+                      key={`page-${p}`}
+                      onClick={() => setPage(Number(p))}
+                      className={`min-w-7 h-7 px-2 rounded-lg text-xs font-bold transition-all ${
+                        page === p
+                          ? "bg-primary text-primary-foreground shadow-xs"
+                          : "border border-border/60 hover:bg-neutral-100 text-neutral-700"
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  )
+                )}
+              </div>
+
+              {/* Next page button */}
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                title="Next Page"
+                className="p-1.5 rounded-lg border border-border/60 hover:bg-neutral-100 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+              >
+                <ChevronRight className="size-3.5 text-neutral-600" />
+              </button>
+
+              {/* Last page button */}
+              <button
+                onClick={() => setPage(totalPages)}
+                disabled={page >= totalPages}
+                title="Last Page"
+                className="p-1.5 rounded-lg border border-border/60 hover:bg-neutral-100 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+              >
+                <ChevronsRight className="size-3.5 text-neutral-600" />
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -671,6 +1025,15 @@ export function AdminTransactionsScreen() {
           </div>
         )}
       </AnimatePresence>
+
+        {/* ── Transaction Forensic Audit Slip Modal ── */}
+        <TransactionAuditSlipModal
+          transaction={selectedTxn}
+          onClose={() => setSelectedTxn(null)}
+          onExportSlip={handleExportSingleSlip}
+          typeConfig={TYPE_CONFIG}
+        />
+      
     </AdminLayout>
   )
 }
