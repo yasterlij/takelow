@@ -155,6 +155,7 @@ export class AdminTransactionsService {
   private readonly platformSharePercent: number;
   private readonly taxPercent: number;
   private readonly commissionPercent: number;
+  private readonly SETTLEMENT_CACHE_TTL_SECONDS = 86400;
 
   constructor(
     private prisma: PrismaService,
@@ -186,11 +187,11 @@ export class AdminTransactionsService {
         orderBy: { created_at: 'desc' },
       });
       if (log?.action === 'SETTLEMENT_CONFIG_RESET') {
-        await this.redisCacheService.set(cacheKey, { reset: true }, 86400 * 365);
+        await this.redisCacheService.set(cacheKey, { reset: true }, this.SETTLEMENT_CACHE_TTL_SECONDS);
         return null;
       }
       if (log?.details) {
-        await this.redisCacheService.set(cacheKey, log.details, 86400 * 365);
+        await this.redisCacheService.set(cacheKey, log.details, this.SETTLEMENT_CACHE_TTL_SECONDS);
         return log.details;
       }
     } catch (e: any) {
@@ -223,7 +224,7 @@ export class AdminTransactionsService {
     };
 
     const cacheKey = `settlement:auction:${auctionId}`;
-    await this.redisCacheService.set(cacheKey, configData, 86400 * 365);
+    await this.redisCacheService.set(cacheKey, configData, this.SETTLEMENT_CACHE_TTL_SECONDS);
 
     try {
       await this.prisma.auditLog.create({
@@ -247,7 +248,7 @@ export class AdminTransactionsService {
     actorId?: string,
   ): Promise<{ success: boolean }> {
     const cacheKey = `settlement:auction:${auctionId}`;
-    await this.redisCacheService.set(cacheKey, { reset: true }, 86400 * 365);
+    await this.redisCacheService.set(cacheKey, { reset: true }, this.SETTLEMENT_CACHE_TTL_SECONDS);
 
     try {
       await this.prisma.auditLog.create({

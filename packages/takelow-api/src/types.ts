@@ -52,7 +52,11 @@ export type ApiAuction = {
   winners?: ApiWinnerInfo[];
   winners_count?: number;
   created_at: string;
-  stats?: { total_bids: number; unique_bidders: number };
+  bid_fee?: number | null;
+  min_bid?: number | null;
+  max_bid?: number | null;
+  num_winners?: number;
+  stats?: { total_bids: number; unique_bidders: number } | null;
 };
 
 export type ReopenAuctionPayload = {

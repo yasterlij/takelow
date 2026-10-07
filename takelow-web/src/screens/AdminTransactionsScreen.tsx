@@ -144,34 +144,7 @@ export function AdminTransactionsScreen() {
         setTotalCount(res.meta?.total || 0)
         if (res.summary) setSummary(res.summary)
       })
-      .catch((err) => {
-        // Fallback gracefully if enhanced endpoint is warming up
-        api.adminListTransactions(page, pageSize)
-          .then((fallbackRes: any) => {
-            const rawList = fallbackRes.data || fallbackRes || []
-            setTxns(rawList.map((r: any) => ({
-              id: r.id,
-              type: r.type,
-              payment_type: r.type,
-              category: r.type === "DEPOSIT" || r.type === "REFUND" ? "WALLET" : "AUCTION",
-              amount: Number(r.amount),
-              status: "SUCCESSFUL",
-              gateway: "WALLET",
-              auction_id: r.reference_id?.length === 36 ? r.reference_id : null,
-              product_name: null,
-              user_id: r.user_id,
-              user_phone: null,
-              user_name: null,
-              reference_id: r.reference_id,
-              ticket_number: null,
-              created_at: r.created_at,
-              escalation_flag: null,
-            })))
-            setTotalPages(Math.max(1, Math.ceil(rawList.length / pageSize)))
-            setTotalCount(rawList.length)
-          })
-          .catch(() => toast("Failed to load transactions", "error"))
-      })
+      .catch(() => toast("Failed to load transactions", "error"))
       .finally(() => setLoading(false))
   }, [categoryFilter, typeFilter, statusFilter, dateBounds, searchQuery, page, pageSize])
 

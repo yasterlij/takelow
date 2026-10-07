@@ -368,9 +368,17 @@ export type ApiAuction = {
   created_at: string;
   winners?: ApiWinnerInfo[];
   winnersCount?: number;
+  winners_count?: number;
   payment_status?: string | null;
   payment_deadline?: string | null;
+  payment_deadline_hours?: number | null;
+  escalation_rule?: string | null;
+  second_winner_assigned?: boolean;
+  bid_fee?: number | null;
+  min_bid?: number | null;
+  max_bid?: number | null;
   num_winners?: number;
+  stats?: { total_bids: number; unique_bidders: number } | null;
 };
 
 export type ApiBid = {

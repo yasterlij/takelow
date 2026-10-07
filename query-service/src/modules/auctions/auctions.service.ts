@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { BidEncryptionService } from "../common/bid-encryption.service";
 import { ListAuctionsQueryDto } from "../common/dto/list-auctions-query.dto";
@@ -18,6 +18,8 @@ interface WinnerRow {
 
 @Injectable()
 export class AuctionsService {
+  private readonly logger = new Logger(AuctionsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private bidEncryptionService: BidEncryptionService,
@@ -177,7 +179,10 @@ export class AuctionsService {
   }
 
   async getActiveAuctions(query?: ListAuctionsQueryDto): Promise<any[]> {
-    const cacheKey = "auctions:active";
+    const page = Math.max(1, query?.page ?? 1);
+    const limit = Math.min(200, Math.max(1, query?.limit ?? 50));
+    const skip = (page - 1) * limit;
+    const cacheKey = `auctions:active:p${page}:l${limit}`;
     const cached = await this.redisCacheService.get<any[]>(cacheKey);
     if (cached !== null) {
       return cached;
@@ -209,7 +214,8 @@ export class AuctionsService {
           },
         },
         orderBy: { created_at: "desc" },
-        take: 50,
+        skip,
+        take: limit,
       });
     } catch (error) {
       if (!this.isRecoverableSchemaError(error)) throw error;
@@ -409,7 +415,10 @@ export class AuctionsService {
   }
 
   async getClosedAuctions(query?: ListAuctionsQueryDto): Promise<any[]> {
-    const cacheKey = "auctions:closed";
+    const page = Math.max(1, query?.page ?? 1);
+    const limit = Math.min(200, Math.max(1, query?.limit ?? 50));
+    const skip = (page - 1) * limit;
+    const cacheKey = `auctions:closed:p${page}:l${limit}`;
     const cached = await this.redisCacheService.get<any[]>(cacheKey);
     if (cached !== null) {
       return cached;
@@ -446,7 +455,8 @@ export class AuctionsService {
           },
         },
         orderBy: { created_at: "desc" },
-        take: 200,
+        skip,
+        take: limit,
       });
     } catch (error) {
       if (!this.isRecoverableSchemaError(error)) throw error;
@@ -558,7 +568,7 @@ export class AuctionsService {
         ticket_number: true,
       },
       orderBy: { bid_time: "desc" },
-      take: 200,
+      take: 500,
     });
 
     // Audit log: bid history viewed
@@ -710,7 +720,7 @@ export class AuctionsService {
           },
         },
         orderBy: { created_at: "desc" },
-        take: 50,
+        take: 100,
       });
     } catch (error) {
       if (!this.isRecoverableSchemaError(error)) throw error;
@@ -746,8 +756,10 @@ export class AuctionsService {
             phone: row.phone || null,
           });
         }
-      } catch {
-        /* ignore */
+      } catch (e: unknown) {
+        this.logger.warn(
+          `Failed to load winners for user ${userId}: ${e instanceof Error ? e.message : String(e)}`,
+        );
       }
     }
 

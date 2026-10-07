@@ -100,28 +100,41 @@ export class AuditViewerService {
 
   async exportAuditLogsCsv(filters: AuditLogFilters): Promise<string> {
     const where = this.buildWhere(filters);
-    const logs = await this.prisma.auditLog.findMany({
-      where,
-      orderBy: { created_at: 'desc' },
-    });
+    const CHUNK = 500;
+    const chunks: string[] = [
+      'id,actor_id,actor_phone,action,entity_type,entity_id,created_at,details',
+    ];
 
-    const header =
-      'id,actor_id,actor_phone,action,entity_type,entity_id,created_at,details';
+    let cursor: string | undefined;
+    while (true) {
+      const batch = await this.prisma.auditLog.findMany({
+        where,
+        orderBy: { created_at: 'desc' },
+        take: CHUNK,
+        skip: cursor ? 1 : 0,
+        cursor: cursor ? { id: cursor } : undefined,
+      });
 
-    const rows = logs.map((log) =>
-      [
-        log.id,
-        log.actor_id,
-        this.csvEscape(log.actor_phone || ''),
-        this.csvEscape(log.action),
-        this.csvEscape(log.entity_type),
-        log.entity_id,
-        log.created_at.toISOString(),
-        this.csvEscape(log.details ? JSON.stringify(log.details) : ''),
-      ].join(','),
-    );
+      for (const log of batch) {
+        chunks.push(
+          [
+            log.id,
+            log.actor_id,
+            this.csvEscape(log.actor_phone || ''),
+            this.csvEscape(log.action),
+            this.csvEscape(log.entity_type),
+            log.entity_id,
+            log.created_at.toISOString(),
+            this.csvEscape(log.details ? JSON.stringify(log.details) : ''),
+          ].join(','),
+        );
+      }
 
-    return [header, ...rows].join('\n');
+      if (batch.length < CHUNK) break;
+      cursor = batch[batch.length - 1].id;
+    }
+
+    return chunks.join('\n');
   }
 
   private csvEscape(value: string): string {

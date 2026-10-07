@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import {
   View,
   Text,
@@ -48,7 +48,21 @@ export function AdminTransactionsScreen() {
   const [typeFilter, setTypeFilter] = useState<TxnTypeFilter>('ALL')
   const [statusFilter, setStatusFilter] = useState<TxnStatusFilter>('ALL')
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [selectedTxn, setSelectedTxn] = useState<ApiUnifiedTransaction | null>(null)
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleSearchChange = useCallback((text: string) => {
+    setSearch(text)
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+    searchTimerRef.current = setTimeout(() => setDebouncedSearch(text), 300)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+    }
+  }, [])
 
   const loadTransactions = useCallback(async (targetPage = 1, isRefresh = false) => {
     if (isRefresh) setRefreshing(true)
@@ -59,7 +73,7 @@ export function AdminTransactionsScreen() {
         category: categoryFilter === 'ALL' ? undefined : (categoryFilter.toLowerCase() as any),
         type: typeFilter === 'ALL' ? undefined : typeFilter,
         status: statusFilter === 'ALL' ? undefined : statusFilter,
-        search: search.trim() || undefined,
+        search: debouncedSearch.trim() || undefined,
         page: targetPage,
         limit: 30,
       })
@@ -80,7 +94,7 @@ export function AdminTransactionsScreen() {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [categoryFilter, typeFilter, statusFilter, search])
+  }, [categoryFilter, typeFilter, statusFilter, debouncedSearch])
 
   useEffect(() => {
     loadTransactions(1)
@@ -272,13 +286,13 @@ export function AdminTransactionsScreen() {
             placeholder="Search bidder phone, auction..."
             placeholderTextColor={colors.mutedForeground}
             value={search}
-            onChangeText={setSearch}
+            onChangeText={handleSearchChange}
             style={s.searchInput}
             returnKeyType="search"
             onSubmitEditing={() => loadTransactions(1)}
           />
           {search.length > 0 && (
-            <TouchableOpacity onPress={() => setSearch('')}>
+            <TouchableOpacity onPress={() => { setSearch(''); setDebouncedSearch('') }}>
               <X size={16} color={colors.mutedForeground} />
             </TouchableOpacity>
           )}

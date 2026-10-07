@@ -19,6 +19,7 @@ import {
   getUserFriendlyMessage,
   onSessionExpired,
   type SessionExpireReason,
+  type ApiAuction,
 } from "./api";
 import { useToast } from "./components/Toast";
 import { useAuctionSocket, applySocketUpdate } from "./hooks/useAuctionSocket";
@@ -203,7 +204,7 @@ const INITIAL_BALANCE = 0;
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 const ABSOLUTE_TIMEOUT_MS = 12 * 60 * 60 * 1000;
 
-function mapAuction(apiAuction: any): Auction {
+function mapAuction(apiAuction: ApiAuction): Auction {
   const timeLeft = Math.max(
     0,
     Math.floor((new Date(apiAuction.end_time).getTime() - Date.now()) / 1000),

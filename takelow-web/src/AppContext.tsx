@@ -17,6 +17,7 @@ import {
   getUserFriendlyMessage,
   getAccessTokenExpiry,
   type SessionExpireReason,
+  type ApiAuction,
 } from "./api";
 import { toast } from "./store/toast.store";
 import { useAuctionSocket, applySocketUpdate } from "./hooks/useAuctionSocket";
@@ -208,7 +209,7 @@ const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 const ABSOLUTE_TIMEOUT_MS = 12 * 60 * 60 * 1000;
 const IDLE_WARNING_MS = 60 * 1000;
 
-function mapAuction(apiAuction: any): Auction {
+function mapAuction(apiAuction: ApiAuction): Auction {
   const timeLeft = Math.max(
     0,
     Math.floor((new Date(apiAuction.end_time).getTime() - Date.now()) / 1000),
@@ -253,12 +254,11 @@ function mapAuction(apiAuction: any): Auction {
     winnersCount: apiAuction.winners_count ?? apiAuction.winners?.length ?? 0,
     winning_bid_amount: apiAuction.winning_bid_amount ?? null,
     winner_user_id: apiAuction.winner_user_id ?? null,
-    payment_status: apiAuction.payment_status,
+    payment_status: apiAuction.payment_status ?? undefined,
     payment_deadline: apiAuction.payment_deadline ?? null,
     payment_deadline_hours: apiAuction.payment_deadline_hours ?? null,
     escalation_rule: apiAuction.escalation_rule ?? null,
     second_winner_assigned: Boolean(apiAuction.second_winner_assigned),
-    total_revenue: apiAuction.total_revenue,
     raw_status: apiAuction.status,
   };
 }

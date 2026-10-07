@@ -8,6 +8,15 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { Transaction, TransactionType } from "./entities/transaction.entity";
 import { User } from "../auth/entities/user.entity";
 
+export interface WalletTransactionDto {
+  id: string;
+  user_id: string;
+  amount: number;
+  type: string;
+  reference_id: string | null;
+  created_at: Date;
+}
+
 @Injectable()
 export class WalletService {
   private readonly logger = new Logger(WalletService.name);
@@ -128,7 +137,7 @@ export class WalletService {
     userId: string,
     page = 1,
     limit = 20,
-  ): Promise<{ data: any[]; total: number }> {
+  ): Promise<{ data: WalletTransactionDto[]; total: number }> {
     const [data, total] = await Promise.all([
       this.prisma.transaction.findMany({
         where: { user_id: userId },
@@ -138,7 +147,7 @@ export class WalletService {
       }),
       this.prisma.transaction.count({ where: { user_id: userId } }),
     ]);
-    return { data, total };
+    return { data: data as unknown as WalletTransactionDto[], total };
   }
 
   async resolveUser(id: string): Promise<any | null> {
